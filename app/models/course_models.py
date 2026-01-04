@@ -262,6 +262,10 @@ class UploadedMaterial(BaseModel):
     description: Optional[str] = None
     weekNumber: Optional[int] = None  # Link to specific week
 
+    # AI-generated summary
+    summary: Optional[str] = None  # LLM-generated summary of document content
+    summaryGenerated: bool = False  # Whether summary was successfully generated
+
 
 # ============================================================================
 # Main Course Model

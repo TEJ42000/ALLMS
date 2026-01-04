@@ -218,6 +218,75 @@ def extract_text_from_file(file_path: Path) -> Tuple[bool, Optional[str], Option
         return False, None, str(e)
 
 
+# Summary generation settings
+MAX_TEXT_FOR_SUMMARY = 50000  # Max characters to send to LLM for summarization
+SUMMARY_MAX_TOKENS = 300  # Max tokens for summary response
+
+
+async def generate_document_summary(
+    extracted_text: str,
+    filename: str,
+    tier: str,
+    category: Optional[str] = None
+) -> Tuple[bool, Optional[str]]:
+    """Generate an AI summary of the document content.
+
+    Args:
+        extracted_text: The extracted text from the document
+        filename: Original filename for context
+        tier: Material tier for context
+        category: Optional category for context
+
+    Returns:
+        Tuple of (success, summary_text)
+    """
+    if not extracted_text or len(extracted_text.strip()) < 100:
+        logger.debug(f"Text too short for summary: {len(extracted_text) if extracted_text else 0} chars")
+        return False, None
+
+    try:
+        from app.services.anthropic_client import get_simple_response
+
+        # Truncate text if too long
+        text_for_summary = extracted_text[:MAX_TEXT_FOR_SUMMARY]
+        if len(extracted_text) > MAX_TEXT_FOR_SUMMARY:
+            text_for_summary += "\n\n[Text truncated for summarization...]"
+
+        # Build context
+        context_parts = [f"Document: {filename}"]
+        if tier:
+            context_parts.append(f"Type: {tier.replace('_', ' ').title()}")
+        if category:
+            context_parts.append(f"Category: {category.title()}")
+        context = " | ".join(context_parts)
+
+        # Create prompt
+        prompt = f"""Summarize the following document in 2-4 sentences. Focus on the main topics, key concepts, and purpose of the document. Be concise and informative.
+
+{context}
+
+Document content:
+{text_for_summary}
+
+Summary:"""
+
+        summary = await get_simple_response(
+            prompt=prompt,
+            max_tokens=SUMMARY_MAX_TOKENS,
+            temperature=0.3  # Lower temperature for more focused summaries
+        )
+
+        # Clean up the summary
+        summary = summary.strip()
+
+        logger.info(f"Generated summary for {filename}: {len(summary)} chars")
+        return True, summary
+
+    except Exception as e:
+        logger.error(f"Failed to generate summary for {filename}: {e}")
+        return False, None
+
+
 async def store_material_metadata(
     course_id: str,
     material: UploadedMaterial
@@ -258,10 +327,11 @@ async def upload_document(
     description: Optional[str] = None,
     week_number: Optional[int] = None,
     uploaded_by: Optional[str] = None,
-    extract_text_flag: bool = True
+    extract_text_flag: bool = True,
+    generate_summary_flag: bool = True
 ) -> UploadedMaterial:
     """Upload a document to course materials.
-    
+
     Args:
         course_id: Course ID
         filename: Original filename
@@ -273,42 +343,58 @@ async def upload_document(
         week_number: Optional week number to link to
         uploaded_by: Optional user ID
         extract_text_flag: Whether to extract text (default: True)
-    
+        generate_summary_flag: Whether to generate AI summary (default: True)
+
     Returns:
         UploadedMaterial object
-    
+
     Raises:
         FileValidationError: If file validation fails
         StorageError: If file storage fails
     """
     # Validate file
     file_extension, mime_type = validate_file(filename, len(file_content))
-    
+
     # Generate unique ID
     material_id = str(uuid.uuid4())
-    
+
     # Generate storage path
     storage_path = generate_storage_path(course_id, filename, tier, category)
-    
+
     # Save file
     await save_file(file_content, storage_path)
-    
+
     # Detect file type
     file_type = detect_file_type(storage_path)
-    
+
     # Extract text if requested
     text_extracted = False
     extracted_text = None
     text_length = None
     extraction_error = None
-    
+
     if extract_text_flag:
         success, text, error = extract_text_from_file(storage_path)
         text_extracted = success
         extracted_text = text
         text_length = len(text) if text else None
         extraction_error = error
-    
+
+    # Generate AI summary if text was extracted and summary requested
+    summary = None
+    summary_generated = False
+
+    if generate_summary_flag and text_extracted and extracted_text:
+        summary_success, summary_text = await generate_document_summary(
+            extracted_text=extracted_text,
+            filename=filename,
+            tier=tier,
+            category=category
+        )
+        if summary_success:
+            summary = summary_text
+            summary_generated = True
+
     # Create material object
     material = UploadedMaterial(
         id=material_id,
@@ -327,13 +413,15 @@ async def upload_document(
         extractionError=extraction_error,
         title=title or filename,
         description=description,
-        weekNumber=week_number
+        weekNumber=week_number,
+        summary=summary,
+        summaryGenerated=summary_generated
     )
-    
+
     # Store metadata in Firestore
     await store_material_metadata(course_id, material)
-    
+
     logger.info(f"Successfully uploaded document: {filename} to {storage_path}")
-    
+
     return material
 

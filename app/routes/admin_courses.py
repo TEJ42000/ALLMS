@@ -1280,7 +1280,8 @@ async def upload_course_material(
     title: Optional[str] = Form(None, description="Display title (defaults to filename)"),
     description: Optional[str] = Form(None, description="Material description"),
     week_number: Optional[int] = Form(None, description="Week number to link to"),
-    extract_text: bool = Form(True, description="Whether to extract text automatically")
+    extract_text: bool = Form(True, description="Whether to extract text automatically"),
+    generate_summary: bool = Form(True, description="Whether to generate AI summary automatically")
 ):
     """
     Upload a document to course materials.
@@ -1294,6 +1295,7 @@ async def upload_course_material(
         description: Optional description
         week_number: Optional week number to link to
         extract_text: Whether to extract text automatically
+        generate_summary: Whether to generate AI summary automatically
 
     Returns:
         UploadResponse with material metadata
@@ -1322,7 +1324,8 @@ async def upload_course_material(
             description=description,
             week_number=week_number,
             uploaded_by=None,  # TODO: Add user ID when auth is implemented
-            extract_text_flag=extract_text
+            extract_text_flag=extract_text,
+            generate_summary_flag=generate_summary
         )
 
         return UploadResponse(

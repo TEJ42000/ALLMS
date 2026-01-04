@@ -187,7 +187,8 @@ async function submitUpload() {
     const weekNumber = document.getElementById('upload-week').value;
     const description = document.getElementById('upload-description').value;
     const extractText = document.getElementById('upload-extract-text').checked;
-    
+    const generateSummary = document.getElementById('upload-generate-summary').checked;
+
     // Show progress
     const progressDiv = document.getElementById('upload-progress');
     const progressFill = document.getElementById('progress-fill');
@@ -208,7 +209,7 @@ async function submitUpload() {
         progressText.textContent = `Uploading ${i + 1} of ${selectedFiles.length}: ${file.name}`;
         
         try {
-            await uploadSingleFile(file, tier, category, weekNumber, description, extractText);
+            await uploadSingleFile(file, tier, category, weekNumber, description, extractText, generateSummary);
             successCount++;
         } catch (error) {
             console.error(`Failed to upload ${file.name}:`, error);
@@ -229,7 +230,7 @@ async function submitUpload() {
     }
 }
 
-async function uploadSingleFile(file, tier, category, weekNumber, description, extractText) {
+async function uploadSingleFile(file, tier, category, weekNumber, description, extractText, generateSummary) {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('tier', tier);
@@ -237,6 +238,7 @@ async function uploadSingleFile(file, tier, category, weekNumber, description, e
     if (weekNumber) formData.append('week_number', weekNumber);
     if (description) formData.append('description', description);
     formData.append('extract_text', extractText);
+    formData.append('generate_summary', generateSummary);
     
     const response = await fetch(`/api/admin/courses/${currentCourseId}/materials/upload`, {
         method: 'POST',
@@ -284,10 +286,12 @@ function displayUploadedMaterials(materials) {
                     ${material.category ? `<span class="material-badge badge-course">${material.category}</span>` : ''}
                     ${material.weekNumber ? `<span class="material-badge badge-course">Week ${material.weekNumber}</span>` : ''}
                     ${material.textExtracted ? '<span class="material-badge badge-extracted">✓ Text Extracted</span>' : ''}
+                    ${material.summaryGenerated ? '<span class="material-badge badge-summary">✨ AI Summary</span>' : ''}
                     ${material.extractionError ? '<span class="material-badge badge-error">⚠ Extraction Failed</span>' : ''}
                 </div>
+                ${material.summary ? `<div class="material-summary"><strong>📝 Summary:</strong> ${escapeHtml(material.summary)}</div>` : ''}
                 <div class="material-meta">
-                    ${formatFileSize(material.fileSize)} • ${material.fileType.toUpperCase()} • 
+                    ${formatFileSize(material.fileSize)} • ${material.fileType.toUpperCase()} •
                     Uploaded ${new Date(material.uploadedAt).toLocaleDateString()}
                 </div>
                 ${material.description ? `<div class="material-meta">${escapeHtml(material.description)}</div>` : ''}

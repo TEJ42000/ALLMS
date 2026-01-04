@@ -969,6 +969,22 @@
     color: #e74c3c;
 }
 
+.badge-summary {
+    background: rgba(155, 89, 182, 0.2);
+    color: #9b59b6;
+}
+
+.material-summary {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin: 8px 0;
+    padding: 8px 12px;
+    background: rgba(155, 89, 182, 0.1);
+    border-left: 3px solid #9b59b6;
+    border-radius: 4px;
+    line-height: 1.4;
+}
+
 .material-actions {
     display: flex;
     gap: 8px;
