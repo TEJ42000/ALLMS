@@ -1,4 +1,4 @@
-# tests/test_health.py - Tests for health and pages endpoints
+"""Tests for health and pages endpoints."""
 
 
 class TestHealthEndpoint:
@@ -7,7 +7,7 @@ class TestHealthEndpoint:
     def test_health_check_returns_ok(self, client):
         """Test that health check returns healthy status."""
         response = client.get("/health")
-        
+
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "healthy"
@@ -17,7 +17,7 @@ class TestHealthEndpoint:
     def test_health_check_version(self, client):
         """Test that health check returns correct version."""
         response = client.get("/health")
-        
+
         data = response.json()
         assert data["version"] == "2.0.0"
 
@@ -28,7 +28,7 @@ class TestPagesEndpoint:
     def test_index_page_returns_html(self, client):
         """Test that index page returns HTML content."""
         response = client.get("/")
-        
+
         assert response.status_code == 200
         assert "text/html" in response.headers["content-type"]
         assert "LLS Study Portal" in response.text
@@ -36,7 +36,7 @@ class TestPagesEndpoint:
     def test_index_page_contains_main_elements(self, client):
         """Test that index page contains expected elements."""
         response = client.get("/")
-        
+
         # Check for main UI elements
         assert "AI Tutor" in response.text or "tutor" in response.text.lower()
 
@@ -47,14 +47,13 @@ class TestAPIDocsEndpoint:
     def test_swagger_docs_accessible(self, client):
         """Test that Swagger docs are accessible."""
         response = client.get("/api/docs")
-        
+
         assert response.status_code == 200
         assert "text/html" in response.headers["content-type"]
 
     def test_redoc_accessible(self, client):
         """Test that ReDoc is accessible."""
         response = client.get("/api/redoc")
-        
+
         assert response.status_code == 200
         assert "text/html" in response.headers["content-type"]
-

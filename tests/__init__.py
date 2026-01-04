@@ -1,2 +1,1 @@
-# tests/__init__.py - Test package initialization
-
+"""Test package initialization for the LLS Study Portal."""

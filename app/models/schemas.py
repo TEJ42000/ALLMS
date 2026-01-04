@@ -1,8 +1,9 @@
-# app/models/schemas.py - Pydantic Models for API Requests/Responses
+"""Pydantic Models for API Requests/Responses."""
+
+from datetime import datetime
+from typing import List, Optional
 
 from pydantic import BaseModel, Field, validator
-from typing import Optional, List, Dict
-from datetime import datetime
 
 
 # ============================================================================
@@ -10,26 +11,32 @@ from datetime import datetime
 # ============================================================================
 
 class ConversationMessage(BaseModel):
-    """Single message in conversation history"""
+    """Single message in conversation history."""
+
     role: str = Field(..., description="Message role: 'user' or 'assistant'")
     content: str = Field(..., description="Message content")
 
 
 class ChatRequest(BaseModel):
-    """Request model for AI tutor chat"""
+    """Request model for AI tutor chat."""
+
     message: str = Field(..., min_length=1, max_length=5000, description="User's message")
     context: str = Field(default="Law & Legal Skills", description="Subject area context")
-    conversation_history: Optional[List[ConversationMessage]] = Field(default=None, description="Previous conversation")
-    
+    conversation_history: Optional[List[ConversationMessage]] = Field(
+        default=None, description="Previous conversation"
+    )
+
     @validator('message')
-    def validate_message(cls, v):
+    def validate_message(cls, v):  # noqa: N805
+        """Validate that message is not empty."""
         if len(v.strip()) == 0:
             raise ValueError('Message cannot be empty')
         return v.strip()
 
 
 class ChatResponse(BaseModel):
-    """Response model for AI tutor chat"""
+    """Response model for AI tutor chat."""
+
     content: str = Field(..., description="AI-generated response")
     status: str = Field(default="success", description="Response status")
     timestamp: datetime = Field(default_factory=datetime.now, description="Response timestamp")
@@ -40,19 +47,26 @@ class ChatResponse(BaseModel):
 # ============================================================================
 
 class AssessmentRequest(BaseModel):
-    """Request model for answer assessment"""
-    topic: str = Field(..., description="Subject area (e.g., 'Private Law', 'Criminal Law')")
+    """Request model for answer assessment."""
+
+    topic: str = Field(
+        ..., description="Subject area (e.g., 'Private Law', 'Criminal Law')"
+    )
     question: Optional[str] = Field(default=None, description="Optional question/prompt")
-    answer: str = Field(..., min_length=10, max_length=10000, description="Student's answer")
-    
+    answer: str = Field(
+        ..., min_length=10, max_length=10000, description="Student's answer"
+    )
+
     @validator('answer')
-    def validate_answer(cls, v):
+    def validate_answer(cls, v):  # noqa: N805
+        """Validate that answer has minimum length."""
         if len(v.strip()) < 10:
             raise ValueError('Answer must be at least 10 characters')
         return v.strip()
-    
+
     @validator('topic')
-    def validate_topic(cls, v):
+    def validate_topic(cls, v):  # noqa: N805
+        """Validate that topic is one of the allowed values."""
         valid_topics = [
             "Constitutional Law",
             "Administrative Law",
@@ -66,11 +80,14 @@ class AssessmentRequest(BaseModel):
 
 
 class AssessmentResponse(BaseModel):
-    """Response model for answer assessment"""
+    """Response model for answer assessment."""
+
     feedback: str = Field(..., description="AI-generated detailed feedback")
     grade: Optional[int] = Field(default=None, ge=0, le=10, description="Grade out of 10")
     status: str = Field(default="success", description="Response status")
-    timestamp: datetime = Field(default_factory=datetime.now, description="Response timestamp")
+    timestamp: datetime = Field(
+        default_factory=datetime.now, description="Response timestamp"
+    )
 
 
 # ============================================================================
@@ -78,7 +95,8 @@ class AssessmentResponse(BaseModel):
 # ============================================================================
 
 class QuizQuestion(BaseModel):
-    """Model for a quiz question"""
+    """Model for a quiz question."""
+
     id: str = Field(..., description="Question ID")
     topic: str = Field(..., description="Subject area")
     question: str = Field(..., description="Question text")
@@ -88,13 +106,15 @@ class QuizQuestion(BaseModel):
 
 
 class QuizSubmission(BaseModel):
-    """Model for quiz answer submission"""
+    """Model for quiz answer submission."""
+
     question_id: str = Field(..., description="Question ID")
     user_answer: int = Field(..., ge=0, description="Index of user's selected answer")
 
 
 class QuizResult(BaseModel):
-    """Model for quiz result"""
+    """Model for quiz result."""
+
     correct: bool = Field(..., description="Whether answer was correct")
     user_answer: int = Field(..., description="Index of user's answer")
     correct_answer: int = Field(..., description="Index of correct answer")
@@ -107,17 +127,23 @@ class QuizResult(BaseModel):
 # ============================================================================
 
 class UserProgress(BaseModel):
-    """Model for tracking user progress"""
+    """Model for tracking user progress."""
+
     user_id: str = Field(..., description="User identifier")
-    practice_questions_completed: int = Field(default=0, description="Number of practice questions done")
+    practice_questions_completed: int = Field(
+        default=0, description="Number of practice questions done"
+    )
     mock_exams_taken: int = Field(default=0, description="Number of mock exams taken")
     average_score: Optional[float] = Field(default=None, description="Average quiz score")
     topics_studied: List[str] = Field(default_factory=list, description="Topics studied")
-    last_active: datetime = Field(default_factory=datetime.now, description="Last activity timestamp")
+    last_active: datetime = Field(
+        default_factory=datetime.now, description="Last activity timestamp"
+    )
 
 
 class ProgressUpdate(BaseModel):
-    """Model for updating user progress"""
+    """Model for updating user progress."""
+
     practice_questions_completed: Optional[int] = None
     mock_exams_taken: Optional[int] = None
     average_score: Optional[float] = None
@@ -129,14 +155,18 @@ class ProgressUpdate(BaseModel):
 # ============================================================================
 
 class ErrorResponse(BaseModel):
-    """Standard error response model"""
+    """Standard error response model."""
+
     detail: str = Field(..., description="Error message")
     status: str = Field(default="error", description="Error status")
-    timestamp: datetime = Field(default_factory=datetime.now, description="Error timestamp")
+    timestamp: datetime = Field(
+        default_factory=datetime.now, description="Error timestamp"
+    )
 
 
 class ValidationError(BaseModel):
-    """Validation error details"""
+    """Validation error details."""
+
     loc: List[str] = Field(..., description="Location of error")
     msg: str = Field(..., description="Error message")
     type: str = Field(..., description="Error type")
@@ -155,7 +185,7 @@ if __name__ == "__main__":
     print("Chat Request:")
     print(chat_req.json(indent=2))
     print()
-    
+
     # Example: Create an assessment request
     assessment_req = AssessmentRequest(
         topic="Private Law",
@@ -165,7 +195,7 @@ if __name__ == "__main__":
     print("Assessment Request:")
     print(assessment_req.json(indent=2))
     print()
-    
+
     # Example: Create a chat response
     chat_resp = ChatResponse(
         content="## Article 6:74 DCC - Damages\n\nThis article establishes..."

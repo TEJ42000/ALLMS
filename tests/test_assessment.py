@@ -1,7 +1,7 @@
-# tests/test_assessment.py - Tests for Assessment endpoints
+"""Tests for Assessment endpoints."""
 
-import pytest
 from unittest.mock import AsyncMock, patch
+
 from app.routes.assessment import extract_grade
 
 
@@ -52,13 +52,19 @@ class TestExtractGrade:
 class TestAssessEndpoint:
     """Tests for the /api/assessment/assess endpoint."""
 
-    def test_assess_success(self, client, sample_assessment_request, mock_assessment_response):
+    def test_assess_success(
+        self, client, sample_assessment_request, mock_assessment_response
+    ):
         """Test successful assessment request."""
         with patch('app.services.anthropic_client.client') as mock_client:
-            mock_client.messages.create = AsyncMock(return_value=mock_assessment_response)
-            
-            response = client.post("/api/assessment/assess", json=sample_assessment_request)
-            
+            mock_client.messages.create = AsyncMock(
+                return_value=mock_assessment_response
+            )
+
+            response = client.post(
+                "/api/assessment/assess", json=sample_assessment_request
+            )
+
             assert response.status_code == 200
             data = response.json()
             assert data["status"] == "success"
@@ -66,23 +72,35 @@ class TestAssessEndpoint:
             assert "grade" in data
             assert "timestamp" in data
 
-    def test_assess_extracts_grade(self, client, sample_assessment_request, mock_assessment_response):
+    def test_assess_extracts_grade(
+        self, client, sample_assessment_request, mock_assessment_response
+    ):
         """Test that grade is extracted from feedback."""
         with patch('app.services.anthropic_client.client') as mock_client:
-            mock_client.messages.create = AsyncMock(return_value=mock_assessment_response)
-            
-            response = client.post("/api/assessment/assess", json=sample_assessment_request)
-            
+            mock_client.messages.create = AsyncMock(
+                return_value=mock_assessment_response
+            )
+
+            response = client.post(
+                "/api/assessment/assess", json=sample_assessment_request
+            )
+
             data = response.json()
             assert data["grade"] == 7  # From mock_assessment_response
 
-    def test_assess_minimal_request(self, client, sample_assessment_request_minimal, mock_assessment_response):
+    def test_assess_minimal_request(
+        self, client, sample_assessment_request_minimal, mock_assessment_response
+    ):
         """Test assessment with minimal fields (no question)."""
         with patch('app.services.anthropic_client.client') as mock_client:
-            mock_client.messages.create = AsyncMock(return_value=mock_assessment_response)
-            
-            response = client.post("/api/assessment/assess", json=sample_assessment_request_minimal)
-            
+            mock_client.messages.create = AsyncMock(
+                return_value=mock_assessment_response
+            )
+
+            response = client.post(
+                "/api/assessment/assess", json=sample_assessment_request_minimal
+            )
+
             assert response.status_code == 200
 
     def test_assess_invalid_topic_fails(self, client):
@@ -91,7 +109,7 @@ class TestAssessEndpoint:
             "topic": "Invalid Topic",
             "answer": "A contract requires agreement between parties."
         })
-        
+
         assert response.status_code == 422
 
     def test_assess_short_answer_fails(self, client):
@@ -100,24 +118,31 @@ class TestAssessEndpoint:
             "topic": "Private Law",
             "answer": "Short"  # Less than 10 characters
         })
-        
+
         assert response.status_code == 422
 
     def test_assess_missing_topic_fails(self, client):
         """Test that missing topic returns validation error."""
         response = client.post("/api/assessment/assess", json={
-            "answer": "A contract requires agreement between parties and must comply with the law."
+            "answer": (
+                "A contract requires agreement between parties and must "
+                "comply with the law."
+            )
         })
-        
+
         assert response.status_code == 422
 
     def test_assess_api_error_handling(self, client, sample_assessment_request):
         """Test error handling when API call fails."""
         with patch('app.services.anthropic_client.client') as mock_client:
-            mock_client.messages.create = AsyncMock(side_effect=Exception("API Error"))
-            
-            response = client.post("/api/assessment/assess", json=sample_assessment_request)
-            
+            mock_client.messages.create = AsyncMock(
+                side_effect=Exception("API Error")
+            )
+
+            response = client.post(
+                "/api/assessment/assess", json=sample_assessment_request
+            )
+
             assert response.status_code == 500
 
 
@@ -127,7 +152,7 @@ class TestRubricEndpoint:
     def test_get_rubric_success(self, client):
         """Test successful rubric retrieval."""
         response = client.get("/api/assessment/rubric")
-        
+
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "success"
@@ -137,10 +162,10 @@ class TestRubricEndpoint:
     def test_rubric_contains_grade_levels(self, client):
         """Test that rubric contains all grade levels."""
         response = client.get("/api/assessment/rubric")
-        
+
         data = response.json()
         rubric = data["rubric"]
-        
+
         assert "9-10" in rubric
         assert "7-8" in rubric
         assert "5-6" in rubric
@@ -150,9 +175,9 @@ class TestRubricEndpoint:
     def test_rubric_levels_have_criteria(self, client):
         """Test that each grade level has label and criteria."""
         response = client.get("/api/assessment/rubric")
-        
+
         data = response.json()
-        for level, details in data["rubric"].items():
+        for details in data["rubric"].values():
             assert "label" in details
             assert "criteria" in details
             assert len(details["criteria"]) > 0
@@ -164,7 +189,7 @@ class TestSampleAnswersEndpoint:
     def test_get_sample_answers_success(self, client):
         """Test successful sample answers retrieval."""
         response = client.get("/api/assessment/sample-answers")
-        
+
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "success"
@@ -174,11 +199,10 @@ class TestSampleAnswersEndpoint:
     def test_sample_answers_have_required_fields(self, client):
         """Test that samples have required fields."""
         response = client.get("/api/assessment/sample-answers")
-        
+
         data = response.json()
         for sample in data["samples"]:
             assert "topic" in sample
             assert "question" in sample
             assert "answers" in sample
             assert len(sample["answers"]) > 0
-

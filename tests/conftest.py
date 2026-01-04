@@ -1,14 +1,16 @@
-# tests/conftest.py - Pytest fixtures and configuration
+"""Pytest fixtures and configuration for the LLS Study Portal tests."""
+
+import os
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
 from fastapi.testclient import TestClient
-import os
 
 # Set dummy API key before importing app
 os.environ["ANTHROPIC_API_KEY"] = "test-api-key-for-testing"
 
-from app.main import app
+# pylint: disable=wrong-import-position
+from app.main import app  # noqa: E402
 
 
 @pytest.fixture
@@ -103,7 +105,10 @@ def sample_assessment_request():
     return {
         "topic": "Private Law",
         "question": "What are the requirements for a valid contract?",
-        "answer": "A valid contract requires four elements: capacity, consensus, permissible content, and determinability."
+        "answer": (
+            "A valid contract requires four elements: capacity, consensus, "
+            "permissible content, and determinability."
+        )
     }
 
 
@@ -112,6 +117,8 @@ def sample_assessment_request_minimal():
     """Sample assessment request with minimal fields."""
     return {
         "topic": "Private Law",
-        "answer": "A contract requires agreement between parties and must be valid under the law."
+        "answer": (
+            "A contract requires agreement between parties and must be "
+            "valid under the law."
+        )
     }
-

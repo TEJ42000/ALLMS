@@ -1,4 +1,4 @@
-"""Application Services"""
+"""Application Services for the LLS Study Portal."""
 
 from .anthropic_client import (
     get_ai_tutor_response,
@@ -13,4 +13,3 @@ __all__ = [
     "get_simple_response",
     "get_files_api_service"
 ]
-
