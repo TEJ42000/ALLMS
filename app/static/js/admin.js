@@ -448,7 +448,7 @@ function getCourseFormData() {
         program: document.getElementById('course-program').value.trim(),
         institution: document.getElementById('course-institution').value.trim(),
         academicYear: document.getElementById('course-year').value.trim(),
-        ectsPoints: parseInt(document.getElementById('course-points').value) || null,
+        totalPoints: parseInt(document.getElementById('course-points').value) || null,
         materialSubjects: document.getElementById('course-subjects').value.split(',').map(s => s.trim()).filter(Boolean),
         components: collectComponents(),
         abbreviations: collectAbbreviations(),
@@ -521,7 +521,7 @@ function renderCoursesList() {
             <div class="course-id">${course.id}</div>
             <div class="course-meta">
                 ${course.institution || ''} ${course.academicYear ? '• ' + course.academicYear : ''}
-                ${course.ectsPoints ? '• ' + course.ectsPoints + ' ECTS' : ''}
+                ${course.totalPoints ? '• ' + course.totalPoints + ' ECTS' : ''}
             </div>
             <span class="course-status ${(course.active ?? course.isActive) ? 'active' : 'inactive'}">
                 ${(course.active ?? course.isActive) ? '● Active' : '○ Inactive'}
@@ -540,7 +540,7 @@ function renderCourseForm() {
     document.getElementById('course-program').value = currentCourse.program || '';
     document.getElementById('course-institution').value = currentCourse.institution || '';
     document.getElementById('course-year').value = currentCourse.academicYear || '';
-    document.getElementById('course-points').value = currentCourse.ectsPoints || '';
+    document.getElementById('course-points').value = currentCourse.totalPoints || '';
     document.getElementById('course-subjects').value = (currentCourse.materialSubjects || []).join(', ');
     document.getElementById('course-active').checked = (currentCourse.active ?? currentCourse.isActive) !== false;
     document.getElementById('course-id').disabled = true;
