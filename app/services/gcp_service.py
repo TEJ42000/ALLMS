@@ -88,7 +88,7 @@ def get_secret(secret_id: str, version: str = "latest") -> Optional[str]:
         logger.info("Using '%s' from environment variable", env_var_name)
         return env_value
     
-    logger.error("Secret '%s' not found in Secret Manager or environment (%s)", secret_id, env_var_name)
+    logger.error("Secret not found in Secret Manager or environment (%s)", env_var_name)
     return None
 
 
