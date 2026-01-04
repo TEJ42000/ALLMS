@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Legal History - Complete Revision Hub</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #2C3E50 0%, #34495E 100%);
+            color: #333;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: #F4E8C1;
+            border-radius: 15px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #8B0000 0%, #5C0000 100%);
+            color: #D4AF37;
+            padding: 60px 40px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 3em;
+            margin-bottom: 10px;
+            text-shadow: 3px 3px 6px rgba(0,0,0,0.5);
+        }
+        
+        .countdown {
+            background: #D4AF37;
+            color: #8B0000;
+            padding: 15px;
+            margin-top: 20px;
+            border-radius: 10px;
+            font-size: 1.2em;
+            font-weight: bold;
+            display: inline-block;
+        }
+        
+        .content {
+            padding: 40px;
+        }
+        
+        .section {
+            background: white;
+            margin: 30px 0;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.15);
+        }
+        
+        .section h2 {
+            color: #8B0000;
+            margin-bottom: 20px;
+            font-size: 2em;
+            border-bottom: 3px solid #D4AF37;
+            padding-bottom: 10px;
+        }
+        
+        .mnemonic-box {
+            background: linear-gradient(135deg, #FFE66D 0%, #FFC300 100%);
+            border-left: 6px solid #FF6B35;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 10px;
+        }
+        
+        .mnemonic-box h3 {
+            color: #C70039;
+            margin-bottom: 15px;
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        
+        .card {
+            background: white;
+            border: 3px solid #8B0000;
+            border-radius: 12px;
+            padding: 25px;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+        }
+        
+        .card h3 {
+            color: #8B0000;
+            margin-bottom: 15px;
+        }
+        
+        .btn {
+            display: inline-block;
+            background: linear-gradient(135deg, #8B0000 0%, #5C0000 100%);
+            color: #D4AF37;
+            padding: 12px 25px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: bold;
+            margin: 10px 5px;
+            transition: all 0.3s;
+        }
+        
+        .btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        
+        th {
+            background: linear-gradient(135deg, #8B0000 0%, #5C0000 100%);
+            color: #D4AF37;
+            padding: 15px;
+            text-align: left;
+        }
+        
+        td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        tr:hover {
+            background: #ECF0F1;
+        }
+        
+        .timeline {
+            position: relative;
+            padding: 20px 0;
+            margin: 30px 0;
+        }
+        
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 50px;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+            background: #D4AF37;
+        }
+        
+        .timeline-item {
+            position: relative;
+            margin: 20px 0;
+            padding-left: 80px;
+        }
+        
+        .timeline-marker {
+            position: absolute;
+            left: 42px;
+            width: 20px;
+            height: 20px;
+            background: #8B0000;
+            border: 4px solid #D4AF37;
+            border-radius: 50%;
+        }
+        
+        .timeline-content {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+        }
+        
+        .timeline-date {
+            font-weight: bold;
+            color: #8B0000;
+            font-size: 1.2em;
+        }
+        
+        pre {
+            background: #f8f8f8;
+            border: 2px solid #8B0000;
+            padding: 20px;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📜 LEGAL HISTORY 📜</h1>
+            <p style="font-size: 1.3em;">Complete Revision Hub</p>
+            <p style="margin-top: 10px;">University of Groningen | Prof. Fritz Brandsma & Prof. Jelle Jansen</p>
+            <div class="countdown">⏰ EXAM: January 14, 2025</div>
+        </div>
+        
+        <div class="content">
+            
+            <!-- Quick Links -->
+            <div class="section">
+                <h2>🚀 Quick Access</h2>
+                <div class="grid">
+                    <div class="card">
+                        <h3>📚 Study Guides</h3>
+                        <a href="html_guides/Week_3_Legal_History_Complete_Study_Guide.html" class="btn">Week 3 Guide</a>
+                        <a href="html_guides/Week_6_Germany_Tutorial_Complete_Notes.html" class="btn">Week 6 Guide</a>
+                    </div>
+                    <div class="card">
+                        <h3>📄 Resources</h3>
+                        <a href="pdfs/" class="btn">All PDFs (18 files)</a>
+                        <a href="practice_exams/" class="btn">Practice Exams</a>
+                        <a href="text_notes/" class="btn">Text Notes</a>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Core Mnemonics -->
+            <div class="section">
+                <h2>🧠 Essential Mnemonics</h2>
+                
+                <div class="mnemonic-box">
+                    <h3>C-O-E (Codification Elements)</h3>
+                    <strong>C</strong> = Committed to writing<br>
+                    <strong>O</strong> = Official authority<br>
+                    <strong>E</strong> = Exclusive source
+                </div>
+                
+                <div class="mnemonic-box">
+                    <h3>GHTCS (Interpretation Methods)</h3>
+                    <strong>G</strong> = Grammatical (literal meaning)<br>
+                    <strong>H</strong> = Historical (legislative intent)<br>
+                    <strong>T</strong> = Teleological (purpose)<br>
+                    <strong>C</strong> = Contextual (systematic)<br>
+                    <strong>S</strong> = Sociological (social context)
+                </div>
+                
+                <div class="mnemonic-box">
+                    <h3>K-R-E (Roman Evolution)</h3>
+                    <strong>K</strong> = Kingdom<br>
+                    <strong>R</strong> = Republic<br>
+                    <strong>E</strong> = Empire
+                </div>
+            </div>
+            
+            <!-- Key Cases -->
+            <div class="section">
+                <h2>⚖️ Must-Know Cases</h2>
+                <table>
+                    <tr>
+                        <th>Case</th>
+                        <th>Year</th>
+                        <th>Key Principle</th>
+                    </tr>
+                    <tr>
+                        <td><strong>Bear Case</strong> (Groningen)</td>
+                        <td>1990</td>
+                        <td>Legality principle in criminal law</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Nix v. Hedden</strong> (Tomato)</td>
+                        <td>1893</td>
+                        <td>Common usage interpretation</td>
+                    </tr>
+                    <tr>
+                        <td><strong>People v. Nelson</strong></td>
+                        <td>2011</td>
+                        <td>Purposive interpretation</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Marbury v. Madison</strong></td>
+                        <td>1803</td>
+                        <td>Judicial review established</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Popov v. Hayashi</strong></td>
+                        <td>2002</td>
+                        <td>Roman law concepts in modern law</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Nuremberg Trials</strong></td>
+                        <td>1945-46</td>
+                        <td>Extremely unjust law not valid</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Wall Shooters Case</strong></td>
+                        <td>1990s</td>
+                        <td>Radbruch Formula application</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Young v. Bristol Aeroplane</strong></td>
+                        <td>1944</td>
+                        <td>Stare decisis rules</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Bulmer v. Bollinger</strong></td>
+                        <td>1974</td>
+                        <td>EU law supremacy</td>
+                    </tr>
+                </table>
+            </div>
+            
+            <!-- Justinian's Codification -->
+            <div class="section">
+                <h2>🏛️ Justinian's 4-Part Codification (6th Century)</h2>
+                
+                <pre>
+1. THE DIGEST (Pandecta)
+   • 50 books of jurist law
+   • NO lex posterior rule
+   • Contradictions: specific over general
+   
+2. THE INSTITUTES  
+   • Student textbook (from Gaius)
+   • Official law status
+   
+3. CODEX JUSTINIANUS
+   • Imperial legislation
+   • YES lex posterior applies
+   • Chronological by emperor
+   
+4. THE NOVELS
+   • Post-Codex imperial laws
+   • Continued until ~1500 CE
+                </pre>
+                
+                <div class="mnemonic-box">
+                    <h3>The Big Five Jurists</h3>
+                    <strong>Gaius</strong> - Original Institutes author<br>
+                    <strong>Ulpianus</strong> - Most cited in Digest<br>
+                    <strong>Paulus</strong> - Prolific writer<br>
+                    <strong>Papinianus</strong> - Tie-breaker authority<br>
+                    <strong>Modestinus</strong> - Last classical jurist
+                </div>
+            </div>
+            
+            <!-- Timeline -->
+            <div class="section">
+                <h2>📅 Historical Timeline</h2>
+                
+                <div class="timeline">
+                    <div class="timeline-item">
+                        <div class="timeline-marker"></div>
+                        <div class="timeline-content">
+                            <div class="timeline-date">6th Century</div>
+                            <p>Justinian's Codification - foundation of European legal tradition</p>
+                        </div>
+                    </div>
+                    
+                    <div class="timeline-item">
+                        <div class="timeline-marker"></div>
+                        <div class="timeline-content">
+                            <div class="timeline-date">1762</div>
+                            <p>Rousseau - Social Contract (volonté générale, popular sovereignty)</p>
+                        </div>
+                    </div>
+                    
+                    <div class="timeline-item">
+                        <div class="timeline-marker"></div>
+                        <div class="timeline-content">
+                            <div class="timeline-date">1764</div>
+                            <p>Beccaria - Crimes and Punishments (legality principle)</p>
+                        </div>
+                    </div>
+                    
+                    <div class="timeline-item">
+                        <div class="timeline-marker"></div>
+                        <div class="timeline-content">
+                            <div class="timeline-date">1804</div>
+                            <p>French Code Civil (Napoleonic Code) - model for worldwide codification</p>
+                        </div>
+                    </div>
+                    
+                    <div class="timeline-item">
+                        <div class="timeline-marker"></div>
+                        <div class="timeline-content">
+                            <div class="timeline-date">1946</div>
+                            <p>Radbruch Formula - "Extremely unjust law is not law"</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Key Principles -->
+            <div class="section">
+                <h2>💡 Fundamental Principles</h2>
+                
+                <div class="grid">
+                    <div class="card">
+                        <h3>Central Paradox</h3>
+                        <p><strong>Enlightenment Ideal:</strong> Judges as "mouths of the law" (bouches de la loi) - mechanical application</p>
+                        <p><strong>Reality:</strong> ALL texts require interpretation. Judges MUST interpret to apply abstract rules to specific facts.</p>
+                    </div>
+                    
+                    <div class="card">
+                        <h3>Formal vs Material</h3>
+                        <p><strong>Formal:</strong> Focus on HOW law is made (proper enactment)</p>
+                        <p><strong>Material:</strong> Focus on WHAT law says (must be just)</p>
+                        <p><em>This distinction appears throughout all legal systems!</em></p>
+                    </div>
+                    
+                    <div class="card">
+                        <h3>Legality Principle</h3>
+                        <p><strong>Latin:</strong> Nullum crimen, nulla poena sine lege</p>
+                        <p><strong>Meaning:</strong> No crime, no punishment without law</p>
+                        <p><strong>Source:</strong> Cesare Beccaria (1764)</p>
+                    </div>
+                    
+                    <div class="card">
+                        <h3>Radbruch Formula</h3>
+                        <p><strong>Statement:</strong> "Extremely unjust law is not law at all"</p>
+                        <p><strong>Application:</strong> Nazi-era laws, Wall Shooters Case</p>
+                        <p><strong>Principle:</strong> Material justice can override formal legality</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Exam Tips -->
+            <div class="section">
+                <h2>🎯 Exam Preparation Tips</h2>
+                
+                <h3 style="margin: 20px 0 10px 0;">Essay Structure:</h3>
+                <ol style="margin-left: 30px; line-height: 2;">
+                    <li><strong>Introduction</strong> - State the legal question clearly</li>
+                    <li><strong>Legal Framework</strong> - Explain applicable rules and principles</li>
+                    <li><strong>Application</strong> - Apply rules to specific facts of the case</li>
+                    <li><strong>Reasoning</strong> - Show which interpretation method you're using</li>
+                    <li><strong>Conclusion</strong> - Provide clear answer to the question</li>
+                </ol>
+                
+                <h3 style="margin: 20px 0 10px 0;">What to Focus On:</h3>
+                <ul style="margin-left: 30px; line-height: 2;">
+                    <li>HOW judges interpret rules (not just memorizing statutes)</li>
+                    <li>The central paradox (Enlightenment ideal vs. reality)</li>
+                    <li>Facts, question, reasoning, and decision for each major case</li>
+                    <li>Connections across weeks (formal/material distinction everywhere)</li>
+                    <li>Timeline showing Roman law's influence on modern codification</li>
+                </ul>
+                
+                <div class="mnemonic-box" style="margin-top: 30px;">
+                    <h3>Key Quotes to Remember</h3>
+                    <p>"A person can only become a good lawyer if he does so with a bad conscience" - Radbruch</p>
+                    <p>"Extremely unjust law is not law at all" - Radbruch Formula</p>
+                    <p>"Bouches de la loi" (mouths of the law) - Enlightenment ideal</p>
+                    <p>"Nullum crimen, nulla poena sine lege" - Legality principle</p>
+                </div>
+            </div>
+            
+            <div style="text-align: center; padding: 40px; background: linear-gradient(135deg, #8B0000 0%, #5C0000 100%); color: #D4AF37; border-radius: 12px; margin-top: 40px;">
+                <h2 style="margin-bottom: 15px;">Good Luck, Matej! 🎓</h2>
+                <p style="font-size: 1.2em;">You've got all the tools you need. Trust your preparation!</p>
+                <p style="margin-top: 10px; opacity: 0.9;">University of Groningen | Legal History 2024-2025</p>
+            </div>
+            
+        </div>
+    </div>
+</body>
+</html>

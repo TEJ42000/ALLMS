@@ -1,0 +1,1370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Week 3: Legal History - Complete Study Guide</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+        
+        .content {
+            padding: 40px;
+        }
+        
+        .case-section {
+            margin-bottom: 50px;
+            border-left: 5px solid #667eea;
+            padding-left: 30px;
+        }
+        
+        .case-title {
+            font-size: 2em;
+            color: #1e3c72;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+        }
+        
+        .case-number {
+            background: #667eea;
+            color: white;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 15px;
+            font-weight: bold;
+            font-size: 1.5em;
+        }
+        
+        .memory-box {
+            background: linear-gradient(135deg, #ffeaa7 0%, #fdcb6e 100%);
+            border-left: 5px solid #f39c12;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 10px;
+        }
+        
+        .memory-box h3 {
+            color: #d35400;
+            margin-bottom: 10px;
+            font-size: 1.3em;
+        }
+        
+        .visual-diagram {
+            background: #f8f9fa;
+            border: 3px solid #667eea;
+            padding: 25px;
+            margin: 25px 0;
+            border-radius: 15px;
+            font-family: 'Courier New', monospace;
+            position: relative;
+            overflow-x: auto;
+        }
+        
+        .visual-diagram h3 {
+            color: #1e3c72;
+            margin-bottom: 15px;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        .timeline {
+            position: relative;
+            padding: 20px 0;
+        }
+        
+        .timeline-item {
+            padding: 20px;
+            border-left: 4px solid #667eea;
+            margin-left: 20px;
+            margin-bottom: 30px;
+            position: relative;
+        }
+        
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: -13px;
+            top: 25px;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #667eea;
+            border: 4px solid white;
+            box-shadow: 0 0 0 3px #667eea;
+        }
+        
+        .timeline-date {
+            font-weight: bold;
+            color: #667eea;
+            font-size: 1.2em;
+            margin-bottom: 5px;
+        }
+        
+        .question-box {
+            background: linear-gradient(135deg, #e8f4f8 0%, #b8e6f7 100%);
+            border-left: 5px solid #3498db;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 10px;
+        }
+        
+        .question-box h4 {
+            color: #2980b9;
+            margin-bottom: 10px;
+            font-size: 1.2em;
+        }
+        
+        .answer-box {
+            background: white;
+            padding: 15px;
+            margin-top: 10px;
+            border-radius: 8px;
+            border: 2px dashed #3498db;
+        }
+        
+        .key-concept {
+            background: linear-gradient(135deg, #dfe6e9 0%, #b2bec3 100%);
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 10px;
+            border-left: 5px solid #2d3436;
+        }
+        
+        .key-concept h3 {
+            color: #2d3436;
+            margin-bottom: 10px;
+        }
+        
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        
+        .comparison-table th {
+            background: #667eea;
+            color: white;
+            padding: 15px;
+            text-align: left;
+            font-size: 1.1em;
+        }
+        
+        .comparison-table td {
+            padding: 15px;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        .comparison-table tr:nth-child(even) {
+            background: #f8f9fa;
+        }
+        
+        .comparison-table tr:hover {
+            background: #e8f4f8;
+        }
+        
+        .highlight-red {
+            color: #e74c3c;
+            font-weight: bold;
+        }
+        
+        .highlight-green {
+            color: #27ae60;
+            font-weight: bold;
+        }
+        
+        .highlight-blue {
+            color: #3498db;
+            font-weight: bold;
+        }
+        
+        .mnemonic {
+            background: linear-gradient(135deg, #a29bfe 0%, #6c5ce7 100%);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 10px;
+            margin: 15px 0;
+            font-size: 1.2em;
+            text-align: center;
+            font-weight: bold;
+            box-shadow: 0 5px 15px rgba(108, 92, 231, 0.3);
+        }
+        
+        .latin-term {
+            background: #fff3cd;
+            padding: 2px 8px;
+            border-radius: 5px;
+            font-style: italic;
+            border: 1px solid #ffc107;
+        }
+        
+        .pro-con {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin: 20px 0;
+        }
+        
+        .pro {
+            background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+            border-left: 5px solid #28a745;
+            padding: 20px;
+            border-radius: 10px;
+        }
+        
+        .con {
+            background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
+            border-left: 5px solid #dc3545;
+            padding: 20px;
+            border-radius: 10px;
+        }
+        
+        .law-hierarchy {
+            text-align: center;
+            margin: 30px 0;
+        }
+        
+        .law-level {
+            padding: 20px;
+            margin: 10px auto;
+            border-radius: 10px;
+            max-width: 600px;
+            font-size: 1.1em;
+            font-weight: bold;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        
+        .level-1 {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
+            color: white;
+        }
+        
+        .level-2 {
+            background: linear-gradient(135deg, #4ecdc4 0%, #44a08d 100%);
+            color: white;
+        }
+        
+        .level-3 {
+            background: linear-gradient(135deg, #95e1d3 0%, #70d6be 100%);
+            color: #2d3436;
+        }
+        
+        .interpretation-method {
+            background: #fff;
+            border: 3px solid #667eea;
+            padding: 20px;
+            margin: 15px 0;
+            border-radius: 10px;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+        }
+        
+        .interpretation-method h4 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+        
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+            
+            .container {
+                box-shadow: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>ðŸ“š Week 3: Legal History</h1>
+            <p>Customary Law, Legal Sources & Roman-Frisian Law</p>
+            <p style="font-size: 0.9em; margin-top: 10px;">Master These Cases: Van Bijnkershoek & Lieuwes v. States of Friesland</p>
+        </div>
+        
+        <div class="content">
+            
+            <!-- INTRODUCTION TO WEEK 3 -->
+            <div class="key-concept">
+                <h3>ðŸŽ¯ Week 3 Big Picture: The Pre-Codification Legal World</h3>
+                <p><strong>Central Question:</strong> In the pre-codification era, what happens when different legal sources conflict? Which takes precedence?</p>
+                <ul style="margin-top: 10px;">
+                    <li>ðŸ“œ <strong>PRIMARY LAW:</strong> Sovereign ordinances, city statutes, customary law</li>
+                    <li>âš–ï¸ <strong>SUBSIDIARY LAW:</strong> Roman law (ius commune) - used when no primary law exists</li>
+                    <li>ðŸ” <strong>The Problem:</strong> What if customary law conflicts with statutory law?</li>
+                </ul>
+            </div>
+
+            <!-- MEMORY AID: Legal Sources Hierarchy -->
+            <div class="memory-box">
+                <h3>ðŸ§  MEMORY AID: Legal Sources Hierarchy</h3>
+                <div class="mnemonic">
+                    "PRIMARY before SUBSIDIARY" = "P before S" = "Please Study!"
+                </div>
+                <div class="law-hierarchy">
+                    <div class="law-level level-1">
+                        1ï¸âƒ£ PRIMARY LAW (Always First!)
+                    </div>
+                    <div class="law-level level-2">
+                        Sovereign Ordinances â€¢ City Statutes â€¢ Customary Law
+                    </div>
+                    <div class="law-level level-3">
+                        2ï¸âƒ£ SUBSIDIARY LAW (Backup)
+                        <br>Roman Law (Corpus Iuris Civilis)
+                    </div>
+                </div>
+            </div>
+
+            <!-- CUSTOMARY LAW FUNDAMENTALS -->
+            <div class="key-concept">
+                <h3>ðŸ“– Understanding Customary Law</h3>
+                <p><strong>Definition:</strong> Traditional law NOT written/issued by legislator, arising from habit</p>
+                
+                <div class="mnemonic" style="margin: 20px 0;">
+                    Two Requirements: "D.O." = Diuturnus Opinio
+                </div>
+                
+                <table class="comparison-table" style="margin-top: 20px;">
+                    <tr>
+                        <th>Requirement</th>
+                        <th>Latin Term</th>
+                        <th>Meaning</th>
+                        <th>Example</th>
+                    </tr>
+                    <tr>
+                        <td><strong>1. Long Usage</strong></td>
+                        <td class="latin-term">diuturnus usus</td>
+                        <td>Practice must exist for a long time</td>
+                        <td>âŒ Walking in clogs â‰  law<br>âœ… Maritime trade customs = law</td>
+                    </tr>
+                    <tr>
+                        <td><strong>2. Legal Opinion</strong></td>
+                        <td class="latin-term">opinio iuris / opinio necessitatis</td>
+                        <td>Belief that the custom IS law and must be obeyed</td>
+                        <td>âŒ Fashion trends â‰  law<br>âœ… Insurance payment rules = law</td>
+                    </tr>
+                </table>
+            </div>
+
+            <!-- HOW TO PROVE CUSTOMARY LAW -->
+            <div class="visual-diagram">
+                <h3>âš–ï¸ How to Prove Customary Law Exists</h3>
+                <pre style="line-height: 1.8;">
+â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—
+â•‘          THREE METHODS TO PROVE CUSTOMARY LAW             â•‘
+â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£
+â•‘                                                           â•‘
+â•‘  1ï¸âƒ£  TURBE (Expert Gathering)                            â•‘
+â•‘      â€¢ Literal meaning: "gang" in Latin                   â•‘
+â•‘      â€¢ Expert witnesses testify about the custom          â•‘
+â•‘      â€¢ Originally: tribe's eldest/wisest men              â•‘
+â•‘      â€¢ Later: lawyers, notaries, market experts           â•‘
+â•‘                                                           â•‘
+â•‘  2ï¸âƒ£  WRITTEN RECORDS                                      â•‘
+â•‘      â€¢ Collection books of customary law                  â•‘
+â•‘      â€¢ NOT comprehensive or exclusive                     â•‘
+â•‘      â€¢ Can still fall into disuse                         â•‘
+â•‘      â€¢ Creates "NOTORIOUS CUSTOM" (known custom)          â•‘
+â•‘                                                           â•‘
+â•‘  3ï¸âƒ£  PRIOR COURT DECISIONS                               â•‘
+â•‘      â€¢ Citing previous cases applying the rule            â•‘
+â•‘      â€¢ Controversial: How many decisions needed?          â•‘
+â•‘      â€¢ Also creates "NOTORIOUS CUSTOM"                    â•‘
+â•‘                                                           â•‘
+â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+                </pre>
+            </div>
+
+            <!-- THE GREAT CONFLICT: TWO VIEWS -->
+            <div class="case-section">
+                <div class="case-title">
+                    <div class="case-number">â“</div>
+                    <span>The Conflict: Can Customary Law Override Statutory Law?</span>
+                </div>
+
+                <div class="memory-box">
+                    <h3>ðŸ§  MEMORY: "J vs C" = "Julian = Custom Wins" vs "Constantine = Custom Loses"</h3>
+                </div>
+
+                <div class="pro-con">
+                    <div class="pro">
+                        <h3 style="color: #28a745;">âœ… JULIAN'S VIEW (Pro-Customary Law)</h3>
+                        <p><strong>Time:</strong> 2nd century AD (Â±115-172 AD)<br>
+                        <strong>Emperor:</strong> Hadrian<br>
+                        <strong>Source:</strong> Digest (D. 1.3.32.1)</p>
+                        <hr style="margin: 15px 0;">
+                        <p><strong>Argument:</strong> YES, customary law CAN derogate from statutory law</p>
+                        <p><strong>Reasoning:</strong></p>
+                        <ul style="margin-left: 20px; margin-top: 10px;">
+                            <li>Laws bind us because accepted by the people's judgment</li>
+                            <li>What difference if people show will by vote OR by conduct?</li>
+                            <li>Laws can be abrogated by the legislator's vote OR by disuse (silent consent)</li>
+                        </ul>
+                        <p style="margin-top: 15px; font-weight: bold; color: #27ae60;">
+                            KEY: People create law through action, not just voting!
+                        </p>
+                    </div>
+                    
+                    <div class="con">
+                        <h3 style="color: #dc3545;">âŒ CONSTANTINE'S VIEW (Anti-Customary Law)</h3>
+                        <p><strong>Time:</strong> 4th century AD (319 AD)<br>
+                        <strong>Context:</strong> Imperial Rome (Emperor holds power)<br>
+                        <strong>Source:</strong> Codex Justinianus (C. 8.52.2)</p>
+                        <hr style="margin: 15px 0;">
+                        <p><strong>Argument:</strong> NO, customary law CANNOT override statutory law</p>
+                        <p><strong>Reasoning:</strong></p>
+                        <ul style="margin-left: 20px; margin-top: 10px;">
+                            <li>Custom has authority, BUT limited</li>
+                            <li>Custom cannot "contravene common sense or the law"</li>
+                            <li>People transferred legislative power to Emperor (leges de imperio)</li>
+                            <li>Once power transferred, people can't negate emperor's law</li>
+                        </ul>
+                        <p style="margin-top: 15px; font-weight: bold; color: #c0392b;">
+                            KEY: Emperor's law = supreme, custom must yield!
+                        </p>
+                    </div>
+                </div>
+
+                <table class="comparison-table" style="margin-top: 30px;">
+                    <tr>
+                        <th>Aspect</th>
+                        <th>Julian's View</th>
+                        <th>Constantine's View</th>
+                    </tr>
+                    <tr>
+                        <td><strong>Government Type</strong></td>
+                        <td class="highlight-green">DEMOCRACY / REPUBLIC<br>(Assembly = legislator)</td>
+                        <td class="highlight-red">MONARCHY / EMPIRE<br>(Emperor = sole legislator)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Source of Law</strong></td>
+                        <td class="highlight-green">People's will (vote OR conduct)</td>
+                        <td class="highlight-red">Emperor's will (derived from people)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Legal Hierarchy</strong></td>
+                        <td class="highlight-green">Custom = Statute<br>(lex posterior principle applies)</td>
+                        <td class="highlight-red">Statute > Custom<br>(reason/law defeats custom)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Can Custom Override Law?</strong></td>
+                        <td class="highlight-green">YES âœ“</td>
+                        <td class="highlight-red">NO âœ—</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Maxim</strong></td>
+                        <td class="highlight-green">Lex posterior derogate legi priori<br>(later law repeals earlier law)</td>
+                        <td class="highlight-red">Ut rationem vincat aut legem<br>(custom cannot defeat reason or law)</td>
+                    </tr>
+                </table>
+            </div>
+
+            <!-- CASE 1: VAN BIJNKERSHOEK -->
+            <div class="case-section">
+                <div class="case-title">
+                    <div class="case-number">1</div>
+                    <span>Van Bijnkershoek's Case (Observationes Tumultuariae)</span>
+                </div>
+
+                <div class="key-concept">
+                    <h3>ðŸ‘¤ Who was Van Bijnkershoek?</h3>
+                    <p><strong>Cornelis van Bijnkershoek</strong></p>
+                    <ul style="margin-left: 20px; margin-top: 10px;">
+                        <li>ðŸ›ï¸ President of the <strong>Hoge Raad</strong> (Supreme Court of Holland, Zeeland, West-Friesland)</li>
+                        <li>ðŸ“ Wrote "Observationes Tumultuariae" = "Hastily written observations"</li>
+                        <li>ðŸ’¥ Known for "hastily and venomously" criticizing colleagues' decisions</li>
+                        <li>âš–ï¸ Applied <strong>Roman-Dutch Law</strong> (mix of Dutch primary law + Roman subsidiary law)</li>
+                        <li>ðŸ“š His work shows 18th century court deliberations WITHOUT formal motivations</li>
+                    </ul>
+                </div>
+
+                <div class="question-box">
+                    <h4>Question 1: Three Legal Sources at Odds - Which Source Was Used?</h4>
+                    <div class="answer-box">
+                        <p><strong>THREE CONFLICTING SOURCES:</strong></p>
+                        <ol style="margin-left: 20px;">
+                            <li><strong>Julian's Opinion (Digest):</strong> Customary law CAN derogate from statutory law</li>
+                            <li><strong>Constantine's Constitution (Codex):</strong> Customary law CANNOT override statutory law</li>
+                            <li><strong>The Maxim "Lex Posterior":</strong> Later law repeals earlier law (could apply to both statute and custom)</li>
+                        </ol>
+                        <p style="margin-top: 15px; padding: 15px; background: #fffbea; border-left: 4px solid #f39c12; border-radius: 5px;">
+                            <strong>âš–ï¸ WHICH SOURCE WAS USED?</strong><br>
+                            The case was decided using <strong>the specific context and facts</strong> to determine which source applied. Van Bijnkershoek had to choose between these competing Roman law authorities!
+                        </p>
+                    </div>
+                </div>
+
+                <div class="question-box">
+                    <h4>Question 2: Democracy vs Monarchy - Link to Julian & Constantine</h4>
+                    <div class="answer-box">
+                        <table class="comparison-table">
+                            <tr>
+                                <th>Constitution Type</th>
+                                <th>Definition</th>
+                                <th>Associated Opinion</th>
+                                <th>Why?</th>
+                            </tr>
+                            <tr>
+                                <td><strong>DEMOCRACY</strong></td>
+                                <td>Power held by the people; people = legislator</td>
+                                <td class="highlight-green">JULIAN'S OPINION</td>
+                                <td>In a democracy, people can express will through voting OR through conduct (customary law). Both are equally valid expressions of popular sovereignty.</td>
+                            </tr>
+                            <tr>
+                                <td><strong>MONARCHY</strong></td>
+                                <td>Power held by monarch/emperor; emperor = sole legislator</td>
+                                <td class="highlight-red">CONSTANTINE'S OPINION</td>
+                                <td>In an empire, people transferred legislative power to the emperor (<span class="latin-term">leges de imperio</span>). Once transferred, people cannot negate emperor's laws through custom.</td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="question-box">
+                    <h4>Question 3: How Does Customary Law Relate to Codification?</h4>
+                    <div class="answer-box">
+                        <p><strong>THE FUNDAMENTAL TENSION:</strong></p>
+                        <div class="visual-diagram">
+                            <pre style="line-height: 1.8;">
+â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—
+â•‘  CUSTOMARY LAW vs CODIFICATION: The Paradox       â•‘
+â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£
+â•‘                                                    â•‘
+â•‘  CUSTOMARY LAW:                                    â•‘
+â•‘  â€¢ Unwritten, organic, evolving                    â•‘
+â•‘  â€¢ Created by people's conduct over time           â•‘
+â•‘  â€¢ Flexible, adapts to social changes              â•‘
+â•‘  â€¢ Difficult to prove, uncertain content           â•‘
+â•‘                                                    â•‘
+â•‘              âš¡ CONFLICT âš¡                         â•‘
+â•‘                                                    â•‘
+â•‘  CODIFICATION:                                     â•‘
+â•‘  â€¢ Written, fixed, clear                           â•‘
+â•‘  â€¢ Created by legislator at specific moment        â•‘
+â•‘  â€¢ Stable, predictable, certain                    â•‘
+â•‘  â€¢ Easy to consult, definite content               â•‘
+â•‘                                                    â•‘
+â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£
+â•‘  THE CODIFICATION IDEAL:                           â•‘
+â•‘  â€¢ Eliminate customary law entirely                â•‘
+â•‘  â€¢ All law in one comprehensive code               â•‘
+â•‘  â€¢ No need for judges to "find" law                â•‘
+â•‘  â€¢ Mechanical application only                     â•‘
+â•‘                                                    â•‘
+â•‘  BUT REALITY:                                      â•‘
+â•‘  â€¢ Interpretation always needed                    â•‘
+â•‘  â€¢ Gaps in code require filling                    â•‘
+â•‘  â€¢ Social evolution demands adaptation             â•‘
+â•‘  â€¢ Codification paradox persists!                  â•‘
+â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+                            </pre>
+                        </div>
+                        <p style="margin-top: 15px; background: #e8f4f8; padding: 15px; border-radius: 8px; border-left: 4px solid #3498db;">
+                            <strong>ðŸ“Œ KEY CONNECTION:</strong><br>
+                            Codification movements (Enlightenment era) wanted to <strong>eliminate customary law</strong> entirely, replacing it with comprehensive written codes. The debate about whether customary law could override statutory law became LESS relevant after codification, because codes aimed to be the EXCLUSIVE source of law. However, the paradox remains: even codes require interpretation, so the "spirit" of customary law (evolving with society) never fully disappears.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CASE 2: LIEUWES V. STATES OF FRIESLAND -->
+            <div class="case-section">
+                <div class="case-title">
+                    <div class="case-number">2</div>
+                    <span>Lieuwes v. States of Friesland (1580-1611)</span>
+                </div>
+
+                <div class="key-concept">
+                    <h3>ðŸ“œ The Historical Context</h3>
+                    <div class="timeline">
+                        <div class="timeline-item">
+                            <div class="timeline-date">August 1579</div>
+                            <p>Friesland joins the <strong>Union of Utrecht</strong> (reluctantly - Calvinists pushed it through despite majority opposition)</p>
+                        </div>
+                        <div class="timeline-item">
+                            <div class="timeline-date">March 1580</div>
+                            <p><strong>Stadholder Rennenberg's betrayal:</strong> He switches sides to Spain, giving them control of Groningen fortress. Friesland now in danger!</p>
+                        </div>
+                        <div class="timeline-item">
+                            <div class="timeline-date">Autumn 1580</div>
+                            <p>Spanish troops occupy SW corner of Friesland (Lemmer to Makkum). Redoubt built at <strong>Sotterum (Cornwerd)</strong> to repel enemy.</p>
+                        </div>
+                        <div class="timeline-item">
+                            <div class="timeline-date">December 23, 1580</div>
+                            <p><strong>THE INCIDENT:</strong> Lieuwes' houses are outside the redoubt. Spanish troops approach, planning to use houses to attack. Frisian soldiers see the plan and <strong>burn down Lieuwes' houses</strong> to prevent Spanish advantage. Spanish troops retreat. Redoubt saved!</p>
+                        </div>
+                        <div class="timeline-item">
+                            <div class="timeline-date">After 1580</div>
+                            <p><strong>Lieuwes' loss:</strong> Over 3,000 gold florins. He asks States of Friesland for compensation. States tell him to "be patient." He waits "several years."</p>
+                        </div>
+                        <div class="timeline-item">
+                            <div class="timeline-date">Eventually</div>
+                            <p>Lieuwes sues! He files against the Procurator-General (States' representative). States initially deny knowledge, then argue it was "necessary defense."</p>
+                        </div>
+                        <div class="timeline-item">
+                            <div class="timeline-date">1611</div>
+                            <p><strong>Court of Friesland's Decision:</strong> Lieuwes WINS! Must be compensated for loss suffered "for the good of the country."</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="memory-box">
+                    <h3>ðŸ§  MEMORY AID: The Core Issue</h3>
+                    <div class="mnemonic">
+                        "L.S.P.C." = Lieuwes Suffered for Public â†’ Compensation!
+                    </div>
+                    <p style="margin-top: 15px;"><strong>The Question:</strong> When government acts for public good but harms individual, must government compensate?</p>
+                    <p><strong>States' Argument:</strong> "We acted in public interest (<span class="latin-term">pro lege et grege domini</span> = for law and lord's flock). No compensation needed!"</p>
+                    <p><strong>Lieuwes' Argument:</strong> "My private property sacrificed for common good. Fair that burden be shared (compensation from public funds)."</p>
+                </div>
+
+                <div class="question-box">
+                    <h4>Question 1: Connection Between Lex Rhodia and This Case</h4>
+                    <div class="answer-box">
+                        <p><strong>ðŸ“– What is Lex Rhodia de iactu?</strong></p>
+                        <div class="visual-diagram">
+                            <pre style="line-height: 1.8;">
+â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—
+â•‘          LEX RHODIA DE IACTU (Rhodian Law)           â•‘
+â•‘         "Law about throwing goods overboard"         â•‘
+â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£
+â•‘                                                      â•‘
+â•‘  SCENARIO: Ship in storm, danger of sinking         â•‘
+â•‘                                                      â•‘
+â•‘  ACTION: Captain throws some cargo overboard        â•‘
+â•‘          to lighten ship and save everyone           â•‘
+â•‘                                                      â•‘
+â•‘  RESULT: Ship saved! But cargo owners suffered loss â•‘
+â•‘                                                      â•‘
+â•‘  LEGAL RULE (D. 14.2.1 & D. 14.2.2):                â•‘
+â•‘  â€¢ Loss must be SHARED by ALL on ship               â•‘
+â•‘  â€¢ Those whose goods were saved contribute           â•‘
+â•‘  â€¢ Compensation for those who lost goods             â•‘
+â•‘                                                      â•‘
+â•‘  PRINCIPLE: "What is given for all must be          â•‘
+â•‘              made good by contribution of all"       â•‘
+â•‘                                                      â•‘
+â•‘  JUSTIFICATION: D. 14.2.2pr.:                        â•‘
+â•‘  "Aequissimum enim est..." = "It is most            â•‘
+â•‘  equitable that loss be shared by those who          â•‘
+â•‘  achieved safety through sacrifice of others"        â•‘
+â•‘                                                      â•‘
+â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+                            </pre>
+                        </div>
+                        
+                        <p style="margin-top: 20px;"><strong>ðŸ”— CONNECTION TO LIEUWES' CASE:</strong></p>
+                        
+                        <table class="comparison-table">
+                            <tr>
+                                <th>Aspect</th>
+                                <th>Lex Rhodia (Ship)</th>
+                                <th>Lieuwes (Friesland)</th>
+                            </tr>
+                            <tr>
+                                <td><strong>Danger</strong></td>
+                                <td>Ship in storm</td>
+                                <td>Spanish troops attacking redoubt</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Action Taken</strong></td>
+                                <td>Throw cargo overboard</td>
+                                <td>Burn Lieuwes' houses</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Purpose</strong></td>
+                                <td>Save ship & all aboard</td>
+                                <td>Save redoubt & preserve country</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Who Benefits?</strong></td>
+                                <td>All on ship (common benefit)</td>
+                                <td>All in Friesland (common benefit)</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Who Suffers Loss?</strong></td>
+                                <td>Cargo owners whose goods thrown</td>
+                                <td>Lieuwes whose houses burned</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Legal Principle</strong></td>
+                                <td>Loss shared by all who benefited</td>
+                                <td>Loss shared by all (via public compensation)</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Justification</strong></td>
+                                <td class="highlight-blue">EQUITY: Those saved because of others' sacrifice must contribute</td>
+                                <td class="highlight-blue">EQUITY: Country preserved because of Lieuwes' sacrifice â†’ compensation</td>
+                            </tr>
+                        </table>
+                        
+                        <div style="margin-top: 20px; padding: 20px; background: #fff9e6; border-radius: 10px; border-left: 5px solid #f39c12;">
+                            <p><strong>ðŸŽ¯ KEY SIMILARITY:</strong> Both involve <strong>private sacrifice for common good</strong>. The Lex Rhodia principle = "distribute burden fairly among all beneficiaries."</p>
+                            <p style="margin-top: 10px;"><strong>ðŸŽ¯ KEY DIFFERENCE:</strong></p>
+                            <ul style="margin-left: 20px;">
+                                <li><strong>Lex Rhodia:</strong> Private parties (merchants) sharing loss</li>
+                                <li><strong>Lieuwes:</strong> PUBLIC authority compensating individual (government paying from public funds)</li>
+                            </ul>
+                            <p style="margin-top: 10px; font-weight: bold;">The Court <strong>EXTENDED</strong> the Lex Rhodia principle from private maritime law to public law (government liability)!</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="question-box">
+                    <h4>Question 2: What is the "Accursian Gloss"? Significance for ius commune?</h4>
+                    <div class="answer-box">
+                        <div class="key-concept" style="margin: 0;">
+                            <h3>ðŸ“š The Accursian Gloss (Glossa Ordinaria)</h3>
+                            <p><strong>Who:</strong> <strong>Accursius</strong> (Italian legal scholar, c. 1185-1263)</p>
+                            <p><strong>What:</strong> Comprehensive collection of glosses (marginal notes/commentaries) on the <span class="latin-term">Corpus Iuris Civilis</span></p>
+                            <p><strong>When:</strong> Completed around 1230 in Bologna</p>
+                            <p><strong>Why Important:</strong> Became THE standard interpretation of Roman law throughout Europe</p>
+                        </div>
+                        
+                        <div class="visual-diagram">
+                            <pre style="line-height: 1.8;">
+â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—
+â•‘          HOW THE GLOSS WORKED                    â•‘
+â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£
+â•‘                                                  â•‘
+â•‘  [Original Roman Law Text in Center]            â•‘
+â•‘                                                  â•‘
+â•‘  â† [Marginal notes/glosses] | [More glosses] â†’ â•‘
+â•‘                                                  â•‘
+â•‘  Explanations, cross-references, solutions      â•‘
+â•‘  to contradictions between texts                 â•‘
+â•‘                                                  â•‘
+â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+                            </pre>
+                        </div>
+                        
+                        <p style="margin-top: 20px;"><strong>ðŸŽ¯ SIGNIFICANCE FOR IUS COMMUNE:</strong></p>
+                        
+                        <div class="law-hierarchy">
+                            <div class="law-level level-1" style="text-align: left; padding: 15px;">
+                                <strong>1. STANDARDIZATION</strong><br>
+                                Before Accursius: Many competing interpretations<br>
+                                After Accursius: ONE authoritative interpretation accepted everywhere
+                            </div>
+                            <div class="law-level level-2" style="text-align: left; padding: 15px;">
+                                <strong>2. PRACTICAL USABILITY</strong><br>
+                                Made Roman law accessible to judges/lawyers<br>
+                                Explained difficult passages, resolved contradictions<br>
+                                Provided ready-made solutions to legal problems
+                            </div>
+                            <div class="law-level level-3" style="text-align: left; padding: 15px;">
+                                <strong>3. LEGAL MAXIM</strong><br>
+                                <span class="latin-term" style="font-size: 1.2em;">Quidquid non agnoscit glossa, non agnoscit curia</span><br>
+                                "What the gloss does not recognize, the court does not recognize"<br>
+                                = If not in the Gloss, courts won't accept it!
+                            </div>
+                        </div>
+                        
+                        <div style="margin-top: 20px; padding: 15px; background: #e8f4f8; border-radius: 8px; border-left: 4px solid #3498db;">
+                            <p><strong>ðŸ“Œ BOTTOM LINE:</strong> The Accursian Gloss became the "official textbook" of <span class="latin-term">ius commune</span>. It unified legal interpretation across Europe and made Roman law the true "common law" of the continent. Courts relied on it almost like a code!</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="question-box">
+                    <h4>Question 3: Legal Meaning of "Quidquid non agnoscit glossa, non agnoscit curia"</h4>
+                    <div class="answer-box">
+                        <div class="mnemonic">
+                            "No Gloss, No Court" = "G.C." = "Gloss Controls!"
+                        </div>
+                        
+                        <p style="margin-top: 20px;"><strong>TRANSLATION:</strong><br>
+                        "What the gloss does not recognize, the court does not recognize"</p>
+                        
+                        <p><strong>LEGAL MEANING:</strong></p>
+                        <div class="interpretation-method">
+                            <h4>ðŸ›ï¸ THE GLOSS = ULTIMATE LEGAL AUTHORITY</h4>
+                            <ul style="margin-left: 20px; line-height: 1.8;">
+                                <li><strong>If an argument appears in the Gloss:</strong> âœ… Court will accept it as valid</li>
+                                <li><strong>If an argument does NOT appear in the Gloss:</strong> âŒ Court will reject it as invalid</li>
+                                <li><strong>Effect:</strong> Accursius's interpretations became BINDING on courts</li>
+                                <li><strong>Practical Result:</strong> Lawyers must cite the Gloss to win arguments</li>
+                            </ul>
+                        </div>
+                        
+                        <div style="margin-top: 20px; padding: 15px; background: #fffbea; border-radius: 8px; border-left: 4px solid #f39c12;">
+                            <p><strong>âš ï¸ CRITICAL POINT:</strong> This maxim shows the IMMENSE AUTHORITY of the Gloss. It wasn't just helpful commentary - it became virtually MANDATORY law itself. Courts wouldn't deviate from it. This is why Bartolus (later) had to work AROUND the Gloss rather than contradict it directly!</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="question-box">
+                    <h4>Question 4: Which Interpretation Method is Associated with Bartolus?</h4>
+                    <div class="answer-box">
+                        <div class="key-concept" style="margin: 0;">
+                            <h3>âš–ï¸ Bartolus de Saxoferrato (1313-1357)</h3>
+                            <p><strong>Method:</strong> <span class="highlight-blue" style="font-size: 1.3em;">EXTENSIVE / ANALOGICAL / TELEOLOGICAL INTERPRETATION</span></p>
+                        </div>
+                        
+                        <div class="visual-diagram">
+                            <pre style="line-height: 1.8;">
+â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—
+â•‘         BARTOLUS'S INTERPRETATION METHOD          â•‘
+â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£
+â•‘                                                   â•‘
+â•‘  APPROACH: Go beyond literal text                â•‘
+â•‘                                                   â•‘
+â•‘  1. Find the RATIO (reason/purpose) of the law   â•‘
+â•‘                                                   â•‘
+â•‘  2. Apply that ratio to NEW situations           â•‘
+â•‘     not explicitly covered by text               â•‘
+â•‘                                                   â•‘
+â•‘  3. Use ANALOGY: if same ratio applies,          â•‘
+â•‘     extend the rule to similar cases             â•‘
+â•‘                                                   â•‘
+â•‘  4. CREATIVE expansion of Corpus Iuris           â•‘
+â•‘     to solve modern problems                      â•‘
+â•‘                                                   â•‘
+â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+                            </pre>
+                        </div>
+                        
+                        <p style="margin-top: 20px;"><strong>ðŸ“– KEY CONCEPTS:</strong></p>
+                        
+                        <table class="comparison-table">
+                            <tr>
+                                <th>Term</th>
+                                <th>Latin</th>
+                                <th>Meaning</th>
+                                <th>Example</th>
+                            </tr>
+                            <tr>
+                                <td><strong>Reasoning by Analogy</strong></td>
+                                <td class="latin-term">ratio legis</td>
+                                <td>Find the PURPOSE/REASON behind the law</td>
+                                <td>If law protects merchants in harbors, extend to merchants in markets (same ratio)</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Extensive Interpretation</strong></td>
+                                <td class="latin-term">interpretatio extensiva</td>
+                                <td>Expand text beyond literal words to cover similar cases</td>
+                                <td>Law says "ship" but apply to "boat" (same purpose)</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Action on the Facts</strong></td>
+                                <td class="latin-term">actio in factum</td>
+                                <td>Create new legal remedy based on analogy when no exact text exists</td>
+                                <td>No law for situation X, but situation X similar to situation Y, so create action</td>
+                            </tr>
+                        </table>
+                        
+                        <div style="margin-top: 20px; padding: 15px; background: #e8f4f8; border-radius: 8px; border-left: 4px solid #3498db;">
+                            <p><strong>ðŸŽ¯ WHY BARTOLUS DID THIS:</strong></p>
+                            <p>The Corpus Iuris Civilis was written 1,000+ years before Bartolus's time. Medieval society faced NEW problems (feudalism, cities, trade guilds, etc.) that Romans never encountered. Bartolus couldn't contradict the Gloss (remember: "What gloss doesn't recognize..."), but he COULD extend it creatively through analogy!</p>
+                            <p style="margin-top: 10px;"><strong>RESULT:</strong> Bartolus made Roman law adaptable and relevant to 14th century Europe.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="question-box">
+                    <h4>Question 5: Which Legal Rules Did Bartolus "Make Up" and Present as Interpretation?</h4>
+                    <div class="answer-box">
+                        <p style="font-size: 1.2em; color: #667eea; font-weight: bold;">ðŸ“œ Bartolus Created: PUBLIC INTERNATIONAL LAW (ius gentium inter gentes)</p>
+                        
+                        <div class="visual-diagram">
+                            <pre style="line-height: 1.8;">
+â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—
+â•‘    BARTOLUS'S CREATIVE "INTERPRETATION"              â•‘
+â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£
+â•‘                                                      â•‘
+â•‘  THE PROBLEM:                                        â•‘
+â•‘  â€¢ Corpus Iuris Civilis had NO rules for            â•‘
+â•‘    relations BETWEEN sovereign states                â•‘
+â•‘  â€¢ In Roman times: One emperor ruled all             â•‘
+â•‘  â€¢ In Bartolus's time: Many independent cities,      â•‘
+â•‘    kingdoms, territories                             â•‘
+â•‘                                                      â•‘
+â•‘  BARTOLUS'S SOLUTION:                                â•‘
+â•‘  Found text mentioning "omnes gentes" (all peoples)  â•‘
+â•‘  in a Roman constitution                             â•‘
+â•‘                                                      â•‘
+â•‘  CLAIMED this referred to rules governing relations  â•‘
+â•‘  BETWEEN different peoples/states                    â•‘
+â•‘                                                      â•‘
+â•‘  RESULT: Created entire body of law for:             â•‘
+â•‘  â€¢ Diplomatic relations                              â•‘
+â•‘  â€¢ Treaties between states                           â•‘
+â•‘  â€¢ Rights of ambassadors                             â•‘
+â•‘  â€¢ War and peace                                     â•‘
+â•‘  â€¢ Sovereignty of city-states                        â•‘
+â•‘                                                      â•‘
+â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+                            </pre>
+                        </div>
+                        
+                        <div style="margin-top: 20px; padding: 20px; background: #fff3cd; border-radius: 10px; border-left: 5px solid #f39c12;">
+                            <p><strong>ðŸŽ­ THE CLEVER TRICK:</strong></p>
+                            <p>Bartolus took the phrase "all peoples" (<span class="latin-term">omnes gentes</span>) and reinterpreted it:</p>
+                            <ul style="margin-left: 20px; margin-top: 10px;">
+                                <li><strong>Roman meaning:</strong> <span class="latin-term">Ius gentium</span> = law common to all peoples (universal private law, like rules for slavery, property, contracts)</li>
+                                <li><strong>Bartolus's new meaning:</strong> <span class="latin-term">Ius gentium inter gentes</span> = law BETWEEN peoples/nations (public international law!)</li>
+                            </ul>
+                            <p style="margin-top: 15px; font-weight: bold;">He invented an entirely NEW field of law and claimed it was just "interpretation" of existing Roman texts!</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="question-box">
+                    <h4>Question 6: Which Method of Interpretation Did the Court Apply in Lieuwes' Case?</h4>
+                    <div class="answer-box">
+                        <p style="font-size: 1.3em; color: #667eea; font-weight: bold;">âš–ï¸ EXTENSIVE / ANALOGICAL INTERPRETATION (Bartolian method)</p>
+                        
+                        <div class="visual-diagram">
+                            <pre style="line-height: 1.8;">
+â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—
+â•‘     HOW THE COURT USED EXTENSIVE INTERPRETATION      â•‘
+â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£
+â•‘                                                      â•‘
+â•‘  STEP 1: Find existing law with similar principle   â•‘
+â•‘          â†’ Lex Rhodia de iactu (maritime law)        â•‘
+â•‘                                                      â•‘
+â•‘  STEP 2: Identify the RATIO (underlying reason)     â•‘
+â•‘          â†’ "Loss for common benefit must be shared"  â•‘
+â•‘                                                      â•‘
+â•‘  STEP 3: Apply ratio to NEW situation               â•‘          
+â•‘          â†’ Houses burned to save country             â•‘
+â•‘          â†’ Same principle: common benefit = shared   â•‘
+â•‘                           burden                     â•‘
+â•‘                                                      â•‘
+â•‘  STEP 4: Extend the rule by ANALOGY                 â•‘
+â•‘          â†’ If maritime law requires loss-sharing,    â•‘
+â•‘             then public law requires government      â•‘
+â•‘             compensation                             â•‘
+â•‘                                                      â•‘
+â•‘  RESULT: Created new rule for government liability   â•‘
+â•‘          based on ancient maritime principle!        â•‘
+â•‘                                                      â•‘
+â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+                            </pre>
+                        </div>
+                        
+                        <div class="interpretation-method">
+                            <h4>ðŸ” THE COURT'S REASONING:</h4>
+                            <ol style="margin-left: 20px; line-height: 1.8;">
+                                <li><strong>Text:</strong> Lex Rhodia (ship cargo thrown overboard)</li>
+                                <li><strong>Ratio:</strong> Equity demands those who benefit share the burden</li>
+                                <li><strong>Gloss:</strong> Accursius noted "if something is suffered for common utility or to prevent another's harm, restitution must be made"</li>
+                                <li><strong>Extension:</strong> If true for ships â†’ also true for country</li>
+                                <li><strong>Conclusion:</strong> States of Friesland must compensate Lieuwes</li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="question-box">
+                    <h4>Question 7: Which Reasoning is Often Used with This Interpretation Method?</h4>
+                    <div class="answer-box">
+                        <p style="font-size: 1.3em; color: #667eea; font-weight: bold;">ðŸ“ "UBI EADEM RATIO, IBI IDEM IUS"</p>
+                        <p style="font-size: 1.1em; margin-top: 10px;">"Where there is the same reason, there is the same law"</p>
+                        
+                        <div class="visual-diagram">
+                            <pre style="line-height: 1.8;">
+â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—
+â•‘           ANALOGICAL REASONING FORMULA               â•‘
+â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£
+â•‘                                                      â•‘
+â•‘  IF:   Situation A has Rule X                       â•‘
+â•‘        (because of Reason Y)                         â•‘
+â•‘                                                      â•‘
+â•‘  AND:  Situation B has same Reason Y                 â•‘
+â•‘                                                      â•‘
+â•‘  THEN: Situation B should have Rule X too            â•‘
+â•‘                                                      â•‘
+â•‘  â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•     â•‘
+â•‘                                                      â•‘
+â•‘  LIEUWES CASE APPLICATION:                           â•‘
+â•‘                                                      â•‘
+â•‘  Situation A: Ship (cargo sacrifice)                 â•‘
+â•‘  Rule X: Compensation by all beneficiaries           â•‘
+â•‘  Reason Y: Equity - burden of common benefit         â•‘
+â•‘            should be shared                          â•‘
+â•‘                                                      â•‘
+â•‘  Situation B: Friesland (house sacrifice)            â•‘
+â•‘  Same Reason Y? YES! Common benefit, burden shared   â•‘
+â•‘                                                      â•‘
+â•‘  THEREFORE: Rule X applies â†’ Compensation required   â•‘
+â•‘                                                      â•‘
+â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+                            </pre>
+                        </div>
+                        
+                        <div class="memory-box" style="margin-top: 20px;">
+                            <h3>ðŸ§  MEMORY AID</h3>
+                            <p><strong>"Same Reason = Same Rule"</strong></p>
+                            <p style="margin-top: 10px;">Think: Legal "copy-paste" - if the PURPOSE is identical, copy the rule to the new situation!</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="question-box">
+                    <h4>Question 8: Connection Between This Method and Bartolus's School of Law</h4>
+                    <div class="answer-box">
+                        <div class="key-concept" style="margin: 0;">
+                            <h3>ðŸ›ï¸ THE COMMENTATORS (or POST-GLOSSATORS) SCHOOL</h3>
+                            <p><strong>Time Period:</strong> 14th-16th centuries<br>
+                            <strong>Leader:</strong> Bartolus de Saxoferrato<br>
+                            <strong>Method:</strong> Extensive interpretation, analogy, creative adaptation</p>
+                        </div>
+                        
+                        <table class="comparison-table" style="margin-top: 20px;">
+                            <tr>
+                                <th>School</th>
+                                <th>Time</th>
+                                <th>Method</th>
+                                <th>Goal</th>
+                            </tr>
+                            <tr>
+                                <td><strong>GLOSSATORS</strong><br>(Accursius)</td>
+                                <td>11th-13th centuries</td>
+                                <td>â€¢ Explain texts literally<br>â€¢ Resolve contradictions<br>â€¢ Clarify difficult passages<br>â€¢ STAY CLOSE to original text</td>
+                                <td>Understand what Roman law SAID</td>
+                            </tr>
+                            <tr>
+                                <td><strong>COMMENTATORS</strong><br>(Bartolus)</td>
+                                <td>14th-16th centuries</td>
+                                <td>â€¢ Find underlying principles<br>â€¢ Extend by analogy<br>â€¢ Apply to new situations<br>â€¢ CREATE new rules</td>
+                                <td>Make Roman law USEFUL for current problems</td>
+                            </tr>
+                        </table>
+                        
+                        <div style="margin-top: 20px; padding: 20px; background: #e8f4f8; border-radius: 10px; border-left: 5px solid #3498db;">
+                            <p><strong>ðŸ”— THE CONNECTION:</strong></p>
+                            <p>The Court of Friesland in Lieuwes' case used the <strong>Commentators' method</strong> (Bartolian approach):</p>
+                            <ul style="margin-left: 20px; margin-top: 10px;">
+                                <li>âœ… Didn't just read Lex Rhodia literally (Glossator approach)</li>
+                                <li>âœ… Found the underlying principle (ratio = equity in burden-sharing)</li>
+                                <li>âœ… Extended it by analogy to a completely different context (maritime â†’ public law)</li>
+                                <li>âœ… Created a new rule (government liability) not explicitly in Roman law</li>
+                            </ul>
+                            <p style="margin-top: 15px; font-weight: bold;">This is CLASSIC Bartolian jurisprudence - creative, analogical, purposive interpretation!</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="question-box">
+                    <h4>Question 9: Why Was This Method Often the ONLY Way to Get Results?</h4>
+                    <div class="answer-box">
+                        <div class="visual-diagram">
+                            <pre style="line-height: 1.8;">
+â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—
+â•‘          THE NECESSITY OF EXTENSIVE INTERPRETATION   â•‘
+â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£
+â•‘                                                      â•‘
+â•‘  THE DILEMMA:                                        â•‘
+â•‘                                                      â•‘
+â•‘  Roman Law (Corpus Iuris Civilis)                    â•‘
+â•‘  â€¢ Written: 6th century AD (Justinian)               â•‘
+â•‘  â€¢ Context: Roman Empire, ancient society            â•‘
+â•‘  â€¢ No coverage of: feudalism, cities, guilds,        â•‘
+â•‘    nation-states, modern commerce                    â•‘
+â•‘                                                      â•‘
+â•‘  Medieval Europe (14th century)                      â•‘
+â•‘  â€¢ Completely different society                      â•‘
+â•‘  â€¢ NEW legal problems every day                      â•‘
+â•‘  â€¢ But Roman law = only comprehensive system         â•‘
+â•‘                                                      â•‘
+â•‘  â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•     â•‘
+â•‘                                                      â•‘
+â•‘  OPTIONS FOR JUDGES:                                 â•‘
+â•‘                                                      â•‘
+â•‘  âŒ Option 1: Strict literal reading                 â•‘
+â•‘     â†’ Can't solve modern problems                    â•‘
+â•‘     â†’ Law becomes useless                            â•‘
+â•‘                                                      â•‘
+â•‘  âŒ Option 2: Ignore Roman law entirely              â•‘
+â•‘     â†’ No comprehensive alternative                   â•‘
+â•‘     â†’ Legal chaos, inconsistency                     â•‘
+â•‘                                                      â•‘
+â•‘  âœ… Option 3: Extensive interpretation               â•‘
+â•‘     â†’ Find flexible principles in Roman texts        â•‘
+â•‘     â†’ Extend by analogy to new situations            â•‘
+â•‘     â†’ Keep authority of Roman law BUT adapt it       â•‘
+â•‘                                                      â•‘
+â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+                            </pre>
+                        </div>
+                        
+                        <div style="margin-top: 20px; padding: 20px; background: #fffbea; border-radius: 10px; border-left: 5px solid #f39c12;">
+                            <p><strong>ðŸ’¡ KEY INSIGHT:</strong></p>
+                            <p><strong>Extensive interpretation wasn't just clever - it was NECESSARY!</strong></p>
+                            <ul style="margin-left: 20px; margin-top: 10px;">
+                                <li><strong>Gap Problem:</strong> Corpus Iuris had NO rules for many medieval situations (e.g., government liability for acts in public interest)</li>
+                                <li><strong>Authority Problem:</strong> Couldn't just "make up" new law - courts had to justify decisions using existing authorities</li>
+                                <li><strong>Practical Solution:</strong> Find closest ancient principle â†’ extract ratio â†’ apply by analogy â†’ pretend you're still "interpreting" Roman law!</li>
+                            </ul>
+                            <p style="margin-top: 15px; font-weight: bold;">Without extensive interpretation, Roman law would have been a historical curiosity rather than a living legal system. Bartolus and the Commentators made it work for their time!</p>
+                        </div>
+                        
+                        <div class="interpretation-method" style="margin-top: 20px;">
+                            <h4>ðŸŽ¯ SPECIFIC TO LIEUWES' CASE:</h4>
+                            <p>Romans had NO concept of:</p>
+                            <ul style="margin-left: 20px;">
+                                <li>Sovereign states (like States of Friesland) as separate legal entities</li>
+                                <li>Government liability for lawful acts in public interest</li>
+                                <li>Compensation doctrine for administrative actions</li>
+                            </ul>
+                            <p style="margin-top: 10px;"><strong>Result:</strong> Court HAD to use extensive interpretation (Lex Rhodia analogy) because no direct Roman rule existed!</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="question-box">
+                    <h4>Question 10: Why Can We Speak of "Roman-Frisian Law" Before Codification?</h4>
+                    <div class="answer-box">
+                        <div class="visual-diagram">
+                            <pre style="line-height: 1.8;">
+â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—
+â•‘              ROMAN-FRISIAN LAW SYSTEM                â•‘
+â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£
+â•‘                                                      â•‘
+â•‘  PRIMARY LAW (Local Frisian Law)                     â•‘
+â•‘  â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•            â•‘
+â•‘  â€¢ Sovereign ordinances                              â•‘
+â•‘  â€¢ City statutes                                     â•‘
+â•‘  â€¢ Frisian customary law                             â•‘
+â•‘                                                      â•‘
+â•‘                    â¬‡ï¸ [If no primary rule]           â•‘
+â•‘                                                      â•‘
+â•‘  SUBSIDIARY LAW (Roman Law)                          â•‘
+â•‘  â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•            â•‘
+â•‘  â€¢ Corpus Iuris Civilis                              â•‘
+â•‘  â€¢ Accursian Gloss                                   â•‘
+â•‘  â€¢ Commentators' works                               â•‘
+â•‘                                                      â•‘
+â•‘  RESULT: Hybrid "Roman-Frisian" System               â•‘
+â•‘  â€¢ Frisian in name (primary)                         â•‘
+â•‘  â€¢ Roman in substance (filled gaps)                  â•‘
+â•‘                                                      â•‘
+â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+                            </pre>
+                        </div>
+                        
+                        <p style="margin-top: 20px;"><strong>ðŸŽ¯ WHY "ROMAN-FRISIAN"?</strong></p>
+                        
+                        <div class="law-hierarchy">
+                            <div class="law-level level-1" style="text-align: left;">
+                                <strong>1. LEGAL EDUCATION:</strong><br>
+                                Frisian judges studied Roman law at universities (Bologna, etc.)<br>
+                                They thought in Roman law categories
+                            </div>
+                            <div class="law-level level-2" style="text-align: left;">
+                                <strong>2. SUBSIDIARY ROLE:</strong><br>
+                                Whenever Frisian law was silent â†’ Roman law applied<br>
+                                Most complex legal questions â†’ resolved using Roman principles
+                            </div>
+                            <div class="law-level level-3" style="text-align: left;">
+                                <strong>3. INTERPRETIVE FRAMEWORK:</strong><br>
+                                Even Frisian customary law interpreted using Roman concepts<br>
+                                Legal reasoning based on Roman categories
+                            </div>
+                        </div>
+                        
+                        <div style="margin-top: 20px; padding: 20px; background: #e8f4f8; border-radius: 10px; border-left: 5px solid #3498db;">
+                            <p><strong>ðŸ“š COMPARISON TO ROMAN-DUTCH LAW:</strong></p>
+                            <p>Just like Holland had "Roman-Dutch law" (Dutch primary + Roman subsidiary), Friesland had "Roman-Frisian law" (Frisian primary + Roman subsidiary). The pattern was the same across Europe:</p>
+                            <ul style="margin-left: 20px; margin-top: 10px;">
+                                <li>ðŸ‡³ðŸ‡± <strong>Holland:</strong> Roman-Dutch law</li>
+                                <li>ðŸ‡³ðŸ‡± <strong>Friesland:</strong> Roman-Frisian law</li>
+                                <li>ðŸ‡«ðŸ‡· <strong>France:</strong> Roman-French law (in south)</li>
+                                <li>ðŸ‡©ðŸ‡ª <strong>Germany:</strong> Roman-German law</li>
+                            </ul>
+                            <p style="margin-top: 15px; font-weight: bold;">All European regions had this "hybrid" character: local on top, Roman underneath, before codification unified everything.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="question-box">
+                    <h4>Question 11: Why Could Court Use Writings/Decisions from Other European Jurisdictions?</h4>
+                    <div class="answer-box">
+                        <div class="visual-diagram">
+                            <pre style="line-height: 1.8;">
+â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—
+â•‘          THE IUS COMMUNE (COMMON LAW) SYSTEM         â•‘
+â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£
+â•‘                                                      â•‘
+â•‘  ALL European courts shared same foundation:         â•‘
+â•‘  â€¢ SAME texts: Corpus Iuris Civilis                  â•‘
+â•‘  â€¢ SAME gloss: Accursian Gloss                       â•‘
+â•‘  â€¢ SAME methods: Glossators & Commentators           â•‘
+â•‘  â€¢ SAME language: Latin                              â•‘
+â•‘  â€¢ SAME university training: Bologna model           â•‘
+â•‘                                                      â•‘
+â•‘  RESULT: Truly "COMMON" law across Europe            â•‘
+â•‘                                                      â•‘
+â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+                            </pre>
+                        </div>
+                        
+                        <p style="margin-top: 20px;"><strong>ðŸŒ SOURCES CITED IN LIEUWES' CASE:</strong></p>
+                        
+                        <table class="comparison-table">
+                            <tr>
+                                <th>Authority</th>
+                                <th>Origin</th>
+                                <th>Type</th>
+                            </tr>
+                            <tr>
+                                <td><strong>Johannes Andreae</strong></td>
+                                <td>ðŸ‡®ðŸ‡¹ Italy</td>
+                                <td>Legal scholar (14th c.)</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Bartolus</strong></td>
+                                <td>ðŸ‡®ðŸ‡¹ Italy</td>
+                                <td>Great Commentator</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Andreas Gaill</strong></td>
+                                <td>ðŸ‡©ðŸ‡ª Germany</td>
+                                <td>Reichskammergericht judge</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Van den Sande</strong></td>
+                                <td>ðŸ‡³ðŸ‡± Netherlands</td>
+                                <td>Dutch legal scholar</td>
+                            </tr>
+                            <tr>
+                                <td><strong>ArgentrÃ©</strong></td>
+                                <td>ðŸ‡«ðŸ‡· France (Brittany)</td>
+                                <td>French customary law expert</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Voet</strong></td>
+                                <td>ðŸ‡³ðŸ‡± Netherlands</td>
+                                <td>Dutch jurist</td>
+                            </tr>
+                        </table>
+                        
+                        <div style="margin-top: 20px; padding: 20px; background: #fff3cd; border-radius: 10px; border-left: 5px solid #f39c12;">
+                            <p><strong>ðŸ”‘ KEY REASONS:</strong></p>
+                            <ol style="margin-left: 20px; line-height: 1.8;">
+                                <li><strong>Common Foundation:</strong> All interpreting the SAME Roman law texts</li>
+                                <li><strong>Persuasive Authority:</strong> Brilliant scholars' opinions respected everywhere</li>
+                                <li><strong>Universal System:</strong> Ius commune = European-wide legal culture</li>
+                                <li><strong>Practical Necessity:</strong> More scholarship = better solutions to complex problems</li>
+                                <li><strong>No National Boundaries:</strong> Law was international, not nationalistic</li>
+                            </ol>
+                            <p style="margin-top: 15px; font-weight: bold;">Think of it like modern international legal scholars citing each other - except in pre-codification Europe, there was even MORE reason because everyone used the SAME legal foundation (Roman law)!</p>
+                        </div>
+                        
+                        <div class="interpretation-method" style="margin-top: 20px;">
+                            <h4>ðŸ“– SPECIFIC EXAMPLE FROM LIEUWES:</h4>
+                            <p>Court cited German Reichskammergericht (Imperial Chamber Court) decisions about similar compensation issues. Why? Because:</p>
+                            <ul style="margin-left: 20px; margin-top: 10px;">
+                                <li>German court interpreted SAME Roman texts (Lex Rhodia)</li>
+                                <li>Dealt with similar issues (public/private burden-sharing)</li>
+                                <li>Used same Bartolian method (extensive interpretation)</li>
+                                <li>Spoke same "legal language" (Latin, Roman categories)</li>
+                            </ul>
+                            <p style="margin-top: 10px;"><strong>Result:</strong> Frisian court could "borrow" German reasoning because they were working within the same ius commune system!</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- FINAL SUMMARY -->
+            <div class="memory-box" style="margin-top: 50px;">
+                <h3>ðŸŽ¯ WEEK 3 MASTER SUMMARY</h3>
+                <div class="mnemonic" style="margin: 20px 0;">
+                    Remember: "C.L.I.P." = Custom, Lex Rhodia, Interpretation, Principles
+                </div>
+                
+                <div class="pro-con" style="margin-top: 20px;">
+                    <div class="pro">
+                        <h3 style="color: #2980b9;">KEY CONCEPTS</h3>
+                        <ul style="margin-left: 20px; line-height: 1.8;">
+                            <li>âœ… Customary law = diuturnus usus + opinio iuris</li>
+                            <li>âœ… Proved by: turbe, written records, or court decisions</li>
+                            <li>âœ… Julian: custom CAN override statute (republic)</li>
+                            <li>âœ… Constantine: custom CANNOT override statute (empire)</li>
+                            <li>âœ… Accursian Gloss = authoritative interpretation</li>
+                            <li>âœ… Bartolus = extensive/analogical interpretation</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="con">
+                        <h3 style="color: #c0392b;">KEY CASES</h3>
+                        <ul style="margin-left: 20px; line-height: 1.8;">
+                            <li>ðŸ“œ Van Bijnkershoek: custom vs. statute debate</li>
+                            <li>ðŸ”¥ Lieuwes: houses burned for public good</li>
+                            <li>âš–ï¸ Lex Rhodia: cargo thrown to save ship</li>
+                            <li>ðŸ”— Analogy: maritime law â†’ government liability</li>
+                            <li>ðŸ’° Result: compensation for individual loss</li>
+                            <li>ðŸ›ï¸ Principle: equity in burden-sharing</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div style="margin-top: 30px; padding: 25px; background: white; border-radius: 10px; border: 3px solid #667eea;">
+                    <h3 style="color: #667eea; text-align: center; margin-bottom: 20px;">â­ THE BIG PICTURE â­</h3>
+                    <p style="text-align: center; font-size: 1.1em; line-height: 1.8;">
+                        Before codification, judges navigated complex systems of primary and subsidiary law. When gaps appeared, they used <strong>extensive interpretation</strong> to extend ancient Roman principles to modern problems. The Lieuwes case shows how maritime law (Lex Rhodia) was creatively applied to create government liability doctrine. This was NECESSARY because Romans never contemplated nation-states or public law issues. The ius commune united Europe through shared legal culture, language, and methods - creating a true "common law" centuries before modern codification!
+                    </p>
+                </div>
+            </div>
+
+            <!-- STUDY TIPS -->
+            <div class="key-concept" style="margin-top: 30px;">
+                <h3>ðŸ“š EXAM PREPARATION TIPS</h3>
+                <ol style="margin-left: 20px; line-height: 1.8;">
+                    <li><strong>Learn the Contrasts:</strong> Julian vs Constantine, Glossators vs Commentators, Primary vs Subsidiary</li>
+                    <li><strong>Master the Connections:</strong> How Lex Rhodia â†’ Lieuwes â†’ Modern compensation law</li>
+                    <li><strong>Understand Methods:</strong> Know WHY extensive interpretation was necessary, not just what it is</li>
+                    <li><strong>Memorize Latin Terms:</strong> diuturnus usus, opinio iuris, ratio legis, ubi eadem ratio</li>
+                    <li><strong>Timeline Context:</strong> Roman Republic â†’ Roman Empire â†’ Medieval Europe â†’ Pre-codification â†’ Codification</li>
+                    <li><strong>Practice Analogy:</strong> Be able to identify ratio and apply to new situations (like exam hypotheticals!)</li>
+                </ol>
+            </div>
+
+        </div>
+    </div>
+</body>
+</html>

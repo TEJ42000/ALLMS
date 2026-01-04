@@ -1,0 +1,338 @@
+# Legal History - Lecture 1 Notes
+
+Prof. Fritz Ralsmar | Introduction to Codification & Interpretation
+
+-----
+
+## Main concepts to remember
+
+Two big ideas run through everything:
+
+- **Codification** = writing all the law down in one official book
+- **Interpretation** = how judges actually use those written rules in real cases
+
+These two concepts are connected - you can’t have one without the other (more on this below)
+
+-----
+
+## The Bear Case (Groningen, 1990)
+
+Context: Fall of Berlin Wall (1989) → people from Eastern Europe traveling west for first time
+
+**What happened:**
+Romanian guy shows up in Groningen with a bear, walking down Heer Street. Police constable sees this and thinks “wtf do I do?” Remembers there’s a local rule about dogs - Section 53 says dogs must be kept on a leash in public.
+
+**The legal question:** Is a bear a dog?
+
+Sounds ridiculous but actually makes sense legally:
+
+The constable’s reasoning:
+
+- Law says dogs must be leashed because they’re dangerous
+- Bears are MORE dangerous than dogs
+- So if the rule applies to dogs, it should definitely apply to bears
+- Therefore: bear = dog (for purposes of this law)
+
+**What the court decided:**
+Court said NO because this involves criminal penalties. In criminal law there’s something called the legality principle - you can only punish someone if they knew in advance their behavior was illegal.
+
+Could this Romanian guy, where it’s normal to walk around with bears (whole scam was bear shows up, people pay him to take it away), have known that Dutch law would treat his bear like a dog? No.
+
+So: bear ≠ dog in this case
+
+**Why this matters:**
+Shows that legal interpretation isn’t about what words literally mean. It’s about how judges apply rules to specific situations. Same text can mean different things depending on context and which interpretation method you use.
+
+-----
+
+## Codification - Definition and Elements
+
+**Three essential elements** (remember: C-O-E)
+
+1. **Committed to writing**
+
+- Has to be written down, not oral/customary
+- Before codification most law was unwritten customs
+- Problem: nobody really knew what the rules were, judges could basically make stuff up
+
+1. **Official authority issues them**
+
+- Must come from the legislator (parliament)
+- Can’t be from random professors or judges writing books
+- Has to have democratic legitimacy
+
+1. **Exclusive source of law** ← most important
+
+- The code is the ONLY place judges can get rules from
+- Can’t use customary law, can’t use other sources
+- This is what forces judges to interpret creatively
+
+The term “codification” was invented by Jeremy Bentham (English philosopher) in 18th century. Comes from Latin: codex (book) + facere (to make).
+
+-----
+
+## Why Did Codification Happen? (18th century developments)
+
+**Three main reasons:**
+
+### 1. Rousseau’s political philosophy
+
+Published “The Social Contract” (du Contrat Social) - argued sovereignty should belong to the people, not kings
+
+Old way: King rules by divine right → does whatever he wants
+New way: People are sovereign → express will through elected representatives → parliament makes laws
+
+Key term: **volonté générale** (general will of the people)
+
+How it works:
+
+- Majority vote in parliament
+- Even if you disagreed, you’re still bound by it
+- Why? Social contract - you agreed to be part of this society
+
+This means ONLY laws made by parliament (representing people’s will) are legitimate. So everything has to be in a written code made by legislators.
+
+In France this required a revolution to actually implement (French Revolution, late 1700s)
+
+### 2. The legality principle
+
+Latin phrase: **nullum crimen, nulla poena sine lege**
+Translation: “no crime, no punishment without law”
+
+**Cesare Beccaria** wrote “On Crimes and Punishments” (1764) - super influential book
+
+Before this: criminal law was basically torture and arbitrary punishment
+
+- Don’t like someone? Arrest them
+- Make up what they did wrong
+- Torture them until they confess
+- Execute them
+
+Beccaria said this is barbaric. Proper criminal law should work like:
+
+1. Write down what’s illegal BEFORE anyone does it
+1. Publish it so everyone knows
+1. THEN if someone does it, you can punish them
+1. Judges can’t just invent new crimes
+
+This REQUIRES codification. You need everything written down clearly beforehand.
+
+### 3. Roman law tradition
+
+Weird thing: Roman law from 6th century AD (Emperor Justinian’s codification) was still being used in 18th century Europe. That’s like 1200+ years later.
+
+How is this possible? **Interpretation.**
+
+Justinian’s books were:
+
+- Detailed enough to cover most situations
+- General enough that judges could adapt them
+- Judges would interpret the ancient rules to fit modern cases
+
+This showed that old codes could work if judges have freedom to interpret them creatively.
+
+In the Middle Ages these Roman law books were rediscovered and became the main source of law across Europe (called “ius commune” - common law, but not the English kind). Universities taught it, lawyers applied it.
+
+-----
+
+## Why Interpretation is Essential
+
+**The Enlightenment ideal:** Judges should be “bouches de la loi” (mouths of the law) - just read what’s in the code and apply it mechanically, like robots or computers
+
+Montesquieu and others thought this would prevent judicial tyranny. Judges shouldn’t have power, they should just apply clear rules.
+
+**Why this failed:**
+
+- ALL texts need to be interpreted
+- Rules are written in abstract/general language
+- Cases involve specific facts
+- Someone has to decide what the rule means in this situation
+- That someone = the judge
+
+Example from Dutch Penal Code: says “He who commits…” certain crimes. Does this mean only men can be punished? No - judges interpret “he” to include “she.” Simple example but shows interpretation is ALWAYS happening.
+
+**In practice:** There are always two parties in a case
+
+- One says: “the rule doesn’t apply to me”
+- Other says: “yes it does”
+- Judge has to decide by interpreting the rule
+
+This is what lawyers do. It’s not about memorizing statutes. It’s about knowing how judges interpret them.
+
+-----
+
+## Methods of Interpretation
+
+### Grammatical (literal) interpretation
+
+Look at the exact words. Use dictionary. Take it at face value.
+
+Example: “dog” means a four-legged canine animal
+So bear ≠ dog
+
+This is **intrinsic** - stays within the text
+
+### Purposive/teleological interpretation
+
+Ask: what was this rule trying to accomplish?
+
+Example: dog leash law is about preventing dangerous animals from harming public
+Bears are dangerous → fits the purpose → can be included
+
+This is **extrinsic** - goes beyond the text
+
+### Systematic interpretation
+
+Look at how all the related rules fit together. Create a logical system. Treat similar cases the same way.
+
+Really important for Roman law because the texts were so old and disconnected - professors at universities would systematize everything into logical frameworks
+
+### Historical interpretation
+
+Look at legislative debates, parliamentary records, what lawmakers said when making the law
+
+Controversial method - some judges (especially American originalists) say we should only look at what the text meant when it was written. Others say this is too limiting.
+
+-----
+
+## Three Classic Cases
+
+### Case 1: The Tomato (Nix v. Hedden, US Supreme Court 1893)
+
+**Background:** Tariff Act of 1883 imposed tax on imported vegetables
+
+**Question:** Is a tomato a vegetable or a fruit?
+
+**Arguments:**
+
+- Plaintiff (Nix, the importer): Tomatoes are fruits. Botanically they have seeds, they’re the fruit of the plant. So no vegetable tax applies.
+- Defendant (Hedden, tax collector): In ordinary language tomatoes are vegetables
+
+**Court’s decision:** Tomato = vegetable
+
+Reasoning: “In the common language of the people… tomatoes are vegetables… usually served at dinner with soup, fish or meats… and not, like fruits, as dessert.”
+
+They used common usage interpretation, not scientific/botanical definition.
+
+There’s actually a restaurant in NY called “Nix” where they only serve vegetables to commemorate this case lol
+
+### Case 2: Standing Still = Driving? (People v. Nelson, California 2011)
+
+**Law:** Can’t use cell phone while driving
+
+**Facts:** Guy is stopped at a red light, using his phone. Cop sees him, gives him a ticket.
+
+**Guy’s defense:** I wasn’t driving, I was stopped. Standing still isn’t the same as driving.
+
+**Court’s decision:** Standing still IS driving for purposes of this law
+
+Reasoning: The purpose of the law is to prevent distracted driving and make roads safer. You can cause danger even when stopped at a light if you’re not paying attention. “Driving” means participating in traffic, being on the road - not just physically moving.
+
+Used purposive interpretation over literal reading.
+
+### Case 3: The Bear (covered above)
+
+-----
+
+## Jeremy Bentham (1748-1832)
+
+English philosopher who invented the term “codification”
+
+**His critique of English law:**
+Said the common law system (where judges make law through precedents) is like “law for dogs” - you punish the dog AFTER it does something bad, so it learns. But people should know the rules in advance.
+
+Wanted to codify all English law. Never succeeded - England still doesn’t have a comprehensive civil code.
+
+**Fun fact:** He founded University College London and his will specified that his body should be preserved and kept at the university. They do this - his skeleton is dressed in his clothes and sits in a case at the entrance. They have an annual dinner in his honor and he “attends” (his corpse is at the head of the table).
+
+One problem: his head didn’t preserve well and looked awful. So they commissioned Madame Tussaud to make a wax head. That’s what’s on the body now. The real head is kept separately.
+
+-----
+
+## Codification vs Common Law Systems
+
+**Continental (codified) systems:**
+
+- One exclusive source: the code
+- Judge’s job: interpret the code
+- Examples: France, Germany, Netherlands, most of Europe
+
+**Common law systems:**
+
+- Multiple sources: statutes + judicial precedents
+- Judges create law through their decisions
+- Precedents are binding (stare decisis)
+- Examples: England, US, former British colonies
+
+Both require lots of interpretation though. Common law just openly admits judges make law.
+
+-----
+
+## Criminal Law vs Private Law
+
+**Criminal law:**
+Only got codified in 18th-19th century with legality principle. Before that it was just arbitrary violence by the state.
+
+**Private law:**
+Has existed for thousands of years. Romans developed sophisticated private law. Most modern European codes are like 90% based on Roman law concepts.
+
+This course focuses mainly on private law codifications because that’s where the longer history is.
+
+-----
+
+## Important concepts for exam
+
+**Codification elements:** Written + Official + Exclusive
+
+**Interpretation methods:** Grammatical, purposive, systematic, historical
+
+**Why codification arose:** Rousseau (democracy), Beccaria (legality principle), Roman law tradition
+
+**Key case examples:** Bear, tomato, standing still
+
+**Reality of codification:** The Enlightenment ideal of judges as “mouths of the law” failed. Judges MUST interpret. Interpretation is unavoidable and actually necessary for codes to work.
+
+**What you need to know as a lawyer:** Not the text of statutes by heart, but HOW JUDGES INTERPRET them. That’s why we read cases.
+
+-----
+
+## Course structure
+
+12 lectures over 6 weeks:
+
+- Week 1: Intro (codification & interpretation) ← this lecture
+- Week 2: Natural law
+- Weeks 3-4: Roman law (2 lectures)
+- Week 5: Italy, Germany
+- Week 6: France, Germany
+- Week 7: England
+- Week 8: Modern Europe
+
+Then one week off for studying. Exam is January 14 - essay questions.
+
+Tutorials: 6 sessions, 2 hours each. Need to read cases on Brightspace beforehand.
+
+-----
+
+## Personal study notes
+
+Main textbook: “History of European Codification” by Kjell Åke Modéer (buy at reading shop)
+Workbook on Brightspace (don’t need to buy)
+
+Example exam questions will be posted on Brightspace
+
+Prof mentioned we should focus on learning how to read cases, not just memorizing provisions. When reading cases look for:
+
+1. The facts
+1. The applicable rule of law
+1. The legal question
+1. The decision
+1. Most importantly - HOW the judge interpreted the rule
+
+Quote from the reading: “A person can only become a good lawyer if he does so with a bad conscience” - Radbruch
+
+Another quote (Goethe): “Jurisprudence begins to please me very much. Thus it is with all things as with good beer: the first time we shudder at it, and having drunk it for a week, we cannot do without it.”
+
+-----
+
+**Random observation:** Prof mentioned Alexis de Tocqueville visited US in 1831 and wrote that “scarcely any political question arises in the United States that is not resolved, sooner or later, into a judicial question.” Still true today - everything becomes a court case in America.​​​​​​​​​​​​​​​​

@@ -1,0 +1,57 @@
+{
+  "course_info": {
+    "title": "Legal History",
+    "institution": "University of Groningen",
+    "professors": ["Prof. Fritz Brandsma", "Prof. Jelle Jansen"],
+    "exam_date": "2025-01-14"
+  },
+  "mnemonics": {
+    "COE": {
+      "C": "Committed to writing",
+      "O": "Official authority",
+      "E": "Exclusive source"
+    },
+    "GHTCS": {
+      "G": "Grammatical",
+      "H": "Historical",
+      "T": "Teleological",
+      "C": "Contextual",
+      "S": "Sociological"
+    },
+    "KRE": {
+      "K": "Kingdom",
+      "R": "Republic",
+      "E": "Empire"
+    }
+  },
+  "justinian_codification": [
+    {"name": "Digest", "books": 50, "content": "Jurist law", "lex_posterior": false},
+    {"name": "Institutes", "content": "Student textbook", "lex_posterior": false},
+    {"name": "Codex", "content": "Imperial legislation", "lex_posterior": true},
+    {"name": "Novels", "content": "Post-Codex laws", "lex_posterior": true}
+  ],
+  "big_five_jurists": ["Gaius", "Ulpianus", "Paulus", "Papinianus", "Modestinus"],
+  "key_cases": [
+    {"name": "Bear Case", "year": 1990, "principle": "Legality principle"},
+    {"name": "Nix v. Hedden", "year": 1893, "principle": "Common usage interpretation"},
+    {"name": "People v. Nelson", "year": 2011, "principle": "Purposive interpretation"},
+    {"name": "Marbury v. Madison", "year": 1803, "principle": "Judicial review"},
+    {"name": "Popov v. Hayashi", "year": 2002, "principle": "Roman law concepts"},
+    {"name": "Nuremberg Trials", "year": "1945-46", "principle": "Unjust law not valid"},
+    {"name": "Wall Shooters", "year": "1990s", "principle": "Radbruch Formula"},
+    {"name": "Young v. Bristol", "year": 1944, "principle": "Stare decisis"},
+    {"name": "Bulmer v. Bollinger", "year": 1974, "principle": "EU law supremacy"}
+  ],
+  "timeline": [
+    {"year": "6th C", "event": "Justinian Codification"},
+    {"year": 1762, "event": "Rousseau - Social Contract"},
+    {"year": 1764, "event": "Beccaria - Crimes & Punishments"},
+    {"year": 1789, "event": "French Revolution"},
+    {"year": 1803, "event": "Marbury v. Madison"},
+    {"year": 1804, "event": "Code Civil"},
+    {"year": 1814, "event": "Thibaut vs Savigny"},
+    {"year": 1861, "event": "Italian Unification"},
+    {"year": 1900, "event": "German Civil Code"},
+    {"year": 1946, "event": "Radbruch Formula"}
+  ]
+}
