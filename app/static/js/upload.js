@@ -5,6 +5,14 @@
 let selectedFiles = [];
 let currentCourseId = null;
 
+// Helper function to escape HTML special characters
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
 // Initialize upload functionality
 function initUpload(courseId) {
     currentCourseId = courseId;
@@ -33,8 +41,6 @@ function initUpload(courseId) {
         dropZone.addEventListener('drop', handleDrop);
     }
     
-    // Load uploaded materials
-    loadUploadedMaterials();
 }
 
 function openUploadModal() {
@@ -187,7 +193,8 @@ async function submitUpload() {
     const weekNumber = document.getElementById('upload-week').value;
     const description = document.getElementById('upload-description').value;
     const extractText = document.getElementById('upload-extract-text').checked;
-    
+    const generateSummary = document.getElementById('upload-generate-summary').checked;
+
     // Show progress
     const progressDiv = document.getElementById('upload-progress');
     const progressFill = document.getElementById('progress-fill');
@@ -208,7 +215,7 @@ async function submitUpload() {
         progressText.textContent = `Uploading ${i + 1} of ${selectedFiles.length}: ${file.name}`;
         
         try {
-            await uploadSingleFile(file, tier, category, weekNumber, description, extractText);
+            await uploadSingleFile(file, tier, category, weekNumber, description, extractText, generateSummary);
             successCount++;
         } catch (error) {
             console.error(`Failed to upload ${file.name}:`, error);
@@ -219,17 +226,20 @@ async function submitUpload() {
     // Reset
     submitBtn.disabled = false;
     progressDiv.classList.add('hidden');
-    
+
     if (errorCount === 0) {
         showToast(`Successfully uploaded ${successCount} file(s)`, 'success');
         closeUploadModal();
-        loadUploadedMaterials();
+        // Refresh the main materials list to include uploaded materials
+        if (typeof renderCourseMaterialsList === 'function' && typeof currentCourse !== 'undefined') {
+            renderCourseMaterialsList(currentCourse?.materials || null);
+        }
     } else {
         showToast(`Uploaded ${successCount} file(s), ${errorCount} failed`, 'warning');
     }
 }
 
-async function uploadSingleFile(file, tier, category, weekNumber, description, extractText) {
+async function uploadSingleFile(file, tier, category, weekNumber, description, extractText, generateSummary) {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('tier', tier);
@@ -237,6 +247,7 @@ async function uploadSingleFile(file, tier, category, weekNumber, description, e
     if (weekNumber) formData.append('week_number', weekNumber);
     if (description) formData.append('description', description);
     formData.append('extract_text', extractText);
+    formData.append('generate_summary', generateSummary);
     
     const response = await fetch(`/api/admin/courses/${currentCourseId}/materials/upload`, {
         method: 'POST',
@@ -249,56 +260,6 @@ async function uploadSingleFile(file, tier, category, weekNumber, description, e
     }
     
     return await response.json();
-}
-
-async function loadUploadedMaterials() {
-    if (!currentCourseId) return;
-    
-    try {
-        const response = await fetch(`/api/admin/courses/${currentCourseId}/materials/uploads`);
-        if (!response.ok) throw new Error('Failed to load uploaded materials');
-        
-        const data = await response.json();
-        displayUploadedMaterials(data.materials);
-    } catch (error) {
-        console.error('Failed to load uploaded materials:', error);
-    }
-}
-
-function displayUploadedMaterials(materials) {
-    const container = document.getElementById('uploaded-materials-list');
-    
-    if (!materials || materials.length === 0) {
-        container.innerHTML = '<p class="empty-state">No uploaded materials yet.</p>';
-        return;
-    }
-    
-    container.innerHTML = materials.map(material => `
-        <div class="uploaded-material-item">
-            <div class="material-info">
-                <div class="material-title">
-                    ${getFileIcon(material.filename)} ${escapeHtml(material.title || material.filename)}
-                </div>
-                <div class="material-meta">
-                    <span class="material-badge badge-${material.tier}">${material.tier.replace('_', ' ')}</span>
-                    ${material.category ? `<span class="material-badge badge-course">${material.category}</span>` : ''}
-                    ${material.weekNumber ? `<span class="material-badge badge-course">Week ${material.weekNumber}</span>` : ''}
-                    ${material.textExtracted ? '<span class="material-badge badge-extracted">✓ Text Extracted</span>' : ''}
-                    ${material.extractionError ? '<span class="material-badge badge-error">⚠ Extraction Failed</span>' : ''}
-                </div>
-                <div class="material-meta">
-                    ${formatFileSize(material.fileSize)} • ${material.fileType.toUpperCase()} • 
-                    Uploaded ${new Date(material.uploadedAt).toLocaleDateString()}
-                </div>
-                ${material.description ? `<div class="material-meta">${escapeHtml(material.description)}</div>` : ''}
-            </div>
-            <div class="material-actions">
-                ${material.textExtracted ? `<button class="btn-icon" onclick="viewMaterialText('${material.id}')" title="View Text">📄</button>` : ''}
-                <button class="btn-icon" onclick="previewMaterial('${escapeHtml(material.storagePath)}')" title="Preview">👁️</button>
-                <button class="btn-icon" onclick="deleteMaterial('${material.id}')" title="Delete" style="color: var(--error-color);">🗑️</button>
-            </div>
-        </div>
-    `).join('');
 }
 
 async function viewMaterialText(materialId) {
@@ -319,16 +280,19 @@ async function deleteMaterial(materialId) {
     if (!confirm('Are you sure you want to delete this material? This cannot be undone.')) {
         return;
     }
-    
+
     try {
         const response = await fetch(`/api/admin/courses/${currentCourseId}/materials/uploads/${materialId}`, {
             method: 'DELETE'
         });
-        
+
         if (!response.ok) throw new Error('Failed to delete material');
-        
+
         showToast('Material deleted successfully', 'success');
-        loadUploadedMaterials();
+        // Refresh the main materials list
+        if (typeof renderCourseMaterialsList === 'function' && typeof currentCourse !== 'undefined') {
+            renderCourseMaterialsList(currentCourse?.materials || null);
+        }
     } catch (error) {
         showToast('Failed to delete material', 'error');
     }

@@ -196,15 +196,7 @@
                     </div>
 
                     <div id="course-materials-list" class="materials-list">
-                        <p class="empty-state">No materials loaded. Click "Scan Folders" to discover materials.</p>
-                    </div>
-
-                    <!-- Uploaded Materials Section -->
-                    <div class="uploaded-materials-section" style="margin-top: 20px;">
-                        <h4>📤 Uploaded Materials</h4>
-                        <div id="uploaded-materials-list" class="uploaded-materials-list">
-                            <p class="empty-state">No uploaded materials yet.</p>
-                        </div>
+                        <p class="empty-state">No materials loaded. Click "Scan Folders" to discover materials or "Upload Files" to add new materials.</p>
                     </div>
                 </div>
 
@@ -419,6 +411,13 @@
                             <small class="form-hint">Text extraction enables AI features like quiz generation</small>
                         </div>
 
+                        <div class="form-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="upload-generate-summary" checked> Generate AI summary
+                            </label>
+                            <small class="form-hint">Automatically create a concise summary of the document content</small>
+                        </div>
+
                         <div id="upload-progress" class="upload-progress hidden">
                             <div class="progress-bar">
                                 <div class="progress-fill" id="progress-fill"></div>
@@ -490,8 +489,8 @@
         // Pass course_id from server if editing specific course
         window.initialCourseId = "{{ course_id | default('') }}";
     </script>
-    <script src="/static/js/upload.js"></script>
-    <script src="/static/js/admin.js"></script>
+    <script src="/static/js/upload.js?v=6"></script>
+    <script src="/static/js/admin.js?v=6"></script>
 </body>
 </html>
 

@@ -143,13 +143,33 @@ async function scanMaterials() {
     }
 }
 
-function renderCourseMaterialsList(materials) {
+async function renderCourseMaterialsList(materials, uploadedMaterials = null) {
     const container = document.getElementById('course-materials-list');
     if (!container) return;  // Guard for when not on course detail view
 
-    if (!materials) {
-        container.innerHTML = '<p class="empty-state">No materials loaded. Click "Scan Folders" to discover materials.</p>';
+    // Fetch uploaded materials if not provided
+    if (uploadedMaterials === null && currentCourse?.id) {
+        try {
+            const response = await fetch(`/api/admin/courses/${currentCourse.id}/materials/uploads`);
+            if (response.ok) {
+                const data = await response.json();
+                uploadedMaterials = data.materials || [];
+            } else {
+                uploadedMaterials = [];
+            }
+        } catch (e) {
+            uploadedMaterials = [];
+        }
+    }
+
+    if (!materials && (!uploadedMaterials || uploadedMaterials.length === 0)) {
+        container.innerHTML = '<p class="empty-state">No materials loaded. Click "Scan Folders" to discover materials or "Upload Files" to add new materials.</p>';
         return;
+    }
+
+    // Initialize materials object if null
+    if (!materials) {
+        materials = {};
     }
 
     // Build a map of file -> weeks that reference it
@@ -205,6 +225,114 @@ function renderCourseMaterialsList(materials) {
         return '<span class="extraction-status-badge not-extracted">Not Extracted</span>';
     };
 
+    // Helper to format file size
+    const formatSize = (bytes) => {
+        if (!bytes) return '';
+        if (bytes < 1024) return bytes + ' B';
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+        return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    };
+
+    // Build a set of uploaded file paths for deduplication
+    const uploadedFilePaths = new Set();
+    const uploadedMaterialIds = {};
+
+    // Convert uploaded materials to the scanned format and merge by category
+    if (uploadedMaterials && uploadedMaterials.length > 0) {
+        uploadedMaterials.forEach(um => {
+            // Strip 'Materials/' prefix from storagePath for preview API compatibility
+            let filePath = um.storagePath || '';
+            if (filePath.startsWith('Materials/')) {
+                filePath = filePath.substring('Materials/'.length);
+            }
+
+            // Track uploaded paths for deduplication
+            uploadedFilePaths.add(filePath);
+            uploadedFilePaths.add(um.filename);  // Also track by filename
+            uploadedMaterialIds[filePath] = um.id;
+
+            const converted = {
+                title: um.title || um.filename,
+                file: filePath,
+                size: formatSize(um.fileSize),
+                week: um.weekNumber,
+                isUploaded: true,  // Mark as uploaded for styling
+                materialId: um.id,  // Store ID for delete functionality
+                summary: um.summary,
+                summaryGenerated: um.summaryGenerated,
+                textExtracted: um.textExtracted,
+                uploadedAt: um.uploadedAt
+            };
+
+            // Map category to the appropriate array
+            const category = um.category?.toLowerCase();
+            if (category === 'lecture') {
+                if (!materials.lectures) materials.lectures = [];
+                materials.lectures.push(converted);
+            } else if (category === 'reading') {
+                if (!materials.readings) materials.readings = [];
+                materials.readings.push(converted);
+            } else if (category === 'case') {
+                if (!materials.caseStudies) materials.caseStudies = [];
+                materials.caseStudies.push(converted);
+            } else if (um.tier === 'syllabus') {
+                // Syllabus goes to coreTextbooks
+                if (!materials.coreTextbooks) materials.coreTextbooks = [];
+                materials.coreTextbooks.push(converted);
+            } else {
+                // Default to 'other' for supplementary or uncategorized
+                if (!materials.other) materials.other = [];
+                materials.other.push(converted);
+            }
+        });
+    }
+
+    // Deduplicate: remove scanned materials that match uploaded materials
+    const deduplicateArray = (arr) => {
+        if (!arr) return arr;
+        return arr.filter(m => {
+            if (m.isUploaded) return true;  // Keep uploaded materials
+            const filename = m.file ? m.file.split('/').pop() : '';
+            return !uploadedFilePaths.has(m.file) && !uploadedFilePaths.has(filename);
+        });
+    };
+
+    materials.coreTextbooks = deduplicateArray(materials.coreTextbooks);
+    materials.lectures = deduplicateArray(materials.lectures);
+    materials.readings = deduplicateArray(materials.readings);
+    materials.caseStudies = deduplicateArray(materials.caseStudies);
+    materials.mockExams = deduplicateArray(materials.mockExams);
+    materials.other = deduplicateArray(materials.other);
+
+    // Helper to render a material item with uploaded badges, extraction status, and delete button
+    const renderMaterialItem = (m, weekHint = null) => {
+        const uploadedBadge = m.isUploaded ? '<span class="material-badge badge-uploaded">📤 Uploaded</span>' : '';
+        const summaryBadge = m.summaryGenerated ? '<span class="material-badge badge-summary">✨ AI Summary</span>' : '';
+        const textBadge = m.textExtracted ? '<span class="material-badge badge-extracted">✓ Text</span>' : '';
+        const badges = [uploadedBadge, summaryBadge, textBadge].filter(b => b).join(' ');
+
+        // Delete button only for uploaded materials
+        const deleteBtn = m.isUploaded && m.materialId
+            ? `<button class="delete-btn" onclick="event.stopPropagation(); deleteMaterial('${m.materialId}')" title="Delete">🗑️</button>`
+            : '';
+
+        return `
+            <li class="${m.isUploaded ? 'uploaded-item' : ''}">
+                <div class="material-item-content">
+                    <span class="material-title">${m.title}</span>
+                    <span class="material-meta">${getWeekDisplay(m.file, weekHint || m.week)} · ${m.size || m.court || ''}</span>
+                    ${badges ? `<div class="material-badges">${badges}</div>` : ''}
+                    ${m.summary ? `<div class="material-summary-inline" title="${m.summary.replace(/"/g, '&quot;')}">📝 ${m.summary.substring(0, 100)}${m.summary.length > 100 ? '...' : ''}</div>` : ''}
+                </div>
+                <div class="material-actions-inline">
+                    ${extractionBadge(m.file)}
+                    ${previewBtn(m.file, m.title)}
+                    ${deleteBtn}
+                </div>
+            </li>
+        `;
+    };
+
     const sections = [];
 
     // Core Textbooks
@@ -213,14 +341,7 @@ function renderCourseMaterialsList(materials) {
             <div class="materials-category">
                 <h4>📚 Core Textbooks (${materials.coreTextbooks.length})</h4>
                 <ul class="materials-items">
-                    ${materials.coreTextbooks.map(t => `
-                        <li>
-                            <span class="material-title">${t.title}</span>
-                            <span class="material-meta">${getWeekDisplay(t.file, null)} · ${t.size || ''}</span>
-                            ${extractionBadge(t.file)}
-                            ${previewBtn(t.file, t.title)}
-                        </li>
-                    `).join('')}
+                    ${materials.coreTextbooks.map(t => renderMaterialItem(t)).join('')}
                 </ul>
             </div>
         `);
@@ -232,14 +353,7 @@ function renderCourseMaterialsList(materials) {
             <div class="materials-category">
                 <h4>🎓 Lectures (${materials.lectures.length})</h4>
                 <ul class="materials-items">
-                    ${materials.lectures.map(l => `
-                        <li>
-                            <span class="material-title">${l.title}</span>
-                            <span class="material-meta">${getWeekDisplay(l.file, l.week)} · ${l.size || ''}</span>
-                            ${extractionBadge(l.file)}
-                            ${previewBtn(l.file, l.title)}
-                        </li>
-                    `).join('')}
+                    ${materials.lectures.map(l => renderMaterialItem(l, l.week)).join('')}
                 </ul>
             </div>
         `);
@@ -251,14 +365,7 @@ function renderCourseMaterialsList(materials) {
             <div class="materials-category">
                 <h4>📖 Readings (${materials.readings.length})</h4>
                 <ul class="materials-items">
-                    ${materials.readings.map(r => `
-                        <li>
-                            <span class="material-title">${r.title}</span>
-                            <span class="material-meta">${getWeekDisplay(r.file, r.week)} · ${r.size || ''}</span>
-                            ${extractionBadge(r.file)}
-                            ${previewBtn(r.file, r.title)}
-                        </li>
-                    `).join('')}
+                    ${materials.readings.map(r => renderMaterialItem(r, r.week)).join('')}
                 </ul>
             </div>
         `);
@@ -270,14 +377,7 @@ function renderCourseMaterialsList(materials) {
             <div class="materials-category">
                 <h4>⚖️ Case Studies (${materials.caseStudies.length})</h4>
                 <ul class="materials-items">
-                    ${materials.caseStudies.map(c => `
-                        <li>
-                            <span class="material-title">${c.title}</span>
-                            <span class="material-meta">${getWeekDisplay(c.file, null)} · ${c.court || ''}</span>
-                            ${extractionBadge(c.file)}
-                            ${previewBtn(c.file, c.title)}
-                        </li>
-                    `).join('')}
+                    ${materials.caseStudies.map(c => renderMaterialItem(c)).join('')}
                 </ul>
             </div>
         `);
@@ -289,39 +389,26 @@ function renderCourseMaterialsList(materials) {
             <div class="materials-category">
                 <h4>📝 Mock Exams (${materials.mockExams.length})</h4>
                 <ul class="materials-items">
-                    ${materials.mockExams.map(e => `
-                        <li>
-                            <span class="material-title">${e.title}</span>
-                            <span class="material-meta">${getWeekDisplay(e.file, null)} · ${e.size || ''}</span>
-                            ${extractionBadge(e.file)}
-                            ${previewBtn(e.file, e.title)}
-                        </li>
-                    `).join('')}
+                    ${materials.mockExams.map(e => renderMaterialItem(e)).join('')}
                 </ul>
             </div>
         `);
     }
 
-    // Other
+    // Other / Supplementary
     if (materials.other?.length) {
         sections.push(`
             <div class="materials-category">
-                <h4>📄 Other (${materials.other.length})</h4>
+                <h4>📄 Other / Supplementary (${materials.other.length})</h4>
                 <ul class="materials-items">
-                    ${materials.other.map(o => `
-                        <li>
-                            <span class="material-title">${o.title}</span>
-                            <span class="material-meta">${getWeekDisplay(o.file, null)} · ${o.category || ''}</span>
-                            ${previewBtn(o.file, o.title)}
-                        </li>
-                    `).join('')}
+                    ${materials.other.map(o => renderMaterialItem(o)).join('')}
                 </ul>
             </div>
         `);
     }
 
     if (sections.length === 0) {
-        container.innerHTML = '<p class="empty-state">No materials found. Click "Scan Folders" to discover materials.</p>';
+        container.innerHTML = '<p class="empty-state">No materials found. Click "Scan Folders" to discover materials or "Upload Files" to add new materials.</p>';
     } else {
         container.innerHTML = sections.join('');
     }
@@ -385,7 +472,7 @@ function getCourseFormData() {
         program: document.getElementById('course-program').value.trim(),
         institution: document.getElementById('course-institution').value.trim(),
         academicYear: document.getElementById('course-year').value.trim(),
-        ectsPoints: parseInt(document.getElementById('course-points').value) || null,
+        totalPoints: parseInt(document.getElementById('course-points').value) || null,
         materialSubjects: document.getElementById('course-subjects').value.split(',').map(s => s.trim()).filter(Boolean),
         components: collectComponents(),
         abbreviations: collectAbbreviations(),
@@ -458,7 +545,7 @@ function renderCoursesList() {
             <div class="course-id">${course.id}</div>
             <div class="course-meta">
                 ${course.institution || ''} ${course.academicYear ? '• ' + course.academicYear : ''}
-                ${course.ectsPoints ? '• ' + course.ectsPoints + ' ECTS' : ''}
+                ${course.totalPoints ? '• ' + course.totalPoints + ' ECTS' : ''}
             </div>
             <span class="course-status ${(course.active ?? course.isActive) ? 'active' : 'inactive'}">
                 ${(course.active ?? course.isActive) ? '● Active' : '○ Inactive'}
@@ -477,7 +564,7 @@ function renderCourseForm() {
     document.getElementById('course-program').value = currentCourse.program || '';
     document.getElementById('course-institution').value = currentCourse.institution || '';
     document.getElementById('course-year').value = currentCourse.academicYear || '';
-    document.getElementById('course-points').value = currentCourse.ectsPoints || '';
+    document.getElementById('course-points').value = currentCourse.totalPoints || '';
     document.getElementById('course-subjects').value = (currentCourse.materialSubjects || []).join(', ');
     document.getElementById('course-active').checked = (currentCourse.active ?? currentCourse.isActive) !== false;
     document.getElementById('course-id').disabled = true;
@@ -1206,6 +1293,42 @@ function closePreviewModal() {
     const modal = document.getElementById('preview-modal');
     if (modal) {
         modal.classList.add('hidden');
+    }
+}
+
+// ========== Delete Material ==========
+async function deleteMaterial(materialId) {
+    if (!currentCourse?.id) {
+        showToast('No course selected', 'error');
+        return;
+    }
+
+    if (!confirm('Are you sure you want to delete this material? This action cannot be undone.')) {
+        return;
+    }
+
+    try {
+        showLoading();
+        const response = await fetch(`${API_BASE}/courses/${currentCourse.id}/materials/uploads/${materialId}`, {
+            method: 'DELETE'
+        });
+
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.detail || 'Failed to delete material');
+        }
+
+        showToast('Material deleted successfully', 'success');
+
+        // Refresh the materials list
+        if (currentCourse?.materials) {
+            await renderCourseMaterialsList(currentCourse.materials);
+        }
+    } catch (error) {
+        console.error('Delete error:', error);
+        showToast(`Failed to delete: ${error.message}`, 'error');
+    } finally {
+        hideLoading();
     }
 }
 
