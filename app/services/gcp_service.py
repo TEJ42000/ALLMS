@@ -74,10 +74,10 @@ def get_secret(secret_id: str, version: str = "latest") -> Optional[str]:
             name = f"projects/{GCP_PROJECT_ID}/secrets/{secret_id}/versions/{version}"
             response = client.access_secret_version(request={"name": name})
             secret_value = response.payload.data.decode("UTF-8")
-            logger.info("Retrieved secret '%s' from Secret Manager", secret_id)
+            logger.info("Retrieved secret from Secret Manager")
             return secret_value
         except Exception as e:
-            logger.warning("Failed to get secret '%s' from Secret Manager: %s", secret_id, str(e))
+            logger.warning("Failed to get secret from Secret Manager: %s", str(e))
     
     # Fallback to environment variable
     # Convert secret-id to ENV_VAR format: anthropic-api-key -> ANTHROPIC_API_KEY
@@ -88,7 +88,7 @@ def get_secret(secret_id: str, version: str = "latest") -> Optional[str]:
         logger.info("Using '%s' from environment variable", env_var_name)
         return env_value
     
-    logger.error("Secret '%s' not found in Secret Manager or environment (%s)", secret_id, env_var_name)
+    logger.error("Secret not found in Secret Manager or environment (%s)", env_var_name)
     return None
 
 
