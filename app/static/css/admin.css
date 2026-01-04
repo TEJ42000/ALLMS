@@ -402,3 +402,59 @@
     font-size: 0.8em;
 }
 
+/* Material picker in week editor */
+.material-picker {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-top: 10px;
+}
+
+.material-picker select {
+    flex: 1;
+    max-width: 400px;
+}
+
+.week-material-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 6px;
+    margin-bottom: 6px;
+}
+
+.week-material-row:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.material-type-badge {
+    background: var(--accent);
+    color: var(--bg-primary);
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 0.75em;
+    font-weight: 600;
+    text-transform: uppercase;
+    min-width: 60px;
+    text-align: center;
+}
+
+.material-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.material-info strong {
+    color: var(--text-primary);
+    font-size: 0.9em;
+}
+
+.material-info small {
+    color: var(--text-secondary);
+    font-size: 0.8em;
+}
+

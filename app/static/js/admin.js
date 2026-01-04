@@ -363,12 +363,9 @@ function collectAbbreviations() {
 }
 
 function collectMaterials() {
-    const rows = document.querySelectorAll('#materials-list .item-row');
-    return Array.from(rows).map(row => ({
-        title: row.querySelector('.mat-title')?.value.trim() || '',
-        file: row.querySelector('.mat-file')?.value.trim() || '',
-        pages: row.querySelector('.mat-pages')?.value.trim() || ''
-    })).filter(m => m.title || m.file);
+    // Materials are now stored directly in currentWeek.materials
+    // They're added via the picker, not via form inputs
+    return (currentWeek?.materials || []).filter(m => m.file || m.title);
 }
 
 function collectConcepts() {
@@ -485,16 +482,132 @@ function renderTopicsList() {
     `).join('') || '<p class="empty-state">No topics</p>';
 }
 
-function renderMaterialsList() {
+function renderWeekMaterialsList() {
     const materials = currentWeek?.materials || [];
-    document.getElementById('materials-list').innerHTML = materials.map((m, i) => `
-        <div class="item-row" data-idx="${i}">
-            <input type="text" value="${m.title || ''}" placeholder="Material title" class="mat-title">
-            <input type="text" value="${m.file || ''}" placeholder="Filename" class="mat-file">
-            <input type="text" value="${m.pages || ''}" placeholder="Pages" class="mat-pages">
-            <button type="button" class="btn-remove" onclick="removeMaterial(${i})">✕</button>
-        </div>
-    `).join('') || '<p class="empty-state">No materials</p>';
+    const container = document.getElementById('week-materials-list');
+
+    if (materials.length === 0) {
+        container.innerHTML = '<p class="empty-state">No materials linked to this week</p>';
+    } else {
+        container.innerHTML = materials.map((m, i) => `
+            <div class="week-material-row" data-idx="${i}">
+                <span class="material-type-badge">${m.type || 'other'}</span>
+                <span class="material-info">
+                    <strong>${m.title || m.file || 'Untitled'}</strong>
+                    ${m.chapters ? `<small>Chapters: ${m.chapters.join(', ')}</small>` : ''}
+                </span>
+                <button type="button" class="btn-remove" onclick="removeWeekMaterial(${i})">✕</button>
+            </div>
+        `).join('');
+    }
+
+    // Also populate the material picker dropdown
+    populateMaterialPicker();
+}
+
+function populateMaterialPicker() {
+    const select = document.getElementById('material-picker-select');
+    const courseMaterials = currentCourse?.materials || {};
+    const currentWeekMaterials = currentWeek?.materials || [];
+
+    // Get files already linked to this week
+    const linkedFiles = new Set(currentWeekMaterials.map(m => m.file));
+
+    let options = '<option value="">-- Select a material to add --</option>';
+
+    // Add textbooks
+    (courseMaterials.coreTextbooks || []).forEach(t => {
+        if (!linkedFiles.has(t.file)) {
+            options += `<option value="textbook|${t.file}|${t.title}">📚 ${t.title}</option>`;
+        }
+    });
+
+    // Add lectures
+    (courseMaterials.lectures || []).forEach(l => {
+        if (!linkedFiles.has(l.file)) {
+            const weekInfo = l.week ? ` (Week ${l.week})` : '';
+            options += `<option value="lecture|${l.file}|${l.title}">🎓 ${l.title}${weekInfo}</option>`;
+        }
+    });
+
+    // Add readings
+    (courseMaterials.readings || []).forEach(r => {
+        if (!linkedFiles.has(r.file)) {
+            const weekInfo = r.week ? ` (Week ${r.week})` : '';
+            options += `<option value="reading|${r.file}|${r.title}">📖 ${r.title}${weekInfo}</option>`;
+        }
+    });
+
+    // Add case studies
+    (courseMaterials.caseStudies || []).forEach(c => {
+        if (!linkedFiles.has(c.file)) {
+            options += `<option value="case|${c.file}|${c.title}">⚖️ ${c.title}</option>`;
+        }
+    });
+
+    // Add exams
+    (courseMaterials.mockExams || []).forEach(e => {
+        if (!linkedFiles.has(e.file)) {
+            options += `<option value="exam|${e.file}|${e.title}">📝 ${e.title}</option>`;
+        }
+    });
+
+    // Add other
+    (courseMaterials.other || []).forEach(o => {
+        if (!linkedFiles.has(o.file)) {
+            options += `<option value="other|${o.file}|${o.title}">📄 ${o.title}</option>`;
+        }
+    });
+
+    select.innerHTML = options;
+}
+
+function addSelectedMaterial() {
+    const select = document.getElementById('material-picker-select');
+    const value = select.value;
+
+    if (!value) {
+        showToast('Select a material first', 'error');
+        return;
+    }
+
+    const [type, file, title] = value.split('|');
+
+    if (!currentWeek) currentWeek = { materials: [] };
+    if (!currentWeek.materials) currentWeek.materials = [];
+
+    currentWeek.materials.push({ type, file, title });
+    renderWeekMaterialsList();
+    showToast(`Added: ${title}`, 'success');
+}
+
+function addCustomMaterial() {
+    if (!currentWeek) currentWeek = { materials: [] };
+    if (!currentWeek.materials) currentWeek.materials = [];
+
+    // Add an empty custom material
+    currentWeek.materials.push({ type: 'other', file: '', title: 'Custom Material' });
+    renderWeekMaterialsList();
+}
+
+function removeWeekMaterial(idx) {
+    if (currentWeek?.materials) {
+        currentWeek.materials.splice(idx, 1);
+        renderWeekMaterialsList();
+    }
+}
+
+// Keep old function name for compatibility
+function renderMaterialsList() {
+    renderWeekMaterialsList();
+}
+
+function addMaterial() {
+    addCustomMaterial();
+}
+
+function removeMaterial(idx) {
+    removeWeekMaterial(idx);
 }
 
 function renderConceptsList() {
@@ -638,7 +751,8 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('save-week-btn').addEventListener('click', saveWeek);
     document.getElementById('back-to-course-btn').addEventListener('click', () => showView('course-detail'));
     document.getElementById('add-topic-btn').addEventListener('click', addTopic);
-    document.getElementById('add-material-btn').addEventListener('click', addMaterial);
+    document.getElementById('add-selected-material-btn').addEventListener('click', addSelectedMaterial);
+    document.getElementById('add-custom-material-btn').addEventListener('click', addCustomMaterial);
     document.getElementById('add-concept-btn').addEventListener('click', addConcept);
 
     // Load specific course if provided

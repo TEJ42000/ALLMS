@@ -174,9 +174,16 @@
                 </div>
 
                 <div class="week-subsection">
-                    <h4>📚 Materials</h4>
-                    <div id="materials-list" class="items-list"></div>
-                    <button id="add-material-btn" class="btn btn-secondary btn-sm">+ Add Material</button>
+                    <h4>📚 Week Materials</h4>
+                    <p class="form-hint">Select from course materials or add custom entries.</p>
+                    <div id="week-materials-list" class="items-list"></div>
+                    <div class="material-picker">
+                        <select id="material-picker-select" class="form-input">
+                            <option value="">-- Select a material to add --</option>
+                        </select>
+                        <button id="add-selected-material-btn" class="btn btn-secondary btn-sm">+ Add Selected</button>
+                        <button id="add-custom-material-btn" class="btn btn-secondary btn-sm">+ Add Custom</button>
+                    </div>
                 </div>
 
                 <div class="week-subsection">
