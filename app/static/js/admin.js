@@ -1333,11 +1333,54 @@ async function deleteMaterial(materialId) {
 }
 
 // ========== Text Extraction Status UI ==========
+
+// Configuration constants
+const EXTRACTION_CONFIG = {
+    // UI Display
+    PREVIEW_CHAR_LIMIT: 500,              // Characters to show in preview before "Show More"
+    ACTIVITY_LOG_LIMIT: 10,               // Number of recent activities to display
+    PROGRESS_HIDE_DELAY: 3000,            // Milliseconds to wait before hiding progress (3 seconds)
+
+    // Performance
+    DEBOUNCE_DELAY: 500,                  // Milliseconds to debounce refresh button (0.5 seconds)
+    MAX_CONCURRENT_EXTRACTIONS: 3,        // Maximum parallel extraction operations
+
+    // Time calculations (in seconds)
+    SECONDS_PER_MINUTE: 60,
+    SECONDS_PER_HOUR: 3600,
+    SECONDS_PER_DAY: 86400,
+    SECONDS_PER_WEEK: 604800,
+
+    // Number formatting
+    THOUSAND: 1000,
+    MILLION: 1000000
+};
+
 let extractionCache = new Map(); // Cache extraction status for files
 let extractionInProgress = false;
 let extractionAbortController = null;
+let refreshDebounceTimer = null;  // Timer for debouncing refresh
 
-async function refreshExtractionDashboard() {
+/**
+ * Debounced wrapper for refreshExtractionDashboard
+ * Prevents rapid-fire API requests when users click refresh multiple times
+ */
+function refreshExtractionDashboard() {
+    // Clear existing timer
+    if (refreshDebounceTimer) {
+        clearTimeout(refreshDebounceTimer);
+    }
+
+    // Set new timer
+    refreshDebounceTimer = setTimeout(() => {
+        refreshExtractionDashboardImmediate();
+    }, EXTRACTION_CONFIG.DEBOUNCE_DELAY);
+}
+
+/**
+ * Immediate refresh without debouncing (for internal use)
+ */
+async function refreshExtractionDashboardImmediate() {
     if (!currentCourse?.materials) {
         showToast('No materials loaded', 'error');
         return;
@@ -1491,9 +1534,9 @@ function updateActivityLog() {
         }
     });
 
-    // Sort by date descending and take last 10
+    // Sort by date descending and take last N activities
     activities.sort((a, b) => b.date - a.date);
-    const recentActivities = activities.slice(0, 10);
+    const recentActivities = activities.slice(0, EXTRACTION_CONFIG.ACTIVITY_LOG_LIMIT);
 
     if (recentActivities.length === 0) {
         activityContainer.innerHTML = '<p class="empty-state">No recent activity</p>';
@@ -1513,20 +1556,24 @@ function updateActivityLog() {
 function getTimeAgo(date) {
     const seconds = Math.floor((new Date() - date) / 1000);
 
-    if (seconds < 60) return 'Just now';
-    if (seconds < 3600) return `${Math.floor(seconds / 60)} minutes ago`;
-    if (seconds < 86400) return `${Math.floor(seconds / 3600)} hours ago`;
-    if (seconds < 604800) return `${Math.floor(seconds / 86400)} days ago`;
+    if (seconds < EXTRACTION_CONFIG.SECONDS_PER_MINUTE) return 'Just now';
+    if (seconds < EXTRACTION_CONFIG.SECONDS_PER_HOUR) return `${Math.floor(seconds / EXTRACTION_CONFIG.SECONDS_PER_MINUTE)} minutes ago`;
+    if (seconds < EXTRACTION_CONFIG.SECONDS_PER_DAY) return `${Math.floor(seconds / EXTRACTION_CONFIG.SECONDS_PER_HOUR)} hours ago`;
+    if (seconds < EXTRACTION_CONFIG.SECONDS_PER_WEEK) return `${Math.floor(seconds / EXTRACTION_CONFIG.SECONDS_PER_DAY)} days ago`;
 
     return date.toLocaleDateString();
 }
 
 function formatNumber(num) {
-    if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
-    if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+    if (num >= EXTRACTION_CONFIG.MILLION) return (num / EXTRACTION_CONFIG.MILLION).toFixed(1) + 'M';
+    if (num >= EXTRACTION_CONFIG.THOUSAND) return (num / EXTRACTION_CONFIG.THOUSAND).toFixed(1) + 'K';
     return num.toString();
 }
 
+/**
+ * Extract all materials with concurrent processing (max 3 at a time)
+ * This significantly improves performance over sequential processing
+ */
 async function extractAllMaterials() {
     if (!currentCourse?.materials) {
         showToast('No materials loaded', 'error');
@@ -1558,29 +1605,41 @@ async function extractAllMaterials() {
 
     let processed = 0;
     let errors = [];
+    let currentlyProcessing = [];
 
     try {
-        for (const filePath of filePaths) {
-            if (extractionAbortController.signal.aborted) {
-                showToast('Extraction cancelled', 'warning');
-                break;
-            }
+        // Process files with concurrency limiting
+        await processConcurrentExtractions(
+            filePaths,
+            async (filePath) => {
+                // Update UI with currently processing files
+                currentlyProcessing.push(filePath.split('/').pop());
+                if (currentlyProcessing.length > EXTRACTION_CONFIG.MAX_CONCURRENT_EXTRACTIONS) {
+                    currentlyProcessing.shift();
+                }
+                progressText.textContent = `Processing: ${currentlyProcessing.join(', ')}`;
+                progressStats.textContent = `${processed} / ${filePaths.length} files`;
 
-            progressText.textContent = `Processing: ${filePath.split('/').pop()}`;
-            progressStats.textContent = `${processed} / ${filePaths.length} files`;
+                try {
+                    await extractSingleFile(filePath);
+                    processed++;
+                } catch (error) {
+                    errors.push({ file: filePath, error: error.message });
+                    processed++;
+                }
 
-            try {
-                await extractSingleFile(filePath);
-                processed++;
-            } catch (error) {
-                errors.push({ file: filePath, error: error.message });
-                processed++;
-            }
+                // Update progress bar
+                const progress = Math.round((processed / filePaths.length) * 100);
+                progressBar.style.width = `${progress}%`;
+                progressBar.textContent = `${progress}%`;
 
-            const progress = Math.round((processed / filePaths.length) * 100);
-            progressBar.style.width = `${progress}%`;
-            progressBar.textContent = `${progress}%`;
-        }
+                // Remove from currently processing
+                const idx = currentlyProcessing.indexOf(filePath.split('/').pop());
+                if (idx > -1) currentlyProcessing.splice(idx, 1);
+            },
+            EXTRACTION_CONFIG.MAX_CONCURRENT_EXTRACTIONS,
+            extractionAbortController.signal
+        );
 
         // Show results
         if (errors.length > 0) {
@@ -1592,20 +1651,61 @@ async function extractAllMaterials() {
         }
 
         // Refresh dashboard
-        await refreshExtractionDashboard();
+        await refreshExtractionDashboardImmediate();
 
     } catch (error) {
-        showToast('Extraction failed: ' + error.message, 'error');
+        if (error.name === 'AbortError') {
+            showToast('Extraction cancelled', 'warning');
+        } else {
+            showToast('Extraction failed: ' + error.message, 'error');
+        }
     } finally {
         extractionInProgress = false;
         extractionAbortController = null;
 
-        // Hide progress after 3 seconds
+        // Hide progress after configured delay
         setTimeout(() => {
             progressContainer.style.display = 'none';
             errorsContainer.style.display = 'none';
-        }, 3000);
+        }, EXTRACTION_CONFIG.PROGRESS_HIDE_DELAY);
     }
+}
+
+/**
+ * Process items concurrently with a maximum concurrency limit
+ * @param {Array} items - Array of items to process
+ * @param {Function} processor - Async function to process each item
+ * @param {number} maxConcurrent - Maximum number of concurrent operations
+ * @param {AbortSignal} signal - Optional abort signal
+ */
+async function processConcurrentExtractions(items, processor, maxConcurrent, signal) {
+    const results = [];
+    const executing = [];
+
+    for (const item of items) {
+        // Check if aborted
+        if (signal?.aborted) {
+            throw new DOMException('Aborted', 'AbortError');
+        }
+
+        // Create promise for this item
+        const promise = processor(item).then(result => {
+            // Remove from executing array when done
+            executing.splice(executing.indexOf(promise), 1);
+            return result;
+        });
+
+        results.push(promise);
+        executing.push(promise);
+
+        // If we've reached max concurrency, wait for one to finish
+        if (executing.length >= maxConcurrent) {
+            await Promise.race(executing);
+        }
+    }
+
+    // Wait for all remaining promises to complete
+    return Promise.all(results);
 }
 
 async function extractSingleFile(filePath) {
@@ -1658,10 +1758,10 @@ async function openTextPreviewModal(filePath) {
         document.getElementById('preview-page-count').textContent = data.metadata?.num_pages || 'N/A';
         document.getElementById('preview-extraction-method').textContent = data.file_type || 'N/A';
 
-        // Show text (first 500 chars by default)
+        // Show text (first N chars by default)
         const text = data.text || 'No text extracted';
         const previewContainer = document.getElementById('preview-text-container');
-        previewContainer.textContent = text.substring(0, 500);
+        previewContainer.textContent = text.substring(0, EXTRACTION_CONFIG.PREVIEW_CHAR_LIMIT);
         previewContainer.classList.add('collapsed');
 
         // Setup buttons
@@ -1676,7 +1776,7 @@ async function openTextPreviewModal(filePath) {
                 previewContainer.classList.remove('collapsed');
                 document.getElementById('show-full-text-btn').textContent = '📖 Show Less';
             } else {
-                previewContainer.textContent = text.substring(0, 500);
+                previewContainer.textContent = text.substring(0, EXTRACTION_CONFIG.PREVIEW_CHAR_LIMIT);
                 previewContainer.classList.add('collapsed');
                 document.getElementById('show-full-text-btn').textContent = '📖 Show Full Text';
             }
