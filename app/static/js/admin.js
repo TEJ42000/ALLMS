@@ -171,8 +171,9 @@ function renderCourseMaterialsList(materials) {
     // Helper to create preview button
     const previewBtn = (file, title) => {
         if (!file) return '';
-        const escapedFile = file.replace(/'/g, "\\'");
-        const escapedTitle = (title || '').replace(/'/g, "\\'");
+        // Escape backslashes first, then single quotes for safe HTML attribute embedding
+        const escapedFile = file.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+        const escapedTitle = (title || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
         return `<button class="preview-btn" onclick="event.stopPropagation(); openPreviewModal('${escapedFile}', '${escapedTitle}')">👁️ Preview</button>`;
     };
 
@@ -527,8 +528,9 @@ function renderWeekMaterialsList() {
         container.innerHTML = '<p class="empty-state">No materials linked to this week</p>';
     } else {
         container.innerHTML = materials.map((m, i) => {
-            const escapedFile = (m.file || '').replace(/'/g, "\\'");
-            const escapedTitle = (m.title || '').replace(/'/g, "\\'");
+            // Escape backslashes first, then single quotes for safe HTML attribute embedding
+            const escapedFile = (m.file || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+            const escapedTitle = (m.title || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
             const previewBtn = m.file
                 ? `<button type="button" class="preview-btn" onclick="event.stopPropagation(); openPreviewModal('${escapedFile}', '${escapedTitle}')">👁️</button>`
                 : '';

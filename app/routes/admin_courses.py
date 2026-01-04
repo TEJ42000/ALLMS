@@ -50,6 +50,57 @@ from app.services.text_extractor import (
 
 logger = logging.getLogger(__name__)
 
+# Base directory for materials - resolved once at module load
+MATERIALS_BASE = pathlib.Path("Materials").resolve()
+
+
+def validate_materials_path(file_path: str) -> pathlib.Path:
+    """
+    Validate and resolve a file path within the Materials directory.
+
+    This function prevents path traversal attacks by ensuring the resolved
+    path is within the Materials directory.
+
+    Args:
+        file_path: Relative path within Materials directory
+
+    Returns:
+        Resolved absolute path to the file
+
+    Raises:
+        HTTPException: If path is invalid or outside Materials directory
+    """
+    # Reject paths with null bytes (can bypass some checks)
+    if "\x00" in file_path:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid path: null bytes not allowed"
+        )
+
+    # Build the path and resolve it
+    try:
+        # Use the already-resolved MATERIALS_BASE
+        full_path = (MATERIALS_BASE / file_path).resolve()
+    except (ValueError, OSError) as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid file path: {e}"
+        )
+
+    # Security: Ensure the resolved path is under MATERIALS_BASE
+    # Using is_relative_to() is the secure way to check this
+    try:
+        full_path.relative_to(MATERIALS_BASE)
+    except ValueError:
+        # Path is not under MATERIALS_BASE - potential path traversal
+        logger.warning("Path traversal attempt blocked: %s -> %s", file_path, full_path)
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied: path outside materials directory"
+        )
+
+    return full_path
+
 router = APIRouter(
     prefix="/api/admin/courses",
     tags=["Admin - Courses"],
@@ -922,27 +973,10 @@ async def preview_material(file_path: str):
     ```
     """
     import mimetypes
-    from pathlib import Path
     from fastapi.responses import FileResponse
 
-    # Build full path (same base as materials_scanner.py)
-    materials_base = Path("Materials")
-    full_path = materials_base / file_path
-
-    # Security: ensure path is within materials directory
-    try:
-        full_path = full_path.resolve()
-        materials_base = materials_base.resolve()
-        if not str(full_path).startswith(str(materials_base)):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Access denied: path outside materials directory"
-            )
-    except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid file path"
-        )
+    # Validate and resolve path (prevents path traversal)
+    full_path = validate_materials_path(file_path)
 
     # Check file exists
     if not full_path.exists():
@@ -1012,20 +1046,8 @@ async def get_slide_page(
     """
     from fastapi.responses import Response
 
-    materials_base = pathlib.Path("Materials")
-    full_path = materials_base / file_path
-
-    # Security check
-    try:
-        full_path = full_path.resolve()
-        materials_base = materials_base.resolve()
-        if not str(full_path).startswith(str(materials_base)):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Access denied"
-            )
-    except Exception:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid path")
+    # Validate and resolve path (prevents path traversal)
+    full_path = validate_materials_path(file_path)
 
     if not full_path.exists():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
@@ -1058,17 +1080,8 @@ async def get_slide_archive_text(
     """
     from app.services.slide_archive import get_slide_text
 
-    materials_base = pathlib.Path("Materials")
-    full_path = materials_base / file_path
-
-    # Security check
-    try:
-        full_path = full_path.resolve()
-        materials_base = materials_base.resolve()
-        if not str(full_path).startswith(str(materials_base)):
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
-    except Exception:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid path")
+    # Validate and resolve path (prevents path traversal)
+    full_path = validate_materials_path(file_path)
 
     if not full_path.exists():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
@@ -1092,17 +1105,8 @@ async def get_material_info(
     Returns the file type and metadata.
     Useful for determining how to display the file before loading it.
     """
-    materials_base = pathlib.Path("Materials")
-    full_path = materials_base / file_path
-
-    # Security check
-    try:
-        full_path = full_path.resolve()
-        materials_base = materials_base.resolve()
-        if not str(full_path).startswith(str(materials_base)):
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
-    except Exception:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid path")
+    # Validate and resolve path (prevents path traversal)
+    full_path = validate_materials_path(file_path)
 
     if not full_path.exists():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
@@ -1155,8 +1159,8 @@ async def extract_material_text(
     Returns extracted text and metadata for use in LLM operations
     (quizzes, summaries, study guides, etc.)
     """
-    materials_base = pathlib.Path("Materials")
-    full_path = materials_base / file_path
+    # Validate and resolve path (prevents path traversal)
+    full_path = validate_materials_path(file_path)
 
     if not full_path.exists():
         raise HTTPException(
@@ -1190,8 +1194,8 @@ async def extract_batch_text(
     """
     from app.services.text_extractor import extract_all_from_folder, get_extraction_summary
 
-    materials_base = pathlib.Path("Materials")
-    folder_path = materials_base / folder
+    # Validate and resolve path (prevents path traversal)
+    folder_path = validate_materials_path(folder)
 
     if not folder_path.exists():
         raise HTTPException(
