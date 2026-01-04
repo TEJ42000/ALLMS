@@ -66,7 +66,13 @@ class AssessmentRequest(BaseModel):
 
     @validator('topic')
     def validate_topic(cls, v):  # noqa: N805
-        """Validate that topic is one of the allowed values."""
+        """Validate that topic is one of the allowed values.
+
+        Note: These are the default topics for backward compatibility.
+        Course-specific topics can be retrieved from Firestore via
+        the /api/tutor/topics?course_id=... endpoint.
+        """
+        # Default topics for backward compatibility
         valid_topics = [
             "Constitutional Law",
             "Administrative Law",
