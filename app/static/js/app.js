@@ -5,17 +5,7 @@ const API_BASE = '';  // Empty for same origin
 // ========== Tab Navigation ==========
 document.addEventListener('DOMContentLoaded', () => {
     const tabs = document.querySelectorAll('.nav-tab');
-    const tabContents = document.querySelectorAll('.tab-content');
-    const mobileMenuBtn = document.getElementById('mobile-menu-btn');
-    const navTabs = document.getElementById('nav-tabs');
-
-    // Mobile menu toggle
-    if (mobileMenuBtn && navTabs) {
-        mobileMenuBtn.addEventListener('click', () => {
-            mobileMenuBtn.classList.toggle('active');
-            navTabs.classList.toggle('active');
-        });
-    }
+    const sections = document.querySelectorAll('.section');
 
     tabs.forEach(tab => {
         tab.addEventListener('click', () => {
@@ -25,37 +15,23 @@ document.addEventListener('DOMContentLoaded', () => {
             tabs.forEach(t => t.classList.remove('active'));
             tab.classList.add('active');
 
-            // Show corresponding content
-            tabContents.forEach(content => {
-                content.classList.remove('active');
-                if (content.id === `${tabName}-tab`) {
-                    content.classList.add('active');
+            // Show corresponding section
+            sections.forEach(section => {
+                section.classList.remove('active');
+                if (section.id === `${tabName}-section`) {
+                    section.classList.add('active');
                 }
             });
-
-            // Close mobile menu after selecting a tab
-            if (mobileMenuBtn && navTabs) {
-                mobileMenuBtn.classList.remove('active');
-                navTabs.classList.remove('active');
-            }
         });
     });
 
-    // Close mobile menu when clicking outside
-    document.addEventListener('click', (e) => {
-        if (mobileMenuBtn && navTabs &&
-            !mobileMenuBtn.contains(e.target) &&
-            !navTabs.contains(e.target)) {
-            mobileMenuBtn.classList.remove('active');
-            navTabs.classList.remove('active');
-        }
-    });
-
     // Initialize event listeners
+    initDashboard();
     initTutorListeners();
     initAssessmentListeners();
     initQuizListeners();
     initStudyListeners();
+    initFlashcardListeners();
 });
 
 // ========== Loading State ==========
@@ -186,6 +162,9 @@ function formatMarkdown(text) {
 
 // Format inline markdown (bold, italic, code, etc.)
 function formatInline(text) {
+    // First escape HTML to prevent XSS
+    text = escapeHtml(text);
+
     // Bold
     text = text.replace(/\*\*(.*?)\*\*/g, '<strong class="md-bold">$1</strong>');
     // Italic
@@ -305,13 +284,16 @@ async function assessAnswer() {
 
 // ========== Quiz Generator ==========
 function initQuizListeners() {
-    document.getElementById('generate-quiz-btn').addEventListener('click', generateQuiz);
+    const startBtn = document.getElementById('start-quiz-btn');
+    if (startBtn) startBtn.addEventListener('click', generateQuiz);
 }
 
 async function generateQuiz() {
-    const topic = document.getElementById('quiz-topic').value;
-    const num_questions = parseInt(document.getElementById('quiz-count').value);
-    const resultDiv = document.getElementById('quiz-result');
+    const topicSelect = document.getElementById('quiz-topic-select');
+    const topic = topicSelect ? topicSelect.value : 'all';
+    const num_questions = 5; // Default to 5 questions
+    const quizContent = document.getElementById('quiz-content');
+    const questionContainer = document.getElementById('quiz-question-container');
     
     showLoading();
     
@@ -321,25 +303,44 @@ async function generateQuiz() {
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({topic, num_questions, difficulty: 'medium'})
         });
-        
+
         if (!response.ok) throw new Error(`API error: ${response.status}`);
-        
+
         const data = await response.json();
-        displayQuiz(data.quiz);
-        
+        displayQuiz(data.quiz, quizContent, questionContainer);
+
     } catch (error) {
         console.error('Error:', error);
-        resultDiv.innerHTML = '<p class="error">Error generating quiz. Please try again.</p>';
+        if (questionContainer) {
+            questionContainer.innerHTML = '<p class="error">Error generating quiz. Please try again.</p>';
+        }
+        if (quizContent) quizContent.classList.remove('hidden');
     } finally {
         hideLoading();
     }
 }
 
-function displayQuiz(quiz) {
-    // Quiz display implementation
-    const resultDiv = document.getElementById('quiz-result');
-    resultDiv.innerHTML = '<p>Quiz generated! (Display implementation pending)</p>';
-    resultDiv.style.display = 'block';
+function displayQuiz(quiz, quizContent, questionContainer) {
+    if (!quizContent || !questionContainer) return;
+
+    quizContent.classList.remove('hidden');
+
+    // Update totals
+    const totalSpan = document.getElementById('quiz-total');
+    if (totalSpan) totalSpan.textContent = quiz.length || 5;
+
+    // Display the quiz content
+    if (typeof quiz === 'string') {
+        questionContainer.innerHTML = `<div class="quiz-generated">${formatMarkdown(quiz)}</div>`;
+    } else if (Array.isArray(quiz)) {
+        let quizHtml = '';
+        quiz.forEach((q, i) => {
+            quizHtml += `<div class="quiz-question"><h4>Question ${i + 1}</h4><p>${escapeHtml(q.question || q)}</p></div>`;
+        });
+        questionContainer.innerHTML = quizHtml;
+    } else {
+        questionContainer.innerHTML = formatMarkdown(JSON.stringify(quiz, null, 2));
+    }
 }
 
 // ========== Study Guide Generator ==========
@@ -374,3 +375,150 @@ async function generateStudyGuide() {
     }
 }
 
+// ========== Dashboard ==========
+// Helper to safely parse integer from localStorage with NaN validation
+function safeParseInt(value, fallback = 0) {
+    const parsed = parseInt(value, 10);
+    return isNaN(parsed) ? fallback : parsed;
+}
+
+function initDashboard() {
+    // Validate topics format (should be like "2/5")
+    const topicsValue = localStorage.getItem('lls_topics');
+    const validTopics = topicsValue && /^\d+\/\d+$/.test(topicsValue) ? topicsValue : '0/5';
+
+    const stats = {
+        points: safeParseInt(localStorage.getItem('lls_points')),
+        streak: safeParseInt(localStorage.getItem('lls_streak')),
+        topics: validTopics,
+        quizzes: safeParseInt(localStorage.getItem('lls_quizzes'))
+    };
+
+    // Safely update DOM elements with null checks
+    const statPoints = document.getElementById('stat-points');
+    const statStreak = document.getElementById('stat-streak');
+    const statTopics = document.getElementById('stat-topics');
+    const statQuizzes = document.getElementById('stat-quizzes');
+
+    if (statPoints) statPoints.textContent = stats.points;
+    if (statStreak) statStreak.textContent = stats.streak;
+    if (statTopics) statTopics.textContent = stats.topics;
+    if (statQuizzes) statQuizzes.textContent = stats.quizzes;
+
+    // Add topic card click handlers with context passing
+    document.querySelectorAll('.topic-card').forEach(card => {
+        card.addEventListener('click', () => {
+            const topic = card.dataset.topic;
+            const tutorTab = document.querySelector('.nav-tab[data-tab="tutor"]');
+            if (tutorTab) tutorTab.click();
+
+            // Set the context select to match the clicked topic
+            const contextSelect = document.getElementById('context-select');
+            if (contextSelect && topic) {
+                const topicMap = {
+                    'criminal': 'Criminal Law',
+                    'private': 'Private Law',
+                    'constitutional': 'Constitutional Law',
+                    'administrative': 'Administrative Law',
+                    'international': 'International Law'
+                };
+                if (topicMap[topic]) {
+                    contextSelect.value = topicMap[topic];
+                }
+            }
+        });
+    });
+}
+
+// ========== Flashcards ==========
+// NOTE: Flashcard data is currently static for the MVP.
+// TODO: Issue #XX - Implement /api/files-content/flashcards endpoint to load flashcards dynamically
+// TODO: Persist flashcard progress (known/unknown) to localStorage
+
+let flashcards = [];
+let currentCardIndex = 0;
+
+/**
+ * Initialize event listeners for flashcard navigation and interaction
+ */
+function initFlashcardListeners() {
+    const flipBtn = document.getElementById('flip-card-btn');
+    const prevBtn = document.getElementById('prev-card-btn');
+    const nextBtn = document.getElementById('next-card-btn');
+    const knowBtn = document.getElementById('know-btn');
+    const studyBtn = document.getElementById('study-btn');
+    const categorySelect = document.getElementById('flashcard-category');
+
+    if (flipBtn) flipBtn.addEventListener('click', flipCard);
+    if (prevBtn) prevBtn.addEventListener('click', () => navigateCard(-1));
+    if (nextBtn) nextBtn.addEventListener('click', () => navigateCard(1));
+    if (knowBtn) knowBtn.addEventListener('click', () => markCard('known'));
+    if (studyBtn) studyBtn.addEventListener('click', () => markCard('study'));
+    if (categorySelect) categorySelect.addEventListener('change', loadFlashcards);
+
+    loadFlashcards();
+}
+
+function loadFlashcards() {
+    flashcards = [
+        {question: "What is the principle of legality in criminal law?", answer: "No punishment without law (nullum crimen sine lege). A person can only be punished if their act was criminally punishable at the time it was committed.", category: "criminal", known: false},
+        {question: "What are the three elements of a crime?", answer: "1) Actus reus (criminal act), 2) Mens rea (criminal intent), 3) No justification or excuse", category: "criminal", known: false},
+        {question: "What is breach of contract?", answer: "Failure to perform a contractual obligation without lawful excuse. It gives rise to remedies including damages, specific performance, or termination.", category: "private", known: false},
+        {question: "What is the Trias Politica?", answer: "The separation of powers into three branches: Legislative (makes laws), Executive (enforces laws), and Judicial (interprets laws).", category: "constitutional", known: false},
+        {question: "What is an administrative order (beschikking)?", answer: "A written decision by an administrative authority concerning a public law matter, directed at a specific person or situation.", category: "administrative", known: false}
+    ];
+
+    const category = document.getElementById('flashcard-category').value;
+    if (category !== 'all') {
+        flashcards = flashcards.filter(card => card.category === category);
+    }
+
+    currentCardIndex = 0;
+    updateFlashcardDisplay();
+    updateFlashcardStats();
+}
+
+function flipCard() {
+    document.getElementById('flashcard').classList.toggle('flipped');
+}
+
+function navigateCard(direction) {
+    currentCardIndex += direction;
+    if (currentCardIndex < 0) currentCardIndex = flashcards.length - 1;
+    if (currentCardIndex >= flashcards.length) currentCardIndex = 0;
+
+    document.getElementById('flashcard').classList.remove('flipped');
+    updateFlashcardDisplay();
+}
+
+function markCard(status) {
+    if (flashcards[currentCardIndex]) {
+        flashcards[currentCardIndex].known = (status === 'known');
+        updateFlashcardStats();
+        navigateCard(1);
+    }
+}
+
+function updateFlashcardDisplay() {
+    const questionEl = document.getElementById('flashcard-question');
+    const answerEl = document.getElementById('flashcard-answer');
+
+    if (flashcards.length === 0) {
+        if (questionEl) questionEl.textContent = 'No flashcards available';
+        if (answerEl) answerEl.textContent = '';
+        return;
+    }
+
+    const card = flashcards[currentCardIndex];
+    if (questionEl) questionEl.textContent = card.question;
+    if (answerEl) answerEl.textContent = card.answer;
+}
+
+function updateFlashcardStats() {
+    const mastered = flashcards.filter(card => card.known).length;
+    const masteredEl = document.getElementById('cards-mastered');
+    const totalEl = document.getElementById('cards-total');
+
+    if (masteredEl) masteredEl.textContent = mastered;
+    if (totalEl) totalEl.textContent = flashcards.length;
+}
