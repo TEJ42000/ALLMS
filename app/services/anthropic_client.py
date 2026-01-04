@@ -1,15 +1,16 @@
 """Anthropic API Client Service for the LLS Study Portal."""
 
 import logging
-import os
 from typing import Dict, List, Optional
 
 from anthropic import AsyncAnthropic
 
+from app.services.gcp_service import get_anthropic_api_key
+
 logger = logging.getLogger(__name__)
 
-# Initialize Anthropic client
-client = AsyncAnthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+# Initialize Anthropic client using ADC-based secret retrieval (with .env fallback)
+client = AsyncAnthropic(api_key=get_anthropic_api_key())
 
 # System prompts for different contexts
 TUTOR_SYSTEM_PROMPT = """You are an expert Law & Legal Skills tutor for the \

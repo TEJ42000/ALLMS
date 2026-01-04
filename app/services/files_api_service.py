@@ -2,11 +2,12 @@
 
 import json
 import logging
-import os
 import re
 from typing import Dict, List, Optional
 
 from anthropic import AsyncAnthropic
+
+from app.services.gcp_service import get_anthropic_api_key
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +25,7 @@ class FilesAPIService:
         Args:
             file_ids_path: Path to the JSON file containing uploaded file IDs.
         """
-        self.client = AsyncAnthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+        self.client = AsyncAnthropic(api_key=get_anthropic_api_key())
 
         # Load uploaded file IDs
         try:
