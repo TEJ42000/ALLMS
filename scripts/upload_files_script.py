@@ -11,11 +11,16 @@ This script automatically discovers files from the three-tier Materials structur
 """
 
 import json
+import logging
 import os
 from pathlib import Path
 from typing import Dict
 
 from anthropic import Anthropic
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Supported file extensions
 SUPPORTED_EXTENSIONS = {'.pdf', '.docx', '.md', '.txt'}
@@ -49,45 +54,57 @@ def discover_materials(materials_dir: str = "./Materials") -> Dict[str, Dict]:
             continue
 
         tier_name = tier_dir.name
-        if tier_name not in TIER_PRIORITIES:
+
+        # Case-insensitive tier name handling with validation
+        tier_name_normalized = tier_name.title()
+        if tier_name_normalized in TIER_PRIORITIES:
+            if tier_name != tier_name_normalized:
+                logger.warning("Directory '%s' should be '%s' (case matters)", tier_name, tier_name_normalized)
+            # Use the normalized name for consistency
+            tier_name = tier_name_normalized
+        else:
+            logger.debug("Skipping non-tier directory: %s", tier_name)
             continue
 
         # Recursively find all supported files in this tier
-        for file_path in tier_dir.rglob("*"):
-            if not file_path.is_file():
-                continue
+        # Use specific glob patterns for each extension for better performance
+        for ext in SUPPORTED_EXTENSIONS:
+            for file_path in tier_dir.rglob("*%s" % ext):
+                # Generate a unique key for this file
+                # Format: tier_subject_category_filename
+                relative_path = file_path.relative_to(tier_dir)
+                parts = list(relative_path.parts)
 
-            if file_path.suffix.lower() not in SUPPORTED_EXTENSIONS:
-                continue
+                # Create a readable key
+                key_parts = [tier_name.lower()]
+                if len(parts) > 1:
+                    # Add subject and category
+                    key_parts.extend([p.lower().replace(" ", "_").replace("-", "_")
+                                     for p in parts[:-1]])
 
-            # Generate a unique key for this file
-            # Format: tier_subject_category_filename
-            relative_path = file_path.relative_to(tier_dir)
-            parts = list(relative_path.parts)
+                # Add filename without extension
+                filename_base = file_path.stem.lower().replace(" ", "_").replace("-", "_")
+                key_parts.append(filename_base)
 
-            # Create a readable key
-            key_parts = [tier_name.lower()]
-            if len(parts) > 1:
-                # Add subject and category
-                key_parts.extend([p.lower().replace(" ", "_").replace("-", "_")
-                                 for p in parts[:-1]])
+                key = "_".join(key_parts)
 
-            # Add filename without extension
-            filename_base = file_path.stem.lower().replace(" ", "_").replace("-", "_")
-            key_parts.append(filename_base)
+                # Check for duplicate keys
+                if key in discovered_files:
+                    logger.warning("Duplicate key '%s' for file '%s'", key, file_path)
+                    # Add hash suffix to make key unique
+                    key = "%s_%s" % (key, hash(str(file_path)) % 100000000)
+                    logger.info("Using unique key: '%s'", key)
 
-            key = "_".join(key_parts)
-
-            # Store file metadata
-            discovered_files[key] = {
-                "path": str(file_path),
-                "filename": file_path.name,
-                "tier": tier_name,
-                "tier_priority": TIER_PRIORITIES[tier_name],
-                "subject": parts[0] if len(parts) > 1 else "General",
-                "category": parts[1] if len(parts) > 2 else "General",
-                "size_bytes": file_path.stat().st_size
-            }
+                # Store file metadata
+                discovered_files[key] = {
+                    "path": str(file_path),
+                    "filename": file_path.name,
+                    "tier": tier_name,
+                    "tier_priority": TIER_PRIORITIES[tier_name],
+                    "subject": parts[0] if len(parts) > 1 else "General",
+                    "category": parts[1] if len(parts) > 2 else "General",
+                    "size_bytes": file_path.stat().st_size
+                }
 
     return discovered_files
 

@@ -10,6 +10,9 @@ from anthropic import AsyncAnthropic
 
 logger = logging.getLogger(__name__)
 
+# Constants
+DEFAULT_FALLBACK_COUNT = 5  # Number of files to return when no specific files found
+
 
 class FilesAPIService:
     """Service for generating content using uploaded files via Anthropic Files API."""
@@ -60,7 +63,17 @@ class FilesAPIService:
 
         Returns:
             Dictionary with quiz questions
+
+        Raises:
+            ValueError: If file_keys is empty
+            TypeError: If file_keys contains non-string values
         """
+        # Input validation
+        if not file_keys:
+            raise ValueError("file_keys cannot be empty")
+        if not all(isinstance(k, str) for k in file_keys):
+            raise TypeError("All file_keys must be strings")
+
         logger.info("Generating quiz: %d questions, files: %s", num_questions, file_keys)
 
         # Build content blocks
@@ -68,16 +81,20 @@ class FilesAPIService:
 
         # Add all requested files
         for key in file_keys:
-            file_id = self.get_file_id(key)
-            content_blocks.append({
-                "type": "document",
-                "source": {
-                    "type": "file",
-                    "file_id": file_id
-                },
-                "title": key.replace("_", " ").title(),
-                "citations": {"enabled": True}
-            })
+            try:
+                file_id = self.get_file_id(key)
+                content_blocks.append({
+                    "type": "document",
+                    "source": {
+                        "type": "file",
+                        "file_id": file_id
+                    },
+                    "title": key.replace("_", " ").title(),
+                    "citations": {"enabled": True}
+                })
+            except ValueError as e:
+                logger.warning("Skipping file '%s': %s", key, e)
+                continue
 
         # Add text prompt
         prompt_text = """Generate %d multiple choice quiz questions about %s from these documents.
@@ -141,19 +158,33 @@ Return ONLY valid JSON:
 
         Returns:
             Formatted study guide
+
+        Raises:
+            ValueError: If file_keys is empty
+            TypeError: If file_keys contains non-string values
         """
+        # Input validation
+        if not file_keys:
+            raise ValueError("file_keys cannot be empty")
+        if not all(isinstance(k, str) for k in file_keys):
+            raise TypeError("All file_keys must be strings")
+
         logger.info("Generating study guide for %s using %d files", topic, len(file_keys))
 
         # Build content
         content_blocks = []
 
         for key in file_keys:
-            file_id = self.get_file_id(key)
-            content_blocks.append({
-                "type": "document",
-                "source": {"type": "file", "file_id": file_id},
-                "citations": {"enabled": True}
-            })
+            try:
+                file_id = self.get_file_id(key)
+                content_blocks.append({
+                    "type": "document",
+                    "source": {"type": "file", "file_id": file_id},
+                    "citations": {"enabled": True}
+                })
+            except ValueError as e:
+                logger.warning("Skipping file '%s': %s", key, e)
+                continue
 
         prompt_text = """Create a comprehensive study guide for %s.
 
@@ -284,13 +315,21 @@ Cite page numbers if available.""" % (article, code)
         # Use relevant files or default to reader
         if relevant_files:
             for key in relevant_files:
-                file_id = self.get_file_id(key)
-                content_blocks.append({
-                    "type": "document",
-                    "source": {"type": "file", "file_id": file_id}
-                })
+                try:
+                    file_id = self.get_file_id(key)
+                    content_blocks.append({
+                        "type": "document",
+                        "source": {"type": "file", "file_id": file_id}
+                    })
+                except ValueError as e:
+                    logger.warning("Skipping file '%s': %s", key, e)
+                    continue
         elif "lls_reader" in self.file_ids:
-            reader_id = self.get_file_id("lls_reader")
+            try:
+                reader_id = self.get_file_id("lls_reader")
+            except ValueError as e:
+                logger.error("Failed to get lls_reader: %s", e)
+                raise
             content_blocks.append({
                 "type": "document",
                 "source": {"type": "file", "file_id": reader_id}
@@ -335,15 +374,39 @@ Use proper legal analysis method and cite articles.""" % (topic, case_facts)
         file_keys: List[str],
         num_cards: int = 20
     ) -> List[Dict]:
-        """Generate flashcards from files."""
+        """
+        Generate flashcards from files.
+
+        Args:
+            topic: Topic name
+            file_keys: Files to use
+            num_cards: Number of flashcards to generate
+
+        Returns:
+            List of flashcard dictionaries
+
+        Raises:
+            ValueError: If file_keys is empty
+            TypeError: If file_keys contains non-string values
+        """
+        # Input validation
+        if not file_keys:
+            raise ValueError("file_keys cannot be empty")
+        if not all(isinstance(k, str) for k in file_keys):
+            raise TypeError("All file_keys must be strings")
+
         content_blocks = []
 
         for key in file_keys:
-            file_id = self.get_file_id(key)
-            content_blocks.append({
-                "type": "document",
-                "source": {"type": "file", "file_id": file_id}
-            })
+            try:
+                file_id = self.get_file_id(key)
+                content_blocks.append({
+                    "type": "document",
+                    "source": {"type": "file", "file_id": file_id}
+                })
+            except ValueError as e:
+                logger.warning("Skipping file '%s': %s", key, e)
+                continue
 
         prompt_text = """Generate %d flashcards for %s.
 
@@ -491,9 +554,13 @@ Include:
         # Sort by tier priority (Syllabus first, then Course_Materials, then Supplementary_Sources)
         prioritized_files = self.get_prioritized_files(subject_files)
 
-        logger.info("Found %d files for topic '%s'", len(prioritized_files), topic)
+        if not prioritized_files:
+            # No files found for this topic - return empty list with clear logging
+            logger.warning("No files found for topic '%s', returning empty list", topic)
+            return []
 
-        return prioritized_files if prioritized_files else list(self.file_ids.keys())[:5]
+        logger.info("Found %d files for topic '%s'", len(prioritized_files), topic)
+        return prioritized_files
 
 
 # Singleton
