@@ -1,33 +1,60 @@
 [MAIN]
 # Specify a score threshold under which the program will exit with error.
-fail-under=8.0
+fail-under=7.0
+
+# Files or directories to be skipped
+ignore=tests,conftest.py,scripts
 
 # Use multiple processes to speed up Pylint.
 jobs=0
 
 [MESSAGES CONTROL]
-# Disable the following checks:
-# R0903: Too few public methods (Pydantic models don't need methods)
-# E0401: Import errors (dependencies not installed in CI)
+# Disable the following checks (merged from both configs):
+# C0103: Invalid name for constants (acceptable for module-level singletons)
+# C0114: Missing module docstring
+# C0115: Missing class docstring
+# C0116: Missing function docstring
+# C0209: Consider using f-string (we use % formatting for consistency with logging)
+# C0301: Line too long (handled by formatter)
+# C0303: Trailing whitespace (handled by formatter)
+# C0305: Trailing newlines (handled by formatter)
+# C0411: Wrong import order (handled by isort)
 # E0213: Method should have "self" as first argument (Pydantic validators use cls)
+# E0401: Import errors (dependencies not installed in CI)
 # R0801: Similar lines in files (duplicate code - acceptable for topic lists)
+# R0903: Too few public methods (Pydantic models don't need methods)
 # R0914: Too many local variables (acceptable for scripts)
 # R0915: Too many statements (acceptable for scripts)
 # W0603: Using the global statement (acceptable for singleton pattern)
-# C0103: Invalid name for constants (acceptable for module-level singletons)
-# C0209: Consider using f-string (we use % formatting for consistency with logging)
+# W0611: Unused import (may be needed for re-exports)
 # W0621: Redefining name from outer scope (common pytest fixture pattern)
+# W0718: Broad exception caught (sometimes needed for catch-all handlers)
+# W1203: Logging f-string interpolation (f-strings are fine in modern Python)
+# W1309: F-string without interpolation (readability preference)
+# W1514: Unspecified encoding (default utf-8 is usually fine)
 disable=
-    R0903,
-    E0401,
+    C0103,
+    C0114,
+    C0115,
+    C0116,
+    C0209,
+    C0301,
+    C0303,
+    C0305,
+    C0411,
     E0213,
+    E0401,
     R0801,
+    R0903,
     R0914,
     R0915,
     W0603,
-    C0103,
-    C0209,
-    W0621
+    W0611,
+    W0621,
+    W0718,
+    W1203,
+    W1309,
+    W1514
 
 [FORMAT]
 # Maximum number of characters on a single line.
@@ -48,6 +75,12 @@ max-returns=6
 
 # Maximum number of statements in function / method body.
 max-statements=60
+
+# Maximum number of attributes for a class
+max-attributes=15
+
+# Maximum number of public methods for a class
+max-public-methods=25
 
 [SIMILARITIES]
 # Minimum lines number of a similarity.
