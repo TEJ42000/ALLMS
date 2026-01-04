@@ -11,7 +11,8 @@ import logging
 import pathlib
 from typing import Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException, Path, Query, status
+from fastapi import APIRouter, HTTPException, Path, Query, status, UploadFile, File, Form
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from app.models.course_models import (
@@ -27,6 +28,7 @@ from app.models.course_models import (
     Lecture,
     CaseStudy,
     MockExam,
+    UploadedMaterial,
 )
 from app.services.course_service import get_course_service
 from app.services.materials_scanner import (
@@ -46,6 +48,15 @@ from app.services.text_extractor import (
     extract_text,
     detect_file_type as detect_extraction_type,
     ExtractionResult,
+)
+from app.services.document_upload_service import (
+    upload_document,
+    FileValidationError,
+    StorageError,
+    SUPPORTED_EXTENSIONS,
+    TIER_FOLDERS,
+    CATEGORY_FOLDERS,
+    MAX_FILE_SIZE,
 )
 
 logger = logging.getLogger(__name__)
@@ -1222,4 +1233,361 @@ async def extract_batch_text(
         "folder": folder,
         "summary": summary,
         "files": file_results
+    }
+
+
+# ============================================================================
+# Document Upload Endpoints
+# ============================================================================
+
+
+class UploadResponse(BaseModel):
+    """Response model for document upload."""
+    success: bool
+    material: UploadedMaterial
+    message: str
+
+
+class MaterialListResponse(BaseModel):
+    """Response model for listing uploaded materials."""
+    materials: List[UploadedMaterial]
+    count: int
+
+
+@router.post(
+    "/{course_id}/materials/upload",
+    response_model=UploadResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Upload document to course materials",
+    description="""
+    Upload a document (PDF, DOCX, image, text file) to course materials.
+
+    The file will be:
+    1. Validated (type, size)
+    2. Stored in the appropriate Materials folder
+    3. Text extracted automatically
+    4. Metadata stored in Firestore
+
+    Supported file types: PDF, DOCX, PPTX, PNG, JPG, JPEG, GIF, BMP, TIFF, WEBP, TXT, MD, HTML
+    Maximum file size: 50MB
+    """
+)
+async def upload_course_material(
+    course_id: str = Path(..., description="Course ID"),
+    file: UploadFile = File(..., description="File to upload"),
+    tier: str = Form(..., description="Material tier: syllabus, course_materials, or supplementary"),
+    category: Optional[str] = Form(None, description="Category (for course_materials): lecture, reading, or case"),
+    title: Optional[str] = Form(None, description="Display title (defaults to filename)"),
+    description: Optional[str] = Form(None, description="Material description"),
+    week_number: Optional[int] = Form(None, description="Week number to link to"),
+    extract_text: bool = Form(True, description="Whether to extract text automatically")
+):
+    """
+    Upload a document to course materials.
+
+    Args:
+        course_id: Course ID
+        file: File to upload
+        tier: Material tier (syllabus, course_materials, supplementary)
+        category: Optional category for course_materials tier
+        title: Optional display title
+        description: Optional description
+        week_number: Optional week number to link to
+        extract_text: Whether to extract text automatically
+
+    Returns:
+        UploadResponse with material metadata
+    """
+    try:
+        # Verify course exists
+        service = get_course_service()
+        course = await service.get_course(course_id)
+        if not course:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Course not found: {course_id}"
+            )
+
+        # Read file content
+        file_content = await file.read()
+
+        # Upload document
+        material = await upload_document(
+            course_id=course_id,
+            filename=file.filename,
+            file_content=file_content,
+            tier=tier,
+            category=category,
+            title=title,
+            description=description,
+            week_number=week_number,
+            uploaded_by=None,  # TODO: Add user ID when auth is implemented
+            extract_text_flag=extract_text
+        )
+
+        return UploadResponse(
+            success=True,
+            material=material,
+            message=f"Successfully uploaded {file.filename}"
+        )
+
+    except FileValidationError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except StorageError as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+    except Exception as e:
+        logger.error(f"Failed to upload document: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to upload document: {str(e)}"
+        )
+
+
+@router.get(
+    "/{course_id}/materials/uploads",
+    response_model=MaterialListResponse,
+    summary="List uploaded materials",
+    description="Get all uploaded materials for a course."
+)
+async def list_uploaded_materials(
+    course_id: str = Path(..., description="Course ID"),
+    tier: Optional[str] = Query(None, description="Filter by tier"),
+    week_number: Optional[int] = Query(None, description="Filter by week number")
+):
+    """
+    List all uploaded materials for a course.
+
+    Args:
+        course_id: Course ID
+        tier: Optional tier filter
+        week_number: Optional week number filter
+
+    Returns:
+        MaterialListResponse with list of materials
+    """
+    try:
+        # Verify course exists
+        service = get_course_service()
+        course = await service.get_course(course_id)
+        if not course:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Course not found: {course_id}"
+            )
+
+        # Get materials from Firestore
+        from app.services.gcp_service import get_firestore_client
+        db = get_firestore_client()
+
+        query = db.collection('courses').document(course_id).collection('uploadedMaterials')
+
+        # Apply filters
+        if tier:
+            query = query.where('tier', '==', tier)
+        if week_number is not None:
+            query = query.where('weekNumber', '==', week_number)
+
+        # Execute query
+        docs = query.stream()
+        materials = [UploadedMaterial(**doc.to_dict()) for doc in docs]
+
+        # Sort by upload date (newest first)
+        materials.sort(key=lambda m: m.uploadedAt, reverse=True)
+
+        return MaterialListResponse(
+            materials=materials,
+            count=len(materials)
+        )
+
+    except Exception as e:
+        logger.error(f"Failed to list uploaded materials: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to list materials: {str(e)}"
+        )
+
+
+@router.get(
+    "/{course_id}/materials/uploads/{material_id}",
+    response_model=UploadedMaterial,
+    summary="Get uploaded material details",
+    description="Get details of a specific uploaded material."
+)
+async def get_uploaded_material(
+    course_id: str = Path(..., description="Course ID"),
+    material_id: str = Path(..., description="Material ID")
+):
+    """
+    Get details of a specific uploaded material.
+
+    Args:
+        course_id: Course ID
+        material_id: Material ID
+
+    Returns:
+        UploadedMaterial object
+    """
+    try:
+        from app.services.gcp_service import get_firestore_client
+        db = get_firestore_client()
+
+        doc_ref = db.collection('courses').document(course_id).collection('uploadedMaterials').document(material_id)
+        doc = doc_ref.get()
+
+        if not doc.exists:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Material not found: {material_id}"
+            )
+
+        return UploadedMaterial(**doc.to_dict())
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get uploaded material: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get material: {str(e)}"
+        )
+
+
+@router.delete(
+    "/{course_id}/materials/uploads/{material_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete uploaded material",
+    description="Delete an uploaded material (file and metadata)."
+)
+async def delete_uploaded_material(
+    course_id: str = Path(..., description="Course ID"),
+    material_id: str = Path(..., description="Material ID")
+):
+    """
+    Delete an uploaded material.
+
+    This will:
+    1. Delete the file from storage
+    2. Delete the metadata from Firestore
+
+    Args:
+        course_id: Course ID
+        material_id: Material ID
+    """
+    try:
+        from app.services.gcp_service import get_firestore_client
+        db = get_firestore_client()
+
+        # Get material metadata
+        doc_ref = db.collection('courses').document(course_id).collection('uploadedMaterials').document(material_id)
+        doc = doc_ref.get()
+
+        if not doc.exists:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Material not found: {material_id}"
+            )
+
+        material = UploadedMaterial(**doc.to_dict())
+
+        # Delete file from storage
+        file_path = pathlib.Path(material.storagePath)
+        if file_path.exists():
+            file_path.unlink()
+            logger.info(f"Deleted file: {file_path}")
+
+        # Delete metadata from Firestore
+        doc_ref.delete()
+        logger.info(f"Deleted material metadata: {material_id}")
+
+        return None
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to delete uploaded material: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete material: {str(e)}"
+        )
+
+
+@router.get(
+    "/{course_id}/materials/uploads/{material_id}/text",
+    summary="Get extracted text from uploaded material",
+    description="Get the extracted text content from an uploaded material."
+)
+async def get_material_text(
+    course_id: str = Path(..., description="Course ID"),
+    material_id: str = Path(..., description="Material ID")
+):
+    """
+    Get extracted text from an uploaded material.
+
+    Args:
+        course_id: Course ID
+        material_id: Material ID
+
+    Returns:
+        JSON with extracted text and metadata
+    """
+    try:
+        from app.services.gcp_service import get_firestore_client
+        db = get_firestore_client()
+
+        doc_ref = db.collection('courses').document(course_id).collection('uploadedMaterials').document(material_id)
+        doc = doc_ref.get()
+
+        if not doc.exists:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Material not found: {material_id}"
+            )
+
+        material = UploadedMaterial(**doc.to_dict())
+
+        return {
+            "material_id": material.id,
+            "filename": material.filename,
+            "text_extracted": material.textExtracted,
+            "text": material.extractedText,
+            "text_length": material.textLength,
+            "extraction_error": material.extractionError
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get material text: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get material text: {str(e)}"
+        )
+
+
+@router.get(
+    "/upload-config",
+    summary="Get upload configuration",
+    description="Get configuration for file uploads (supported types, size limits, etc.)."
+)
+async def get_upload_config():
+    """
+    Get upload configuration.
+
+    Returns:
+        Configuration for file uploads
+    """
+    return {
+        "max_file_size": MAX_FILE_SIZE,
+        "max_file_size_mb": MAX_FILE_SIZE / 1024 / 1024,
+        "supported_extensions": sorted(list(SUPPORTED_EXTENSIONS)),
+        "tiers": list(TIER_FOLDERS.keys()),
+        "categories": list(CATEGORY_FOLDERS.keys()),
+        "tier_folders": TIER_FOLDERS,
+        "category_folders": CATEGORY_FOLDERS
     }

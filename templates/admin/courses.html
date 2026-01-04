@@ -117,6 +117,7 @@
                     <div class="section-header">
                         <h3>📁 Course Materials</h3>
                         <div class="header-actions">
+                            <button id="upload-material-btn" class="btn btn-primary btn-sm">📤 Upload Files</button>
                             <label class="checkbox-label">
                                 <input type="checkbox" id="use-ai-titles"> Use AI for titles
                             </label>
@@ -125,11 +126,20 @@
                         </div>
                     </div>
                     <p class="form-hint">
+                        <strong>Upload Files:</strong> Upload new documents (PDF, DOCX, images) to course materials.<br>
                         <strong>Scan Folders:</strong> Discovers files from materialSubjects folders.<br>
                         <strong>Sync to Weeks:</strong> Auto-links materials to weeks based on week numbers in filenames.
                     </p>
                     <div id="course-materials-list" class="materials-list">
                         <p class="empty-state">No materials loaded. Click "Scan Folders" to discover materials.</p>
+                    </div>
+
+                    <!-- Uploaded Materials Section -->
+                    <div class="uploaded-materials-section" style="margin-top: 20px;">
+                        <h4>📤 Uploaded Materials</h4>
+                        <div id="uploaded-materials-list" class="uploaded-materials-list">
+                            <p class="empty-state">No uploaded materials yet.</p>
+                        </div>
                     </div>
                 </div>
 
@@ -283,6 +293,81 @@
                 </div>
             </div>
         </div>
+
+        <!-- Upload Material Modal -->
+        <div id="upload-modal" class="modal hidden">
+            <div class="modal-content modal-large">
+                <div class="modal-header">
+                    <h3>📤 Upload Course Materials</h3>
+                    <button class="modal-close" onclick="closeUploadModal()">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <form id="upload-form" enctype="multipart/form-data">
+                        <div class="form-group">
+                            <label for="upload-files">Select Files</label>
+                            <div class="file-drop-zone" id="file-drop-zone">
+                                <input type="file" id="upload-files" name="files" multiple accept=".pdf,.docx,.pptx,.png,.jpg,.jpeg,.gif,.bmp,.tiff,.webp,.txt,.md,.html,.htm" style="display:none;">
+                                <div class="drop-zone-content">
+                                    <p class="drop-zone-icon">📁</p>
+                                    <p class="drop-zone-text">Drag & drop files here or <button type="button" class="btn-link" onclick="document.getElementById('upload-files').click()">browse</button></p>
+                                    <p class="drop-zone-hint">Supported: PDF, DOCX, PPTX, Images, Text files (Max 50MB each)</p>
+                                </div>
+                                <div id="file-list" class="file-list"></div>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="upload-tier">Material Tier *</label>
+                                <select id="upload-tier" class="form-input" required>
+                                    <option value="">-- Select Tier --</option>
+                                    <option value="syllabus">Syllabus</option>
+                                    <option value="course_materials">Course Materials</option>
+                                    <option value="supplementary">Supplementary Sources</option>
+                                </select>
+                            </div>
+                            <div class="form-group" id="category-group" style="display:none;">
+                                <label for="upload-category">Category</label>
+                                <select id="upload-category" class="form-input">
+                                    <option value="">-- Select Category --</option>
+                                    <option value="lecture">Lecture</option>
+                                    <option value="reading">Reading</option>
+                                    <option value="case">Case</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="upload-week">Link to Week (Optional)</label>
+                            <input type="number" id="upload-week" class="form-input" min="1" max="52" placeholder="e.g., 1">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="upload-description">Description (Optional)</label>
+                            <textarea id="upload-description" class="form-input" rows="3" placeholder="Brief description of the material..."></textarea>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="upload-extract-text" checked> Extract text automatically
+                            </label>
+                            <small class="form-hint">Text extraction enables AI features like quiz generation</small>
+                        </div>
+
+                        <div id="upload-progress" class="upload-progress hidden">
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="progress-fill"></div>
+                            </div>
+                            <p class="progress-text" id="progress-text">Uploading...</p>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" onclick="closeUploadModal()">Cancel</button>
+                    <button id="upload-submit-btn" class="btn btn-primary" onclick="submitUpload()">📤 Upload Files</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <footer class="footer">
@@ -293,6 +378,7 @@
         // Pass course_id from server if editing specific course
         window.initialCourseId = "{{ course_id | default('') }}";
     </script>
+    <script src="/static/js/upload.js"></script>
     <script src="/static/js/admin.js"></script>
 </body>
 </html>
