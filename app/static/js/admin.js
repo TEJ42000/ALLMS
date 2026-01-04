@@ -1348,6 +1348,54 @@ function updateExtractionDashboard(metrics) {
                 </div>
             `).join('');
     }
+
+    // Update activity log
+    updateActivityLog();
+}
+
+function updateActivityLog() {
+    const activityContainer = document.getElementById('extraction-activity-log');
+
+    // Get recent extraction activities from cache
+    const activities = [];
+    extractionCache.forEach((status, filePath) => {
+        if (status.extracted && status.extractionDate) {
+            activities.push({
+                file: filePath.split('/').pop(),
+                date: new Date(status.extractionDate),
+                chars: status.charCount
+            });
+        }
+    });
+
+    // Sort by date descending and take last 10
+    activities.sort((a, b) => b.date - a.date);
+    const recentActivities = activities.slice(0, 10);
+
+    if (recentActivities.length === 0) {
+        activityContainer.innerHTML = '<p class="empty-state">No recent activity</p>';
+    } else {
+        activityContainer.innerHTML = recentActivities.map(activity => {
+            const timeAgo = getTimeAgo(activity.date);
+            return `
+                <div class="activity-item">
+                    <div class="activity-item-time">${timeAgo}</div>
+                    <div class="activity-item-text">Extracted ${activity.file} (${formatNumber(activity.chars)} chars)</div>
+                </div>
+            `;
+        }).join('');
+    }
+}
+
+function getTimeAgo(date) {
+    const seconds = Math.floor((new Date() - date) / 1000);
+
+    if (seconds < 60) return 'Just now';
+    if (seconds < 3600) return `${Math.floor(seconds / 60)} minutes ago`;
+    if (seconds < 86400) return `${Math.floor(seconds / 3600)} hours ago`;
+    if (seconds < 604800) return `${Math.floor(seconds / 86400)} days ago`;
+
+    return date.toLocaleDateString();
 }
 
 function formatNumber(num) {
@@ -1438,23 +1486,21 @@ async function extractAllMaterials() {
 }
 
 async function extractSingleFile(filePath) {
-    const response = await fetch(`/api/admin/cache/populate`, {
+    // Use the correct endpoint for individual file extraction
+    const response = await fetch(`/api/admin/cache/file/${encodeURIComponent(filePath)}/refresh`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            folder_path: filePath,
-            force_refresh: false,
-            recursive: false
-        })
+        headers: { 'Content-Type': 'application/json' }
     });
 
     if (!response.ok) {
-        const error = await response.json();
+        const error = await response.json().catch(() => ({ detail: 'Extraction failed' }));
         throw new Error(error.detail || 'Extraction failed');
     }
 
-    // Clear cache for this file
+    // Clear cache for this file to force refresh
     extractionCache.delete(filePath);
+
+    return await response.json();
 }
 
 function downloadErrorReport(errors) {
@@ -1522,6 +1568,14 @@ function closeTextPreviewModal() {
     document.getElementById('text-preview-modal').classList.add('hidden');
 }
 
+// Close modal when clicking outside
+document.addEventListener('click', (e) => {
+    const modal = document.getElementById('text-preview-modal');
+    if (modal && e.target === modal) {
+        closeTextPreviewModal();
+    }
+});
+
 // ========== Event Listeners ==========
 document.addEventListener('DOMContentLoaded', () => {
     fetchCourses();
@@ -1545,6 +1599,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // Extraction actions
     document.getElementById('extract-all-btn').addEventListener('click', extractAllMaterials);
     document.getElementById('refresh-extraction-stats-btn').addEventListener('click', refreshExtractionDashboard);
+    document.getElementById('cancel-extraction-btn').addEventListener('click', () => {
+        if (extractionAbortController) {
+            extractionAbortController.abort();
+            showToast('Cancelling extraction...', 'info');
+        }
+    });
 
     // Week actions
     document.getElementById('save-week-btn').addEventListener('click', saveWeek);
