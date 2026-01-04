@@ -602,3 +602,120 @@ async def get_course_materials(
         "course_id": course_id,
         "materials": course.materials.model_dump() if course.materials else None
     }
+
+
+class SyncWeekMaterialsResponse(BaseModel):
+    """Response from syncing materials to weeks."""
+    course_id: str
+    weeks_updated: int
+    materials_linked: int
+    message: str
+
+
+@router.post(
+    "/{course_id}/sync-week-materials",
+    response_model=SyncWeekMaterialsResponse,
+    summary="Sync materials to course weeks",
+    description="""
+    Automatically link materials to course weeks based on week numbers.
+
+    This endpoint:
+    1. Gets the course's materials registry (lectures, readings with week numbers)
+    2. For each week, creates WeekMaterial entries for matching materials
+    3. Updates the week's materials list in Firestore
+
+    Materials are matched by their `week` field. Materials without a week number
+    are not automatically linked.
+    """
+)
+async def sync_week_materials(
+    course_id: str = Path(..., description="Course ID")
+):
+    """Auto-link materials to weeks based on week numbers."""
+    service = get_course_service()
+
+    # Get course with weeks
+    course = service.get_course(course_id, include_weeks=True)
+    if course is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Course not found: {course_id}"
+        )
+
+    materials = course.materials
+    if not materials:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Course has no materials. Run 'Scan Folders' first."
+        )
+
+    weeks = course.weeks or []
+    if not weeks:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Course has no weeks configured."
+        )
+
+    # Build week -> materials mapping
+    week_materials_map: Dict[int, List[Dict]] = {}
+
+    # Add lectures
+    for lecture in materials.lectures or []:
+        if lecture.week:
+            if lecture.week not in week_materials_map:
+                week_materials_map[lecture.week] = []
+            week_materials_map[lecture.week].append({
+                "type": "lecture",
+                "file": lecture.file,
+                "title": lecture.title
+            })
+
+    # Add readings if they exist
+    readings = getattr(materials, 'readings', None) or []
+    for reading in readings:
+        week = getattr(reading, 'week', None)
+        if week:
+            if week not in week_materials_map:
+                week_materials_map[week] = []
+            week_materials_map[week].append({
+                "type": "reading",
+                "file": reading.file,
+                "title": reading.title
+            })
+
+    # Update weeks with materials
+    weeks_updated = 0
+    materials_linked = 0
+
+    from datetime import datetime, timezone
+
+    for week in weeks:
+        week_num = week.weekNumber
+        if week_num in week_materials_map:
+            new_materials = week_materials_map[week_num]
+
+            # Convert to WeekMaterial format
+            week_material_list = [
+                {"type": m["type"], "file": m["file"]}
+                for m in new_materials
+            ]
+
+            # Update week in Firestore (document ID is "week-{n}")
+            try:
+                week_ref = service.db.collection("courses").document(course_id)\
+                    .collection("weeks").document(f"week-{week_num}")
+                week_ref.update({
+                    "materials": week_material_list,
+                    "updatedAt": datetime.now(timezone.utc)
+                })
+                weeks_updated += 1
+                materials_linked += len(new_materials)
+            except Exception as e:
+                logger.warning("Failed to update week %d: %s", week_num, e)
+
+    return SyncWeekMaterialsResponse(
+        course_id=course_id,
+        weeks_updated=weeks_updated,
+        materials_linked=materials_linked,
+        message=f"Linked {materials_linked} materials to {weeks_updated} weeks"
+    )

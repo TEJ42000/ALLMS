@@ -72,6 +72,7 @@ async function fetchCourse(courseId) {
         currentCourse = await response.json();
         renderCourseForm();
         renderWeeksList();
+        renderMaterialsList(currentCourse.materials);
         showView('course-detail');
     } catch (error) {
         showToast('Error loading course: ' + error.message, 'error');
@@ -126,10 +127,10 @@ async function scanMaterials() {
 
         const result = await response.json();
         showToast(result.message, 'success');
-        renderMaterialsSummary(result);
 
-        // Refresh course data to get updated materials
+        // Refresh course data to get updated materials and render list
         await fetchCourse(currentCourse.id);
+        renderMaterialsList(currentCourse.materials);
     } catch (error) {
         showToast('Error: ' + error.message, 'error');
     } finally {
@@ -137,23 +138,151 @@ async function scanMaterials() {
     }
 }
 
-function renderMaterialsSummary(scanResult) {
-    const container = document.getElementById('materials-summary');
-    if (!scanResult || scanResult.total_files === 0) {
-        container.innerHTML = '<p class="empty-state">No materials found. Check materialSubjects configuration.</p>';
+function renderMaterialsList(materials) {
+    const container = document.getElementById('materials-list');
+    if (!materials) {
+        container.innerHTML = '<p class="empty-state">No materials loaded. Click "Scan Folders" to discover materials.</p>';
         return;
     }
 
-    const categories = Object.entries(scanResult.categories || {})
-        .map(([cat, count]) => `<span class="category-badge">${cat}: ${count}</span>`)
-        .join(' ');
+    const sections = [];
 
-    container.innerHTML = `
-        <div class="scan-result">
-            <p><strong>✅ Found ${scanResult.total_files} files</strong> in ${scanResult.subjects_scanned?.join(', ') || 'folders'}</p>
-            <div class="categories">${categories}</div>
-        </div>
-    `;
+    // Core Textbooks
+    if (materials.coreTextbooks?.length) {
+        sections.push(`
+            <div class="materials-category">
+                <h4>📚 Core Textbooks (${materials.coreTextbooks.length})</h4>
+                <ul class="materials-items">
+                    ${materials.coreTextbooks.map(t => `
+                        <li>
+                            <span class="material-title">${t.title}</span>
+                            <span class="material-meta">${t.size || ''} · ${t.type || 'textbook'}</span>
+                        </li>
+                    `).join('')}
+                </ul>
+            </div>
+        `);
+    }
+
+    // Lectures
+    if (materials.lectures?.length) {
+        sections.push(`
+            <div class="materials-category">
+                <h4>🎓 Lectures (${materials.lectures.length})</h4>
+                <ul class="materials-items">
+                    ${materials.lectures.map(l => `
+                        <li>
+                            <span class="material-title">${l.title}</span>
+                            <span class="material-meta">${l.week ? 'Week ' + l.week : 'No week'} · ${l.size || ''}</span>
+                        </li>
+                    `).join('')}
+                </ul>
+            </div>
+        `);
+    }
+
+    // Readings
+    if (materials.readings?.length) {
+        sections.push(`
+            <div class="materials-category">
+                <h4>📖 Readings (${materials.readings.length})</h4>
+                <ul class="materials-items">
+                    ${materials.readings.map(r => `
+                        <li>
+                            <span class="material-title">${r.title}</span>
+                            <span class="material-meta">${r.week ? 'Week ' + r.week : 'No week'} · ${r.size || ''}</span>
+                        </li>
+                    `).join('')}
+                </ul>
+            </div>
+        `);
+    }
+
+    // Case Studies
+    if (materials.caseStudies?.length) {
+        sections.push(`
+            <div class="materials-category">
+                <h4>⚖️ Case Studies (${materials.caseStudies.length})</h4>
+                <ul class="materials-items">
+                    ${materials.caseStudies.map(c => `
+                        <li>
+                            <span class="material-title">${c.title}</span>
+                            <span class="material-meta">${c.court || ''}</span>
+                        </li>
+                    `).join('')}
+                </ul>
+            </div>
+        `);
+    }
+
+    // Mock Exams
+    if (materials.mockExams?.length) {
+        sections.push(`
+            <div class="materials-category">
+                <h4>📝 Mock Exams (${materials.mockExams.length})</h4>
+                <ul class="materials-items">
+                    ${materials.mockExams.map(e => `
+                        <li>
+                            <span class="material-title">${e.title}</span>
+                            <span class="material-meta">${e.size || ''}</span>
+                        </li>
+                    `).join('')}
+                </ul>
+            </div>
+        `);
+    }
+
+    // Other
+    if (materials.other?.length) {
+        sections.push(`
+            <div class="materials-category">
+                <h4>📄 Other (${materials.other.length})</h4>
+                <ul class="materials-items">
+                    ${materials.other.map(o => `
+                        <li>
+                            <span class="material-title">${o.title}</span>
+                            <span class="material-meta">${o.category || ''} · ${o.size || ''}</span>
+                        </li>
+                    `).join('')}
+                </ul>
+            </div>
+        `);
+    }
+
+    if (sections.length === 0) {
+        container.innerHTML = '<p class="empty-state">No materials found. Click "Scan Folders" to discover materials.</p>';
+    } else {
+        container.innerHTML = sections.join('');
+    }
+}
+
+async function syncWeekMaterials() {
+    if (!currentCourse?.id) {
+        showToast('Save the course first', 'error');
+        return;
+    }
+
+    showLoading();
+    try {
+        const response = await fetch(`${API_BASE}/${currentCourse.id}/sync-week-materials`, {
+            method: 'POST'
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to sync materials');
+        }
+
+        const result = await response.json();
+        showToast(result.message, 'success');
+
+        // Refresh course data
+        await fetchCourse(currentCourse.id);
+    } catch (error) {
+        showToast('Error: ' + error.message, 'error');
+    } finally {
+        hideLoading();
+    }
 }
 
 async function saveWeek() {
@@ -503,6 +632,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('add-component-btn').addEventListener('click', addComponent);
     document.getElementById('add-abbreviation-btn').addEventListener('click', addAbbreviation);
     document.getElementById('scan-materials-btn').addEventListener('click', scanMaterials);
+    document.getElementById('sync-week-materials-btn').addEventListener('click', syncWeekMaterials);
 
     // Week actions
     document.getElementById('save-week-btn').addEventListener('click', saveWeek);
