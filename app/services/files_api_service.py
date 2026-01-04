@@ -405,18 +405,80 @@ Include:
             logger.error(f"Text was: {text[:500]}")
             raise ValueError(f"Invalid JSON response: {e}")
     
+    def get_files_by_tier(self, tier: str) -> List[str]:
+        """Get all file keys for a specific tier"""
+        return [key for key, info in self.file_ids.items()
+                if info.get("tier") == tier]
+
+    def get_files_by_subject(self, subject: str) -> List[str]:
+        """Get all file keys for a specific subject"""
+        return [key for key, info in self.file_ids.items()
+                if info.get("subject", "").lower() == subject.lower()]
+
+    def get_prioritized_files(self, file_keys: List[str]) -> List[str]:
+        """
+        Sort file keys by tier priority (Syllabus first, then Course_Materials, then Supplementary_Sources)
+
+        Args:
+            file_keys: List of file keys to sort
+
+        Returns:
+            Sorted list with highest priority (lowest tier_priority number) first
+        """
+        def get_priority(key: str) -> int:
+            file_info = self.file_ids.get(key, {})
+            return file_info.get("tier_priority", 999)  # Default to low priority if not found
+
+        return sorted(file_keys, key=get_priority)
+
     def get_topic_files(self, topic: str) -> List[str]:
-        """Get recommended file keys for a topic"""
-        
-        topic_map = {
-            "Constitutional Law": ["lls_reader", "elsa_notes"],
-            "Administrative Law": ["lls_reader", "lecture_week_3", "elsa_notes"],
-            "Criminal Law": ["lls_reader", "lecture_week_4", "elsa_notes"],
-            "Private Law": ["lls_reader", "readings_week_2", "elsa_notes"],
-            "International Law": ["lls_reader", "lecture_week_6", "elsa_notes"]
+        """
+        Get recommended file keys for a topic, prioritized by tier.
+
+        Now uses the three-tier structure:
+        - Tier 1 (Syllabus): Highest priority
+        - Tier 2 (Course_Materials): Medium priority
+        - Tier 3 (Supplementary_Sources): Lowest priority
+
+        Args:
+            topic: Topic name (e.g., "Criminal Law", "Administrative Law")
+
+        Returns:
+            List of file keys sorted by tier priority
+        """
+
+        # Map topics to subjects in the new structure
+        topic_to_subject = {
+            "Criminal Law": "Criminal_Law",
+            "Administrative Law": "Administrative_Law",
+            "Private Law": "Private_Law",
+            "Constitutional Law": "Constitutional_Law",
+            "International Law": "International_Law"
         }
-        
-        return topic_map.get(topic, ["lls_reader"])
+
+        subject = topic_to_subject.get(topic)
+
+        if not subject:
+            # If topic not recognized, return all files sorted by priority
+            logger.warning(f"Topic '{topic}' not recognized, returning all files")
+            all_keys = list(self.file_ids.keys())
+            return self.get_prioritized_files(all_keys)
+
+        # Get files for this subject
+        subject_files = self.get_files_by_subject(subject)
+
+        if not subject_files:
+            # Fallback: try to find files with topic name in key
+            logger.warning(f"No files found for subject '{subject}', searching by keyword")
+            subject_files = [key for key in self.file_ids.keys()
+                           if topic.lower().replace(" ", "_") in key.lower()]
+
+        # Sort by tier priority (Syllabus first, then Course_Materials, then Supplementary_Sources)
+        prioritized_files = self.get_prioritized_files(subject_files)
+
+        logger.info(f"Found {len(prioritized_files)} files for topic '{topic}'")
+
+        return prioritized_files if prioritized_files else list(self.file_ids.keys())[:5]
 
 
 # Singleton
