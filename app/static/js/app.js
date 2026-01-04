@@ -162,6 +162,9 @@ function formatMarkdown(text) {
 
 // Format inline markdown (bold, italic, code, etc.)
 function formatInline(text) {
+    // First escape HTML to prevent XSS
+    text = escapeHtml(text);
+
     // Bold
     text = text.replace(/\*\*(.*?)\*\*/g, '<strong class="md-bold">$1</strong>');
     // Italic
@@ -281,13 +284,16 @@ async function assessAnswer() {
 
 // ========== Quiz Generator ==========
 function initQuizListeners() {
-    document.getElementById('generate-quiz-btn').addEventListener('click', generateQuiz);
+    const startBtn = document.getElementById('start-quiz-btn');
+    if (startBtn) startBtn.addEventListener('click', generateQuiz);
 }
 
 async function generateQuiz() {
-    const topic = document.getElementById('quiz-topic').value;
-    const num_questions = parseInt(document.getElementById('quiz-count').value);
-    const resultDiv = document.getElementById('quiz-result');
+    const topicSelect = document.getElementById('quiz-topic-select');
+    const topic = topicSelect ? topicSelect.value : 'all';
+    const num_questions = 5; // Default to 5 questions
+    const quizContent = document.getElementById('quiz-content');
+    const questionContainer = document.getElementById('quiz-question-container');
     
     showLoading();
     
@@ -295,27 +301,46 @@ async function generateQuiz() {
         const response = await fetch(`${API_BASE}/api/files-content/quiz`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({topic, num_questions, difficulty: 'medium'})
+            body: JSON.stringify({topic: topic === 'all' ? 'Criminal Law' : topic, num_questions, difficulty: 'medium'})
         });
-        
+
         if (!response.ok) throw new Error(`API error: ${response.status}`);
-        
+
         const data = await response.json();
-        displayQuiz(data.quiz);
-        
+        displayQuiz(data.quiz, quizContent, questionContainer);
+
     } catch (error) {
         console.error('Error:', error);
-        resultDiv.innerHTML = '<p class="error">Error generating quiz. Please try again.</p>';
+        if (questionContainer) {
+            questionContainer.innerHTML = '<p class="error">Error generating quiz. Please try again.</p>';
+        }
+        if (quizContent) quizContent.classList.remove('hidden');
     } finally {
         hideLoading();
     }
 }
 
-function displayQuiz(quiz) {
-    // Quiz display implementation
-    const resultDiv = document.getElementById('quiz-result');
-    resultDiv.innerHTML = '<p>Quiz generated! (Display implementation pending)</p>';
-    resultDiv.style.display = 'block';
+function displayQuiz(quiz, quizContent, questionContainer) {
+    if (!quizContent || !questionContainer) return;
+
+    quizContent.classList.remove('hidden');
+
+    // Update totals
+    const totalSpan = document.getElementById('quiz-total');
+    if (totalSpan) totalSpan.textContent = quiz.length || 5;
+
+    // Display the quiz content
+    if (typeof quiz === 'string') {
+        questionContainer.innerHTML = `<div class="quiz-generated">${formatMarkdown(quiz)}</div>`;
+    } else if (Array.isArray(quiz)) {
+        let quizHtml = '';
+        quiz.forEach((q, i) => {
+            quizHtml += `<div class="quiz-question"><h4>Question ${i + 1}</h4><p>${escapeHtml(q.question || q)}</p></div>`;
+        });
+        questionContainer.innerHTML = quizHtml;
+    } else {
+        questionContainer.innerHTML = formatMarkdown(JSON.stringify(quiz, null, 2));
+    }
 }
 
 // ========== Study Guide Generator ==========
@@ -353,10 +378,10 @@ async function generateStudyGuide() {
 // ========== Dashboard ==========
 function initDashboard() {
     const stats = {
-        points: localStorage.getItem('lls_points') || 0,
-        streak: localStorage.getItem('lls_streak') || 0,
+        points: parseInt(localStorage.getItem('lls_points'), 10) || 0,
+        streak: parseInt(localStorage.getItem('lls_streak'), 10) || 0,
         topics: localStorage.getItem('lls_topics') || '0/5',
-        quizzes: localStorage.getItem('lls_quizzes') || 0
+        quizzes: parseInt(localStorage.getItem('lls_quizzes'), 10) || 0
     };
 
     document.getElementById('stat-points').textContent = stats.points;
