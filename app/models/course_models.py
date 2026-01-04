@@ -128,7 +128,16 @@ class Lecture(BaseModel):
     """Lecture material reference."""
 
     title: str
-    week: int
+    week: Optional[int] = None
+    file: str
+    size: Optional[str] = None
+
+
+class Reading(BaseModel):
+    """Reading material reference."""
+
+    title: str
+    week: Optional[int] = None
     file: str
     size: Optional[str] = None
 
@@ -159,6 +168,7 @@ class MaterialsRegistry(BaseModel):
 
     coreTextbooks: List[CoreTextbook] = []
     lectures: List[Lecture] = []
+    readings: List[Reading] = []
     caseStudies: List[CaseStudy] = []
     mockExams: List[MockExam] = []
 
