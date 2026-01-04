@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-from google.cloud.firestore_v1 import FieldFilter
+from google.cloud.firestore_v1 import Increment
 
 from app.models.text_cache_models import (
     TextCacheEntry,
@@ -30,17 +30,50 @@ logger = logging.getLogger(__name__)
 # Firestore collection name
 TEXT_CACHE_COLLECTION = "material_text_cache"
 
-# Maximum text length to store (to avoid Firestore document size limits)
-# Firestore max doc size is 1MB, we use 900KB to be safe
-MAX_TEXT_LENGTH = 900_000
+# Maximum text bytes to store (to avoid Firestore document size limits)
+# Firestore max doc size is 1MB, we use 850KB to be safe (accounts for metadata)
+MAX_TEXT_BYTES = 850_000
+
+# Chunk size for file hashing
+HASH_CHUNK_SIZE = 8192
+
+
+def _validate_path_within_materials(file_path: Path) -> bool:
+    """Validate that a path is within the MATERIALS_ROOT directory.
+
+    Args:
+        file_path: Path to validate (can be absolute or relative)
+
+    Returns:
+        True if path is within MATERIALS_ROOT, False otherwise
+    """
+    try:
+        resolved = file_path.resolve()
+        materials_resolved = MATERIALS_ROOT.resolve()
+        resolved.relative_to(materials_resolved)
+        return True
+    except ValueError:
+        return False
 
 
 def _compute_file_hash(file_path: Path) -> str:
-    """Compute MD5 hash of file content for change detection."""
+    """Compute MD5 hash of file content for change detection.
+
+    Args:
+        file_path: Path to file (must be validated before calling)
+
+    Returns:
+        MD5 hex digest or empty string on error
+    """
+    # Security: Validate path is within MATERIALS_ROOT
+    if not _validate_path_within_materials(file_path):
+        logger.warning("Attempted to hash file outside Materials: %s", file_path)
+        return ""
+
     hash_md5 = hashlib.md5()
     try:
         with open(file_path, "rb") as f:
-            for chunk in iter(lambda: f.read(8192), b""):
+            for chunk in iter(lambda: f.read(HASH_CHUNK_SIZE), b""):
                 hash_md5.update(chunk)
         return hash_md5.hexdigest()
     except Exception as e:
@@ -109,11 +142,15 @@ class TextCacheService:
             data = doc.to_dict()
             entry = TextCacheEntry(**data)
 
-            # Update access stats
-            doc_ref.update({
-                "last_accessed": datetime.now(timezone.utc),
-                "access_count": entry.access_count + 1,
-            })
+            # Update access stats using atomic increment to prevent race conditions
+            try:
+                doc_ref.update({
+                    "last_accessed": datetime.now(timezone.utc),
+                    "access_count": Increment(1),  # Atomic server-side increment
+                })
+            except Exception as update_err:
+                # Stats update failure shouldn't block cache read
+                logger.warning("Failed to update access stats for %s: %s", file_path, update_err)
 
             return entry
         except Exception as e:
@@ -131,6 +168,11 @@ class TextCacheService:
             True if cache is valid, False if file has changed
         """
         full_path = MATERIALS_ROOT / file_path
+
+        # Security: Validate path is within MATERIALS_ROOT
+        if not _validate_path_within_materials(full_path):
+            logger.warning("Attempted to validate cache for path outside Materials: %s", file_path)
+            return False
 
         if not full_path.exists():
             return False
@@ -151,10 +193,17 @@ class TextCacheService:
         if not self.is_available:
             return False
 
-        # Truncate text if too long
+        # Truncate text if too long (use byte-based truncation for UTF-8 safety)
         text = result.text
-        if len(text) > MAX_TEXT_LENGTH:
-            text = text[:MAX_TEXT_LENGTH] + "\n\n[Text truncated for storage...]"
+        text_bytes = text.encode('utf-8')
+        if len(text_bytes) > MAX_TEXT_BYTES:
+            logger.warning(
+                "Truncating cached text for %s: %d bytes exceeds limit of %d bytes",
+                file_path, len(text_bytes), MAX_TEXT_BYTES
+            )
+            # Truncate safely on character boundaries
+            text = text_bytes[:MAX_TEXT_BYTES].decode('utf-8', errors='ignore')
+            text = text + "\n\n[Text truncated for storage...]"
 
         subject, tier = _extract_subject_and_tier(file_path)
 
@@ -365,18 +414,14 @@ def populate_cache_for_folder(
     """Populate cache for all files in a folder."""
     from app.services.text_extractor import extract_all_from_folder
 
-    # Normalize and validate folder path against MATERIALS_ROOT to prevent traversal
-    materials_root = MATERIALS_ROOT.resolve()
-    full_path = (materials_root / folder_path).resolve()
-    try:
-        full_path.relative_to(materials_root)
-    except ValueError:
+    full_path = MATERIALS_ROOT / folder_path
+
+    # Security: Validate path is within MATERIALS_ROOT
+    if not _validate_path_within_materials(full_path):
+        logger.warning("Attempted to populate cache for path outside Materials: %s", folder_path)
         return CachePopulateResponse(
-            total_files=0,
-            cached=0,
-            skipped=0,
-            failed=0,
-            errors=[{"error": f"Folder outside materials root: {folder_path}"}],
+            total_files=0, cached=0, skipped=0, failed=0,
+            errors=[{"error": "Invalid path: outside Materials directory"}],
         )
 
     if not full_path.exists() or not full_path.is_dir():
@@ -387,9 +432,9 @@ def populate_cache_for_folder(
 
     cache = get_text_cache_service()
 
-    # Find all files
-    files = list(full_path.rglob("*") if recursive else full_path.glob("*"))
-    files = [f for f in files if f.is_file()]
+    # Find all files (generator-based to avoid memory issues with large directories)
+    file_iterator = full_path.rglob("*") if recursive else full_path.glob("*")
+    files = [f for f in file_iterator if f.is_file() and _validate_path_within_materials(f)]
 
     total_files = len(files)
     cached = 0

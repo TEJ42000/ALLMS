@@ -158,9 +158,13 @@ class TestCacheInvalidateRequest:
 class TestHelperFunctions:
     """Tests for helper functions in text_cache_service."""
 
-    def test_compute_file_hash(self, tmp_path):
+    def test_compute_file_hash(self, tmp_path, monkeypatch):
         """Test file hash computation."""
+        from app.services import text_cache_service
         from app.services.text_cache_service import _compute_file_hash
+
+        # Mock path validation to allow temp files for testing
+        monkeypatch.setattr(text_cache_service, "_validate_path_within_materials", lambda p: True)
 
         # Create a test file
         test_file = tmp_path / "test.txt"
@@ -175,9 +179,13 @@ class TestHelperFunctions:
         # Hash should be consistent
         assert hash_result == _compute_file_hash(test_file)
 
-    def test_compute_file_hash_different_content(self, tmp_path):
+    def test_compute_file_hash_different_content(self, tmp_path, monkeypatch):
         """Test that different content produces different hashes."""
+        from app.services import text_cache_service
         from app.services.text_cache_service import _compute_file_hash
+
+        # Mock path validation to allow temp files for testing
+        monkeypatch.setattr(text_cache_service, "_validate_path_within_materials", lambda p: True)
 
         file1 = tmp_path / "file1.txt"
         file2 = tmp_path / "file2.txt"
@@ -185,6 +193,18 @@ class TestHelperFunctions:
         file2.write_text("Content B")
 
         assert _compute_file_hash(file1) != _compute_file_hash(file2)
+
+    def test_compute_file_hash_rejects_outside_materials(self, tmp_path):
+        """Test that file hash computation rejects files outside Materials."""
+        from app.services.text_cache_service import _compute_file_hash
+
+        # Create a test file outside Materials
+        test_file = tmp_path / "test.txt"
+        test_file.write_text("Hello, World!")
+
+        # Should return empty string for files outside Materials
+        hash_result = _compute_file_hash(test_file)
+        assert hash_result == ""
 
     def test_path_to_doc_id(self):
         """Test conversion of file path to Firestore document ID."""
