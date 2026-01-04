@@ -143,13 +143,33 @@ async function scanMaterials() {
     }
 }
 
-function renderCourseMaterialsList(materials) {
+async function renderCourseMaterialsList(materials, uploadedMaterials = null) {
     const container = document.getElementById('course-materials-list');
     if (!container) return;  // Guard for when not on course detail view
 
-    if (!materials) {
-        container.innerHTML = '<p class="empty-state">No materials loaded. Click "Scan Folders" to discover materials.</p>';
+    // Fetch uploaded materials if not provided
+    if (uploadedMaterials === null && currentCourse?.id) {
+        try {
+            const response = await fetch(`/api/admin/courses/${currentCourse.id}/materials/uploads`);
+            if (response.ok) {
+                const data = await response.json();
+                uploadedMaterials = data.materials || [];
+            } else {
+                uploadedMaterials = [];
+            }
+        } catch (e) {
+            uploadedMaterials = [];
+        }
+    }
+
+    if (!materials && (!uploadedMaterials || uploadedMaterials.length === 0)) {
+        container.innerHTML = '<p class="empty-state">No materials loaded. Click "Scan Folders" to discover materials or "Upload Files" to add new materials.</p>';
         return;
+    }
+
+    // Initialize materials object if null
+    if (!materials) {
+        materials = {};
     }
 
     // Build a map of file -> weeks that reference it
@@ -182,6 +202,72 @@ function renderCourseMaterialsList(materials) {
         return `<button class="preview-btn" onclick="event.stopPropagation(); openPreviewModal('${escapedFile}', '${escapedTitle}')">👁️ Preview</button>`;
     };
 
+    // Helper to format file size
+    const formatSize = (bytes) => {
+        if (!bytes) return '';
+        if (bytes < 1024) return bytes + ' B';
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+        return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    };
+
+    // Convert uploaded materials to the scanned format and merge by category
+    if (uploadedMaterials && uploadedMaterials.length > 0) {
+        uploadedMaterials.forEach(um => {
+            const converted = {
+                title: um.title || um.filename,
+                file: um.storagePath,
+                size: formatSize(um.fileSize),
+                week: um.weekNumber,
+                isUploaded: true,  // Mark as uploaded for styling
+                summary: um.summary,
+                summaryGenerated: um.summaryGenerated,
+                textExtracted: um.textExtracted,
+                uploadedAt: um.uploadedAt
+            };
+
+            // Map category to the appropriate array
+            const category = um.category?.toLowerCase();
+            if (category === 'lecture') {
+                if (!materials.lectures) materials.lectures = [];
+                materials.lectures.push(converted);
+            } else if (category === 'reading') {
+                if (!materials.readings) materials.readings = [];
+                materials.readings.push(converted);
+            } else if (category === 'case') {
+                if (!materials.caseStudies) materials.caseStudies = [];
+                materials.caseStudies.push(converted);
+            } else if (um.tier === 'syllabus') {
+                // Syllabus goes to coreTextbooks
+                if (!materials.coreTextbooks) materials.coreTextbooks = [];
+                materials.coreTextbooks.push(converted);
+            } else {
+                // Default to 'other' for supplementary or uncategorized
+                if (!materials.other) materials.other = [];
+                materials.other.push(converted);
+            }
+        });
+    }
+
+    // Helper to render a material item with uploaded badges
+    const renderMaterialItem = (m, weekHint = null) => {
+        const uploadedBadge = m.isUploaded ? '<span class="material-badge badge-uploaded">📤 Uploaded</span>' : '';
+        const summaryBadge = m.summaryGenerated ? '<span class="material-badge badge-summary">✨ AI Summary</span>' : '';
+        const textBadge = m.textExtracted ? '<span class="material-badge badge-extracted">✓ Text</span>' : '';
+        const badges = [uploadedBadge, summaryBadge, textBadge].filter(b => b).join(' ');
+
+        return `
+            <li class="${m.isUploaded ? 'uploaded-item' : ''}">
+                <div class="material-item-content">
+                    <span class="material-title">${m.title}</span>
+                    <span class="material-meta">${getWeekDisplay(m.file, weekHint || m.week)} · ${m.size || m.court || ''}</span>
+                    ${badges ? `<div class="material-badges">${badges}</div>` : ''}
+                    ${m.summary ? `<div class="material-summary-inline" title="${m.summary.replace(/"/g, '&quot;')}">📝 ${m.summary.substring(0, 100)}${m.summary.length > 100 ? '...' : ''}</div>` : ''}
+                </div>
+                ${previewBtn(m.file, m.title)}
+            </li>
+        `;
+    };
+
     const sections = [];
 
     // Core Textbooks
@@ -190,13 +276,7 @@ function renderCourseMaterialsList(materials) {
             <div class="materials-category">
                 <h4>📚 Core Textbooks (${materials.coreTextbooks.length})</h4>
                 <ul class="materials-items">
-                    ${materials.coreTextbooks.map(t => `
-                        <li>
-                            <span class="material-title">${t.title}</span>
-                            <span class="material-meta">${getWeekDisplay(t.file, null)} · ${t.size || ''}</span>
-                            ${previewBtn(t.file, t.title)}
-                        </li>
-                    `).join('')}
+                    ${materials.coreTextbooks.map(t => renderMaterialItem(t)).join('')}
                 </ul>
             </div>
         `);
@@ -208,13 +288,7 @@ function renderCourseMaterialsList(materials) {
             <div class="materials-category">
                 <h4>🎓 Lectures (${materials.lectures.length})</h4>
                 <ul class="materials-items">
-                    ${materials.lectures.map(l => `
-                        <li>
-                            <span class="material-title">${l.title}</span>
-                            <span class="material-meta">${getWeekDisplay(l.file, l.week)} · ${l.size || ''}</span>
-                            ${previewBtn(l.file, l.title)}
-                        </li>
-                    `).join('')}
+                    ${materials.lectures.map(l => renderMaterialItem(l, l.week)).join('')}
                 </ul>
             </div>
         `);
@@ -226,13 +300,7 @@ function renderCourseMaterialsList(materials) {
             <div class="materials-category">
                 <h4>📖 Readings (${materials.readings.length})</h4>
                 <ul class="materials-items">
-                    ${materials.readings.map(r => `
-                        <li>
-                            <span class="material-title">${r.title}</span>
-                            <span class="material-meta">${getWeekDisplay(r.file, r.week)} · ${r.size || ''}</span>
-                            ${previewBtn(r.file, r.title)}
-                        </li>
-                    `).join('')}
+                    ${materials.readings.map(r => renderMaterialItem(r, r.week)).join('')}
                 </ul>
             </div>
         `);
@@ -244,13 +312,7 @@ function renderCourseMaterialsList(materials) {
             <div class="materials-category">
                 <h4>⚖️ Case Studies (${materials.caseStudies.length})</h4>
                 <ul class="materials-items">
-                    ${materials.caseStudies.map(c => `
-                        <li>
-                            <span class="material-title">${c.title}</span>
-                            <span class="material-meta">${getWeekDisplay(c.file, null)} · ${c.court || ''}</span>
-                            ${previewBtn(c.file, c.title)}
-                        </li>
-                    `).join('')}
+                    ${materials.caseStudies.map(c => renderMaterialItem(c)).join('')}
                 </ul>
             </div>
         `);
@@ -262,38 +324,26 @@ function renderCourseMaterialsList(materials) {
             <div class="materials-category">
                 <h4>📝 Mock Exams (${materials.mockExams.length})</h4>
                 <ul class="materials-items">
-                    ${materials.mockExams.map(e => `
-                        <li>
-                            <span class="material-title">${e.title}</span>
-                            <span class="material-meta">${getWeekDisplay(e.file, null)} · ${e.size || ''}</span>
-                            ${previewBtn(e.file, e.title)}
-                        </li>
-                    `).join('')}
+                    ${materials.mockExams.map(e => renderMaterialItem(e)).join('')}
                 </ul>
             </div>
         `);
     }
 
-    // Other
+    // Other / Supplementary
     if (materials.other?.length) {
         sections.push(`
             <div class="materials-category">
-                <h4>📄 Other (${materials.other.length})</h4>
+                <h4>📄 Other / Supplementary (${materials.other.length})</h4>
                 <ul class="materials-items">
-                    ${materials.other.map(o => `
-                        <li>
-                            <span class="material-title">${o.title}</span>
-                            <span class="material-meta">${getWeekDisplay(o.file, null)} · ${o.category || ''}</span>
-                            ${previewBtn(o.file, o.title)}
-                        </li>
-                    `).join('')}
+                    ${materials.other.map(o => renderMaterialItem(o)).join('')}
                 </ul>
             </div>
         `);
     }
 
     if (sections.length === 0) {
-        container.innerHTML = '<p class="empty-state">No materials found. Click "Scan Folders" to discover materials.</p>';
+        container.innerHTML = '<p class="empty-state">No materials found. Click "Scan Folders" to discover materials or "Upload Files" to add new materials.</p>';
     } else {
         container.innerHTML = sections.join('');
     }
