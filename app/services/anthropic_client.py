@@ -1,9 +1,10 @@
-# app/services/anthropic_client.py - Anthropic API Client Service
+"""Anthropic API Client Service for the LLS Study Portal."""
 
-import os
-from typing import List, Dict, Optional
-from anthropic import AsyncAnthropic
 import logging
+import os
+from typing import Dict, List, Optional
+
+from anthropic import AsyncAnthropic
 
 logger = logging.getLogger(__name__)
 
@@ -11,7 +12,8 @@ logger = logging.getLogger(__name__)
 client = AsyncAnthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
 # System prompts for different contexts
-TUTOR_SYSTEM_PROMPT = """You are an expert Law & Legal Skills tutor for the University of Groningen's LLS course.
+TUTOR_SYSTEM_PROMPT = """You are an expert Law & Legal Skills tutor for the \
+University of Groningen's LLS course.
 
 COURSE COVERAGE:
 - Constitutional Law (Dutch Constitution, separation of powers, judicial review Art. 120)
@@ -51,7 +53,8 @@ TEACHING APPROACH:
 
 Respond immediately with substantive, VISUALLY FORMATTED legal information."""
 
-ASSESSMENT_SYSTEM_PROMPT = """You are an expert Law & Legal Skills assessor grading student answers for the University of Groningen LLS course.
+ASSESSMENT_SYSTEM_PROMPT = """You are an expert Law & Legal Skills assessor grading \
+student answers for the University of Groningen LLS course.
 
 YOUR TASK - Provide detailed, VISUALLY FORMATTED assessment:
 
@@ -92,32 +95,32 @@ async def get_ai_tutor_response(
 ) -> str:
     """
     Get AI tutor response for a user message.
-    
+
     Args:
         message: User's question or prompt
         context: Subject area context
         conversation_history: Previous conversation messages
-        
+
     Returns:
         AI-generated response text
     """
     try:
         # Build conversation history
         messages = []
-        
+
         if conversation_history:
             # Add previous messages (limit to last 10)
             messages.extend(conversation_history[-10:])
-        
+
         # Add current message
         messages.append({
             "role": "user",
             "content": message
         })
-        
+
         # Add context to system prompt
-        system_prompt = TUTOR_SYSTEM_PROMPT + f"\n\nCurrent topic context: {context}"
-        
+        system_prompt = TUTOR_SYSTEM_PROMPT + "\n\nCurrent topic context: " + context
+
         # Call Anthropic API
         response = await client.messages.create(
             model="claude-sonnet-4-20250514",
@@ -125,16 +128,16 @@ async def get_ai_tutor_response(
             system=system_prompt,
             messages=messages
         )
-        
+
         # Extract text from response
         response_text = response.content[0].text
-        
-        logger.info(f"AI Tutor response generated for context: {context}")
-        
+
+        logger.info("AI Tutor response generated for context: %s", context)
+
         return response_text
-        
+
     except Exception as e:
-        logger.error(f"Error getting AI tutor response: {str(e)}")
+        logger.error("Error getting AI tutor response: %s", str(e))
         raise
 
 
@@ -145,25 +148,25 @@ async def get_assessment_response(
 ) -> str:
     """
     Get AI assessment and grading for a student answer.
-    
+
     Args:
         topic: Subject area (e.g., "Private Law", "Criminal Law")
         question: Optional question/prompt
         answer: Student's answer text
-        
+
     Returns:
         AI-generated assessment with grade and feedback
     """
     try:
         # Build assessment prompt
         system_prompt = ASSESSMENT_SYSTEM_PROMPT.replace("${topic}", topic)
-        
+
         # Build user message
         if question:
-            user_message = f"Question/Prompt: {question}\n\nMy Answer:\n{answer}"
+            user_message = "Question/Prompt: %s\n\nMy Answer:\n%s" % (question, answer)
         else:
-            user_message = f"Please assess this answer:\n\n{answer}"
-        
+            user_message = "Please assess this answer:\n\n%s" % answer
+
         # Call Anthropic API
         response = await client.messages.create(
             model="claude-sonnet-4-20250514",
@@ -174,16 +177,16 @@ async def get_assessment_response(
                 "content": user_message
             }]
         )
-        
+
         # Extract text from response
         response_text = response.content[0].text
-        
-        logger.info(f"AI Assessment generated for topic: {topic}")
-        
+
+        logger.info("AI Assessment generated for topic: %s", topic)
+
         return response_text
-        
+
     except Exception as e:
-        logger.error(f"Error getting assessment response: {str(e)}")
+        logger.error("Error getting assessment response: %s", str(e))
         raise
 
 
@@ -194,12 +197,12 @@ async def get_simple_response(
 ) -> str:
     """
     Get a simple AI response without special formatting.
-    
+
     Args:
         prompt: User prompt
         max_tokens: Maximum tokens in response
         temperature: Response creativity (0.0 - 1.0)
-        
+
     Returns:
         AI-generated response text
     """
@@ -213,28 +216,29 @@ async def get_simple_response(
                 "content": prompt
             }]
         )
-        
+
         return response.content[0].text
-        
+
     except Exception as e:
-        logger.error(f"Error getting simple response: {str(e)}")
+        logger.error("Error getting simple response: %s", str(e))
         raise
 
 
 # Example usage:
 if __name__ == "__main__":
     import asyncio
-    
+
     async def test():
+        """Test the AI tutor and assessment functions."""
         # Test tutor response
-        response = await get_ai_tutor_response(
+        tutor_response = await get_ai_tutor_response(
             message="Explain Art. 6:74 DCC",
             context="Private Law"
         )
         print("Tutor Response:")
-        print(response)
-        print("\n" + "="*80 + "\n")
-        
+        print(tutor_response)
+        print("\n" + "=" * 80 + "\n")
+
         # Test assessment
         assessment = await get_assessment_response(
             topic="Private Law",
@@ -243,5 +247,5 @@ if __name__ == "__main__":
         )
         print("Assessment:")
         print(assessment)
-    
+
     asyncio.run(test())

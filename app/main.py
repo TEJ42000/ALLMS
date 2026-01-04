@@ -1,12 +1,12 @@
-# app/main.py - FastAPI Application Entry Point
+"""FastAPI Application Entry Point for LLS Study Portal."""
 
-from fastapi import FastAPI, Request
+import os
+
+from dotenv import load_dotenv
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
-import os
-from dotenv import load_dotenv
 
 # Import routers
 from app.routes import ai_tutor, assessment, pages, files_content
@@ -44,33 +44,36 @@ app.include_router(ai_tutor.router)
 app.include_router(assessment.router)
 app.include_router(files_content.router)
 
+
 # Startup event
 @app.on_event("startup")
 async def startup_event():
-    """Run on application startup"""
+    """Run on application startup."""
     print("🚀 LLS Study Portal starting up...")
-    
+
     # Verify Anthropic API key is set
     api_key = os.getenv("ANTHROPIC_API_KEY")
     if not api_key:
         print("⚠️  WARNING: ANTHROPIC_API_KEY not set!")
     else:
         print("✅ Anthropic API key loaded")
-    
+
     print("✅ Application ready!")
+
 
 # Shutdown event
 @app.on_event("shutdown")
 async def shutdown_event():
-    """Run on application shutdown"""
+    """Run on application shutdown."""
     print("👋 LLS Study Portal shutting down...")
+
 
 if __name__ == "__main__":
     import uvicorn
-    
+
     # Get port from environment variable (Cloud Run sets PORT)
-    port = int(os.getenv("PORT", 8080))
-    
+    port = int(os.getenv("PORT", "8080"))
+
     uvicorn.run(
         "app.main:app",
         host="0.0.0.0",

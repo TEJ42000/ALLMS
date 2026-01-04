@@ -1,40 +1,47 @@
-# app/services/files_api_service.py - Content Generation using Anthropic Files API
+"""Content Generation using Anthropic Files API for the LLS Study Portal."""
+
+import json
+import logging
+import os
+import re
+from typing import Dict, List, Optional
 
 from anthropic import AsyncAnthropic
-import os
-import json
-from typing import List, Dict, Optional
-import logging
-import re
 
 logger = logging.getLogger(__name__)
 
 
 class FilesAPIService:
-    """Service for generating content using uploaded files via Anthropic Files API"""
-    
+    """Service for generating content using uploaded files via Anthropic Files API."""
+
     def __init__(self, file_ids_path: str = "file_ids.json"):
+        """
+        Initialize the Files API service.
+
+        Args:
+            file_ids_path: Path to the JSON file containing uploaded file IDs.
+        """
         self.client = AsyncAnthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
-        
+
         # Load uploaded file IDs
         try:
-            with open(file_ids_path, "r") as f:
+            with open(file_ids_path, "r", encoding="utf-8") as f:
                 self.file_ids = json.load(f)
-            logger.info(f"Loaded {len(self.file_ids)} file IDs")
+            logger.info("Loaded %d file IDs", len(self.file_ids))
         except FileNotFoundError:
-            logger.warning(f"file_ids.json not found! Run upload_files_script.py first")
+            logger.warning("file_ids.json not found! Run upload_files_script.py first")
             self.file_ids = {}
-        
+
         # Beta header for Files API
         self.beta_header = "files-api-2025-04-14"
-    
+
     def get_file_id(self, key: str) -> str:
-        """Get file_id for a course material"""
+        """Get file_id for a course material."""
         file_info = self.file_ids.get(key)
         if not file_info:
-            raise ValueError(f"File '{key}' not found in file_ids.json")
+            raise ValueError("File '%s' not found in file_ids.json" % key)
         return file_info["file_id"]
-    
+
     async def generate_quiz_from_files(
         self,
         file_keys: List[str],
@@ -44,21 +51,21 @@ class FilesAPIService:
     ) -> Dict:
         """
         Generate quiz questions from uploaded files.
-        
+
         Args:
             file_keys: List of file keys to use (e.g., ["lecture_week_3", "lls_reader"])
             topic: Topic name
             num_questions: Number of questions
             difficulty: easy, medium, or hard
-            
+
         Returns:
             Dictionary with quiz questions
         """
-        logger.info(f"Generating quiz: {num_questions} questions, files: {file_keys}")
-        
+        logger.info("Generating quiz: %d questions, files: %s", num_questions, file_keys)
+
         # Build content blocks
         content_blocks = []
-        
+
         # Add all requested files
         for key in file_keys:
             file_id = self.get_file_id(key)
@@ -71,13 +78,11 @@ class FilesAPIService:
                 "title": key.replace("_", " ").title(),
                 "citations": {"enabled": True}
             })
-        
-        # Add text prompt
-        content_blocks.append({
-            "type": "text",
-            "text": f"""Generate {num_questions} multiple choice quiz questions about {topic} from these documents.
 
-Difficulty: {difficulty}
+        # Add text prompt
+        prompt_text = """Generate %d multiple choice quiz questions about %s from these documents.
+
+Difficulty: %s
 Requirements:
 - Each question tests understanding of legal concepts
 - Include article citations (e.g., Art. 6:74 DCC)
@@ -86,21 +91,25 @@ Requirements:
 - Include detailed explanation
 
 Return ONLY valid JSON:
-{{
+{
   "questions": [
-    {{
+    {
       "question": "What are the 4 requirements for a valid contract?",
       "options": ["A", "B", "C", "D"],
       "correct_index": 0,
       "explanation": "Under Dutch law...",
-      "difficulty": "{difficulty}",
+      "difficulty": "%s",
       "articles": ["Art. 3:32 DCC", "Art. 3:33 DCC"],
-      "topic": "{topic}"
-    }}
+      "topic": "%s"
+    }
   ]
-}}"""
+}""" % (num_questions, topic, difficulty, difficulty, topic)
+
+        content_blocks.append({
+            "type": "text",
+            "text": prompt_text
         })
-        
+
         # Call API
         response = await self.client.messages.create(
             model="claude-sonnet-4-20250514",
@@ -110,14 +119,14 @@ Return ONLY valid JSON:
                 "content": content_blocks
             }]
         )
-        
+
         # Parse response
         text = response.content[0].text
         quiz_data = self._parse_json(text)
-        
-        logger.info(f"Generated {len(quiz_data.get('questions', []))} questions")
+
+        logger.info("Generated %d questions", len(quiz_data.get('questions', [])))
         return quiz_data
-    
+
     async def generate_study_guide(
         self,
         topic: str,
@@ -125,19 +134,19 @@ Return ONLY valid JSON:
     ) -> str:
         """
         Generate comprehensive study guide from files.
-        
+
         Args:
             topic: Topic name
             file_keys: Files to use
-            
+
         Returns:
             Formatted study guide
         """
-        logger.info(f"Generating study guide for {topic} using {len(file_keys)} files")
-        
+        logger.info("Generating study guide for %s using %d files", topic, len(file_keys))
+
         # Build content
         content_blocks = []
-        
+
         for key in file_keys:
             file_id = self.get_file_id(key)
             content_blocks.append({
@@ -145,10 +154,8 @@ Return ONLY valid JSON:
                 "source": {"type": "file", "file_id": file_id},
                 "citations": {"enabled": True}
             })
-        
-        content_blocks.append({
-            "type": "text",
-            "text": f"""Create a comprehensive study guide for {topic}.
+
+        prompt_text = """Create a comprehensive study guide for %s.
 
 Include:
 ## Key Concepts
@@ -177,19 +184,23 @@ Use visual formatting:
 - ❌ for mistakes
 - ⚠️ for warnings
 - Bold **key terms**
-- Cite articles properly"""
+- Cite articles properly""" % topic
+
+        content_blocks.append({
+            "type": "text",
+            "text": prompt_text
         })
-        
+
         response = await self.client.messages.create(
             model="claude-sonnet-4-20250514",
             max_tokens=3000,
             messages=[{"role": "user", "content": content_blocks}]
         )
-        
+
         guide = response.content[0].text
-        logger.info(f"Generated study guide: {len(guide)} characters")
+        logger.info("Generated study guide: %d characters", len(guide))
         return guide
-    
+
     async def explain_article(
         self,
         article: str,
@@ -198,19 +209,19 @@ Use visual formatting:
     ) -> str:
         """
         Explain a legal article using course materials.
-        
+
         Args:
             article: Article number (e.g., "6:74")
             code: Legal code
             use_reader: Whether to include LLS Reader
-            
+
         Returns:
             Detailed explanation
         """
-        logger.info(f"Explaining Art. {article} {code}")
-        
+        logger.info("Explaining Art. %s %s", article, code)
+
         content_blocks = []
-        
+
         # Add LLS Reader if requested
         if use_reader and "lls_reader" in self.file_ids:
             reader_id = self.get_file_id("lls_reader")
@@ -220,11 +231,9 @@ Use visual formatting:
                 "title": "LLS Course Reader",
                 "citations": {"enabled": True}
             })
-        
+
         # Add prompt
-        content_blocks.append({
-            "type": "text",
-            "text": f"""Explain Art. {article} {code} in detail.
+        prompt_text = """Explain Art. %s %s in detail.
 
 Provide:
 1. **Full Article Text** (if available in documents)
@@ -236,17 +245,21 @@ Provide:
 7. **Example Scenario** - Practical example
 
 Use visual formatting with headers, ✅, ❌, ⚠️, etc.
-Cite page numbers if available."""
+Cite page numbers if available.""" % (article, code)
+
+        content_blocks.append({
+            "type": "text",
+            "text": prompt_text
         })
-        
+
         response = await self.client.messages.create(
             model="claude-sonnet-4-20250514",
             max_tokens=2500,
             messages=[{"role": "user", "content": content_blocks}]
         )
-        
+
         return response.content[0].text
-    
+
     async def generate_case_analysis(
         self,
         case_facts: str,
@@ -255,19 +268,19 @@ Cite page numbers if available."""
     ) -> str:
         """
         Analyze a case using course materials.
-        
+
         Args:
             case_facts: Description of case
             topic: Legal topic
             relevant_files: Optional specific files to use
-            
+
         Returns:
             Case analysis
         """
-        logger.info(f"Generating case analysis for {topic}")
-        
+        logger.info("Generating case analysis for %s", topic)
+
         content_blocks = []
-        
+
         # Use relevant files or default to reader
         if relevant_files:
             for key in relevant_files:
@@ -282,12 +295,10 @@ Cite page numbers if available."""
                 "type": "document",
                 "source": {"type": "file", "file_id": reader_id}
             })
-        
-        content_blocks.append({
-            "type": "text",
-            "text": f"""Analyze this {topic} case:
 
-{case_facts}
+        prompt_text = """Analyze this %s case:
+
+%s
 
 Provide structured analysis:
 
@@ -303,89 +314,93 @@ Provide structured analysis:
 ## STEP 4: Conclusion
 [Clear answer with reasoning]
 
-Use proper legal analysis method and cite articles."""
+Use proper legal analysis method and cite articles.""" % (topic, case_facts)
+
+        content_blocks.append({
+            "type": "text",
+            "text": prompt_text
         })
-        
+
         response = await self.client.messages.create(
             model="claude-sonnet-4-20250514",
             max_tokens=2500,
             messages=[{"role": "user", "content": content_blocks}]
         )
-        
+
         return response.content[0].text
-    
+
     async def generate_flashcards(
         self,
         topic: str,
         file_keys: List[str],
         num_cards: int = 20
     ) -> List[Dict]:
-        """Generate flashcards from files"""
-        
+        """Generate flashcards from files."""
         content_blocks = []
-        
+
         for key in file_keys:
             file_id = self.get_file_id(key)
             content_blocks.append({
                 "type": "document",
                 "source": {"type": "file", "file_id": file_id}
             })
-        
-        content_blocks.append({
-            "type": "text",
-            "text": f"""Generate {num_cards} flashcards for {topic}.
+
+        prompt_text = """Generate %d flashcards for %s.
 
 Return ONLY valid JSON:
-{{
+{
   "flashcards": [
-    {{
+    {
       "front": "What is consensus?",
       "back": "Meeting of the minds between parties (Art. 3:33 DCC)..."
-    }}
+    }
   ]
-}}
+}
 
 Include:
 - Article definitions
 - Key concepts
 - Legal principles
-- Procedural rules"""
+- Procedural rules""" % (num_cards, topic)
+
+        content_blocks.append({
+            "type": "text",
+            "text": prompt_text
         })
-        
+
         response = await self.client.messages.create(
             model="claude-sonnet-4-20250514",
             max_tokens=3000,
             messages=[{"role": "user", "content": content_blocks}]
         )
-        
+
         data = self._parse_json(response.content[0].text)
         return data.get("flashcards", [])
-    
+
     async def list_available_files(self) -> List[Dict]:
-        """List all uploaded files from Anthropic API"""
-        
+        """List all uploaded files from Anthropic API."""
         try:
             response = await self.client.beta.files.list()
-            
+
             files = []
-            for file in response.data:
+            for file_item in response.data:
                 files.append({
-                    "id": file.id,
-                    "filename": file.filename,
-                    "size_bytes": file.size_bytes,
-                    "size_mb": round(file.size_bytes / (1024 * 1024), 2),
-                    "created_at": file.created_at
+                    "id": file_item.id,
+                    "filename": file_item.filename,
+                    "size_bytes": file_item.size_bytes,
+                    "size_mb": round(file_item.size_bytes / (1024 * 1024), 2),
+                    "created_at": file_item.created_at
                 })
-            
+
             return files
-        except Exception as e:
-            logger.error(f"Error listing files: {e}")
+        except Exception as e:  # pylint: disable=broad-except
+            logger.error("Error listing files: %s", e)
             return []
-    
+
     # ========== Helper Methods ==========
-    
+
     def _parse_json(self, text: str) -> Dict:
-        """Parse JSON from AI response, handling markdown code blocks"""
+        """Parse JSON from AI response, handling markdown code blocks."""
         # Remove markdown code blocks
         if "```json" in text:
             match = re.search(r'```json\n(.*?)\n```', text, re.DOTALL)
@@ -395,29 +410,29 @@ Include:
             match = re.search(r'```\n(.*?)\n```', text, re.DOTALL)
             if match:
                 text = match.group(1)
-        
+
         text = text.strip()
-        
+
         try:
             return json.loads(text)
         except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse JSON: {e}")
-            logger.error(f"Text was: {text[:500]}")
-            raise ValueError(f"Invalid JSON response: {e}")
-    
+            logger.error("Failed to parse JSON: %s", e)
+            logger.error("Text was: %s", text[:500])
+            raise ValueError("Invalid JSON response: %s" % e) from e
+
     def get_files_by_tier(self, tier: str) -> List[str]:
-        """Get all file keys for a specific tier"""
+        """Get all file keys for a specific tier."""
         return [key for key, info in self.file_ids.items()
                 if info.get("tier") == tier]
 
     def get_files_by_subject(self, subject: str) -> List[str]:
-        """Get all file keys for a specific subject"""
+        """Get all file keys for a specific subject."""
         return [key for key, info in self.file_ids.items()
                 if info.get("subject", "").lower() == subject.lower()]
 
     def get_prioritized_files(self, file_keys: List[str]) -> List[str]:
         """
-        Sort file keys by tier priority (Syllabus first, then Course_Materials, then Supplementary_Sources)
+        Sort file keys by tier priority (Syllabus first, then Course_Materials, then Supplementary_Sources).
 
         Args:
             file_keys: List of file keys to sort
@@ -460,7 +475,7 @@ Include:
 
         if not subject:
             # If topic not recognized, return all files sorted by priority
-            logger.warning(f"Topic '{topic}' not recognized, returning all files")
+            logger.warning("Topic '%s' not recognized, returning all files", topic)
             all_keys = list(self.file_ids.keys())
             return self.get_prioritized_files(all_keys)
 
@@ -469,24 +484,25 @@ Include:
 
         if not subject_files:
             # Fallback: try to find files with topic name in key
-            logger.warning(f"No files found for subject '{subject}', searching by keyword")
+            logger.warning("No files found for subject '%s', searching by keyword", subject)
             subject_files = [key for key in self.file_ids.keys()
                            if topic.lower().replace(" ", "_") in key.lower()]
 
         # Sort by tier priority (Syllabus first, then Course_Materials, then Supplementary_Sources)
         prioritized_files = self.get_prioritized_files(subject_files)
 
-        logger.info(f"Found {len(prioritized_files)} files for topic '{topic}'")
+        logger.info("Found %d files for topic '%s'", len(prioritized_files), topic)
 
         return prioritized_files if prioritized_files else list(self.file_ids.keys())[:5]
 
 
 # Singleton
-_files_api_service = None
+_files_api_service = None  # pylint: disable=invalid-name
+
 
 def get_files_api_service() -> FilesAPIService:
-    """Get or create Files API service singleton"""
-    global _files_api_service
+    """Get or create Files API service singleton."""
+    global _files_api_service  # pylint: disable=global-statement
     if _files_api_service is None:
         _files_api_service = FilesAPIService()
     return _files_api_service

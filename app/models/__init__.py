@@ -1,4 +1,4 @@
-"""Data Models"""
+"""Data Models for the LLS Study Portal API."""
 
 from .schemas import (
     ChatRequest,
@@ -15,4 +15,3 @@ __all__ = [
     "AssessmentResponse",
     "ConversationMessage"
 ]
-

@@ -1,10 +1,12 @@
-# app/routes/assessment.py - AI Assessment API Routes
+"""AI Assessment API Routes for the LLS Study Portal."""
 
-from fastapi import APIRouter, HTTPException, status
-from app.models.schemas import AssessmentRequest, AssessmentResponse, ErrorResponse
-from app.services.anthropic_client import get_assessment_response
 import logging
 import re
+
+from fastapi import APIRouter, HTTPException, status
+
+from app.models.schemas import AssessmentRequest, AssessmentResponse, ErrorResponse
+from app.services.anthropic_client import get_assessment_response
 
 logger = logging.getLogger(__name__)
 
@@ -20,10 +22,10 @@ router = APIRouter(
 def extract_grade(feedback: str) -> int:
     """
     Extract numeric grade from AI feedback.
-    
+
     Args:
         feedback: AI-generated feedback text
-        
+
     Returns:
         Grade as integer (0-10), or None if not found
     """
@@ -34,14 +36,14 @@ def extract_grade(feedback: str) -> int:
         r'##\s*GRADE:\s*(\d+)/10',
         r'Score:\s*(\d+)/10'
     ]
-    
+
     for pattern in grade_patterns:
         match = re.search(pattern, feedback, re.IGNORECASE)
         if match:
-            grade = int(match.group(1))
-            if 0 <= grade <= 10:
-                return grade
-    
+            extracted_grade = int(match.group(1))
+            if 0 <= extracted_grade <= 10:
+                return extracted_grade
+
     return None
 
 
@@ -49,21 +51,21 @@ def extract_grade(feedback: str) -> int:
 async def assess_answer(request: AssessmentRequest):
     """
     Assess and grade a student's answer using AI.
-    
+
     The AI provides:
     - A grade out of 10
     - Detailed strengths and weaknesses
     - Specific corrections with article citations
     - Step-by-step improvement suggestions
     - Key takeaways for exam preparation
-    
+
     **Grading Rubric:**
     - 9-10: Excellent (complete, accurate, well-structured)
     - 7-8: Good (mostly correct, minor errors)
     - 5-6: Satisfactory (basic understanding, some gaps)
     - 3-4: Poor (significant errors)
     - 0-2: Fail (fundamental misunderstanding)
-    
+
     **Example Request:**
     ```json
     {
@@ -72,7 +74,7 @@ async def assess_answer(request: AssessmentRequest):
         "answer": "A contract needs agreement between parties."
     }
     ```
-    
+
     **Example Response:**
     ```json
     {
@@ -84,48 +86,51 @@ async def assess_answer(request: AssessmentRequest):
     ```
     """
     try:
-        logger.info(f"Assessment request - Topic: {request.topic}, Answer length: {len(request.answer)}")
-        
+        logger.info(
+            "Assessment request - Topic: %s, Answer length: %d",
+            request.topic, len(request.answer)
+        )
+
         # Get AI assessment
         feedback = await get_assessment_response(
             topic=request.topic,
             question=request.question,
             answer=request.answer
         )
-        
+
         # Extract grade from feedback
-        grade = extract_grade(feedback)
-        
-        if grade is None:
+        result_grade = extract_grade(feedback)
+
+        if result_grade is None:
             logger.warning("Could not extract grade from AI feedback")
         else:
-            logger.info(f"Assessment complete - Grade: {grade}/10")
-        
+            logger.info("Assessment complete - Grade: %d/10", result_grade)
+
         return AssessmentResponse(
             feedback=feedback,
-            grade=grade,
+            grade=result_grade,
             status="success"
         )
-        
+
     except ValueError as e:
-        logger.error(f"Validation error in assessment: {str(e)}")
+        logger.error("Validation error in assessment: %s", str(e))
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
-        )
+        ) from e
     except Exception as e:
-        logger.error(f"Error in assessment endpoint: {str(e)}")
+        logger.error("Error in assessment endpoint: %s", str(e))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to generate assessment. Please try again."
-        )
+        ) from e
 
 
 @router.get("/rubric")
 async def get_grading_rubric():
     """
     Get the grading rubric used for assessments.
-    
+
     Returns detailed criteria for each grade level.
     """
     return {
@@ -196,7 +201,7 @@ async def get_grading_rubric():
 async def get_sample_answers():
     """
     Get sample answers for different topics with expected grades.
-    
+
     Useful for understanding what different grade levels look like.
     """
     return {
@@ -207,15 +212,30 @@ async def get_sample_answers():
                 "answers": [
                     {
                         "grade": 9,
-                        "text": "A valid contract requires four elements under Dutch law: (1) Capacity (Art. 3:32 DCC) - parties must have legal capacity; (2) Consensus (Art. 3:33 DCC) - meeting of the minds; (3) Permissible content (Art. 3:40 DCC) - must not violate law or morality; (4) Determinability (Art. 6:227 DCC) - content must be sufficiently certain. All four must be present for a valid contract."
+                        "text": (
+                            "A valid contract requires four elements under Dutch law: "
+                            "(1) Capacity (Art. 3:32 DCC) - parties must have legal capacity; "
+                            "(2) Consensus (Art. 3:33 DCC) - meeting of the minds; "
+                            "(3) Permissible content (Art. 3:40 DCC) - must not violate law or "
+                            "morality; (4) Determinability (Art. 6:227 DCC) - content must be "
+                            "sufficiently certain. All four must be present for a valid contract."
+                        )
                     },
                     {
                         "grade": 6,
-                        "text": "A contract needs agreement between parties (consensus), they must be able to make contracts (capacity), the content must be legal, and it must be clear what the contract is about. These are the four requirements."
+                        "text": (
+                            "A contract needs agreement between parties (consensus), they must "
+                            "be able to make contracts (capacity), the content must be legal, "
+                            "and it must be clear what the contract is about. These are the "
+                            "four requirements."
+                        )
                     },
                     {
                         "grade": 3,
-                        "text": "A contract requires that both parties agree to something and sign the document."
+                        "text": (
+                            "A contract requires that both parties agree to something and "
+                            "sign the document."
+                        )
                     }
                 ]
             },
@@ -225,11 +245,24 @@ async def get_sample_answers():
                 "answers": [
                     {
                         "grade": 9,
-                        "text": "The decision model in Articles 348-350 CCP provides a structured framework for criminal courts to make decisions. It ensures systematic consideration of: whether the indictment can be proven (factual determination), whether the proven facts constitute a criminal offense (legal qualification), whether the accused is punishable (culpability), and what sanction should be imposed. This prevents arbitrary decisions and ensures thorough legal reasoning."
+                        "text": (
+                            "The decision model in Articles 348-350 CCP provides a structured "
+                            "framework for criminal courts to make decisions. It ensures "
+                            "systematic consideration of: whether the indictment can be proven "
+                            "(factual determination), whether the proven facts constitute a "
+                            "criminal offense (legal qualification), whether the accused is "
+                            "punishable (culpability), and what sanction should be imposed. "
+                            "This prevents arbitrary decisions and ensures thorough legal "
+                            "reasoning."
+                        )
                     },
                     {
                         "grade": 5,
-                        "text": "The decision model helps judges decide criminal cases by looking at whether the facts are proven, if it's a crime, and what punishment to give."
+                        "text": (
+                            "The decision model helps judges decide criminal cases by looking "
+                            "at whether the facts are proven, if it's a crime, and what "
+                            "punishment to give."
+                        )
                     }
                 ]
             }
@@ -241,15 +274,15 @@ async def get_sample_answers():
 # For testing during development
 if __name__ == "__main__":
     # Test grade extraction
-    test_feedback = """## GRADE: 7/10
-    
+    TEST_FEEDBACK = """## GRADE: 7/10
+
     ### Overall Assessment
     This is a good answer but could be improved.
     """
-    
-    grade = extract_grade(test_feedback)
-    print(f"Extracted grade: {grade}")
-    
+
+    test_grade = extract_grade(TEST_FEEDBACK)
+    print("Extracted grade: %d" % test_grade)
+
     print("\nAssessment routes module loaded successfully")
     print("Available endpoints:")
     print("  POST /api/assessment/assess")

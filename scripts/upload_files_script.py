@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-Upload Course Materials to Anthropic Files API
+Upload Course Materials to Anthropic Files API.
+
 Run this once to upload all your course PDFs to Anthropic.
 
 This script automatically discovers files from the three-tier Materials structure:
@@ -9,12 +10,12 @@ This script automatically discovers files from the three-tier Materials structur
 - Tier 3: Supplementary_Sources/ - External and supplementary materials
 """
 
-from anthropic import Anthropic
+import json
 import os
 from pathlib import Path
-import json
-from datetime import datetime
-from typing import Dict, List, Tuple
+from typing import Dict
+
+from anthropic import Anthropic
 
 # Supported file extensions
 SUPPORTED_EXTENSIONS = {'.pdf', '.docx', '.md', '.txt'}
@@ -101,7 +102,6 @@ def upload_course_files(materials_directory: str = "./Materials"):
     Returns:
         Dictionary of file_ids with metadata
     """
-
     # Initialize client
     api_key = os.getenv("ANTHROPIC_API_KEY")
     if not api_key:
@@ -124,7 +124,7 @@ def upload_course_files(materials_directory: str = "./Materials"):
         print("❌ No files found in Materials directory!")
         return {}
 
-    print(f"   Found {len(discovered_files)} files across all tiers")
+    print("   Found %d files across all tiers" % len(discovered_files))
 
     # Group by tier for display
     tier_counts = {}
@@ -133,7 +133,7 @@ def upload_course_files(materials_directory: str = "./Materials"):
         tier_counts[tier] = tier_counts.get(tier, 0) + 1
 
     for tier, count in sorted(tier_counts.items(), key=lambda x: TIER_PRIORITIES[x[0]]):
-        print(f"   - Tier {TIER_PRIORITIES[tier]} ({tier}): {count} files")
+        print("   - Tier %d (%s): %d files" % (TIER_PRIORITIES[tier], tier, count))
 
     print()
 
@@ -142,9 +142,9 @@ def upload_course_files(materials_directory: str = "./Materials"):
     try:
         existing_files = client.beta.files.list()
         existing_filenames = {f.filename: f.id for f in existing_files.data}
-        print(f"   Found {len(existing_filenames)} files already uploaded")
-    except Exception as e:
-        print(f"   Warning: Could not check existing files: {e}")
+        print("   Found %d files already uploaded" % len(existing_filenames))
+    except Exception as e:  # pylint: disable=broad-except
+        print("   Warning: Could not check existing files: %s" % e)
         existing_filenames = {}
 
     print()
@@ -161,7 +161,7 @@ def upload_course_files(materials_directory: str = "./Materials"):
 
         # Check if already uploaded
         if filename in existing_filenames:
-            print(f"✓  Already uploaded: {filename}")
+            print("✓  Already uploaded: %s" % filename)
             file_ids[key] = {
                 "file_id": existing_filenames[filename],
                 "filename": filename,
@@ -175,7 +175,7 @@ def upload_course_files(materials_directory: str = "./Materials"):
             continue
 
         # Upload file
-        print(f"📤 Uploading: {filename} (Tier {file_info['tier_priority']} - {file_info['tier']})")
+        print("📤 Uploading: %s (Tier %d - %s)" % (filename, file_info['tier_priority'], file_info['tier']))
         try:
             uploaded_file = client.beta.files.upload(
                 file=filepath
@@ -194,30 +194,30 @@ def upload_course_files(materials_directory: str = "./Materials"):
             }
 
             size_mb = uploaded_file.size_bytes / (1024 * 1024)
-            print(f"   ✅ Success! ID: {uploaded_file.id} ({size_mb:.2f} MB)")
+            print("   ✅ Success! ID: %s (%.2f MB)" % (uploaded_file.id, size_mb))
             uploaded_count += 1
 
-        except Exception as e:
-            print(f"   ❌ Error: {str(e)}")
+        except Exception as e:  # pylint: disable=broad-except
+            print("   ❌ Error: %s" % str(e))
             error_count += 1
 
         print()
 
     # Save file IDs to JSON
     output_file = "file_ids.json"
-    with open(output_file, "w") as f:
+    with open(output_file, "w", encoding="utf-8") as f:
         json.dump(file_ids, f, indent=2, default=str)
 
     # Print summary
     print("=" * 60)
     print("📊 Upload Summary")
     print("=" * 60)
-    print(f"✅ Uploaded: {uploaded_count}")
-    print(f"⏭️  Skipped:  {skipped_count}")
-    print(f"❌ Errors:   {error_count}")
-    print(f"📁 Total:    {len(file_ids)}")
+    print("✅ Uploaded: %d" % uploaded_count)
+    print("⏭️  Skipped:  %d" % skipped_count)
+    print("❌ Errors:   %d" % error_count)
+    print("📁 Total:    %d" % len(file_ids))
     print()
-    print(f"💾 File IDs saved to: {output_file}")
+    print("💾 File IDs saved to: %s" % output_file)
     print()
 
     # Print tier summary
@@ -225,82 +225,90 @@ def upload_course_files(materials_directory: str = "./Materials"):
     print("-" * 60)
     for tier in sorted(TIER_PRIORITIES.keys(), key=lambda x: TIER_PRIORITIES[x]):
         tier_files = [k for k, v in file_ids.items() if v.get("tier") == tier]
-        print(f"Tier {TIER_PRIORITIES[tier]} ({tier}): {len(tier_files)} files")
+        print("Tier %d (%s): %d files" % (TIER_PRIORITIES[tier], tier, len(tier_files)))
     print("-" * 60)
 
     return file_ids
 
 
 def list_uploaded_files():
-    """List all files currently uploaded to Anthropic"""
-    
+    """
+    List all files currently uploaded to Anthropic.
+
+    Prints a formatted list of all uploaded files with their IDs,
+    sizes, and creation dates.
+    """
     api_key = os.getenv("ANTHROPIC_API_KEY")
     if not api_key:
         print("❌ Error: ANTHROPIC_API_KEY not set!")
         return
-    
+
     client = Anthropic(api_key=api_key)
-    
+
     print("📋 Currently Uploaded Files:")
     print("=" * 60)
-    
+
     try:
         files = client.beta.files.list()
-        
+
         if not files.data:
             print("No files uploaded yet.")
             return
-        
-        for i, file in enumerate(files.data, 1):
-            size_mb = file.size_bytes / (1024 * 1024)
-            print(f"{i}. {file.filename}")
-            print(f"   ID: {file.id}")
-            print(f"   Size: {size_mb:.2f} MB")
-            print(f"   Created: {file.created_at}")
+
+        for i, file_item in enumerate(files.data, 1):
+            size_mb = file_item.size_bytes / (1024 * 1024)
+            print("%d. %s" % (i, file_item.filename))
+            print("   ID: %s" % file_item.id)
+            print("   Size: %.2f MB" % size_mb)
+            print("   Created: %s" % file_item.created_at)
             print()
-        
-        print(f"Total: {len(files.data)} files")
-        
-    except Exception as e:
-        print(f"❌ Error: {str(e)}")
+
+        print("Total: %d files" % len(files.data))
+
+    except Exception as e:  # pylint: disable=broad-except
+        print("❌ Error: %s" % str(e))
 
 
 def delete_all_files():
-    """Delete all uploaded files (use with caution!)"""
-    
+    """
+    Delete all uploaded files from Anthropic.
+
+    Use with caution! This will permanently delete all uploaded files.
+    Requires user confirmation before proceeding.
+    """
     api_key = os.getenv("ANTHROPIC_API_KEY")
     if not api_key:
         print("❌ Error: ANTHROPIC_API_KEY not set!")
         return
-    
+
     client = Anthropic(api_key=api_key)
-    
+
     # Confirmation
-    response = input("⚠️  Delete ALL uploaded files? (yes/no): ")
-    if response.lower() != "yes":
+    user_response = input("⚠️  Delete ALL uploaded files? (yes/no): ")
+    if user_response.lower() != "yes":
         print("Cancelled.")
         return
-    
+
     try:
         files = client.beta.files.list()
-        
+
         if not files.data:
             print("No files to delete.")
             return
-        
-        print(f"Deleting {len(files.data)} files...")
-        
-        for file in files.data:
+
+        print("Deleting %d files..." % len(files.data))
+
+        for file_item in files.data:
             try:
-                client.beta.files.delete(file.id)
-                print(f"✅ Deleted: {file.filename}")
-            except Exception as e:
-                print(f"❌ Error deleting {file.filename}: {e}")
-        
+                client.beta.files.delete(file_item.id)
+                print("✅ Deleted: %s" % file_item.filename)
+            except Exception as delete_error:  # pylint: disable=broad-except
+                print("❌ Error deleting %s: %s" % (file_item.filename, delete_error))
+
         print("Done!")
-        
-    except Exception as e:
-        print(f"❌ Error: {str(e)}")
+
+    except Exception as e:  # pylint: disable=broad-except
+        print("❌ Error: %s" % str(e))
 
 
 if __name__ == "__main__":
