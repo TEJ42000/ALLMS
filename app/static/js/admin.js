@@ -56,7 +56,8 @@ async function fetchCourses() {
         const response = await fetch(API_BASE);
         if (!response.ok) throw new Error('Failed to fetch courses');
         const data = await response.json();
-        courses = data.courses || [];
+        // API returns a list directly, not an object with courses property
+        courses = Array.isArray(data) ? data : (data.courses || []);
         renderCoursesList();
     } catch (error) {
         showToast('Error loading courses: ' + error.message, 'error');
@@ -186,8 +187,8 @@ function renderCoursesList() {
                 ${course.institution || ''} ${course.academicYear ? '• ' + course.academicYear : ''}
                 ${course.ectsPoints ? '• ' + course.ectsPoints + ' ECTS' : ''}
             </div>
-            <span class="course-status ${course.isActive ? 'active' : 'inactive'}">
-                ${course.isActive ? '● Active' : '○ Inactive'}
+            <span class="course-status ${(course.active ?? course.isActive) ? 'active' : 'inactive'}">
+                ${(course.active ?? course.isActive) ? '● Active' : '○ Inactive'}
             </span>
         </div>
     `).join('');
@@ -205,7 +206,7 @@ function renderCourseForm() {
     document.getElementById('course-year').value = currentCourse.academicYear || '';
     document.getElementById('course-points').value = currentCourse.ectsPoints || '';
     document.getElementById('course-subjects').value = (currentCourse.materialSubjects || []).join(', ');
-    document.getElementById('course-active').checked = currentCourse.isActive !== false;
+    document.getElementById('course-active').checked = (currentCourse.active ?? currentCourse.isActive) !== false;
     document.getElementById('course-id').disabled = true;
 }
 
