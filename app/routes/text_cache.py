@@ -95,10 +95,19 @@ async def populate_cache(request: CachePopulateRequest):
     if not is_firestore_available():
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Firestore not available")
 
-    validate_cache_path(request.folder_path)
+    full_path = validate_cache_path(request.folder_path)
+    try:
+        relative_folder = str(full_path.relative_to(MATERIALS_BASE))
+    except ValueError:
+        # This should not happen because validate_cache_path already enforces containment,
+        # but we guard defensively and treat it as the base folder.
+        relative_folder = ""
+    if not relative_folder:
+        # Use empty string to represent the base Materials folder, matching existing semantics.
+        relative_folder = ""
 
     result = populate_cache_for_folder(
-        folder_path=request.folder_path, recursive=request.recursive,
+        folder_path=relative_folder, recursive=request.recursive,
         force_refresh=request.force_refresh,
     )
 
