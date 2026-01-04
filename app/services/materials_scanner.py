@@ -256,14 +256,14 @@ def convert_to_materials_registry(scan_result: ScanResult) -> Dict:
         elif mat.material_type == "lecture":
             registry["lectures"].append({
                 "title": mat.title,
-                "week": mat.week or 0,
+                "week": mat.week,  # None if no week detected - course-wide material
                 "file": mat.file,
                 "size": size_mb
             })
         elif mat.material_type == "reading":
             registry["readings"].append({
                 "title": mat.title,
-                "week": mat.week or 0,
+                "week": mat.week,  # None if no week detected - course-wide material
                 "file": mat.file,
                 "size": size_mb
             })
