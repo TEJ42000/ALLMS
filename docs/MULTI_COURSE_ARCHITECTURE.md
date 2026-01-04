@@ -26,7 +26,6 @@ Course-Specific Study Portal
 |-------|-------------|----------|
 | `/` | Course selection landing page | `course_selection.html` |
 | `/courses/{course_id}/study-portal` | Course-specific study portal | `index.html` (with course context) |
-| `/legacy` | Legacy single-course portal (backward compatibility) | `index.html` (no course context) |
 
 ### 3. Course Context
 
@@ -52,11 +51,6 @@ Course context is passed from the backend to the frontend through:
 - Validates course exists and is active
 - Passes course context to template
 - Returns 404 if course not found
-
-**`legacy_portal()`**
-- Maintains backward compatibility
-- Serves study portal without course context
-- Available at `/legacy`
 
 #### 2. Course Service Integration
 
@@ -167,9 +161,8 @@ When `course_id` is provided:
 - Materials are filtered by course's `materialSubjects`
 
 When `course_id` is NOT provided:
-- System falls back to legacy behavior
-- Uses hardcoded topic mappings
-- Uses all available materials
+- System returns an error or redirects to course selection
+- All features require course context
 
 ## Session Management
 
@@ -190,21 +183,20 @@ const courseId = sessionStorage.getItem('selectedCourse');
 3. User clicks "Change Course" → returns to `/` (selection page)
 4. User closes browser → sessionStorage cleared
 
-## Backward Compatibility
+## Migration from Single-Course Setup
 
-### Legacy Mode
+### For Existing Users
 
-The `/legacy` route maintains the original single-course behavior:
-- No course selection required
-- Uses hardcoded topics
-- No course badge in header
-- All existing functionality preserved
+Users transitioning from the old single-course setup should:
+1. Visit the root URL (`/`) to see the course selection page
+2. Select their course (e.g., "LLS-2025-2026")
+3. Bookmark the course-specific URL for quick access: `/courses/{course_id}/study-portal`
 
-### Migration Path
+### API Compatibility
 
-For existing users:
-1. Bookmark `/legacy` for old behavior
-2. Or use course selection to choose "LLS-2025-2026" (default course)
+All API endpoints now require `course_id` parameter for course-specific functionality:
+- Endpoints gracefully handle missing `course_id` by returning appropriate errors
+- Frontend automatically includes `course_id` when in course context
 
 ## Styling
 
@@ -242,7 +234,6 @@ For existing users:
 - [ ] Course badge appears in portal header
 - [ ] "Change Course" link returns to selection page
 - [ ] API calls include course_id parameter
-- [ ] Legacy route works without course context
 - [ ] Session storage persists course selection
 - [ ] Error handling for invalid course IDs
 - [ ] Loading states display correctly
@@ -264,11 +255,6 @@ For existing users:
    - Return to selection page
    - Select different course
    - New course context applied
-
-4. **Legacy User Flow:**
-   - Visit `/legacy`
-   - Use portal without course selection
-   - All features work as before
 
 ## Future Enhancements
 
@@ -314,9 +300,9 @@ For existing users:
 - **Solution:** Verify course ID exists in Firestore
 - **Check:** Course is marked as active
 
-**Issue:** Legacy features broken
-- **Solution:** Use `/legacy` route for backward compatibility
-- **Check:** API endpoints handle missing course_id
+**Issue:** API calls failing without course_id
+- **Solution:** Ensure you're accessing portal through course-specific URL
+- **Check:** URL should be `/courses/{course_id}/study-portal`
 
 ## Related Documentation
 

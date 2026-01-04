@@ -67,25 +67,6 @@ async def course_study_portal(request: Request, course_id: str):
         raise HTTPException(status_code=500, detail="Failed to load course")
 
 
-@router.get("/legacy", response_class=HTMLResponse)
-async def legacy_portal(request: Request):
-    """
-    Serve the legacy single-course study portal (for backward compatibility).
-    This route maintains the old behavior before multi-course support.
-    """
-    return templates.TemplateResponse(
-        "index.html",
-        {
-            "request": request,
-            "title": "LLS Study Portal",
-            "version": "2.0.0",
-            "course_id": None,  # Legacy mode - no specific course
-            "course_name": "LLS",
-            "course": None
-        }
-    )
-
-
 @router.get("/health")
 async def health_check():
     """Health check endpoint for Cloud Run."""
