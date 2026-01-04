@@ -719,3 +719,187 @@ async def sync_week_materials(
         materials_linked=materials_linked,
         message=f"Linked {materials_linked} materials to {weeks_updated} weeks"
     )
+
+
+# ============================================================================
+# Syllabus Import Endpoints
+# ============================================================================
+
+
+class SyllabusInfo(BaseModel):
+    """Information about a discovered syllabus PDF."""
+    subject: str
+    filename: str
+    path: str
+    pages: int
+
+
+class ScanSyllabiResponse(BaseModel):
+    """Response from scanning for syllabi."""
+    syllabi: List[SyllabusInfo]
+    count: int
+
+
+class ExtractedCourseData(BaseModel):
+    """Extracted course data from syllabus."""
+    courseName: Optional[str] = None
+    courseCode: Optional[str] = None
+    academicYear: Optional[str] = None
+    program: Optional[str] = None
+    institution: Optional[str] = None
+    totalPoints: Optional[int] = None
+    passingThreshold: Optional[int] = None
+    components: List[Dict] = []
+    coordinators: List[Dict] = []
+    lecturers: List[Dict] = []
+    weeks: List[Dict] = []
+    examInfo: Optional[Dict] = None
+    participationRequirements: Optional[str] = None
+
+
+class ImportSyllabusRequest(BaseModel):
+    """Request to import course data from a syllabus."""
+    syllabus_path: str  # Path relative to Materials/
+
+
+class ImportSyllabusResponse(BaseModel):
+    """Response from syllabus import."""
+    success: bool
+    extracted_data: ExtractedCourseData
+    message: str
+
+
+@router.get("/syllabi/scan", response_model=ScanSyllabiResponse)
+async def scan_syllabi(
+    subject: Optional[str] = Query(None, description="Filter by subject folder")
+):
+    """
+    Scan for syllabus PDFs in the Materials/Syllabus directory.
+
+    Returns a list of discovered syllabi with their metadata.
+    """
+    try:
+        from app.services.syllabus_parser import scan_syllabi as do_scan
+
+        syllabi = do_scan(subject=subject)
+
+        return ScanSyllabiResponse(
+            syllabi=[SyllabusInfo(**s) for s in syllabi],
+            count=len(syllabi)
+        )
+    except Exception as e:
+        logger.error("Error scanning syllabi: %s", e)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to scan syllabi: {str(e)}"
+        )
+
+
+@router.post("/syllabi/extract", response_model=ImportSyllabusResponse)
+async def extract_syllabus_data(request: ImportSyllabusRequest):
+    """
+    Extract course data from a syllabus PDF using AI.
+
+    This endpoint reads the PDF, extracts text, and uses AI to parse
+    structured course information including weeks, readings, and lecturers.
+
+    The extracted data can be reviewed before creating/updating a course.
+    """
+    try:
+        from app.services.syllabus_parser import extract_text_from_pdf
+        from app.services.syllabus_extractor import extract_course_data
+
+        # Extract text from PDF
+        logger.info("Extracting text from: %s", request.syllabus_path)
+        pdf_text = extract_text_from_pdf(request.syllabus_path)
+
+        # Use AI to extract structured data
+        logger.info("Extracting course data with AI...")
+        extracted = await extract_course_data(pdf_text)
+
+        return ImportSyllabusResponse(
+            success=True,
+            extracted_data=ExtractedCourseData(**extracted),
+            message="Successfully extracted course data from syllabus"
+        )
+    except FileNotFoundError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Syllabus not found: {str(e)}"
+        )
+    except Exception as e:
+        logger.error("Error extracting syllabus data: %s", e)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to extract syllabus data: {str(e)}"
+        )
+
+
+# ============================================================================
+# Material Preview Endpoint
+# ============================================================================
+
+
+@router.get("/materials/preview/{file_path:path}")
+async def preview_material(file_path: str):
+    """
+    Get a material file for preview.
+
+    Returns the file with appropriate content type for browser preview.
+    Supports PDF, images, and text files.
+
+    **Parameters:**
+    - `file_path`: Path relative to Materials/ directory
+
+    **Example:**
+    ```
+    GET /api/admin/courses/materials/preview/Course_Materials/LLS/Readings/dutch_example.pdf
+    ```
+    """
+    import mimetypes
+    from pathlib import Path
+    from fastapi.responses import FileResponse
+
+    # Build full path (same base as materials_scanner.py)
+    materials_base = Path("Materials")
+    full_path = materials_base / file_path
+
+    # Security: ensure path is within materials directory
+    try:
+        full_path = full_path.resolve()
+        materials_base = materials_base.resolve()
+        if not str(full_path).startswith(str(materials_base)):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied: path outside materials directory"
+            )
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid file path"
+        )
+
+    # Check file exists
+    if not full_path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"File not found: {file_path}"
+        )
+
+    if not full_path.is_file():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Path is not a file"
+        )
+
+    # Determine content type
+    content_type, _ = mimetypes.guess_type(str(full_path))
+    if content_type is None:
+        content_type = "application/octet-stream"
+
+    # Return file for preview
+    return FileResponse(
+        path=full_path,
+        media_type=content_type,
+        filename=full_path.name
+    )

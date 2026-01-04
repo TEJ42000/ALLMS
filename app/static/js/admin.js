@@ -168,6 +168,14 @@ function renderCourseMaterialsList(materials) {
         }
     };
 
+    // Helper to create preview button
+    const previewBtn = (file, title) => {
+        if (!file) return '';
+        const escapedFile = file.replace(/'/g, "\\'");
+        const escapedTitle = (title || '').replace(/'/g, "\\'");
+        return `<button class="preview-btn" onclick="event.stopPropagation(); openPreviewModal('${escapedFile}', '${escapedTitle}')">👁️ Preview</button>`;
+    };
+
     const sections = [];
 
     // Core Textbooks
@@ -180,6 +188,7 @@ function renderCourseMaterialsList(materials) {
                         <li>
                             <span class="material-title">${t.title}</span>
                             <span class="material-meta">${getWeekDisplay(t.file, null)} · ${t.size || ''}</span>
+                            ${previewBtn(t.file, t.title)}
                         </li>
                     `).join('')}
                 </ul>
@@ -197,6 +206,7 @@ function renderCourseMaterialsList(materials) {
                         <li>
                             <span class="material-title">${l.title}</span>
                             <span class="material-meta">${getWeekDisplay(l.file, l.week)} · ${l.size || ''}</span>
+                            ${previewBtn(l.file, l.title)}
                         </li>
                     `).join('')}
                 </ul>
@@ -214,6 +224,7 @@ function renderCourseMaterialsList(materials) {
                         <li>
                             <span class="material-title">${r.title}</span>
                             <span class="material-meta">${getWeekDisplay(r.file, r.week)} · ${r.size || ''}</span>
+                            ${previewBtn(r.file, r.title)}
                         </li>
                     `).join('')}
                 </ul>
@@ -231,6 +242,7 @@ function renderCourseMaterialsList(materials) {
                         <li>
                             <span class="material-title">${c.title}</span>
                             <span class="material-meta">${getWeekDisplay(c.file, null)} · ${c.court || ''}</span>
+                            ${previewBtn(c.file, c.title)}
                         </li>
                     `).join('')}
                 </ul>
@@ -248,6 +260,7 @@ function renderCourseMaterialsList(materials) {
                         <li>
                             <span class="material-title">${e.title}</span>
                             <span class="material-meta">${getWeekDisplay(e.file, null)} · ${e.size || ''}</span>
+                            ${previewBtn(e.file, e.title)}
                         </li>
                     `).join('')}
                 </ul>
@@ -265,6 +278,7 @@ function renderCourseMaterialsList(materials) {
                         <li>
                             <span class="material-title">${o.title}</span>
                             <span class="material-meta">${getWeekDisplay(o.file, null)} · ${o.category || ''}</span>
+                            ${previewBtn(o.file, o.title)}
                         </li>
                     `).join('')}
                 </ul>
@@ -512,16 +526,23 @@ function renderWeekMaterialsList() {
     if (materials.length === 0) {
         container.innerHTML = '<p class="empty-state">No materials linked to this week</p>';
     } else {
-        container.innerHTML = materials.map((m, i) => `
+        container.innerHTML = materials.map((m, i) => {
+            const escapedFile = (m.file || '').replace(/'/g, "\\'");
+            const escapedTitle = (m.title || '').replace(/'/g, "\\'");
+            const previewBtn = m.file
+                ? `<button type="button" class="preview-btn" onclick="event.stopPropagation(); openPreviewModal('${escapedFile}', '${escapedTitle}')">👁️</button>`
+                : '';
+            return `
             <div class="week-material-row" data-idx="${i}">
                 <span class="material-type-badge">${m.type || 'other'}</span>
                 <span class="material-info">
                     <strong>${m.title || m.file || 'Untitled'}</strong>
                     ${m.chapters ? `<small>Chapters: ${m.chapters.join(', ')}</small>` : ''}
                 </span>
+                ${previewBtn}
                 <button type="button" class="btn-remove" onclick="removeWeekMaterial(${i})">✕</button>
             </div>
-        `).join('');
+        `}).join('');
     }
 
     // Also populate the material picker dropdown
@@ -751,6 +772,216 @@ function removeAbbreviation(key) {
     }
 }
 
+// ========== Syllabus Import ==========
+let selectedSyllabus = null;
+let extractedSyllabusData = null;
+
+async function openSyllabusModal() {
+    document.getElementById('syllabus-modal').classList.remove('hidden');
+    document.getElementById('syllabus-step-1').classList.remove('hidden');
+    document.getElementById('syllabus-step-2').classList.add('hidden');
+    document.getElementById('syllabus-back-btn').classList.add('hidden');
+    document.getElementById('syllabus-extract-btn').classList.add('hidden');
+    document.getElementById('syllabus-import-btn').classList.add('hidden');
+    selectedSyllabus = null;
+    extractedSyllabusData = null;
+
+    // Scan for syllabi
+    try {
+        const response = await fetch(`${API_BASE}/syllabi/scan`);
+        if (!response.ok) throw new Error('Failed to scan syllabi');
+        const data = await response.json();
+        renderSyllabiList(data.syllabi);
+    } catch (error) {
+        document.getElementById('syllabi-list').innerHTML =
+            `<p class="error">Error scanning syllabi: ${error.message}</p>`;
+    }
+}
+
+function closeSyllabusModal() {
+    document.getElementById('syllabus-modal').classList.add('hidden');
+}
+
+function renderSyllabiList(syllabi) {
+    const container = document.getElementById('syllabi-list');
+    if (!syllabi || syllabi.length === 0) {
+        container.innerHTML = '<p class="empty-state">No syllabus PDFs found in Materials/Syllabus/</p>';
+        return;
+    }
+
+    container.innerHTML = syllabi.map(s => `
+        <div class="syllabus-item" onclick="selectSyllabus('${s.path}', '${s.filename}', this)">
+            <div class="syllabus-info">
+                <strong>📄 ${s.filename}</strong>
+                <small>Subject: ${s.subject} | Pages: ${s.pages}</small>
+            </div>
+        </div>
+    `).join('');
+}
+
+function selectSyllabus(path, filename, element) {
+    // Remove previous selection
+    document.querySelectorAll('.syllabus-item').forEach(el => el.classList.remove('selected'));
+    element.classList.add('selected');
+    selectedSyllabus = { path, filename };
+    document.getElementById('syllabus-extract-btn').classList.remove('hidden');
+}
+
+async function extractSyllabusData() {
+    if (!selectedSyllabus) {
+        showToast('Please select a syllabus first', 'error');
+        return;
+    }
+
+    showLoading();
+    try {
+        const response = await fetch(`${API_BASE}/syllabi/extract`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ syllabus_path: selectedSyllabus.path })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to extract data');
+        }
+
+        const result = await response.json();
+        extractedSyllabusData = result.extracted_data;
+
+        // Show step 2
+        document.getElementById('syllabus-step-1').classList.add('hidden');
+        document.getElementById('syllabus-step-2').classList.remove('hidden');
+        document.getElementById('syllabus-extract-btn').classList.add('hidden');
+        document.getElementById('syllabus-back-btn').classList.remove('hidden');
+        document.getElementById('syllabus-import-btn').classList.remove('hidden');
+
+        // Populate form
+        document.getElementById('extracted-name').value = extractedSyllabusData.courseName || '';
+        document.getElementById('extracted-code').value = extractedSyllabusData.courseCode || '';
+        document.getElementById('extracted-year').value = extractedSyllabusData.academicYear || '';
+        document.getElementById('extracted-program').value = extractedSyllabusData.program || '';
+        document.getElementById('extracted-institution').value = extractedSyllabusData.institution || '';
+        document.getElementById('extracted-points').value = extractedSyllabusData.totalPoints || '';
+        document.getElementById('extracted-threshold').value = extractedSyllabusData.passingThreshold || '';
+
+        // Show weeks preview
+        const weeks = extractedSyllabusData.weeks || [];
+        document.getElementById('extracted-weeks-count').textContent = weeks.length;
+        document.getElementById('extracted-weeks-preview').innerHTML = weeks.map(w => `
+            <div class="week-preview-item">
+                <strong>Week ${w.weekNumber}: ${w.title || 'Untitled'}</strong>
+                ${w.topics ? `<br><small>Topics: ${w.topics.join(', ')}</small>` : ''}
+            </div>
+        `).join('') || '<p class="empty-state">No weeks extracted</p>';
+
+        showToast('Data extracted successfully!', 'success');
+    } catch (error) {
+        showToast('Error extracting data: ' + error.message, 'error');
+    } finally {
+        hideLoading();
+    }
+}
+
+function syllabusStepBack() {
+    document.getElementById('syllabus-step-1').classList.remove('hidden');
+    document.getElementById('syllabus-step-2').classList.add('hidden');
+    document.getElementById('syllabus-back-btn').classList.add('hidden');
+    document.getElementById('syllabus-import-btn').classList.add('hidden');
+    if (selectedSyllabus) {
+        document.getElementById('syllabus-extract-btn').classList.remove('hidden');
+    }
+}
+
+async function importSyllabusData() {
+    // Get edited values from form
+    const courseName = document.getElementById('extracted-name').value;
+    const courseCode = document.getElementById('extracted-code').value;
+    const academicYear = document.getElementById('extracted-year').value;
+
+    if (!courseName || !academicYear) {
+        showToast('Course name and academic year are required', 'error');
+        return;
+    }
+
+    // Generate course ID from code or name
+    const courseId = courseCode
+        ? `${courseCode.replace(/[^a-zA-Z0-9]/g, '')}-${academicYear}`
+        : `${courseName.replace(/[^a-zA-Z0-9]/g, '-').substring(0, 20)}-${academicYear}`;
+
+    showLoading();
+    try {
+        // Create course
+        const courseData = {
+            id: courseId,
+            name: courseName,
+            program: document.getElementById('extracted-program').value || null,
+            institution: document.getElementById('extracted-institution').value || null,
+            academicYear: academicYear,
+            totalPoints: parseInt(document.getElementById('extracted-points').value) || null,
+            passingThreshold: parseInt(document.getElementById('extracted-threshold').value) || null,
+            components: extractedSyllabusData.components || [],
+            materialSubjects: []
+        };
+
+        const response = await fetch(API_BASE, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(courseData)
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to create course');
+        }
+
+        // Create weeks if extracted
+        const weeks = extractedSyllabusData.weeks || [];
+        for (const week of weeks) {
+            const weekData = {
+                weekNumber: week.weekNumber,
+                title: week.title || `Week ${week.weekNumber}`,
+                topics: week.topics || [],
+                materials: [],
+                keyConcepts: []
+            };
+
+            await fetch(`${API_BASE}/${courseId}/weeks`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(weekData)
+            });
+        }
+
+        showToast(`Course "${courseName}" created with ${weeks.length} weeks!`, 'success');
+        closeSyllabusModal();
+        fetchCourses();
+
+    } catch (error) {
+        showToast('Error importing course: ' + error.message, 'error');
+    } finally {
+        hideLoading();
+    }
+}
+
+// ========== Material Preview ==========
+function openPreviewModal(filePath, title) {
+    const modal = document.getElementById('preview-modal');
+    const iframe = document.getElementById('preview-iframe');
+    const titleEl = document.getElementById('preview-title');
+
+    titleEl.textContent = `📄 ${title || filePath.split('/').pop()}`;
+    iframe.src = `${API_BASE}/materials/preview/${filePath}`;
+    modal.classList.remove('hidden');
+}
+
+function closePreviewModal() {
+    const modal = document.getElementById('preview-modal');
+    const iframe = document.getElementById('preview-iframe');
+    iframe.src = '';
+    modal.classList.add('hidden');
+}
+
 // ========== Event Listeners ==========
 document.addEventListener('DOMContentLoaded', () => {
     fetchCourses();
@@ -769,6 +1000,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('add-abbreviation-btn').addEventListener('click', addAbbreviation);
     document.getElementById('scan-materials-btn').addEventListener('click', scanMaterials);
     document.getElementById('sync-week-materials-btn').addEventListener('click', syncWeekMaterials);
+    document.getElementById('import-syllabus-btn').addEventListener('click', openSyllabusModal);
 
     // Week actions
     document.getElementById('save-week-btn').addEventListener('click', saveWeek);
