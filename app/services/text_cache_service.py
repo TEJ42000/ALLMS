@@ -365,7 +365,20 @@ def populate_cache_for_folder(
     """Populate cache for all files in a folder."""
     from app.services.text_extractor import extract_all_from_folder
 
-    full_path = MATERIALS_ROOT / folder_path
+    # Normalize and validate folder path against MATERIALS_ROOT to prevent traversal
+    materials_root = MATERIALS_ROOT.resolve()
+    full_path = (materials_root / folder_path).resolve()
+    try:
+        full_path.relative_to(materials_root)
+    except ValueError:
+        return CachePopulateResponse(
+            total_files=0,
+            cached=0,
+            skipped=0,
+            failed=0,
+            errors=[{"error": f"Folder outside materials root: {folder_path}"}],
+        )
+
     if not full_path.exists() or not full_path.is_dir():
         return CachePopulateResponse(
             total_files=0, cached=0, skipped=0, failed=0,
