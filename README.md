@@ -111,7 +111,14 @@ If you want to use the Files API features (quiz generation, study guides):
 python scripts/upload_files_script.py
 ```
 
-This will upload all materials from the `Materials/` folder to Anthropic's Files API and generate `file_ids.json`.
+This will automatically discover and upload all materials from the three-tier `Materials/` structure to Anthropic's Files API and generate `file_ids.json` with tier metadata.
+
+**Materials Structure:**
+- **Tier 1: `Syllabus/`** - Official course syllabi (highest priority)
+- **Tier 2: `Course_Materials/`** - Primary learning materials
+- **Tier 3: `Supplementary_Sources/`** - External and supplementary resources
+
+See `Materials/README.md` for detailed information about the three-tier organization system.
 
 ## ☁️ Deploy to Google Cloud Run
 
