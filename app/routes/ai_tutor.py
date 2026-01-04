@@ -1,9 +1,11 @@
-# app/routes/ai_tutor.py - AI Tutor API Routes
+"""AI Tutor API Routes for the LLS Study Portal."""
+
+import logging
 
 from fastapi import APIRouter, HTTPException, status
+
 from app.models.schemas import ChatRequest, ChatResponse, ErrorResponse
 from app.services.anthropic_client import get_ai_tutor_response
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -20,13 +22,13 @@ router = APIRouter(
 async def chat_with_tutor(request: ChatRequest):
     """
     Send a message to the AI tutor and get a formatted response.
-    
+
     The AI tutor provides visual, formatted responses with:
     - Color-coded boxes (green tips, yellow warnings, red errors)
     - Article citations with blue badges
     - Step-by-step explanations
     - Structured headers and lists
-    
+
     **Example Request:**
     ```json
     {
@@ -38,7 +40,7 @@ async def chat_with_tutor(request: ChatRequest):
         ]
     }
     ```
-    
+
     **Example Response:**
     ```json
     {
@@ -49,8 +51,11 @@ async def chat_with_tutor(request: ChatRequest):
     ```
     """
     try:
-        logger.info(f"AI Tutor request - Context: {request.context}, Message length: {len(request.message)}")
-        
+        logger.info(
+            "AI Tutor request - Context: %s, Message length: %d",
+            request.context, len(request.message)
+        )
+
         # Convert Pydantic models to dict for service
         history = None
         if request.conversation_history:
@@ -58,33 +63,33 @@ async def chat_with_tutor(request: ChatRequest):
                 {"role": msg.role, "content": msg.content}
                 for msg in request.conversation_history
             ]
-        
+
         # Get AI response
         response_content = await get_ai_tutor_response(
             message=request.message,
             context=request.context,
             conversation_history=history
         )
-        
-        logger.info(f"AI Tutor response generated - Length: {len(response_content)}")
-        
+
+        logger.info("AI Tutor response generated - Length: %d", len(response_content))
+
         return ChatResponse(
             content=response_content,
             status="success"
         )
-        
+
     except ValueError as e:
-        logger.error(f"Validation error in AI Tutor: {str(e)}")
+        logger.error("Validation error in AI Tutor: %s", str(e))
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
-        )
+        ) from e
     except Exception as e:
-        logger.error(f"Error in AI Tutor endpoint: {str(e)}")
+        logger.error("Error in AI Tutor endpoint: %s", str(e))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to generate AI response. Please try again."
-        )
+        ) from e
 
 
 @router.get("/topics")

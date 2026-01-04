@@ -1,4 +1,3 @@
-"""LLS Study Portal Application"""
+"""LLS Study Portal Application."""
 
 __version__ = "2.0.0"
-
