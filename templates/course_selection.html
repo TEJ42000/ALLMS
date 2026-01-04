@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Select Your Course - LLS Study Portal</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <link rel="stylesheet" href="/static/css/course-selection.css">
+</head>
+<body>
+    <div class="container">
+        <header class="landing-header">
+            <h1 class="landing-title">⚖️ LLS Study Portal</h1>
+            <p class="landing-subtitle">Select your course to begin studying</p>
+        </header>
+
+        <main class="landing-main">
+            <div class="course-selection-container">
+                <div class="selection-header">
+                    <h2>📚 Available Courses</h2>
+                    <p>Choose a course to access study materials, AI tutor, quizzes, and more</p>
+                </div>
+
+                <div id="loading-indicator" class="loading-indicator">
+                    <div class="spinner"></div>
+                    <p>Loading courses...</p>
+                </div>
+
+                <div id="error-message" class="error-message" style="display: none;">
+                    <p>⚠️ Failed to load courses. Please try again later.</p>
+                    <button onclick="loadCourses()" class="retry-button">Retry</button>
+                </div>
+
+                <div id="courses-grid" class="courses-grid">
+                    <!-- Courses will be loaded dynamically -->
+                </div>
+
+                <div id="no-courses-message" class="no-courses-message" style="display: none;">
+                    <div class="empty-state">
+                        <div class="empty-icon">📚</div>
+                        <h3>No Courses Available</h3>
+                        <p>There are currently no active courses. Please check back later or contact your administrator.</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <footer class="landing-footer">
+            <p>&copy; 2026 LLS Study Portal | Version {{ version }}</p>
+            <p>
+                <a href="/admin/courses" class="admin-link">Admin Dashboard</a> |
+                <a href="/api/docs" class="docs-link">API Documentation</a>
+            </p>
+        </footer>
+    </div>
+
+    <script src="/static/js/course-selection.js"></script>
+</body>
+</html>
+
