@@ -66,7 +66,43 @@ logger = logging.getLogger(__name__)
 MATERIALS_BASE = pathlib.Path("Materials").resolve()
 
 
-def validate_materials_path(file_path: str) -> pathlib.Path:
+def resolve_incomplete_path(file_path: str) -> Optional[str]:
+    """
+    Attempt to resolve an incomplete storagePath by searching Course_Materials subdirectories.
+
+    This handles cases where storagePath was stored incorrectly as e.g. "Readings/file.pdf"
+    instead of "Course_Materials/LLS/Readings/file.pdf".
+
+    Args:
+        file_path: The incomplete path to resolve
+
+    Returns:
+        The corrected path if found, None otherwise
+    """
+    # If path already starts with a known tier folder, it's likely correct
+    if file_path.startswith(("Course_Materials/", "Syllabus/", "Supplementary_Sources/")):
+        return None
+
+    # Search in Course_Materials subdirectories
+    course_materials_dir = MATERIALS_BASE / "Course_Materials"
+    if not course_materials_dir.exists():
+        return None
+
+    # file_path might be something like "Readings/file.pdf" or "Lectures/file.pdf"
+    # Search all subject folders for a match
+    for subject_dir in course_materials_dir.iterdir():
+        if subject_dir.is_dir():
+            candidate_path = subject_dir / file_path
+            if candidate_path.exists():
+                # Found it! Return the corrected relative path
+                corrected = f"Course_Materials/{subject_dir.name}/{file_path}"
+                logger.info("Resolved incomplete path '%s' to '%s'", file_path, corrected)
+                return corrected
+
+    return None
+
+
+def validate_materials_path(file_path: str, try_resolve: bool = True) -> pathlib.Path:
     """
     Validate and resolve a file path within the Materials directory.
 
@@ -75,6 +111,8 @@ def validate_materials_path(file_path: str) -> pathlib.Path:
 
     Args:
         file_path: Relative path within Materials directory
+        try_resolve: If True, attempt to resolve incomplete paths by searching
+                     Course_Materials subdirectories
 
     Returns:
         Resolved absolute path to the file
@@ -110,6 +148,13 @@ def validate_materials_path(file_path: str) -> pathlib.Path:
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access denied: path outside materials directory"
         )
+
+    # If file doesn't exist and try_resolve is True, attempt to resolve incomplete path
+    if not full_path.exists() and try_resolve:
+        corrected_path = resolve_incomplete_path(file_path)
+        if corrected_path:
+            # Recursively validate the corrected path (with try_resolve=False to avoid loops)
+            return validate_materials_path(corrected_path, try_resolve=False)
 
     return full_path
 
@@ -1931,6 +1976,16 @@ async def batch_process_materials(
                 storage_path = material.storagePath
                 logger.debug(f"Processing material: {material.filename}, storagePath: {storage_path}")
                 try:
+                    # Check if path needs resolution (incomplete path)
+                    corrected_path = resolve_incomplete_path(storage_path)
+                    if corrected_path:
+                        # Fix the storagePath in Firestore
+                        service.update_storage_path(course_id, material.id, corrected_path)
+                        storage_path = corrected_path
+                        result["path_corrected"] = True
+                        result["corrected_path"] = corrected_path
+                        logger.info(f"Corrected storagePath for {material.filename}: {corrected_path}")
+
                     # Validate path to prevent path traversal
                     file_path = validate_materials_path(storage_path)
                     logger.debug(f"Full file path: {file_path}")
@@ -1953,11 +2008,11 @@ async def batch_process_materials(
                             errors += 1
                     else:
                         result["text_extracted"] = False
-                        result["text_error"] = "File not found"
+                        result["text_error"] = f"File not found: {storage_path}"
+                        errors += 1
                 except HTTPException as e:
                     result["text_extracted"] = False
                     result["text_error"] = f"Invalid path: {e.detail}"
-                    errors += 1
                     errors += 1
             elif material.textExtracted:
                 result["text_extracted"] = True
