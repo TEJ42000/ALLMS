@@ -176,6 +176,7 @@
                         <strong>Scan Folders:</strong> Discovers files from materialSubjects folders.<br>
                         <strong>Sync to Weeks:</strong> Auto-links materials to weeks based on week numbers in filenames.
                     </p>
+                    <div id="materials-stats" class="materials-stats hidden"></div>
 
                     <!-- Bulk Extraction Progress -->
                     <div id="extraction-progress-container" class="extraction-progress-container" style="display: none;">
@@ -489,8 +490,8 @@
         // Pass course_id from server if editing specific course
         window.initialCourseId = "{{ course_id | default('') }}";
     </script>
-    <script src="/static/js/upload.js?v=6"></script>
-    <script src="/static/js/admin.js?v=6"></script>
+    <script src="/static/js/upload.js?v=7"></script>
+    <script src="/static/js/admin.js?v=7"></script>
 </body>
 </html>
 

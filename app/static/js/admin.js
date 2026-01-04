@@ -24,6 +24,85 @@ const elements = {
 function showLoading() { elements.loading.classList.remove('hidden'); }
 function hideLoading() { elements.loading.classList.add('hidden'); }
 
+// Helper to format file size
+function formatFileSize(bytes) {
+    if (!bytes) return '';
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+// Display materials statistics
+function displayMaterialsStats(stats) {
+    const statsContainer = document.getElementById('materials-stats');
+    if (!statsContainer) return;
+
+    const textPending = stats.text_pending || 0;
+    const summaryPending = stats.summary_pending || 0;
+
+    statsContainer.innerHTML = `
+        <div class="stats-bar">
+            <span class="stat-item">📁 Total: ${stats.total}</span>
+            <span class="stat-item">📤 Uploaded: ${stats.by_source?.uploaded || 0}</span>
+            <span class="stat-item">🔍 Scanned: ${stats.by_source?.scanned || 0}</span>
+            <span class="stat-item ${textPending > 0 ? 'pending' : 'complete'}">
+                📝 Text: ${stats.text_extracted}/${stats.total}
+            </span>
+            <span class="stat-item ${summaryPending > 0 ? 'pending' : 'complete'}">
+                ✨ Summaries: ${stats.summary_generated}/${stats.total}
+            </span>
+            ${textPending > 0 || summaryPending > 0 ? `
+                <button class="btn-action batch-process-btn" onclick="batchProcessMaterials()">
+                    🔄 Process All (${textPending + summaryPending} pending)
+                </button>
+            ` : ''}
+        </div>
+    `;
+    statsContainer.classList.remove('hidden');
+}
+
+// Batch process materials (extract text and generate summaries)
+async function batchProcessMaterials() {
+    if (!currentCourse?.id) {
+        showToast('No course selected', 'error');
+        return;
+    }
+
+    if (!confirm('This will extract text and generate AI summaries for all pending materials. This may take several minutes and use API credits. Continue?')) {
+        return;
+    }
+
+    try {
+        showLoading();
+        showToast('Processing materials... This may take a while.', 'info');
+
+        const response = await fetch(`${API_BASE}/${currentCourse.id}/unified-materials/batch-process`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                process_text: true,
+                process_summary: true
+            })
+        });
+
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.detail || 'Batch processing failed');
+        }
+
+        const result = await response.json();
+        showToast(`Processed ${result.processed} materials (${result.errors} errors)`, result.errors > 0 ? 'warning' : 'success');
+
+        // Refresh the materials list
+        await renderCourseMaterialsList(currentCourse.materials);
+
+    } catch (e) {
+        showToast(`Error: ${e.message}`, 'error');
+    } finally {
+        hideLoading();
+    }
+}
+
 function showToast(message, type = 'info') {
     elements.toast.textContent = message;
     elements.toast.className = `toast ${type}`;
@@ -147,18 +226,81 @@ async function renderCourseMaterialsList(materials, uploadedMaterials = null) {
     const container = document.getElementById('course-materials-list');
     if (!container) return;  // Guard for when not on course detail view
 
-    // Fetch uploaded materials if not provided
-    if (uploadedMaterials === null && currentCourse?.id) {
+    // Try to use unified materials API first
+    let unifiedMaterials = null;
+    if (currentCourse?.id) {
         try {
-            const response = await fetch(`/api/admin/courses/${currentCourse.id}/materials/uploads`);
+            const response = await fetch(`/api/admin/courses/${currentCourse.id}/unified-materials?include_stats=true`);
             if (response.ok) {
                 const data = await response.json();
-                uploadedMaterials = data.materials || [];
-            } else {
-                uploadedMaterials = [];
+                unifiedMaterials = data.materials || [];
+
+                // Display stats if available
+                if (data.stats) {
+                    displayMaterialsStats(data.stats);
+                }
             }
         } catch (e) {
-            uploadedMaterials = [];
+            console.warn('Failed to fetch unified materials, falling back to legacy:', e);
+        }
+    }
+
+    // If we got unified materials, convert them to the expected format
+    if (unifiedMaterials && unifiedMaterials.length > 0) {
+        // Convert unified materials to the legacy format for display
+        materials = materials || {};
+        uploadedMaterials = [];  // Clear - we'll use unified materials
+
+        unifiedMaterials.forEach(um => {
+            const converted = {
+                title: um.title || um.filename,
+                file: um.storagePath,
+                size: formatFileSize(um.fileSize),
+                week: um.weekNumber,
+                isUploaded: um.source === 'uploaded',
+                materialId: um.id,
+                summary: um.summary,
+                summaryGenerated: um.summaryGenerated,
+                textExtracted: um.textExtracted,
+                source: um.source
+            };
+
+            // Map category to the appropriate array
+            const category = um.category?.toLowerCase();
+            if (category === 'textbook') {
+                if (!materials.coreTextbooks) materials.coreTextbooks = [];
+                materials.coreTextbooks.push(converted);
+            } else if (category === 'lecture') {
+                if (!materials.lectures) materials.lectures = [];
+                materials.lectures.push(converted);
+            } else if (category === 'reading') {
+                if (!materials.readings) materials.readings = [];
+                materials.readings.push(converted);
+            } else if (category === 'case') {
+                if (!materials.caseStudies) materials.caseStudies = [];
+                materials.caseStudies.push(converted);
+            } else if (category === 'exam') {
+                if (!materials.mockExams) materials.mockExams = [];
+                materials.mockExams.push(converted);
+            } else {
+                if (!materials.other) materials.other = [];
+                materials.other.push(converted);
+            }
+        });
+    } else {
+        // Fall back to legacy approach: fetch uploaded materials separately
+        if (uploadedMaterials === null && currentCourse?.id) {
+            try {
+                const response = await fetch(`/api/admin/courses/${currentCourse.id}/materials/uploads`);
+                if (response.ok) {
+                    const data = await response.json();
+                    uploadedMaterials = data.materials || [];
+                } else {
+                    uploadedMaterials = [];
+                }
+            } catch (e) {
+                uploadedMaterials = [];
+            }
         }
     }
 
@@ -1309,11 +1451,20 @@ async function deleteMaterial(materialId) {
 
     try {
         showLoading();
-        const response = await fetch(`${API_BASE}/courses/${currentCourse.id}/materials/uploads/${materialId}`, {
+
+        // Try unified endpoint first, fall back to legacy
+        let response = await fetch(`${API_BASE}/${currentCourse.id}/unified-materials/${materialId}?delete_file=true`, {
             method: 'DELETE'
         });
 
-        if (!response.ok) {
+        // If unified endpoint fails with 404, try legacy endpoint
+        if (response.status === 404) {
+            response = await fetch(`${API_BASE}/${currentCourse.id}/materials/uploads/${materialId}`, {
+                method: 'DELETE'
+            });
+        }
+
+        if (!response.ok && response.status !== 204) {
             const err = await response.json();
             throw new Error(err.detail || 'Failed to delete material');
         }
@@ -1321,9 +1472,7 @@ async function deleteMaterial(materialId) {
         showToast('Material deleted successfully', 'success');
 
         // Refresh the materials list
-        if (currentCourse?.materials) {
-            await renderCourseMaterialsList(currentCourse.materials);
-        }
+        await renderCourseMaterialsList(currentCourse?.materials);
     } catch (error) {
         console.error('Delete error:', error);
         showToast(`Failed to delete: ${error.message}`, 'error');

@@ -395,7 +395,7 @@ async def upload_document(
             summary = summary_text
             summary_generated = True
 
-    # Create material object
+    # Create legacy material object (for backward compatibility)
     material = UploadedMaterial(
         id=material_id,
         filename=filename,
@@ -418,8 +418,54 @@ async def upload_document(
         summaryGenerated=summary_generated
     )
 
-    # Store metadata in Firestore
+    # Store metadata in Firestore (legacy uploadedMaterials collection)
     await store_material_metadata(course_id, material)
+
+    # Also store in unified materials collection
+    try:
+        from app.models.course_models import CourseMaterial
+        from app.services.course_materials_service import generate_material_id, get_course_materials_service
+
+        # Convert storage path to relative path (strip Materials/ prefix if present)
+        relative_path = str(storage_path)
+        if relative_path.startswith("Materials/"):
+            relative_path = relative_path[len("Materials/"):]
+
+        # Generate deterministic ID from path
+        unified_id = generate_material_id(relative_path)
+        now = datetime.now(timezone.utc)
+
+        unified_material = CourseMaterial(
+            id=unified_id,
+            filename=filename,
+            storagePath=relative_path,
+            fileSize=len(file_content),
+            fileType=file_type,
+            mimeType=mime_type,
+            tier=tier,
+            category=category,
+            title=title or filename,
+            description=description,
+            weekNumber=week_number,
+            source="uploaded",
+            uploadedBy=uploaded_by,
+            textExtracted=text_extracted,
+            extractedText=extracted_text,
+            textLength=text_length or 0,
+            extractionError=extraction_error,
+            summary=summary,
+            summaryGenerated=summary_generated,
+            createdAt=now,
+            updatedAt=now
+        )
+
+        materials_service = get_course_materials_service()
+        materials_service.upsert_material(course_id, unified_material)
+        logger.info(f"Stored unified material {unified_id} for {filename}")
+
+    except Exception as e:
+        logger.error(f"Failed to store unified material (non-fatal): {e}")
+        # Don't fail upload if unified storage fails
 
     logger.info(f"Successfully uploaded document: {filename} to {storage_path}")
 

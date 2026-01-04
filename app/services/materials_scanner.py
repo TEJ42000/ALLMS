@@ -293,3 +293,79 @@ def convert_to_materials_registry(scan_result: ScanResult) -> Dict:
 
     return registry
 
+
+def convert_to_course_materials(
+    scan_result: ScanResult,
+    subject: str
+) -> List["CourseMaterial"]:
+    """Convert scan result to unified CourseMaterial objects.
+
+    Args:
+        scan_result: Result from scan_materials_folder
+        subject: The subject/folder name being scanned
+
+    Returns:
+        List of CourseMaterial objects ready for Firestore
+    """
+    from datetime import datetime, timezone
+    from app.models.course_models import CourseMaterial
+    from app.services.course_materials_service import generate_material_id
+
+    materials = []
+    now = datetime.now(timezone.utc)
+
+    for mat in scan_result.materials:
+        # Build full storage path relative to Materials/
+        storage_path = f"Course_Materials/{subject}/{mat.file}"
+        material_id = generate_material_id(storage_path)
+
+        # Map material_type to category
+        category_map = {
+            "textbook": "textbook",
+            "lecture": "lecture",
+            "reading": "reading",
+            "case_study": "case",
+            "exam": "exam",
+            "other": "other"
+        }
+        category = category_map.get(mat.material_type, "other")
+
+        # Detect file type from extension
+        ext = Path(mat.filename).suffix.lower()
+        file_type_map = {
+            ".pdf": "pdf",
+            ".docx": "docx",
+            ".doc": "docx",
+            ".txt": "text",
+            ".md": "markdown",
+            ".zip": "slide_archive"
+        }
+        file_type = file_type_map.get(ext, "unknown")
+
+        course_material = CourseMaterial(
+            id=material_id,
+            filename=mat.filename,
+            storagePath=storage_path,
+            fileSize=mat.size_bytes,
+            fileType=file_type,
+            mimeType=None,  # Will be detected on access
+            tier="course_materials",
+            category=category,
+            title=mat.title or mat.filename,
+            description=None,
+            weekNumber=mat.week,
+            source="scanned",
+            uploadedBy=None,
+            textExtracted=False,
+            extractedText=None,
+            textLength=0,
+            extractionError=None,
+            summary=None,
+            summaryGenerated=False,
+            createdAt=now,
+            updatedAt=now
+        )
+        materials.append(course_material)
+
+    return materials
+

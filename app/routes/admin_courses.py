@@ -29,6 +29,7 @@ from app.models.course_models import (
     CaseStudy,
     MockExam,
     UploadedMaterial,
+    CourseMaterial,
 )
 from app.services.course_service import get_course_service
 from app.services.materials_scanner import (
@@ -551,6 +552,7 @@ class MaterialsScanResponse(BaseModel):
     categories: Dict[str, int]
     materials_updated: bool
     message: str
+    warnings: Optional[List[str]] = None
 
 
 @router.post(
@@ -596,6 +598,7 @@ async def scan_course_materials(
     # Scan all subject folders
     all_materials = []
     all_categories: Dict[str, int] = {}
+    all_course_materials = []  # Unified CourseMaterial objects
 
     for subject in subjects:
         logger.info("Scanning materials for subject: %s", subject)
@@ -603,6 +606,12 @@ async def scan_course_materials(
         all_materials.extend(scan_result.materials)
         for cat, count in scan_result.categories.items():
             all_categories[cat] = all_categories.get(cat, 0) + count
+
+        # Convert to unified CourseMaterial format
+        from app.services.materials_scanner import convert_to_course_materials
+        course_materials = convert_to_course_materials(scan_result, subject)
+        if course_materials:
+            all_course_materials.extend(course_materials)
 
     if not all_materials:
         return MaterialsScanResponse(
@@ -619,8 +628,13 @@ async def scan_course_materials(
     if use_ai:
         logger.info("Enhancing titles with AI for %d materials", len(all_materials))
         all_materials = await enhance_titles_with_ai(all_materials)
+        # Also update titles in unified materials
+        title_map = {m.filename: m.title for m in all_materials if m.title}
+        for cm in all_course_materials:
+            if cm.filename in title_map:
+                cm.title = title_map[cm.filename]
 
-    # Convert to registry format
+    # Convert to registry format (legacy - kept for backward compatibility)
     combined_result = ScanResult(
         subject=",".join(subjects),
         total_files=len(all_materials),
@@ -637,7 +651,7 @@ async def scan_course_materials(
             "materials": registry,
             "updatedAt": datetime.now(timezone.utc)
         })
-        logger.info("Updated materials for course %s: %d files", course_id, len(all_materials))
+        logger.info("Updated legacy materials registry for course %s: %d files", course_id, len(all_materials))
     except Exception as e:
         logger.error("Failed to update materials for %s: %s", course_id, e)
         raise HTTPException(
@@ -645,13 +659,25 @@ async def scan_course_materials(
             detail=f"Failed to update materials: {str(e)}"
         )
 
+    # Store in unified materials collection
+    warnings = []
+    try:
+        from app.services.course_materials_service import get_course_materials_service
+        materials_service = get_course_materials_service()
+        count = materials_service.bulk_upsert_materials(course_id, all_course_materials)
+        logger.info("Upserted %d materials to unified collection for course %s", count, course_id)
+    except Exception as e:
+        logger.error("Failed to upsert unified materials for %s: %s", course_id, e)
+        warnings.append(f"Failed to update unified materials collection: {str(e)}")
+
     return MaterialsScanResponse(
         course_id=course_id,
         subjects_scanned=subjects,
         total_files=len(all_materials),
         categories=all_categories,
         materials_updated=True,
-        message=f"Successfully scanned and updated {len(all_materials)} materials"
+        message=f"Successfully scanned and updated {len(all_materials)} materials",
+        warnings=warnings if warnings else None
     )
 
 
@@ -1594,3 +1620,434 @@ async def get_upload_config():
         "tier_folders": TIER_FOLDERS,
         "category_folders": CATEGORY_FOLDERS
     }
+
+
+# ============================================================================
+# Unified Materials Endpoints (Issue #51)
+# ============================================================================
+
+
+class UnifiedMaterialsResponse(BaseModel):
+    """Response model for unified materials list."""
+    materials: List[CourseMaterial]
+    count: int
+    stats: Optional[Dict] = None
+
+
+class BatchProcessRequest(BaseModel):
+    """Request model for batch processing."""
+    material_ids: Optional[List[str]] = None  # If None, process all
+    process_text: bool = True
+    process_summary: bool = True
+
+
+class BatchProcessResponse(BaseModel):
+    """Response model for batch processing."""
+    processed: int
+    errors: int
+    results: List[Dict]
+
+
+@router.get(
+    "/{course_id}/unified-materials",
+    response_model=UnifiedMaterialsResponse,
+    summary="List all course materials (unified)",
+    description="Get all materials for a course from the unified collection."
+)
+async def list_unified_materials(
+    course_id: str = Path(..., description="Course ID"),
+    tier: Optional[str] = Query(None, description="Filter by tier"),
+    category: Optional[str] = Query(None, description="Filter by category"),
+    source: Optional[str] = Query(None, description="Filter by source (scanned/uploaded)"),
+    text_extracted: Optional[bool] = Query(None, description="Filter by text extraction status"),
+    summary_generated: Optional[bool] = Query(None, description="Filter by summary status"),
+    include_stats: bool = Query(False, description="Include material statistics")
+):
+    """List all materials from the unified collection."""
+    try:
+        from app.services.course_materials_service import get_course_materials_service
+
+        service = get_course_materials_service()
+        materials = service.list_materials(
+            course_id=course_id,
+            tier=tier,
+            category=category,
+            source=source,
+            text_extracted=text_extracted,
+            summary_generated=summary_generated
+        )
+
+        stats = None
+        if include_stats:
+            stats = service.get_materials_stats(course_id)
+
+        return UnifiedMaterialsResponse(
+            materials=materials,
+            count=len(materials),
+            stats=stats
+        )
+
+    except Exception as e:
+        logger.error(f"Failed to list unified materials: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to list materials: {str(e)}"
+        )
+
+
+@router.get(
+    "/{course_id}/unified-materials/stats",
+    summary="Get materials statistics",
+    description="Get statistics about materials for a course."
+)
+async def get_materials_stats(
+    course_id: str = Path(..., description="Course ID")
+):
+    """Get statistics about materials for a course."""
+    try:
+        from app.services.course_materials_service import get_course_materials_service
+
+        service = get_course_materials_service()
+        stats = service.get_materials_stats(course_id)
+        return stats
+
+    except Exception as e:
+        logger.error(f"Failed to get materials stats: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get stats: {str(e)}"
+        )
+
+
+@router.get(
+    "/{course_id}/unified-materials/{material_id}",
+    response_model=CourseMaterial,
+    summary="Get a specific material",
+    description="Get details of a specific material from the unified collection."
+)
+async def get_unified_material(
+    course_id: str = Path(..., description="Course ID"),
+    material_id: str = Path(..., description="Material ID")
+):
+    """Get a specific material from the unified collection."""
+    try:
+        from app.services.course_materials_service import get_course_materials_service
+
+        service = get_course_materials_service()
+        material = service.get_material(course_id, material_id)
+
+        if not material:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Material not found: {material_id}"
+            )
+
+        return material
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get unified material: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get material: {str(e)}"
+        )
+
+
+
+
+@router.post(
+    "/{course_id}/unified-materials/{material_id}/extract-text",
+    summary="Extract text from a material",
+    description="Trigger text extraction for a specific material."
+)
+async def extract_material_text(
+    course_id: str = Path(..., description="Course ID"),
+    material_id: str = Path(..., description="Material ID")
+):
+    """Extract text from a specific material."""
+    try:
+        from app.services.course_materials_service import get_course_materials_service
+        from app.services.text_extractor import extract_text
+
+        service = get_course_materials_service()
+        material = service.get_material(course_id, material_id)
+
+        if not material:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Material not found: {material_id}"
+            )
+
+        # Build full file path with security validation
+        file_path = validate_materials_path(material.storagePath)
+        if not file_path.exists():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"File not found: {material.storagePath}"
+            )
+
+        # Extract text
+        result = extract_text(file_path)
+
+        if result.success:
+            updated = service.update_text_extraction(
+                course_id=course_id,
+                material_id=material_id,
+                extracted_text=result.text,
+                text_length=len(result.text)
+            )
+            return {
+                "success": True,
+                "material_id": material_id,
+                "text_length": len(result.text),
+                "preview": result.text[:500] if result.text else ""
+            }
+        else:
+            service.update_text_extraction(
+                course_id=course_id,
+                material_id=material_id,
+                extracted_text="",
+                text_length=0,
+                error=result.error
+            )
+            return {
+                "success": False,
+                "material_id": material_id,
+                "error": result.error
+            }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to extract text: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to extract text: {str(e)}"
+        )
+
+
+@router.post(
+    "/{course_id}/unified-materials/{material_id}/generate-summary",
+    summary="Generate AI summary for a material",
+    description="Generate an AI summary for a material that has extracted text."
+)
+async def generate_material_summary(
+    course_id: str = Path(..., description="Course ID"),
+    material_id: str = Path(..., description="Material ID")
+):
+    """Generate AI summary for a specific material."""
+    try:
+        from app.services.course_materials_service import get_course_materials_service
+        from app.services.document_upload_service import generate_document_summary
+
+        service = get_course_materials_service()
+        material = service.get_material(course_id, material_id)
+
+        if not material:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Material not found: {material_id}"
+            )
+
+        if not material.textExtracted or not material.extractedText:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Text must be extracted before generating summary"
+            )
+
+        # Generate summary
+        summary = await generate_document_summary(
+            text=material.extractedText,
+            filename=material.filename
+        )
+
+        if summary:
+            service.update_summary(
+                course_id=course_id,
+                material_id=material_id,
+                summary=summary
+            )
+            return {
+                "success": True,
+                "material_id": material_id,
+                "summary": summary
+            }
+        else:
+            return {
+                "success": False,
+                "material_id": material_id,
+                "error": "Failed to generate summary"
+            }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to generate summary: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate summary: {str(e)}"
+        )
+
+
+@router.post(
+    "/{course_id}/unified-materials/batch-process",
+    response_model=BatchProcessResponse,
+    summary="Batch process materials",
+    description="Extract text and/or generate summaries for multiple materials."
+)
+async def batch_process_materials(
+    course_id: str = Path(..., description="Course ID"),
+    request: BatchProcessRequest = None
+):
+    """Batch process materials for text extraction and summary generation."""
+    try:
+        from app.services.course_materials_service import get_course_materials_service
+        from app.services.text_extractor import extract_text
+        from app.services.document_upload_service import generate_document_summary
+
+        service = get_course_materials_service()
+
+        # Get materials to process
+        if request and request.material_ids:
+            materials = [service.get_material(course_id, mid) for mid in request.material_ids]
+            materials = [m for m in materials if m is not None]
+        else:
+            # Get all materials
+            materials = service.list_materials(course_id)
+
+        process_text = request.process_text if request else True
+        process_summary = request.process_summary if request else True
+
+        results = []
+        processed = 0
+        errors = 0
+
+        for material in materials:
+            result = {"material_id": material.id, "filename": material.filename}
+
+            # Extract text if needed
+            if process_text and not material.textExtracted:
+                storage_path = material.storagePath
+                logger.debug(f"Processing material: {material.filename}, storagePath: {storage_path}")
+                try:
+                    # Validate path to prevent path traversal
+                    file_path = validate_materials_path(storage_path)
+                    logger.debug(f"Full file path: {file_path}")
+                    if file_path.exists():
+                        extraction = extract_text(file_path)
+                        if extraction.success:
+                            service.update_text_extraction(
+                                course_id=course_id,
+                                material_id=material.id,
+                                extracted_text=extraction.text,
+                                text_length=len(extraction.text)
+                            )
+                            result["text_extracted"] = True
+                            result["text_length"] = len(extraction.text)
+                            material.extractedText = extraction.text
+                            material.textExtracted = True
+                        else:
+                            result["text_extracted"] = False
+                            result["text_error"] = extraction.error
+                            errors += 1
+                    else:
+                        result["text_extracted"] = False
+                        result["text_error"] = "File not found"
+                except HTTPException as e:
+                    result["text_extracted"] = False
+                    result["text_error"] = f"Invalid path: {e.detail}"
+                    errors += 1
+                    errors += 1
+            elif material.textExtracted:
+                result["text_extracted"] = True
+                result["text_skipped"] = "Already extracted"
+
+            # Generate summary if needed
+            if process_summary and material.textExtracted and not material.summaryGenerated:
+                if material.extractedText:
+                    success, summary = await generate_document_summary(
+                        extracted_text=material.extractedText,
+                        filename=material.filename,
+                        tier=material.tier or "course_materials",
+                        category=material.category
+                    )
+                    if success and summary:
+                        service.update_summary(
+                            course_id=course_id,
+                            material_id=material.id,
+                            summary=summary
+                        )
+                        result["summary_generated"] = True
+                        result["summary_preview"] = summary[:100] + "..." if len(summary) > 100 else summary
+                    else:
+                        result["summary_generated"] = False
+                        result["summary_error"] = "Failed to generate"
+                        errors += 1
+            elif material.summaryGenerated:
+                result["summary_generated"] = True
+                result["summary_skipped"] = "Already generated"
+
+            results.append(result)
+            processed += 1
+
+        return BatchProcessResponse(
+            processed=processed,
+            errors=errors,
+            results=results
+        )
+
+    except Exception as e:
+        import traceback
+        logger.error(f"Failed to batch process materials: {e}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to batch process: {str(e)}"
+        )
+
+
+@router.delete(
+    "/{course_id}/unified-materials/{material_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete a material from unified collection",
+    description="Delete a material from the unified collection (and optionally the file)."
+)
+async def delete_unified_material(
+    course_id: str = Path(..., description="Course ID"),
+    material_id: str = Path(..., description="Material ID"),
+    delete_file: bool = Query(False, description="Also delete the physical file")
+):
+    """Delete a material from the unified collection."""
+    try:
+        from app.services.course_materials_service import get_course_materials_service
+
+        service = get_course_materials_service()
+        material = service.get_material(course_id, material_id)
+
+        if not material:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Material not found: {material_id}"
+            )
+
+        # Optionally delete the file (with path validation for security)
+        if delete_file:
+            file_path = validate_materials_path(material.storagePath)
+            if file_path.exists():
+                file_path.unlink()
+                logger.info(f"Deleted file: {file_path}")
+
+        # Delete from unified collection
+        service.delete_material(course_id, material_id)
+
+        return None
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to delete unified material: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete material: {str(e)}"
+        )
