@@ -1956,11 +1956,13 @@ async def batch_process_materials(
             # Generate summary if needed
             if process_summary and material.textExtracted and not material.summaryGenerated:
                 if material.extractedText:
-                    summary = await generate_document_summary(
-                        text=material.extractedText,
-                        filename=material.filename
+                    success, summary = await generate_document_summary(
+                        extracted_text=material.extractedText,
+                        filename=material.filename,
+                        tier=material.tier or "course_materials",
+                        category=material.category
                     )
-                    if summary:
+                    if success and summary:
                         service.update_summary(
                             course_id=course_id,
                             material_id=material.id,
