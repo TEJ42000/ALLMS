@@ -1070,3 +1070,69 @@
     transform: scale(1.2);
 }
 
+
+/* Materials Stats Bar */
+.materials-stats {
+    margin-bottom: 15px;
+}
+
+.materials-stats .stats-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    align-items: center;
+    padding: 12px 15px;
+    background: var(--bg-light);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+}
+
+.materials-stats .stat-item {
+    font-size: 14px;
+    color: var(--text-secondary);
+}
+
+.materials-stats .stat-item.pending {
+    color: #f59e0b;
+    font-weight: 500;
+}
+
+.materials-stats .stat-item.complete {
+    color: #10b981;
+}
+
+.materials-stats .batch-process-btn {
+    margin-left: auto;
+    padding: 6px 12px;
+    font-size: 13px;
+    background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.materials-stats .batch-process-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
+}
+
+/* Source badge for materials */
+.source-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    font-size: 11px;
+    border-radius: 4px;
+    margin-left: 5px;
+}
+
+.source-badge.scanned {
+    background: #dbeafe;
+    color: #1d4ed8;
+}
+
+.source-badge.uploaded {
+    background: #dcfce7;
+    color: #16a34a;
+}

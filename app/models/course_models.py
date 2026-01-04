@@ -233,12 +233,63 @@ class LegalSkillsConfig(BaseModel):
 
 
 # ============================================================================
-# Uploaded Materials
+# Unified Course Materials (Issue #51)
 # ============================================================================
 
 
+class CourseMaterial(BaseModel):
+    """Unified material model for both scanned and uploaded files.
+
+    Stored in Firestore: courses/{course_id}/materials/{material_id}
+
+    This replaces both the old UploadedMaterial model and the MaterialsRegistry
+    nested structure, providing a single queryable collection for all materials.
+    """
+
+    id: str  # Hash of storagePath for deduplication
+
+    # File info
+    filename: str  # Original filename
+    storagePath: str  # Path relative to Materials/ (e.g., "Course_Materials/LLS/Readings/file.pdf")
+    fileSize: int  # Bytes
+    fileType: str  # 'pdf', 'docx', 'slide_archive', 'image', 'text', etc.
+    mimeType: Optional[str] = None
+
+    # Categorization
+    tier: str  # 'syllabus', 'course_materials', 'supplementary'
+    category: Optional[str] = None  # 'lecture', 'reading', 'case', 'textbook', 'exam', 'other'
+
+    # Display metadata
+    title: str  # Display title (AI-enhanced or parsed from filename)
+    description: Optional[str] = None
+    weekNumber: Optional[int] = None  # Link to specific week (extracted from filename or manual)
+
+    # Source tracking
+    source: str  # 'scanned' or 'uploaded'
+    uploadedBy: Optional[str] = None  # User ID (for uploaded files)
+
+    # Text extraction
+    textExtracted: bool = False
+    extractedText: Optional[str] = None  # Extracted text content
+    textLength: int = 0
+    extractionError: Optional[str] = None
+
+    # AI Summary
+    summary: Optional[str] = None  # LLM-generated summary
+    summaryGenerated: bool = False
+
+    # Timestamps
+    createdAt: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updatedAt: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+# Legacy model - kept for backward compatibility during migration
 class UploadedMaterial(BaseModel):
-    """Uploaded material record for course documents."""
+    """DEPRECATED: Use CourseMaterial instead.
+
+    Uploaded material record for course documents.
+    This model is kept for backward compatibility during migration.
+    """
 
     id: str  # UUID
     filename: str  # Original filename
