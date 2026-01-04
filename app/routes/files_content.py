@@ -125,6 +125,50 @@ class FlashcardsRequest(BaseModel):
 
 # ========== Helper Functions ==========
 
+def _validate_week_parameter(week: Optional[int]) -> None:
+    """
+    Validate week parameter is within valid range.
+
+    Args:
+        week: Week number to validate (1-52)
+
+    Raises:
+        HTTPException: If week is outside valid range
+    """
+    if week is not None and (week < 1 or week > 52):
+        raise HTTPException(
+            400,
+            detail="Week number must be between 1 and 52"
+        )
+
+
+def _add_course_context(
+    response: dict,
+    course_id: Optional[str] = None,
+    week: Optional[int] = None,
+    weeks: Optional[List[int]] = None
+) -> dict:
+    """
+    Add course context to response dictionary.
+
+    Args:
+        response: Response dictionary to augment
+        course_id: Optional course ID
+        week: Optional single week number
+        weeks: Optional list of week numbers
+
+    Returns:
+        Response dictionary with course context added
+    """
+    if course_id:
+        response["course_id"] = course_id
+    if week is not None:
+        response["week"] = week
+    if weeks:
+        response["weeks"] = weeks
+    return response
+
+
 def _get_file_keys(
     service,
     topic: Optional[str] = None,
@@ -138,14 +182,18 @@ def _get_file_keys(
         service: FilesAPIService instance
         topic: Topic name (legacy mode)
         course_id: Course ID (course-aware mode)
-        week: Optional week number for filtering
+        week: Optional week number for filtering (1-52)
 
     Returns:
         List of file keys
 
     Raises:
-        HTTPException: If neither topic nor course_id provided, or course not found
+        HTTPException: If neither topic nor course_id provided, course not found,
+                       or week is outside valid range
     """
+    # Validate week parameter
+    _validate_week_parameter(week)
+
     if course_id:
         # Course-aware mode: get files from Firestore
         try:
@@ -234,11 +282,15 @@ async def generate_quiz_from_files(request: FilesQuizRequest):
             "cached": True  # Files API auto-caches
         }
 
-        # Include course context if provided
+        # Add course context to response
+        _add_course_context(response, course_id=request.course_id, week=request.week)
+
+        # Log successful generation
         if request.course_id:
-            response["course_id"] = request.course_id
-        if request.week:
-            response["week"] = request.week
+            logger.info(
+                "Generated quiz for course %s, week %s, %d questions",
+                request.course_id, request.week, request.num_questions
+            )
 
         return response
 
@@ -284,21 +336,32 @@ async def generate_study_guide(request: FilesStudyGuideRequest):
     try:
         service = get_files_api_service()
 
+        # Validate weeks if provided
+        if request.weeks:
+            for week in request.weeks:
+                _validate_week_parameter(week)
+
         # Get files (supports both legacy and course-aware modes)
         if request.course_id:
-            # Course-aware mode: get files for each week
-            file_keys = []
-            if request.weeks:
-                for week in request.weeks:
-                    week_files = service.get_files_for_course(
-                        request.course_id,
-                        week_number=week
-                    )
-                    file_keys.extend(week_files)
-                # Remove duplicates
-                file_keys = list(dict.fromkeys(file_keys))
-            else:
-                file_keys = service.get_files_for_course(request.course_id)
+            # Course-aware mode: get all course files first, then filter if weeks specified
+            # This avoids N+1 queries by fetching course data once
+            try:
+                if request.weeks:
+                    # Get files for multiple weeks in a single course lookup
+                    file_keys = []
+                    for week in request.weeks:
+                        week_files = service.get_files_for_course(
+                            request.course_id,
+                            week_number=week
+                        )
+                        file_keys.extend(week_files)
+                    # Remove duplicates while preserving order
+                    file_keys = list(dict.fromkeys(file_keys))
+                else:
+                    file_keys = service.get_files_for_course(request.course_id)
+            except ValueError as e:
+                logger.warning("Course not found: %s", request.course_id)
+                raise HTTPException(404, detail=str(e)) from e
         elif request.topic:
             # Legacy mode
             file_keys = service.get_topic_files(request.topic)
@@ -328,18 +391,20 @@ async def generate_study_guide(request: FilesStudyGuideRequest):
             "files_used": file_keys
         }
 
+        # Add course context to response
+        _add_course_context(response, course_id=request.course_id, weeks=request.weeks)
+
+        # Log successful generation
         if request.course_id:
-            response["course_id"] = request.course_id
-        if request.weeks:
-            response["weeks"] = request.weeks
+            logger.info(
+                "Generated study guide for course %s, weeks %s",
+                request.course_id, request.weeks
+            )
 
         return response
 
     except HTTPException:
         raise
-    except ValueError as e:
-        logger.warning("Course not found: %s", str(e))
-        raise HTTPException(404, detail=str(e)) from e
     except Exception as e:
         logger.error("Error generating study guide: %s", e)
         raise HTTPException(500, detail=str(e)) from e
@@ -483,10 +548,15 @@ async def generate_flashcards(request: FlashcardsRequest):
             "topic": topic
         }
 
+        # Add course context to response
+        _add_course_context(response, course_id=request.course_id, week=request.week)
+
+        # Log successful generation
         if request.course_id:
-            response["course_id"] = request.course_id
-        if request.week:
-            response["week"] = request.week
+            logger.info(
+                "Generated %d flashcards for course %s, week %s",
+                len(flashcards), request.course_id, request.week
+            )
 
         return response
 

@@ -439,3 +439,317 @@ class TestInputValidation:
                 file_keys=[123, 456],
                 num_cards=20
             )
+
+
+class TestCourseAwareQuizEndpoint:
+    """Tests for course-aware quiz generation."""
+
+    def test_quiz_with_course_id(self, client):
+        """Test quiz generation with course_id parameter."""
+        mock_service = MagicMock()
+        mock_service.get_files_for_course.return_value = ["reader_private_law"]
+        mock_service.generate_quiz_from_files = AsyncMock(return_value=[
+            {"question": "Test question", "options": ["A", "B"], "correct": 0}
+        ])
+
+        with patch(
+            'app.routes.files_content.get_files_api_service',
+            return_value=mock_service
+        ):
+            response = client.post("/api/files-content/quiz", json={
+                "course_id": "LLS-2025-2026",
+                "num_questions": 5,
+                "difficulty": "medium"
+            })
+
+            assert response.status_code == 200
+            data = response.json()
+            assert "quiz" in data
+            assert data.get("course_id") == "LLS-2025-2026"
+            mock_service.get_files_for_course.assert_called_once()
+
+    def test_quiz_with_course_id_and_week(self, client):
+        """Test quiz generation with course_id and week parameters."""
+        mock_service = MagicMock()
+        mock_service.get_files_for_course.return_value = ["lecture_week_3"]
+        mock_service.generate_quiz_from_files = AsyncMock(return_value=[])
+
+        with patch(
+            'app.routes.files_content.get_files_api_service',
+            return_value=mock_service
+        ):
+            response = client.post("/api/files-content/quiz", json={
+                "course_id": "LLS-2025-2026",
+                "week": 3,
+                "num_questions": 10,
+                "difficulty": "hard"
+            })
+
+            assert response.status_code == 200
+            data = response.json()
+            assert data.get("course_id") == "LLS-2025-2026"
+            assert data.get("week") == 3
+            mock_service.get_files_for_course.assert_called_with(
+                "LLS-2025-2026", week_number=3
+            )
+
+    def test_quiz_course_not_found(self, client):
+        """Test quiz returns 404 when course not found."""
+        mock_service = MagicMock()
+        mock_service.get_files_for_course.side_effect = ValueError(
+            "Course not found: INVALID"
+        )
+
+        with patch(
+            'app.routes.files_content.get_files_api_service',
+            return_value=mock_service
+        ):
+            response = client.post("/api/files-content/quiz", json={
+                "course_id": "INVALID",
+                "num_questions": 5,
+                "difficulty": "medium"
+            })
+
+            assert response.status_code == 404
+            assert "Course not found" in response.json()["detail"]
+
+    def test_quiz_requires_topic_or_course_id(self, client):
+        """Test quiz returns 400 when neither topic nor course_id provided."""
+        mock_service = MagicMock()
+
+        with patch(
+            'app.routes.files_content.get_files_api_service',
+            return_value=mock_service
+        ):
+            response = client.post("/api/files-content/quiz", json={
+                "num_questions": 5,
+                "difficulty": "medium"
+            })
+
+            assert response.status_code == 400
+            assert "Either 'topic' or 'course_id'" in response.json()["detail"]
+
+
+class TestCourseAwareStudyGuideEndpoint:
+    """Tests for course-aware study guide generation."""
+
+    def test_study_guide_with_course_id(self, client):
+        """Test study guide generation with course_id parameter."""
+        mock_service = MagicMock()
+        mock_service.get_files_for_course.return_value = ["reader_criminal_law"]
+        mock_service.generate_study_guide = AsyncMock(return_value={
+            "sections": []
+        })
+
+        with patch(
+            'app.routes.files_content.get_files_api_service',
+            return_value=mock_service
+        ):
+            response = client.post("/api/files-content/study-guide", json={
+                "course_id": "LLS-2025-2026"
+            })
+
+            assert response.status_code == 200
+            data = response.json()
+            assert "guide" in data
+            assert data.get("course_id") == "LLS-2025-2026"
+
+    def test_study_guide_with_course_id_and_weeks(self, client):
+        """Test study guide with course_id and multiple weeks."""
+        mock_service = MagicMock()
+        mock_service.get_files_for_course.return_value = ["lecture_week_2"]
+        mock_service.generate_study_guide = AsyncMock(return_value={})
+
+        with patch(
+            'app.routes.files_content.get_files_api_service',
+            return_value=mock_service
+        ):
+            response = client.post("/api/files-content/study-guide", json={
+                "course_id": "LLS-2025-2026",
+                "weeks": [2, 3]
+            })
+
+            assert response.status_code == 200
+            data = response.json()
+            assert data.get("weeks") == [2, 3]
+
+
+class TestCourseAwareFlashcardsEndpoint:
+    """Tests for course-aware flashcards generation."""
+
+    def test_flashcards_with_course_id(self, client):
+        """Test flashcards generation with course_id parameter."""
+        mock_service = MagicMock()
+        mock_service.get_files_for_course.return_value = ["reader_admin_law"]
+        mock_service.generate_flashcards = AsyncMock(return_value=[
+            {"front": "Q1", "back": "A1"},
+            {"front": "Q2", "back": "A2"}
+        ])
+
+        with patch(
+            'app.routes.files_content.get_files_api_service',
+            return_value=mock_service
+        ):
+            response = client.post("/api/files-content/flashcards", json={
+                "course_id": "LLS-2025-2026",
+                "num_cards": 10
+            })
+
+            assert response.status_code == 200
+            data = response.json()
+            assert "flashcards" in data
+            assert data.get("course_id") == "LLS-2025-2026"
+            assert data["count"] == 2
+
+
+class TestCourseFilesEndpoint:
+    """Tests for /api/files-content/course-files/{course_id} endpoint."""
+
+    def test_get_course_files(self, client):
+        """Test getting files for a course."""
+        mock_service = MagicMock()
+        mock_service.get_files_for_course.return_value = ["file1", "file2"]
+        mock_service.get_file_id.return_value = "file-id-123"
+        mock_service.file_ids = {
+            "file1": {"filename": "test.pdf", "tier": "Syllabus"},
+            "file2": {"filename": "test2.pdf", "tier": "Course_Materials"}
+        }
+
+        with patch(
+            'app.routes.files_content.get_files_api_service',
+            return_value=mock_service
+        ):
+            response = client.get("/api/files-content/course-files/LLS-2025-2026")
+
+            assert response.status_code == 200
+            data = response.json()
+            assert data["course_id"] == "LLS-2025-2026"
+            assert "files" in data
+            assert data["count"] == 2
+
+    def test_get_course_files_with_week(self, client):
+        """Test getting files for a course filtered by week."""
+        mock_service = MagicMock()
+        mock_service.get_files_for_course.return_value = ["lecture_week_3"]
+        mock_service.get_file_id.return_value = "file-id-456"
+        mock_service.file_ids = {
+            "lecture_week_3": {"filename": "week3.pdf", "tier": "Course_Materials"}
+        }
+
+        with patch(
+            'app.routes.files_content.get_files_api_service',
+            return_value=mock_service
+        ):
+            response = client.get(
+                "/api/files-content/course-files/LLS-2025-2026?week=3"
+            )
+
+            assert response.status_code == 200
+            data = response.json()
+            assert data.get("week") == 3
+            mock_service.get_files_for_course.assert_called_with(
+                "LLS-2025-2026", week_number=3
+            )
+
+    def test_get_course_files_not_found(self, client):
+        """Test 404 when course not found."""
+        mock_service = MagicMock()
+        mock_service.get_files_for_course.side_effect = ValueError(
+            "Course not found: INVALID"
+        )
+
+        with patch(
+            'app.routes.files_content.get_files_api_service',
+            return_value=mock_service
+        ):
+            response = client.get("/api/files-content/course-files/INVALID")
+
+            assert response.status_code == 404
+
+
+class TestTopicsEndpointCourseAware:
+    """Tests for course-aware /api/tutor/topics endpoint."""
+
+    def test_topics_default(self, client):
+        """Test topics endpoint returns default topics."""
+        response = client.get("/api/tutor/topics")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "topics" in data
+        assert len(data["topics"]) == 5  # Default topics
+        assert data["status"] == "success"
+
+    def test_topics_with_course_id(self, client):
+        """Test topics endpoint with course_id parameter."""
+        mock_service = MagicMock()
+        mock_service.get_course_topics.return_value = [
+            {"id": "week1_intro", "name": "Introduction", "week": 1}
+        ]
+
+        # Patch the import inside the function
+        with patch(
+            'app.services.files_api_service.get_files_api_service',
+            return_value=mock_service
+        ):
+            response = client.get("/api/tutor/topics?course_id=LLS-2025-2026")
+
+            assert response.status_code == 200
+            data = response.json()
+            assert data.get("course_id") == "LLS-2025-2026"
+            assert "topics" in data
+
+    def test_topics_course_not_found(self, client):
+        """Test topics returns 404 when course not found."""
+        mock_service = MagicMock()
+        mock_service.get_course_topics.side_effect = ValueError(
+            "Course not found: INVALID"
+        )
+
+        # Patch the import inside the function
+        with patch(
+            'app.services.files_api_service.get_files_api_service',
+            return_value=mock_service
+        ):
+            response = client.get("/api/tutor/topics?course_id=INVALID")
+
+            assert response.status_code == 404
+
+
+class TestWeekValidation:
+    """Tests for week parameter validation."""
+
+    def test_quiz_week_too_high(self, client):
+        """Test quiz returns 400 for week > 52."""
+        mock_service = MagicMock()
+
+        with patch(
+            'app.routes.files_content.get_files_api_service',
+            return_value=mock_service
+        ):
+            response = client.post("/api/files-content/quiz", json={
+                "course_id": "LLS-2025-2026",
+                "week": 100,
+                "num_questions": 5,
+                "difficulty": "medium"
+            })
+
+            # FastAPI validates Field(ge=1, le=52) at the Pydantic level
+            assert response.status_code == 422
+
+    def test_quiz_week_zero(self, client):
+        """Test quiz returns 422 for week = 0."""
+        mock_service = MagicMock()
+
+        with patch(
+            'app.routes.files_content.get_files_api_service',
+            return_value=mock_service
+        ):
+            response = client.post("/api/files-content/quiz", json={
+                "course_id": "LLS-2025-2026",
+                "week": 0,
+                "num_questions": 5,
+                "difficulty": "medium"
+            })
+
+            assert response.status_code == 422
