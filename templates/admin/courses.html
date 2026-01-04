@@ -26,7 +26,10 @@
             <section id="courses-view" class="admin-section active">
                 <div class="section-header">
                     <h2 class="section-title">📚 Courses</h2>
-                    <button id="create-course-btn" class="btn btn-primary">+ New Course</button>
+                    <div class="header-actions">
+                        <button id="import-syllabus-btn" class="btn btn-secondary">📄 Import from Syllabus</button>
+                        <button id="create-course-btn" class="btn btn-primary">+ New Course</button>
+                    </div>
                 </div>
                 <div id="courses-list" class="courses-grid">
                     <div class="loading-placeholder">Loading courses...</div>
@@ -200,6 +203,86 @@
         </div>
 
         <div id="toast" class="toast hidden"></div>
+
+        <!-- Syllabus Import Modal -->
+        <div id="syllabus-modal" class="modal hidden">
+            <div class="modal-content modal-large">
+                <div class="modal-header">
+                    <h3>📄 Import Course from Syllabus</h3>
+                    <button class="modal-close" onclick="closeSyllabusModal()">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div id="syllabus-step-1">
+                        <h4>Step 1: Select a Syllabus PDF</h4>
+                        <div id="syllabi-list" class="syllabi-list">
+                            <p class="loading-placeholder">Scanning for syllabi...</p>
+                        </div>
+                    </div>
+                    <div id="syllabus-step-2" class="hidden">
+                        <h4>Step 2: Review Extracted Data</h4>
+                        <p class="form-hint">Review and edit the extracted course information before importing.</p>
+                        <div id="extracted-data-preview" class="extracted-preview">
+                            <div class="form-group">
+                                <label>Course Name</label>
+                                <input type="text" id="extracted-name" class="form-input">
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Course Code</label>
+                                    <input type="text" id="extracted-code" class="form-input">
+                                </div>
+                                <div class="form-group">
+                                    <label>Academic Year</label>
+                                    <input type="text" id="extracted-year" class="form-input">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Program</label>
+                                    <input type="text" id="extracted-program" class="form-input">
+                                </div>
+                                <div class="form-group">
+                                    <label>Institution</label>
+                                    <input type="text" id="extracted-institution" class="form-input">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Total Points</label>
+                                    <input type="number" id="extracted-points" class="form-input">
+                                </div>
+                                <div class="form-group">
+                                    <label>Passing Threshold</label>
+                                    <input type="number" id="extracted-threshold" class="form-input">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Weeks Found: <span id="extracted-weeks-count">0</span></label>
+                                <div id="extracted-weeks-preview" class="weeks-preview"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button id="syllabus-back-btn" class="btn btn-secondary hidden" onclick="syllabusStepBack()">← Back</button>
+                    <button id="syllabus-extract-btn" class="btn btn-primary hidden" onclick="extractSyllabusData()">Extract Data</button>
+                    <button id="syllabus-import-btn" class="btn btn-primary hidden" onclick="importSyllabusData()">Import Course</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Material Preview Modal -->
+        <div id="preview-modal" class="modal hidden">
+            <div class="modal-content modal-fullscreen">
+                <div class="modal-header">
+                    <h3 id="preview-title">📄 Material Preview</h3>
+                    <button class="modal-close" onclick="closePreviewModal()">&times;</button>
+                </div>
+                <div class="modal-body preview-body">
+                    <iframe id="preview-iframe" class="preview-iframe"></iframe>
+                </div>
+            </div>
+        </div>
     </div>
 
     <footer class="footer">

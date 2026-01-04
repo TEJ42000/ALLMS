@@ -8,6 +8,7 @@ See Issue #29 for the implementation plan.
 """
 
 import logging
+import pathlib
 from typing import Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, Path, Query, status
@@ -34,8 +35,71 @@ from app.services.materials_scanner import (
     convert_to_materials_registry,
     ScanResult,
 )
+from app.services.slide_archive import (
+    get_file_type,
+    extract_slide_archive,
+    get_slide_image,
+    get_all_text,
+    SlideArchiveData,
+)
+from app.services.text_extractor import (
+    extract_text,
+    detect_file_type as detect_extraction_type,
+    ExtractionResult,
+)
 
 logger = logging.getLogger(__name__)
+
+# Base directory for materials - resolved once at module load
+MATERIALS_BASE = pathlib.Path("Materials").resolve()
+
+
+def validate_materials_path(file_path: str) -> pathlib.Path:
+    """
+    Validate and resolve a file path within the Materials directory.
+
+    This function prevents path traversal attacks by ensuring the resolved
+    path is within the Materials directory.
+
+    Args:
+        file_path: Relative path within Materials directory
+
+    Returns:
+        Resolved absolute path to the file
+
+    Raises:
+        HTTPException: If path is invalid or outside Materials directory
+    """
+    # Reject paths with null bytes (can bypass some checks)
+    if "\x00" in file_path:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid path: null bytes not allowed"
+        )
+
+    # Build the path and resolve it
+    try:
+        # Use the already-resolved MATERIALS_BASE
+        full_path = (MATERIALS_BASE / file_path).resolve()
+    except (ValueError, OSError) as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid file path: {e}"
+        )
+
+    # Security: Ensure the resolved path is under MATERIALS_BASE
+    # Using is_relative_to() is the secure way to check this
+    try:
+        full_path.relative_to(MATERIALS_BASE)
+    except ValueError:
+        # Path is not under MATERIALS_BASE - potential path traversal
+        logger.warning("Path traversal attempt blocked: %s -> %s", file_path, full_path)
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied: path outside materials directory"
+        )
+
+    return full_path
 
 router = APIRouter(
     prefix="/api/admin/courses",
@@ -719,3 +783,443 @@ async def sync_week_materials(
         materials_linked=materials_linked,
         message=f"Linked {materials_linked} materials to {weeks_updated} weeks"
     )
+
+
+# ============================================================================
+# Syllabus Import Endpoints
+# ============================================================================
+
+
+class SyllabusFileInfo(BaseModel):
+    """Information about a single syllabus PDF file."""
+    filename: str
+    path: str
+    pages: int
+
+
+class SyllabusFolderInfo(BaseModel):
+    """Information about a discovered syllabus folder."""
+    subject: str
+    path: str
+    files: List[SyllabusFileInfo]
+    total_pages: int
+
+
+class ScanSyllabiResponse(BaseModel):
+    """Response from scanning for syllabi folders."""
+    folders: List[SyllabusFolderInfo]
+    count: int
+
+
+class ExtractedCourseData(BaseModel):
+    """Extracted course data from syllabus."""
+    # Basic course info
+    courseName: Optional[str] = None
+    courseCode: Optional[str] = None
+    academicYear: Optional[str] = None
+    program: Optional[str] = None
+    institution: Optional[str] = None
+    totalPoints: Optional[int] = None
+    passingThreshold: Optional[int] = None
+    components: Optional[List[Dict]] = None
+    coordinators: Optional[List[Dict]] = None
+    lecturers: Optional[List[Dict]] = None
+    weeks: Optional[List[Dict]] = None
+    examInfo: Optional[Dict] = None
+    participationRequirements: Optional[str] = None
+    materialSubjects: Optional[List[str]] = None  # Derived from syllabus folder
+
+    # Extended syllabus data
+    courseDescription: Optional[str] = None
+    learningObjectives: Optional[List[str]] = None
+    prerequisites: Optional[str] = None
+    teachingMethods: Optional[str] = None
+    assessmentInfo: Optional[str] = None
+    assessments: Optional[List[Dict]] = None
+    attendancePolicy: Optional[str] = None
+    academicIntegrity: Optional[str] = None
+    sections: Optional[List[Dict]] = None
+    additionalNotes: Optional[str] = None
+
+    # Raw text for storage
+    rawText: Optional[str] = None
+    sourceFolder: Optional[str] = None
+    sourceFiles: Optional[List[str]] = None
+
+
+class ImportSyllabusRequest(BaseModel):
+    """Request to import course data from a syllabus folder."""
+    syllabus_path: str  # Path to folder relative to Materials/
+
+
+class ImportSyllabusResponse(BaseModel):
+    """Response from syllabus import."""
+    success: bool
+    extracted_data: ExtractedCourseData
+    message: str
+
+
+@router.get("/syllabi/scan", response_model=ScanSyllabiResponse)
+async def scan_syllabi(
+    subject: Optional[str] = Query(None, description="Filter by subject folder")
+):
+    """
+    Scan for syllabus folders in the Materials/Syllabus directory.
+
+    Returns a list of discovered syllabus folders with their PDF files.
+    """
+    try:
+        from app.services.syllabus_parser import scan_syllabi as do_scan
+
+        folders = do_scan(subject=subject)
+
+        return ScanSyllabiResponse(
+            folders=[SyllabusFolderInfo(
+                subject=f["subject"],
+                path=f["path"],
+                files=[SyllabusFileInfo(**file) for file in f["files"]],
+                total_pages=f["total_pages"]
+            ) for f in folders],
+            count=len(folders)
+        )
+    except Exception as e:
+        logger.error("Error scanning syllabi: %s", e)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to scan syllabi: {str(e)}"
+        )
+
+
+@router.post("/syllabi/extract", response_model=ImportSyllabusResponse)
+async def extract_syllabus_data(request: ImportSyllabusRequest):
+    """
+    Extract course data from all PDFs in a syllabus folder using AI.
+
+    This endpoint reads all PDFs in the folder, extracts text, and uses AI to parse
+    structured course information including weeks, readings, and lecturers.
+
+    The extracted data can be reviewed before creating/updating a course.
+    Also includes raw text and source information for storage with the course.
+    """
+    try:
+        from app.services.syllabus_parser import extract_text_from_folder
+        from app.services.syllabus_extractor import extract_course_data
+
+        # Extract subject from syllabus path (e.g., "Syllabus/LLS" -> "LLS")
+        path_parts = request.syllabus_path.split("/")
+        subject = path_parts[1] if len(path_parts) >= 2 else None
+
+        # Extract text from all PDFs in folder (with details)
+        logger.info("Extracting text from folder: %s", request.syllabus_path)
+        extraction_result = extract_text_from_folder(
+            request.syllabus_path,
+            return_details=True
+        )
+
+        raw_text = extraction_result["text"]
+        source_files = extraction_result["files"]
+        source_folder = extraction_result["folder_path"]
+
+        # Use AI to extract structured data
+        logger.info("Extracting course data with AI...")
+        extracted = await extract_course_data(raw_text)
+
+        # Add materialSubjects derived from syllabus folder
+        if subject:
+            extracted["materialSubjects"] = [subject]
+
+        # Add raw text and source info for storage
+        extracted["rawText"] = raw_text
+        extracted["sourceFolder"] = source_folder
+        extracted["sourceFiles"] = source_files
+
+        return ImportSyllabusResponse(
+            success=True,
+            extracted_data=ExtractedCourseData(**extracted),
+            message=f"Successfully extracted course data from {len(source_files)} file(s)"
+        )
+    except FileNotFoundError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Syllabus not found: {str(e)}"
+        )
+    except Exception as e:
+        logger.error("Error extracting syllabus data: %s", e)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to extract syllabus data: {str(e)}"
+        )
+
+
+# ============================================================================
+# Material Preview Endpoint
+# ============================================================================
+
+
+@router.get("/materials/preview/{file_path:path}")
+async def preview_material(file_path: str):
+    """
+    Get a material file for preview.
+
+    Returns the file with appropriate content type for browser preview.
+    Supports PDF, images, and text files.
+
+    **Parameters:**
+    - `file_path`: Path relative to Materials/ directory
+
+    **Example:**
+    ```
+    GET /api/admin/courses/materials/preview/Course_Materials/LLS/Readings/dutch_example.pdf
+    ```
+    """
+    import mimetypes
+    from fastapi.responses import FileResponse
+
+    # Validate and resolve path (prevents path traversal)
+    full_path = validate_materials_path(file_path)
+
+    # Check file exists
+    if not full_path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"File not found: {file_path}"
+        )
+
+    if not full_path.is_file():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Path is not a file"
+        )
+
+    # Determine content type
+    content_type, _ = mimetypes.guess_type(str(full_path))
+    if content_type is None:
+        content_type = "application/octet-stream"
+
+    # Return file for inline preview (not download)
+    # Check if this is a slide archive (ZIP with manifest.json)
+    file_type = get_file_type(full_path)
+
+    if file_type == 'slide_archive':
+        # Return metadata about the slide archive so frontend can use the slide viewer
+        archive_data = extract_slide_archive(full_path)
+        if archive_data:
+            return {
+                "type": "slide_archive",
+                "file_path": file_path,
+                "num_pages": archive_data.num_pages,
+                "slides": [
+                    {
+                        "page_number": slide.page_number,
+                        "width": slide.width,
+                        "height": slide.height,
+                        "has_text": bool(slide.text_content)
+                    }
+                    for slide in archive_data.slides
+                ]
+            }
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to extract slide archive"
+            )
+
+    # For real PDFs, return the file for inline preview
+    return FileResponse(
+        path=full_path,
+        media_type=content_type,
+        headers={
+            "Content-Disposition": f'inline; filename="{full_path.name}"'
+        }
+    )
+
+
+
+@router.get("/materials/slide/{file_path:path}/page/{page_number}")
+async def get_slide_page(
+    file_path: str = Path(..., description="File path relative to Materials/"),
+    page_number: int = Path(..., ge=1, description="Page number (1-based)")
+):
+    """Get a slide image from a slide archive.
+
+    Returns the JPEG image for the specified page number.
+    """
+    from fastapi.responses import Response
+
+    # Validate and resolve path (prevents path traversal)
+    full_path = validate_materials_path(file_path)
+
+    if not full_path.exists():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
+
+    # Get slide image
+    result = get_slide_image(full_path, page_number)
+    if not result:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Slide {page_number} not found"
+        )
+
+    image_bytes, media_type = result
+    return Response(
+        content=image_bytes,
+        media_type=media_type,
+        headers={"Cache-Control": "public, max-age=3600"}
+    )
+
+
+@router.get("/materials/slide/{file_path:path}/text")
+async def get_slide_archive_text(
+    file_path: str = Path(..., description="File path relative to Materials/"),
+    page: Optional[int] = Query(None, ge=1, description="Specific page number, or None for all")
+):
+    """Get text content from a slide archive.
+
+    If page is specified, returns text for that page only.
+    If page is None, returns all text concatenated (useful for indexing).
+    """
+    from app.services.slide_archive import get_slide_text
+
+    # Validate and resolve path (prevents path traversal)
+    full_path = validate_materials_path(file_path)
+
+    if not full_path.exists():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
+
+    if page:
+        text = get_slide_text(full_path, page)
+        if text is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Page {page} not found")
+        return {"page": page, "text": text}
+    else:
+        text = get_all_text(full_path)
+        return {"text": text}
+
+
+@router.get("/materials/info/{file_path:path}")
+async def get_material_info(
+    file_path: str = Path(..., description="File path relative to Materials/")
+):
+    """Get information about a material file.
+
+    Returns the file type and metadata.
+    Useful for determining how to display the file before loading it.
+    """
+    # Validate and resolve path (prevents path traversal)
+    full_path = validate_materials_path(file_path)
+
+    if not full_path.exists():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
+
+    file_type = get_file_type(full_path)
+
+    result = {
+        "file_path": file_path,
+        "file_name": full_path.name,
+        "file_type": file_type,
+        "size_bytes": full_path.stat().st_size
+    }
+
+    if file_type == 'slide_archive':
+        archive_data = extract_slide_archive(full_path)
+        if archive_data:
+            result["num_pages"] = archive_data.num_pages
+            result["slides"] = [
+                {
+                    "page_number": s.page_number,
+                    "width": s.width,
+                    "height": s.height,
+                    "has_text": bool(s.text_content)
+                }
+                for s in archive_data.slides
+            ]
+
+    return result
+
+
+# ============================================================================
+# Text Extraction Endpoints
+# ============================================================================
+
+@router.get("/materials/extract/{file_path:path}")
+async def extract_material_text(
+    file_path: str = Path(..., description="Path to material file relative to Materials folder")
+):
+    """Extract text from any supported material file.
+
+    Supports:
+    - PDFs (real PDFs)
+    - Slide Archives (ZIP with manifest.json)
+    - Images (PNG, JPG, etc. via OCR)
+    - DOCX files
+    - Markdown/Text files
+    - HTML files
+    - JSON files
+
+    Returns extracted text and metadata for use in LLM operations
+    (quizzes, summaries, study guides, etc.)
+    """
+    # Validate and resolve path (prevents path traversal)
+    full_path = validate_materials_path(file_path)
+
+    if not full_path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"File not found: {file_path}"
+        )
+
+    result = extract_text(full_path)
+
+    return {
+        "file_path": result.file_path,
+        "file_type": result.file_type,
+        "success": result.success,
+        "error": result.error,
+        "text": result.text,
+        "text_length": len(result.text),
+        "metadata": result.metadata,
+        "pages": result.pages
+    }
+
+
+@router.get("/materials/extract-batch")
+async def extract_batch_text(
+    folder: str = Query(..., description="Folder path relative to Materials"),
+    recursive: bool = Query(True, description="Whether to search subdirectories")
+):
+    """Extract text from all supported files in a folder.
+
+    Returns a summary of extraction results for batch processing.
+    Useful for indexing all materials for a course.
+    """
+    from app.services.text_extractor import extract_all_from_folder, get_extraction_summary
+
+    # Validate and resolve path (prevents path traversal)
+    folder_path = validate_materials_path(folder)
+
+    if not folder_path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Folder not found: {folder}"
+        )
+
+    results = extract_all_from_folder(folder_path, recursive=recursive)
+    summary = get_extraction_summary(results)
+
+    # Include abbreviated results (text truncated for response size)
+    file_results = []
+    for r in results:
+        file_results.append({
+            "file_path": r.file_path,
+            "file_type": r.file_type,
+            "success": r.success,
+            "error": r.error,
+            "text_preview": r.text[:500] + "..." if len(r.text) > 500 else r.text,
+            "text_length": len(r.text)
+        })
+
+    return {
+        "folder": folder,
+        "summary": summary,
+        "files": file_results
+    }
