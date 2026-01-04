@@ -1,0 +1,211 @@
+# **Case Notes: Etsirk v. Germany (ECHR)**
+
+## **Article 6(3)(e) ECHR - Right to Free Interpretation**
+
+-----
+
+## **📋 OVERVIEW**
+
+This case teaches us **two fundamental concepts**:
+
+1. **When does Article 6(2) and (3) ECHR apply?** (Scope of application)
+1. **What does “free interpretation” mean?** (Substantive right)
+
+-----
+
+## **📖 THE FACTS**
+
+**Who:** Mr. Etsirk, a Turkish man living in Germany who didn’t speak German well
+
+**What happened:**
+
+- Car accident → fined
+- Appealed the fine → wanted court proceedings
+- During trial → withdrew his appeal
+- German district court sentenced him AND ordered him to pay:
+  - Court costs
+  - **Interpreter fees**
+
+**His complaint:** Article 6(3)(e) ECHR says interpretation should be **FREE** - he shouldn’t have to pay!
+
+-----
+
+## **📑 STRUCTURE OF ECHR JUDGMENTS** *(Important for exam!)*
+
+|Section          |Content                                          |Considerations|
+|-----------------|-------------------------------------------------|--------------|
+|**Facts**        |Story + national law + domestic court decisions  |¶¶ 9-44       |
+|**The Law**      |Court’s legal analysis                           |Main section  |
+|**Legal Issue 1**|Question presented                               |¶ 46          |
+|                 |Court’s previous interpretation                  |¶¶ 47-50      |
+|                 |Analysis of current case                         |¶¶ 51-55      |
+|                 |**Conclusion**                                   |¶ 56          |
+|**Legal Issue 2**|Question + interpretation + analysis + conclusion|¶¶ 57-58      |
+
+-----
+
+## **⚖️ LEGAL ISSUE #1: Was There a “Criminal Charge”?**
+
+### **Why this matters:**
+
+Article 6(3)(e) only applies if someone is “**charged with a criminal offense**”
+
+### **The Problem:**
+
+Germany had **decriminalized** this traffic offense → classified it as “regulatory offense” (administrative, not criminal)
+
+### **The Solution: AUTONOMOUS INTERPRETATION**
+
+🔑 **KEY PRINCIPLE:** The ECHR decides what counts as “criminal” - **NOT national governments**
+
+**Why?**
+
+- If countries could decide themselves, they could simply decriminalize offenses
+- Then Article 6(2) and (3) protections wouldn’t apply
+- This would **undermine** the Convention’s purpose: protecting **minimum rights** of citizens
+
+-----
+
+## **🎯 THE ENGEL CRITERIA** *(Learn these!)*
+
+### **How ECHR Determines “Criminal Charge”:**
+
+#### **Criterion 1: Classification in National Law**
+
+- Is it in the Criminal Code or criminal legislation?
+- ✅ If YES → clearly criminal, Article 6 applies
+- ❌ If NO → this is just a **starting point** (little weight), continue to Criterion 2
+
+#### **Criterion 2: Nature of the Offense** *(Most complex)*
+
+Ask these questions:
+
+1. **Who does it apply to?**
+
+- Everyone in society? → More likely criminal
+- Specific professional group only? → More likely disciplinary (e.g., lawyers, judges)
+
+1. **What’s the purpose of the sanction?**
+
+- Retributive/punitive goal? → Criminal
+- Deterrent purpose? → Criminal
+
+1. **Comparative legal research:**
+
+- How do other Member States classify this conduct?
+- If vast majority treat it as **criminal** → likely criminal charge
+
+#### **Criterion 3: Severity of Sanction** *(Decisive)*
+
+🔑 **The Rule:** More severe the **possible** sanction → more likely criminal
+
+**Indicators of criminal charge:**
+
+- **Deprivation of liberty** (imprisonment possible)
+- **Very high fines**
+
+**Important:** Look at **MAXIMUM sentence** in legislation, NOT the actual sentence imposed
+
+**Requirement:** Sanction must serve a **punitive purpose**
+
+-----
+
+## **📌 WHAT IS A “CHARGE”?**
+
+**Definition (¶ 55):**
+
+> “Official notification given to an individual by competent authority of an allegation that he committed a criminal offense”
+
+**OR**
+
+> “Other measures which carry the implication of such an allegation and substantially affect the suspect’s situation”
+
+**In simple terms:** The moment you know/must be aware that you’re being investigated in a criminal procedure
+
+-----
+
+## **✅ APPLICATION TO ETSIRK CASE**
+
+### **Criterion 1:** Classification under German law?
+
+- **Regulatory offense** (decriminalized)
+- Only a starting point → continue
+
+### **Criterion 2:** Nature of offense?
+
+**The Court found:**
+
+- ✅ Criminal in **vast majority** of Member States
+- ✅ Rule of **general character** (applies to undetermined group)
+- ✅ Penalty serves **deterrent and punitive** purpose
+
+**Result:** SO CLEAR that Court didn’t even need Criterion 3!
+
+### **Conclusion to Legal Issue #1:**
+
+**YES** - Article 6(3)(e) applies because there WAS a criminal charge
+
+-----
+
+## **⚖️ LEGAL ISSUE #2: Was Article 6(3)(e) Violated?**
+
+### **The Text:**
+
+> “Everyone charged with a criminal offense has the right… to have the **free** assistance of an interpreter if he cannot understand or speak the language used in court.”
+
+### **Previous Case Law:**
+
+Court cited: **Luedicke, Belkacem and Koç v. Germany**
+
+**The Rule:**
+
+- “**Free**” means FREE
+- Article 6(3)(e) is an **ABSOLUTE RIGHT**
+- **NO exceptions** allowed for interpretation costs
+
+### **Application:**
+
+Did Mr. Etsirk have to pay for interpretation? **YES**
+
+### **Conclusion to Legal Issue #2:**
+
+**VIOLATION** of Article 6(3)(e) ECHR
+
+-----
+
+## **💡 KEY TAKEAWAYS FOR EXAMS**
+
+### **1. Two Separate Questions:**
+
+- Applicability (Is there a criminal charge?)
+- Violation (Was the right breached?)
+
+### **2. Autonomous Interpretation:**
+
+- ECHR decides what “criminal charge” means
+- National classification is just starting point
+
+### **3. The Engel Test (3 Criteria):**
+
+1. National law classification
+1. Nature of offense
+1. Severity of sanction
+
+### **4. Article 6(3)(e) is Absolute:**
+
+- “Free” means completely free
+- No exceptions for interpretation costs
+- Applies throughout criminal proceedings
+
+-----
+
+## **🎓 PROFESSOR’S TIPS**
+
+- **Exam strategy:** Always address applicability BEFORE discussing violation
+- **Structure:** Follow ECHR judgment structure in your answers
+- **Engel criteria:** Can be applied cumulatively OR separately (if one is decisive)
+- **Comparative research:** ECHR often checks how other Member States handle similar issues
+
+-----
+
+**Next step:** Read the full judgment to see how the Court reasoned through each stage!​​​​​​​​​​​​​​​​

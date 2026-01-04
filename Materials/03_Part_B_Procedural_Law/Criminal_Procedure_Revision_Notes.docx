@@ -1,0 +1,466 @@
+**CRIMINAL PROCEDURE LAW**
+
+**Public Prosecution Service & Criminal Investigations**
+
+*Lecture Notes - Part B*
+
+I. REVIEW OF KEY ECHR ARTICLES
+
+Article 5 ECHR - Right to Liberty and Security
+
+**General Rule:** Everyone has the right to liberty and security. State
+CANNOT deprive liberty except in specific situations listed in Article
+5(1).
+
+Key Exception: Article 5(1)(c)
+
+-   Arrest and pretrial detention for bringing before competent legal
+    authority
+
+-   Exceptions are exhaustive (closed list) and interpreted strictly
+
+Article 5(3) - Promptness Requirement
+
+**Rule:** When arrested, person must be brought *\"promptly\"* before a
+judge
+
+> **📌 Brogan and Others v. UK:** \"Promptly\" means approximately 4
+> DAYS maximum. Even terrorism cases don\'t justify longer periods
+> without judicial oversight.
+
+-   [x] Within 4 days = generally acceptable
+
+-   ✗ Beyond 4 days = likely violation
+
+-   **Purpose:** Prevents arbitrary detention and ensures judicial
+    oversight quickly
+
+Article 5(3) - Reasonable Time for Trial
+
+**Rule:** Once detained pretrial, person has right to trial within
+reasonable time OR release pending trial
+
+> **📌 Letellier v. France:** \"Reasonable time\" depends on
+> case-by-case assessment considering complexity and seriousness.
+
+-   Simple shoplifting → shorter time required
+
+-   Complex financial fraud → longer time acceptable
+
+Article 8 ECHR - Right to Privacy
+
+**Article 8(1):** Everyone has the right to respect for private and
+family life, home, and correspondence.
+
+**Article 8(2):** State can interfere IF:
+
+1.  **In accordance with law** (accessible, foreseeable, sufficient
+    quality)
+
+2.  **For legitimate aim** (public safety, prevention of crime, etc.)
+
+3.  **Proportionate/necessary**
+
+> **📌 Niemietz v. Germany:**
+
+-   \"Home\" interpreted broadly → includes business premises,
+    > professional offices
+
+-   \"Correspondence\" includes emails, phone communications
+
+-   Any search must be proportionate
+
+> **📌 Klass v. Germany:** Law must be of \"sufficient quality\" with
+> clear provisions, safeguards against abuse, and independent oversight.
+
+Privilege Against Self-Incrimination
+
+**Core Principle:** Cannot be forced to provide evidence against
+yourself (part of Article 6 fair trial rights)
+
+Two Categories of Evidence
+
+**[1. Evidence Depending on Will of Accused]{.underline}**
+
+-   **PROTECTED** by privilege
+
+-   Examples: Spoken statements, written confessions, testimony
+
+-   Cannot be compelled
+
+**[2. Evidence with Independent Existence]{.underline}**
+
+-   **Generally NOT PROTECTED**
+
+-   Examples: DNA samples, blood samples, fingerprints
+
+-   Rationale: Exists independently of your will
+
+⚠️ CRITICAL EXCEPTION: Jalloh v. Germany
+
+> **JALLOH RULE:** When evidence is inside the body and extracting it
+> violates Article 3 (inhuman/degrading treatment), the privilege
+> against self-incrimination DOES apply.
+
+-   **Facts:** Police forcibly administered emetic to make suspect vomit
+    drugs
+
+-   **Holdings:**
+
+    -   Article 3 violation (inhuman/degrading treatment)
+
+    -   Article 6 violation (privilege applies despite \"independent
+        existence\")
+
+-   **Exam distinction:**
+
+    -   [x] DNA swab with consent/minor compulsion = acceptable
+
+    -   ✗ Forcing emetic/stomach pumping = violates both Articles 3 & 6
+
+Functional Equivalent: Allan v. UK
+
+> **ALLAN PRINCIPLE:** State cannot circumvent procedural protections by
+> using indirect methods (e.g., undercover cellmate to extract
+> confession).
+
+-   **Facts:** Police planted fake cellmate after suspect invoked right
+    to silence
+
+-   **Holding:** This is \"functional equivalent of police
+    interrogation\" → same protections apply
+
+-   State can\'t avoid giving Miranda-type warnings through deceptive
+    methods
+
+II\. PUBLIC PROSECUTION SERVICE
+
+The \"Gatekeepers\" Role
+
+**Definition:** Prosecutors are the link between police and court. They
+decide whether criminal prosecution takes place and bring cases to
+court.
+
+-   **Why \"gatekeepers\"?** They hold the key to the courtroom door
+
+-   They decide who gets prosecuted
+
+-   Without prosecutor\'s decision to prosecute → no trial, no
+    conviction possible
+
+Why This Power is Crucial
+
+> **KEY INSIGHT:** The decision to prosecute is arguably MORE powerful
+> than the judge\'s sentencing decision, because without prosecution,
+> there is no case at all.
+
+Fascinating Comparative Aspect
+
+**How prosecutorial power is organized tells you about:**
+
+-   History and culture of the legal system
+
+-   Trust/confidence in state institutions
+
+-   Balance between individual rights and state power
+
+*Examples:*
+
+-   Netherlands: Prosecutors have substantial power
+
+-   Other countries: Prosecutorial power kept to minimum
+
+Civil Law vs. Common Law Traditions
+
++-----------------------------------+-----------------------------------+
+| **CIVIL LAW TRADITION**           | **COMMON LAW TRADITION**          |
++===================================+===================================+
+| **Continental Europe              | **England, former colonies        |
+| (inquisitorial systems)**         | (adversarial systems)**           |
++-----------------------------------+-----------------------------------+
+| **[Role:]{.underline}**           | **[History:]{.underline}**        |
+|                                   |                                   |
+| State magistrates acting in       | Originally PRIVATE prosecution    |
+| PUBLIC INTEREST                   | (citizen v. citizen)              |
++-----------------------------------+-----------------------------------+
+| **[Duty:]{.underline}**           | **[Development:]{.underline}**    |
+|                                   |                                   |
+| Must act with NEUTRALITY and      | Police developed first, then      |
+| OBJECTIVITY                       | prosecution service later         |
+|                                   |                                   |
+| Must present exculpatory evidence |                                   |
++-----------------------------------+-----------------------------------+
+| **[Examples:]{.underline}**       | **[Shocking Fact:]{.underline}**  |
+|                                   |                                   |
+| Netherlands, Germany, France,     | UK Crown Prosecution Service      |
+| Italy                             | established only in 1985!         |
++-----------------------------------+-----------------------------------+
+
+III\. MONTESQUIEU & SEPARATION OF POWERS
+
+Historical Context
+
+-   **Montesquieu** (Charles-Louis de Secondat) - French lawyer,
+    17th-18th century
+
+-   Studied at University of Bordeaux
+
+-   **Book:** *The Spirit of the Laws* (1748)
+
+-   **Problem he observed:** Absolute monarchies with arbitrary state
+    power, torture, no checks on authority
+
+The Three Branches of Government
+
+**1. LEGISLATIVE BRANCH**
+
+-   **Function:** Creates the laws
+
+-   Examples: Parliament, Congress, Legislature
+
+-   Represents the people
+
+**2. EXECUTIVE BRANCH**
+
+-   **Function:** Enforces the laws
+
+-   Examples: Government, ministries, police forces, administrative
+    agencies
+
+-   Implements what legislature decided
+
+**3. JUDICIAL BRANCH**
+
+-   **Function:** Interprets and applies the laws
+
+-   Examples: Courts and judges
+
+-   Must be INDEPENDENT from other branches
+
+Why Separation is Essential
+
+> **CORE PRINCIPLE:** These three branches must be SEPARATED to prevent
+> concentration of power, which leads to arbitrary use and abuse.
+
+-   Goal: Clarity, stability, and good balance
+
+-   Avoid arbitrariness (what ECHR also wants to avoid)
+
+Judicial Independence = Most Crucial
+
+**Why most important?**
+
+-   Judiciary must be independent to check whether other branches follow
+    their own rules
+
+-   **Rule of Law:** State must adhere to its own rules
+
+-   Protects individual rights against state power
+
+Checks and Balances
+
+Powers must not only be separated but also **in balance**
+
+-   Each branch can check the others
+
+-   No branch becomes too powerful
+
+-   Dynamic equilibrium
+
+IV\. THE PROSECUTION PUZZLE
+
+> **❓ THE PUZZLE:** Where should the prosecution service be positioned?
+> Are they EXECUTIVE or JUDICIARY?
+
+Arguments for EXECUTIVE
+
+-   Prosecutors **enforce** criminal law (executive function)
+
+-   Work with police (executive agencies)
+
+-   Represent state authority
+
+-   Part of government structure
+
+Arguments for JUDICIARY
+
+-   Prosecutors **evaluate evidence** (judicial function)
+
+-   Act as **magistrates** with objectivity
+
+-   Make **quasi-judicial decisions** (prosecute or not)
+
+-   In civil law: often considered \"standing magistrate\"
+
+-   Exercise judgment, not just ministerial functions
+
+Why This Matters
+
+**Different positioning = Different consequences:**
+
+**[If Executive:]{.underline}**
+
+-   Subject to government direction (political accountability)
+
+-   Less independence
+
+-   Concerns about political prosecutions
+
+-   BUT: Democratic accountability
+
+**[If Judiciary:]{.underline}**
+
+-   Independent from government
+
+-   Cannot receive instructions
+
+-   More protection against political interference
+
+-   BUT: Concerns about accountability (who checks prosecutors?)
+
+> **THE TENSION:** Want independence (protect from political abuse) AND
+> accountability (prevent prosecutorial abuse). Hard to have both
+> perfectly.
+
+Different National Solutions
+
+*As lecturer noted: \"Different states solve this puzzle differently.
+They\'ve created different solutions.\"*
+
+**Examples (to be explored further in lecture):**
+
+-   Netherlands: Prosecutors have broad powers
+
+-   Germany: Prosecutors as part of judiciary
+
+-   France: Investigating judges
+
+-   England: Crown Prosecution Service (more executive)
+
+V. KEY TERMS GLOSSARY
+
+**Coercive Measures:**
+
+> Investigative techniques that infringe on constitutional/human rights
+> (arrest, search, seizure, detention)
+
+**Promptly (Article 5(3)):**
+
+> Within approximately 4 days of arrest
+
+**In Accordance with Law:**
+
+> State interference must have legal basis that is accessible,
+> foreseeable, and of sufficient quality
+
+**Proportionality:**
+
+> State interference must be proportionate to legitimate aim; not
+> excessive
+
+**Privilege Against Self-Incrimination:**
+
+> Right not to be compelled to provide evidence against yourself
+
+**Functional Equivalent of Interrogation:**
+
+> Indirect state methods to extract information that circumvent formal
+> interrogation protections
+
+**Gatekeeper:**
+
+> Prosecutor\'s role - they \"hold the key\" to the courtroom and decide
+> who enters
+
+**Public Prosecutor:**
+
+> State official who decides whether to prosecute and brings cases to
+> court; acts in public interest
+
+**Separation of Powers:**
+
+> Division of state authority into legislative, executive, and judicial
+> branches to prevent concentration and abuse
+
+**Rule of Law:**
+
+> Principle that everyone, including the state, must follow the law; no
+> one is above the law
+
+**Checks and Balances:**
+
+> System where each branch of government can check/limit the others to
+> maintain balance
+
+**Judicial Independence:**
+
+> Judges must be free from interference by other branches to ensure fair
+> justice and uphold rule of law
+
+VI\. EXAM STRATEGY
+
+Article-by-Article Checklist
+
+**For Article 5 (Liberty) Questions:**
+
+4.  Is there detention/arrest?
+
+5.  Is it for a permitted reason under Article 5(1)?
+
+6.  Was person brought promptly before judge (\~4 days)?
+
+7.  Is pretrial detention reasonable in length given case complexity?
+
+**For Article 8 (Privacy) Questions:**
+
+8.  Is there interference with private life/home/correspondence?
+
+9.  Is it \"in accordance with law\"? (legal basis? accessible?
+    foreseeable? sufficient quality?)
+
+10. Is it for legitimate aim (Article 8(2))?
+
+11. Is it proportionate/necessary?
+
+Common Mistakes to Avoid
+
+-   ❌ Forgetting ECHR rights apply at investigation stage, not just
+    trial
+
+-   ❌ Confusing domestic law classification with ECHR classification
+    (remember *Öztürk* autonomous interpretation)
+
+-   ❌ Not analyzing \"quality of law\" for Article 8 (must check if
+    accessible, foreseeable, sufficient quality)
+
+-   ❌ Forgetting the *Jalloh* exception (check HOW evidence was
+    obtained)
+
+-   ❌ Not considering proportionality (even if lawful and for
+    legitimate aim, must still be proportionate)
+
+Key Phrases for Exam Answers
+
+**Article 5:**
+
+> *\"The starting point is that everyone has the right to liberty\...\"*
+>
+> *\"As established in Brogan, \'promptly\' means approximately 4
+> days\...\"*
+
+**Article 8:**
+
+> *\"Following Niemietz, \'home\' is interpreted broadly to
+> include\...\"*
+>
+> *\"The interference must be in accordance with law that is accessible,
+> foreseeable, and of sufficient quality\...\"*
+
+**Privilege Against Self-Incrimination:**
+
+> *\"However, as Jalloh establishes, when extraction violates Article
+> 3\...\"*
+
+END OF LECTURE NOTES
+
+*Study well for your January 21, 2026 exam!*

@@ -1,0 +1,799 @@
+
+## Lecture Notes - Week 2
+
+-----
+
+## 📋 LECTURE OVERVIEW
+
+**Topic**: Criminal Investigations and Human Rights  
+**Focus Areas**:
+
+- Criminal investigations as the first stage of criminal procedure
+- Article 5 ECHR (Right to Liberty and Security) - **Arrest & Detention**
+- Article 8 ECHR (Right to Privacy) - **Search & Seizure**
+
+-----
+
+## 🔄 RECAP: Key Distinctions from Week 1
+
+### Substantive Criminal Law vs. Criminal Procedure Law
+
+**Substantive Criminal Law**:
+
+- Focuses on **WHAT** is criminal behavior
+- Defines prohibited conduct
+- Asks: “What conduct is criminal?”
+
+**Criminal Procedure Law**:
+
+- Focuses on **HOW** to respond to crime
+- Process from discovery to sanction
+- Asks: “How do we get to the right sanction for the right person?”
+
+### Two Models of Criminal Justice
+
+|**INQUISITORIAL MODEL**                        |**ADVERSARIAL MODEL**                      |
+|-----------------------------------------------|-------------------------------------------|
+|**Active judge** - asks questions              |**Passive judge** - referee role           |
+|**Vertical relationship** (state vs. defendant)|**Horizontal relationship** (equal parties)|
+|Defendant as **object** of investigation       |Defendant as **equal party**               |
+|**Written case file** central                  |**Oral presentation** in court             |
+|State best equipped to find truth              |Adversaries debating finds truth           |
+|Evidence collected in case file                |Evidence presented in courtroom            |
+|**Example**: Netherlands, Germany, France      |**Example**: UK, USA                       |
+
+**Note**: Modern systems are converging due to ECHR influence - defendants now have stronger rights even in inquisitorial systems.
+
+-----
+
+## 🔍 CRIMINAL INVESTIGATIONS
+
+### Definition
+
+An initial inquiry by officers to:
+
+1. Establish facts and circumstances of a suspected crime
+1. Identify those involved
+1. Preserve any evidence related to the crime
+
+### Primary Objective
+
+**Finding the truth** - BUT this must be balanced against fundamental rights protection
+
+### How Investigations Start
+
+- Witnesses report to police
+- Victims report to police
+- Police acting on information they obtained
+- Discovery by police during regular duties
+
+-----
+
+## 🛠️ INVESTIGATIVE MEASURES
+
+### Categories of Investigative Measures
+
+**1. Collection of Testimonial Evidence**
+
+- Interrogations of suspects
+- Questioning witnesses
+- Questioning victims
+
+**2. Surveillance**
+
+- CCTV cameras
+- Physical observation
+- Electronic monitoring
+
+**3. Search & Seizure**
+
+- Searching houses, cars, offices
+- Bodily searches
+- Seizure of physical evidence
+
+**4. Arrest & Pre-trial Detention**
+
+- Stopping a person
+- Arrest (handcuffing)
+- Police custody
+- Pre-trial detention
+
+**5. Special Investigative Techniques**
+
+- Interception of communications
+- Undercover operations/secret agents
+- DNA investigations
+- Blood/urine samples
+
+### COERCIVE MEASURES ⚠️
+
+**Definition**: Investigative measures that infringe on human/constitutional rights WITHOUT the person’s consent
+
+**Characteristics**:
+
+- Can be applied by force
+- Restrict fundamental rights
+- Require special legal justification
+
+**Examples**:
+
+- Identity checks (forced to stop)
+- Arrest (restriction of movement)
+- Police custody/detention (deprivation of liberty)
+- Interception of communications (privacy)
+- Search of home/body (privacy)
+- DNA collection (bodily integrity)
+
+**Dutch Example - “Lokfiets” (Bait Bike)**:
+
+- Police leave unlocked bicycle
+- Has tracking sensor
+- Used to catch bicycle thieves
+- ✅ Approved by Supreme Court: Not considered entrapment because police don’t actively push someone to commit theft
+
+-----
+
+## ⚖️ THE FUNDAMENTAL BALANCE
+
+### The Central Tension in Criminal Procedure
+
+```
+STATE POWERS              vs.        INDIVIDUAL RIGHTS
+(Finding Truth)                     (Presumption of Innocence)
+    
+Arrest                              Article 5 (Liberty)
+Detention                           Article 6 (Fair Trial)
+Search                              Article 8 (Privacy)
+Seizure                             Human Dignity
+```
+
+**Key Principle**: Finding the truth is NOT the only objective - it must ALWAYS be balanced against fundamental rights that must be respected regardless of offense severity.
+
+### Historical Context: Why This Balance Matters
+
+**15th-16th Century**:
+
+- Absolute monarchies in Europe
+- Torture was normal to obtain confessions
+- No rights for accused persons
+
+**Post-WWII Development**:
+
+- Human rights become central
+- Torture prohibited absolutely
+- Defense rights strengthened
+
+**Modern Challenge**:
+
+- AI and new technologies
+- Mass surveillance capabilities
+- Question: Do we have a “right to commit crimes” if everything is monitored 100%?
+
+-----
+
+## 🔒 ARTICLE 5 ECHR: RIGHT TO LIBERTY AND SECURITY
+
+### Article 5(1) - The Starting Point
+
+**Core Principle**: “Everyone has the right to liberty and security of person”
+
+**Rule**: “No one shall be deprived of his liberty SAVE in the following cases…”
+
+### When Can Liberty Be Taken? Article 5(1)(c)
+
+**The Criminal Justice Exception**:
+Liberty can be taken for:
+
+1. **Purpose**: Bringing person before competent legal authority
+1. **On basis of**: REASONABLE SUSPICION of having committed an offence
+1. **Or**: When reasonably necessary to prevent committing an offence OR fleeing
+
+### ⭐ REASONABLE SUSPICION - Key Standard
+
+**Definition**: Objective facts or information that would convince a **NEUTRAL OBSERVER** that the person committed a crime
+
+**Examples**:
+
+- ✅ Man running from bank with smoking gun and bag of money = REASONABLE SUSPICION
+- ❌ Man walking down street who “doesn’t look right” = NOT REASONABLE SUSPICION
+
+**Importance**: This is the legal barrier separating a free society from a police state
+
+-----
+
+## ⏱️ ARTICLE 5(3): THE “PROMPTLY” REQUIREMENT
+
+### The Rule: Brought Before a Judge
+
+**Article 5(3) Requirements**:
+
+1. Must be brought **PROMPTLY** before a judge (or other judicial officer)
+1. Entitled to trial within reasonable time OR release pending trial
+
+### Why a Judge?
+
+**Critical Reasons**:
+
+1. **Independence** from state powers
+1. **Impartiality** - neutral assessment
+1. **Protection** - only state officer you can rely on as suspect
+
+**Judge’s Role**:
+
+- Check if arrest was lawful
+- Verify reasonable suspicion exists
+- Decide if continued detention is justified
+
+-----
+
+## ⚖️ LANDMARK CASE: BROGAN v. UK (1988)
+
+### Facts
+
+- **4 suspects** arrested under Terrorism Act (UK)
+- Held in detention WITHOUT being brought before judge:
+  - Person A: **5 days, 11 hours**
+  - Person B: **6 days, 16.5 hours**
+  - Person C: **4 days, 6 hours**
+  - Person D: **4 days, 11 hours**
+- All released without charges
+- Mr. Brogan (shortest detention) complained
+
+### Issue
+
+What does “promptly” mean under Article 5(3)?
+
+### Holding
+
+**VIOLATION of Article 5(3)** - Even 4 days, 6 hours is TOO LONG
+
+### Court’s Reasoning
+
+“The scope for flexibility in interpreting and applying the notion of promptness is **VERY LIMITED**”
+
+**Established Rule**:
+
+- ⏰ **MAXIMUM 4 DAYS** = “Promptly”
+- Even in terrorism cases (court acknowledged seriousness but law doesn’t stretch)
+
+### What This Means
+
+**What it DOES require**:
+✅ Within 4 days: Suspect must see a judge who checks if arrest was lawful
+
+**What it DOES NOT require**:
+❌ Criminal investigation must end in 4 days
+❌ Suspect must be released after 4 days
+
+**After 4 days**:
+
+- Investigation can continue
+- Suspect can remain in detention
+- BUT: Must have judicial authorization and periodic review
+
+-----
+
+## 📅 TWO “REASONABLE TIME” REQUIREMENTS - Don’t Confuse!
+
+### 1️⃣ Article 5(3) - Reasonable Time to TRIAL
+
+**Scope**: From arrest until trial begins  
+**About**: Length of PRE-TRIAL DETENTION  
+**Case**: Letellier v. France
+
+**Key Points**:
+
+- How long can you be held in pre-trial detention?
+- Must be brought to trial within reasonable time
+- Longer than “promptly” (4 days)
+- Depends on case circumstances
+- Can be months or even years if justified
+
+### 2️⃣ Article 6(1) - Reasonable Time for PROCEEDINGS
+
+**Scope**: From criminal charge until final conviction  
+**About**: Total length of ENTIRE CRIMINAL PROCEDURE  
+**Case**: Vendittelli v. Italy (your Week 1 case)
+
+**Different criteria and much longer timeframes**
+
+-----
+
+## 📱 ARTICLE 5: Additional Protections
+
+### Article 5(2) - Right to Information
+
+**Everyone arrested must be informed**:
+
+- **PROMPTLY** (quickly, in simple terms)
+- In a **language they understand**
+- Of **reasons for arrest**
+- Of any **charges against them**
+
+### Article 5(4) - Habeas Corpus
+
+**Right to challenge detention**:
+
+- Can apply for judicial review of detention
+- Court checks: Is detention still lawful?
+- Court checks: Is there still reasonable suspicion?
+- Must be decided **SPEEDILY**
+- Can apply multiple times during detention
+
+**Example**: Miss Letellier used this in Letellier v. France
+
+-----
+
+## 🏠 ARTICLE 8 ECHR: RIGHT TO PRIVACY
+
+### Article 8(1) - The Protected Rights
+
+**“Everyone has the right to respect for”**:
+
+1. **Private life**
+1. **Family life**
+1. **Home**
+1. **Correspondence**
+
+### What These Terms Mean (Extended Interpretations)
+
+**HOME** (Niemetz v. Germany):
+
+- Not just your house
+- Includes: Workspace, offices, home office
+- Covers: “Where you live your private life”
+
+**CORRESPONDENCE**:
+
+- Traditional: Letters
+- Modern: Email, WhatsApp, Signal, all digital messages
+
+**PRIVATE LIFE**:
+
+- Personal data
+- Medical records
+- Digital footprint
+- Everything else relating to personal sphere
+
+**FAMILY LIFE**:
+
+- Relations with family members
+- Family relationships
+
+-----
+
+## 🚧 ARTICLE 8(2): When Can Privacy Be Interfered With?
+
+### The Three-Step Test (MANDATORY STRUCTURE)
+
+When state wants to interfere with privacy (search, surveillance, etc.), it must pass ALL THREE tests:
+
+### ✅ STEP 1: In Accordance with Law
+
+**Requirements**:
+
+1. Must be basis in **national law**
+1. Law must be of **good quality**:
+- Enacted properly by legislator
+- **Foreseeable** (people can foresee state can do this)
+- **Accessible** (people can consult the law)
+
+**Case**: Kahn v. UK (discusses quality of law)
+
+### ✅ STEP 2: Legitimate Aim
+
+**Must be in interests of** (Article 8(2) list):
+
+- National security
+- Public safety
+- Economic well-being of country
+- **Prevention of disorder or crime** ⭐ (most relevant for criminal investigations)
+- Protection of health or morals
+- Protection of rights and freedoms of others
+
+**Note**: “Prevention of disorder or crime” is very broad - usually satisfied
+
+### ✅ STEP 3: Necessary in Democratic Society
+
+**PROPORTIONALITY TEST** - This is where cases are often decided!
+
+**Key Questions**:
+
+- Is the intrusion proportionate to the crime being investigated?
+- Is it the least intrusive means available?
+- Does it balance state interest vs. individual rights?
+
+**Examples**:
+
+- ❌ Searching entire house for stolen bicycle = DISPROPORTIONATE
+- ✅ Tapping phone in major drug trafficking case = PROPORTIONATE
+
+**For HIGH intrusions**: **JUDICIAL WARRANT required**
+
+**Why judicial warrant?**
+
+- Judge is independent and impartial
+- Provides objective assessment
+- Protects against abuse
+
+-----
+
+## 🎯 EXAM STRUCTURE: How to Analyze Article 8 Issues
+
+### IRAC Method for Article 8 Questions
+
+**ISSUE**: Is the search/interference in conformity with Article 8 ECHR?
+
+**RULE**: Article 8 three-step test:
+
+1. Was there an interference with private life/home/correspondence?
+- Extended interpretation (Niemetz v. Germany)
+1. If yes, was interference by public authority justified?
+   a. In accordance with law (quality - Kahn v. UK)
+   b. Legitimate aim (Art 8(2) interests)
+   c. Necessary in democratic society (proportionality + warrant if high intrusion)
+
+**ANALYSIS**: Apply facts to each step systematically
+
+**CONCLUSION**: Does it violate Article 8 or is it justified?
+
+-----
+
+## 📱 PRACTICAL SCENARIO: The “Green Light” Case
+
+### The Scenario
+
+**Leo** (student) is selling cannabis near university library via “Green Light” app
+
+**Police Action**:
+
+1. Officer sees Leo taking cash, handing over package
+1. **Arrests Leo** on reasonable suspicion (Article 5 applies)
+1. Leo brought promptly before judge (within 4 days - Brogan rule)
+1. Leo in police custody
+
+**Police Problem**: Have suspect, but need evidence
+
+**Police Want To**:
+
+1. Search pockets and backpack
+1. Search apartment
+1. Unlock and read phone messages
+
+### Question: Are These Actions Allowed Under Article 8?
+
+-----
+
+## 🔍 ANALYSIS 1: Search Pockets & Backpack
+
+### IRAC Analysis
+
+**ISSUE**: Search of pockets/backpack in conformity with Article 8?
+
+**RULES**: Article 8 three-step test
+
+**ANALYSIS**:
+
+**Step 1**: Interference with Art 8(1) rights?
+
+- ✅ YES - Private life involved
+
+**Step 2**: By public authority?
+
+- ✅ YES - Police
+
+**Step 2a**: In accordance with law?
+
+- ✅ YES (presumed in scenario)
+
+**Step 2b**: Legitimate aim?
+
+- ✅ YES - Prevention of disorder/crime
+
+**Step 2c**: Necessary in democratic society?
+
+- **Level of intrusion**: LOW
+- Looking for drugs/cash/evidence
+- Not highly intrusive
+- **Proportionate** to drug dealing investigation
+- **NO judicial warrant needed** (low intrusion)
+
+**CONCLUSION**: ✅ **ALLOWED** - Proportionate and justified under Article 8
+
+-----
+
+## 🏠 ANALYSIS 2: Search Leo’s Apartment
+
+### IRAC Analysis
+
+**ISSUE**: Search of apartment in conformity with Article 8?
+
+**RULES**: Article 8 three-step test
+
+**ANALYSIS**:
+
+**Step 1**: Interference with Art 8(1) rights?
+
+- ✅ YES - **HOME** (explicitly protected)
+
+**Step 2**: By public authority?
+
+- ✅ YES - Police
+
+**Step 2a**: In accordance with law?
+
+- ✅ YES (presumed)
+
+**Step 2b**: Legitimate aim?
+
+- ✅ YES - Prevention of disorder/crime
+
+**Step 2c**: Necessary in democratic society?
+
+- **Level of intrusion**: **HIGH** ⚠️
+- Police in someone’s home = major intrusion
+- **REQUIRES JUDICIAL WARRANT** (independent, impartial judge permission)
+- Must be proportionate to case (large-scale operation?)
+
+**CONCLUSION**: ✅ **ALLOWED IF**:
+
+- Judicial warrant obtained
+- Proportionate to scale of drug operation
+- Otherwise: ❌ **VIOLATES** Article 8
+
+-----
+
+## 📲 ANALYSIS 3: Unlock & Read Phone
+
+### IRAC Analysis
+
+**ISSUE**: Unlocking phone and reading messages in conformity with Article 8?
+
+**RULES**: Article 8 three-step test
+
+**ANALYSIS**:
+
+**Step 1**: Interference with Art 8(1) rights?
+
+- ✅ YES - **CORRESPONDENCE** (messages)
+- Also: **PRIVATE LIFE** (entire life in phone)
+
+**Step 2**: By public authority?
+
+- ✅ YES - Police
+
+**Step 2a**: In accordance with law?
+
+- Complex issue - depends on scope of search
+
+**Step 2b**: Legitimate aim?
+
+- ✅ YES - Prevention of disorder/crime
+
+**Step 2c**: Necessary in democratic society?
+
+- **Level of intrusion**: **EXTREMELY HIGH** 🚨
+- “Our entire lives are in our phones”
+- Difference between:
+  - Limited check of specific app ≠ Full phone search
+  - Checking photos, messages, history = massive intrusion
+
+-----
+
+## 📱 DUTCH LAW ON PHONE SEARCHES
+
+### Current Dutch Legal Position
+
+**Article 94 Dutch Code of Criminal Procedure**:
+
+- General power to **seize objects**
+- BUT: Seizure ≠ Searching contents!
+
+### Dutch Supreme Court Ruling
+
+**Key Finding**:
+“Searching full contents of phone could provide **virtually complete picture** of someone’s private life”
+
+**Principle**: “The deeper the intrusion, the higher the required legal authority”
+
+**Current Rules**:
+
+- ✅ **LIMITED check**: Can use general police powers
+- ❌ **FULL search** (messages, photos, history):
+  - Requires **JUDICIAL WARRANT**
+  - Requires **specific legal basis**
+
+### Can Police Force You to Unlock Phone? 🔐
+
+**Depends on lock type!**
+
+**Privilege Against Self-Incrimination** (Article 6 ECHR):
+
+- You don’t have to collaborate with investigations
+- Cannot be forced to provide evidence against yourself
+
+**Key Distinction** (Saunders v. UK):
+
+1. **Evidence dependent on will** = PROTECTED
+- Anything in your brain (statements, passwords, PIN codes)
+- You choose to reveal it orally
+1. **Evidence independent of will** = NOT PROTECTED
+- Physical evidence that “just exists”
+- DNA, blood, hair, fingerprints
+- Can be taken against your will
+
+### PRACTICAL IMPLICATION ⚠️
+
+|Lock Type                       |Can Police Force Unlock?       |
+|--------------------------------|-------------------------------|
+|**PIN code**                    |❌ NO - Protected (in your mind)|
+|**Password**                    |❌ NO - Protected (in your mind)|
+|**Biometric** (fingerprint/face)|✅ YES - Physical characteristic|
+
+**💡 LESSON: Protect your phone with PASSWORD, not biometric!**
+
+**After Unlocking**:
+
+- Still need judicial warrant for full search
+- Search must be proportionate
+- Cannot just browse all content without justification
+
+-----
+
+## 📊 LEVELS OF INTRUSION - Quick Reference
+
+### Understanding Proportionality
+
+|Intrusion Level   |Example                                |Warrant Needed?                  |
+|------------------|---------------------------------------|---------------------------------|
+|**LOW**           |Pocket search, backpack                |Usually NO                       |
+|**MEDIUM**        |Car search, office desk                |Depends                          |
+|**HIGH**          |Home search, enter premises            |**YES - Judicial**               |
+|**EXTREMELY HIGH**|Full phone search, ongoing surveillance|**YES - Judicial + Specific law**|
+
+**General Rule**: The higher the intrusion, the stronger the legal justification needed
+
+-----
+
+## 🎯 KEY CASES SUMMARY
+
+### Article 5 Cases
+
+**Brogan v. UK (1988)**
+
+- **Issue**: What is “promptly”?
+- **Holding**: Maximum 4 days
+- **Importance**: Establishes time limit for seeing judge after arrest
+
+**Letellier v. France**
+
+- **Issue**: Reasonable time to trial (pre-trial detention)
+- **Importance**: Different from Article 6 reasonable time
+
+### Article 8 Cases
+
+**Niemetz v. Germany**
+
+- **Issue**: What is “home”?
+- **Holding**: Extended interpretation - includes workplace/office
+- **Importance**: Broadens privacy protection
+
+**Kahn v. UK**
+
+- **Issue**: “In accordance with law” - what quality?
+- **Importance**: Law must be foreseeable and accessible
+
+**Saunders v. UK**
+
+- **Issue**: Self-incrimination and evidence
+- **Holding**: Evidence dependent on will vs. independent of will
+- **Importance**: Can’t be forced to reveal password/PIN
+
+-----
+
+## ✅ EXAM CHECKLIST
+
+### For Article 5 Questions:
+
+- [ ] Was there an arrest/detention?
+- [ ] Was there reasonable suspicion? (objective facts convincing neutral observer)
+- [ ] Was person brought before judge **promptly**? (max 4 days - Brogan)
+- [ ] If longer detention: reasonable time to trial? judicial review? (Letellier)
+- [ ] Was person informed of reasons? (Art 5(2))
+- [ ] Did person have access to court to challenge? (Art 5(4) habeas corpus)
+
+### For Article 8 Questions:
+
+- [ ] Step 1: Was there interference with private life/home/correspondence?
+  - [ ] Check Niemetz for extended “home” interpretation
+- [ ] Step 2: Was it by public authority?
+- [ ] Step 3: Was it justified?
+  - [ ] a) In accordance with law? (quality - Kahn)
+  - [ ] b) Legitimate aim? (usually prevention of crime)
+  - [ ] c) Necessary in democratic society?
+    - [ ] Assess level of intrusion (low/medium/high/extreme)
+    - [ ] Is it proportionate to the crime?
+    - [ ] If HIGH intrusion: judicial warrant required?
+    - [ ] If EXTREME: specific legal basis + warrant?
+
+-----
+
+## 💡 PROFESSOR’S TIPS
+
+### Understanding the Balance
+
+**Remember**: Criminal procedure is ALWAYS about balance:
+
+- State power to find truth
+- Individual rights protection
+
+**Central Question**: How can we let police investigate effectively while protecting fundamental rights?
+
+### Common Exam Mistakes
+
+❌ **DON’T** confuse:
+
+- Article 5(3) reasonable time (pre-trial detention) ≠ Article 6(1) reasonable time (whole procedure)
+- Seizure of object ≠ Searching its contents
+- 4-day rule = time to see judge (not end of investigation or release required)
+
+❌ **DON’T** forget:
+
+- Judge must be independent and impartial (that’s WHY warrant from judge)
+- “Promptly” has specific meaning (4 days max)
+- Proportionality is key (small crime ≠ big intrusion)
+
+✅ **DO** remember:
+
+- Always follow IRAC structure
+- Apply three-step test systematically for Article 8
+- Cite relevant cases (Brogan for promptly, Niemetz for home, etc.)
+- Assess level of intrusion before concluding on proportionality
+
+### Future Challenges
+
+**Think about**:
+
+- AI in policing
+- Mass surveillance capabilities
+- Balance between security and privacy
+- Do we want a world where every crime is detected 100%?
+
+-----
+
+## 📚 RELATED MATERIALS
+
+**For Working Groups This Week**:
+
+- Niemetz v. Germany (extended interpretation of “home”)
+- Kahn v. UK (quality of law requirement)
+- Letellier v. France (reasonable time for pre-trial detention)
+
+**Next Week**: Interrogations and Privilege Against Self-Incrimination
+
+- Saunders v. UK
+- Gafgen case (inhuman treatment to obtain confession)
+
+**Use**: SlimStampen for memorizing cases!
+
+-----
+
+## 🎓 FINAL SUMMARY
+
+### Article 5 in One Sentence
+
+You can only be arrested if there’s **reasonable suspicion**, you must see a **judge within 4 days** (Brogan), and pre-trial detention must be **justified and reasonable** in length.
+
+### Article 8 in One Sentence
+
+Privacy can only be interfered with if it’s **lawful**, for a **legitimate aim**, and **proportionate** to that aim - with **judicial warrant** for high intrusions.
+
+### The Core Principle
+
+**BALANCE**: Truth-finding powers vs. Fundamental rights protection - ALWAYS.
+
+-----
+
+*Remember: Criminal procedure protects us all - today’s suspect could be tomorrow’s victim, and vice versa. Human rights are universal and non-negotiable.*
+
+**Good luck with your studies! 🎯**

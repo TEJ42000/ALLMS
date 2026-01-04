@@ -1,0 +1,497 @@
+Criminal Law Study Notes
+
+**Defenses - Justifications & Excuses**
+
+*Course: Criminal Law Part A*
+
+🎯 LEARNING OBJECTIVES
+
+By the end of these notes, you should be able to:
+
+-   Distinguish between justifications and excuses within the tripartite
+    framework
+
+-   Apply the criteria for self-defense to hypothetical scenarios
+
+-   Understand how defenses operate at different stages of criminal
+    liability
+
+-   Recognize when prior fault defeats a defense
+
+-   Analyze self-defense excess situations
+
+I. FUNDAMENTAL DISTINCTION: JUSTIFICATIONS VS. EXCUSES
+
+The Core Difference (MEMORIZE THIS!)
+
+**Justification:** \"We accept responsibility but deny that it was bad\"
+
+**Excuse:** \"We admit it was bad but don\'t accept full (or any)
+responsibility\"
+
+Examples to Illustrate
+
+**Justification Example** (Self-Defense):
+
+-   *Scenario:* Someone is about to kill you, so you wound them first
+
+-   *Your position:* \"Yes, I did it, and what I did was RIGHT given the
+    circumstances\"
+
+-   *Legal effect:* The act was **lawful/justified** - no wrongdoing
+    occurred
+
+**Excuse Example** (Insanity):
+
+-   *Scenario:* You kill someone because you believe aliens ordered you
+    to do so
+
+-   *Your position:* \"Yes, I did it, and it was wrong, but you can\'t
+    blame ME because I\'m mentally ill\"
+
+-   *Legal effect:* The act was **wrongful** but you\'re not
+    **blameworthy**
+
+II\. WHERE DEFENSES OPERATE IN THE TRIPARTITE FRAMEWORK
+
+The Tripartite Framework Review
+
+**Stage 1: LEGAL ELEMENTS**
+
+-   Actus Reus (objective elements)
+
+-   Mens Rea (subjective elements)
+
+> *↓ \[Only proceed if Stage 1 fulfilled\]*
+
+**Stage 2: UNLAWFULNESS**
+
+-   Are there JUSTIFICATIONS? (Self-defense, Necessity, State Order)
+
+> *↓ \[Only proceed if no justification\]*
+
+**Stage 3: CULPABILITY**
+
+-   Are there EXCUSES? (Duress, Insanity, Self-defense Excess,
+    Provocation, Mistake of Law, Intoxication)
+
+Critical Rules for Using the Framework
+
+-   **STOP when a stage is not fulfilled** - don\'t continue analyzing
+
+-   **Justifications operate at Stage 2** (Unlawfulness)
+
+-   **Excuses operate at Stage 3** (Culpability/Blameworthiness)
+
+-   **Never skip stages or analyze out of order**
+
+III\. SELF-DEFENSE (JUSTIFICATION - STAGE 2)
+
+Dutch Criminal Code Article 41(1)
+
+*\"He who commits an act where this is necessary in the defense of his
+person or the person of another, his or another person\'s integrity or
+property, against an imminent unlawful attack, is not criminally
+liable.\"*
+
+The Seven Criteria for Self-Defense
+
+1\. Defense of Legitimate Interests
+
+**What can be defended?**
+
+-   Life and bodily integrity
+
+-   Property
+
+-   Another person\'s interests (defense of others)
+
+**Note:** Dutch law is **broader** than some systems - it explicitly
+includes defense of property and others
+
+2\. Imminent Attack
+
+**Definition:** The attack must be happening NOW or about to happen
+imminently
+
+**THE TIMING RULE (Critical for Exams):**
+
+-   ❌ **Too early** = Pre-emptive strike (NOT self-defense)
+
+-   ✅ **Just right** = Imminent/ongoing attack (VALID self-defense)
+
+-   ❌ **Too late** = Retaliation/revenge (NOT self-defense)
+
+**Examples:**
+
+  -------------------------------------------------------------------------
+  **Scenario**                        **Imminent?**   **Self-Defense?**
+  ----------------------------------- --------------- ---------------------
+  A raises a knife and is about to    YES             ✓ Valid
+  stab you                                            
+
+  A threatens \"I\'ll kill you        NO              ✗ Too early
+  tomorrow\"                                          
+
+  A punched you yesterday, today you  NO              ✗ Too late
+  punch back                                          (retaliation)
+
+  A is actively strangling you        YES             ✓ Valid
+
+  You hear rumors A wants to hurt you NO              ✗ Too early (mere
+                                                      fear)
+  -------------------------------------------------------------------------
+
+**Key Phrase:** *Mere fear of an attack does NOT equal self-defense*
+
+3\. Unlawful Attack
+
+**The Rule:** You may NOT use self-defense against **lawful, justified
+force**
+
+**Unlawful Attack (Self-defense available):**
+
+-   Criminal assaults you ✓
+
+-   Someone tries to steal your property ✓
+
+-   Police use **excessive** force during arrest ✓ (the excess is
+    unlawful)
+
+**Lawful Attack (No self-defense):**
+
+-   Police lawfully arrest you using reasonable force ✗
+
+-   Referee tackles you during a rugby match ✗ (you consented)
+
+-   Prison guard restrains you appropriately ✗
+
+**EXCEPTION: No self-defense against self-defense**
+
+-   If someone is validly defending themselves, you can\'t claim
+    self-defense against them
+
+-   **Why?** Their defensive action is **justified** (lawful), and you
+    can\'t defend against lawful force
+
+4\. Necessity 1 (Necessary Defense)
+
+**Question:** Did you HAVE to act in self-defense, or could you have
+avoided the situation?
+
+**The Retreat Rule (Jurisdiction-Dependent):**
+
+-   **Some systems:** Duty to retreat if safely possible
+
+-   **Other systems:** No duty to retreat (\"Stand Your Ground\")
+
+5\. Proportionality
+
+**The Rule:** The defensive force must be **proportionate** to the
+threat
+
+**How to Assess Proportionality:**
+
+-   Compare the **interest threatened** vs. **interest harmed**
+
+-   Compare the **severity of attack** vs. **severity of defense**
+
+**Examples:**
+
+  -----------------------------------------------------------------------
+  **Attack**              **Defense Response**    **Proportionate?**
+  ----------------------- ----------------------- -----------------------
+  Punch to the face       Punch back              ✓ YES
+
+  Slap                    Shoot with gun          ✗ NO - excessive
+
+  Deadly knife attack     Shoot to stop attacker  ✓ YES
+
+  Teenager stealing apple Breaking their arm      ✗ NO - excessive
+
+  Armed home invasion     Using weapon to defend  ✓ YES (likely)
+  -----------------------------------------------------------------------
+
+**Key Concept:** Life vs. Life is usually proportionate; Life vs.
+Property usually is NOT
+
+6\. Necessity 2 (Necessary Force)
+
+**Question:** Was the specific amount of force you used necessary to
+repel the attack?
+
+**Distinction from Necessity 1:**
+
+-   **Necessity 1:** Did you need to defend yourself at all?
+
+-   **Necessity 2:** Given you needed to defend, did you use more force
+    than necessary?
+
+*This is where \"Self-Defense Excess\" comes in (see Section IV)*
+
+7\. Prior Fault
+
+**THE GOLDEN RULE: Prior fault defeats ALL defenses - both
+justifications AND excuses**
+
+**Definition:** If you caused the situation through your own wrongful
+behavior, you cannot claim self-defense
+
+**Examples:**
+
+**Scenario 1: Provoked Fight**
+
+-   You insult and push someone
+
+-   They attack you back
+
+-   You \"defend\" yourself and hurt them
+
+-   **Result:** NO self-defense - you provoked the attack (prior fault)
+
+**Scenario 2: Criminal Enterprise**
+
+-   You\'re robbing a house
+
+-   Homeowner attacks you
+
+-   You \"defend\" yourself
+
+-   **Result:** NO self-defense - you initiated the criminal situation
+
+**Scenario 3: Mutual Combat**
+
+-   You agree to a street fight
+
+-   During the fight, the other person is winning
+
+-   You now claim self-defense
+
+-   **Result:** Likely NO self-defense - you consented to mutual combat
+
+IV\. SELF-DEFENSE EXCESS (EXCUSE - STAGE 3)
+
+What is Self-Defense Excess?
+
+**Definition:** When you start with valid self-defense but use
+**excessive force** beyond what\'s necessary
+
+Key Characteristics
+
+-   **Initial self-defense was justified** (Stages 1 & 2 fulfilled)
+
+-   **But you went too far** in the amount of force
+    (proportionality/necessity failed)
+
+-   **This becomes an EXCUSE at Stage 3**, not a justification
+
+Why It\'s an Excuse, Not a Justification
+
+-   The **excessive part** of your act was **wrongful** (Stage 2:
+    unlawful)
+
+-   But we recognize you were in a **high-stress defensive situation**
+
+-   So we **excuse** you from full blame (Stage 3: reduced culpability)
+
+Types of Excess
+
+**Intensive Excess:** Too much force
+
+-   *Example:* Attacker slaps you, you shoot them
+
+**Extensive Excess:** Continuing after threat ends
+
+-   *Example:* Attacker falls down incapacitated, you keep beating them
+
+Legal Outcome
+
+-   **Not fully justified** (you did wrong)
+
+-   **But partially or fully excused** (reduced or no blame)
+
+-   Often results in: Reduced sentence or acquittal depending on
+    circumstances
+
+V. THE TRESPASSER SCENARIO (WORKING GROUP CASE)
+
+Facts
+
+-   A walks through the open door of B\'s home
+
+-   A takes a seat on B\'s couch
+
+-   A refuses to leave
+
+-   **Question:** Can B forcefully remove A according to Article 41(1)
+    Dutch Criminal Code?
+
+Analysis Using Self-Defense Criteria
+
+1\. Defense of Legitimate Interests?
+
+✓ YES - Property rights (B\'s home) are included in Article 41(1)
+
+2\. Imminent Attack?
+
+✓ YES - The trespass is **ongoing** (A is currently on the property)
+
+-   Not too early (A is already there)
+
+-   Not too late (A hasn\'t left yet)
+
+3\. Unlawful Attack?
+
+✓ YES - Trespassing is unlawful
+
+-   A has no right to be in B\'s home
+
+-   Even if the door was open, entry without permission = trespass
+
+4\. Necessity 1 (Necessary Defense)?
+
+**QUESTION MARK** - Could B call the police instead?
+
+-   If police response would be quick → maybe not necessary to use force
+
+-   If police would take too long → force may be necessary
+
+5\. Proportionality?
+
+**DEPENDS on the force used:**
+
+-   Gentle physical guidance out the door? → ✓ Likely proportionate
+
+-   Punching A repeatedly? → ✗ Likely disproportionate
+
+-   Property interest \< Bodily integrity interest
+
+6\. Necessity 2 (Necessary Force)?
+
+**DEPENDS** - Use minimum force needed to remove A:
+
+-   Start with verbal commands
+
+-   Then minimal physical force
+
+-   No excessive violence
+
+7\. Prior Fault?
+
+**KEY ISSUE:** Did B leave the door open as an **invitation**?
+
+-   If door open = implied invitation → A might argue no \"unlawful\"
+    attack
+
+-   If door merely unlocked but not inviting entry → Unlawful attack
+    stands
+
+Conclusion
+
+**Most Likely Result:**
+
+-   B can use **minimal force** to remove A
+
+-   BUT must be proportionate and necessary
+
+-   Excessive violence would NOT be justified
+
+-   Calling police first might be required in Dutch law interpretation
+
+**Differences by Jurisdiction:**
+
+-   **German law:** Clearer right to defend property → B likely
+    justified
+
+-   **Dutch law:** More restrictive → May require exhausting
+    alternatives first
+
+VI\. EXAM STRATEGY FOR DEFENSE QUESTIONS
+
+Step-by-Step Approach
+
+**STEP 1: Complete Stage 1 Analysis First**
+
+-   Establish all legal elements are fulfilled
+
+-   Don\'t jump straight to defenses!
+
+**STEP 2: Identify Potential Defenses**
+
+-   Does the fact pattern suggest justification or excuse?
+
+-   Which specific defense might apply?
+
+**STEP 3: For Justifications (Stage 2)**
+
+-   Go through ALL criteria systematically
+
+-   Don\'t assume - test each one
+
+-   If self-defense: Use all 7 criteria
+
+**STEP 4: For Excuses (Stage 3)**
+
+-   Only reach here if no justification found
+
+-   Check if an excuse might apply
+
+-   Consider prior fault
+
+**STEP 5: Conclude Clearly**
+
+-   State whether defense succeeds or fails
+
+-   Explain the legal outcome
+
+Common Exam Traps
+
+❌ **TRAP 1:** Assuming self-defense automatically applies when someone
+is attacked
+
+-   **Solution:** Check ALL seven criteria
+
+❌ **TRAP 2:** Confusing justification with excuse
+
+-   **Solution:** Remember - justifications = act was right; excuses =
+    not blameworthy
+
+❌ **TRAP 3:** Forgetting prior fault
+
+-   **Solution:** Always ask \"Did the defendant cause this situation?\"
+
+❌ **TRAP 4:** Analyzing defenses when Stage 1 isn\'t fulfilled
+
+-   **Solution:** Follow the framework - never skip stages
+
+❌ **TRAP 5:** Ignoring proportionality
+
+-   **Solution:** Always compare threat to response
+
+VII\. FINAL SUMMARY
+
+**Key Takeaways:**
+
+-   **Justifications** (Stage 2) = \"What I did was RIGHT\"
+
+-   **Excuses** (Stage 3) = \"What I did was WRONG, but don\'t blame
+    me\"
+
+-   **Self-defense** requires ALL 7 criteria to be met
+
+-   **Prior fault** defeats ALL defenses
+
+-   **Imminence** = not too early, not too late
+
+-   **Proportionality** = force must match threat
+
+-   **Self-defense excess** = started justified but went too far
+    (excuse)
+
+-   **Always** follow the tripartite framework systematically
+
+**Remember: The tripartite framework is your roadmap!**
+
+Master it, and defenses become much clearer.
+
+Good luck with your studies! 📚⚖️
