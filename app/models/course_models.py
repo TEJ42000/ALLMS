@@ -29,7 +29,7 @@ class KeyConcept(BaseModel):
 
     term: str
     definition: str
-    source: str
+    source: Optional[str] = None  # Made optional for UI flexibility
     citation: Optional[str] = None
 
 
@@ -55,6 +55,7 @@ class WeekMaterial(BaseModel):
 
     type: str  # reader, lecture, reading, case, etc.
     file: str  # Path relative to Materials/
+    title: Optional[str] = None  # Display title
     chapters: Optional[List[str]] = None
     fileId: Optional[str] = None  # Link to file_ids.json
 
@@ -128,7 +129,16 @@ class Lecture(BaseModel):
     """Lecture material reference."""
 
     title: str
-    week: int
+    week: Optional[int] = None
+    file: str
+    size: Optional[str] = None
+
+
+class Reading(BaseModel):
+    """Reading material reference."""
+
+    title: str
+    week: Optional[int] = None
     file: str
     size: Optional[str] = None
 
@@ -159,6 +169,7 @@ class MaterialsRegistry(BaseModel):
 
     coreTextbooks: List[CoreTextbook] = []
     lectures: List[Lecture] = []
+    readings: List[Reading] = []
     caseStudies: List[CaseStudy] = []
     mockExams: List[MockExam] = []
 
@@ -321,6 +332,7 @@ class CourseUpdate(BaseModel):
     components: Optional[List[CourseComponent]] = None
     materialSubjects: Optional[List[str]] = None
     abbreviations: Optional[Dict[str, str]] = None
+    materials: Optional[MaterialsRegistry] = None
     active: Optional[bool] = None
 
 

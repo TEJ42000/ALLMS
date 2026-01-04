@@ -1,0 +1,460 @@
+/* LLS Admin Portal Styles */
+
+.header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.admin-section {
+    display: none;
+}
+
+.admin-section.active {
+    display: block;
+    animation: fadeIn 0.3s ease-out;
+}
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 25px;
+    flex-wrap: wrap;
+    gap: 15px;
+}
+
+.header-actions {
+    display: flex;
+    gap: 10px;
+}
+
+/* Course Grid */
+.courses-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 20px;
+}
+
+.course-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 15px;
+    padding: 25px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.course-card:hover {
+    transform: translateY(-5px);
+    border-color: var(--gold);
+    box-shadow: 0 10px 30px rgba(212, 175, 55, 0.15);
+}
+
+.course-card h3 {
+    color: var(--gold-light);
+    margin-bottom: 10px;
+    font-size: 1.3em;
+}
+
+.course-card .course-id {
+    color: var(--gold);
+    font-family: monospace;
+    font-size: 0.9em;
+    margin-bottom: 10px;
+}
+
+.course-card .course-meta {
+    color: var(--text-secondary);
+    font-size: 0.9em;
+    margin-bottom: 15px;
+}
+
+.course-card .course-status {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.8em;
+    font-weight: 600;
+}
+
+.course-status.active {
+    background: rgba(72, 187, 120, 0.2);
+    color: var(--success);
+}
+
+.course-status.inactive {
+    background: rgba(245, 101, 101, 0.2);
+    color: var(--error);
+}
+
+/* Form Styles */
+.course-form, .week-form {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 15px;
+    padding: 25px;
+    margin-bottom: 30px;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+}
+
+/* Weeks Grid */
+.weeks-section {
+    margin-top: 30px;
+}
+
+.weeks-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 15px;
+    margin-top: 15px;
+}
+
+.week-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 15px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.week-card:hover {
+    border-color: var(--gold);
+    transform: translateY(-2px);
+}
+
+.week-card .week-number {
+    font-size: 1.5em;
+    color: var(--gold);
+    font-weight: bold;
+}
+
+.week-card .week-title {
+    color: var(--text-primary);
+    margin-top: 5px;
+    font-size: 0.95em;
+}
+
+.week-card .week-stats {
+    color: var(--text-secondary);
+    font-size: 0.8em;
+    margin-top: 10px;
+}
+
+.item-row .btn-remove {
+    background: rgba(245, 101, 101, 0.2);
+    color: var(--error);
+    border: none;
+    padding: 6px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9em;
+}
+
+.item-row .btn-remove:hover {
+    background: rgba(245, 101, 101, 0.4);
+}
+
+.btn-sm {
+    padding: 8px 16px;
+    font-size: 0.9em;
+}
+
+.empty-state {
+    color: var(--text-secondary);
+    text-align: center;
+    padding: 30px;
+    font-style: italic;
+}
+
+.loading-placeholder {
+    color: var(--text-secondary);
+    text-align: center;
+    padding: 40px;
+}
+
+/* Toast Notifications */
+.toast {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    padding: 15px 25px;
+    border-radius: 10px;
+    color: white;
+    font-weight: 500;
+    z-index: 10000;
+    animation: slideIn 0.3s ease-out;
+}
+
+.toast.success {
+    background: var(--success);
+}
+
+.toast.error {
+    background: var(--error);
+}
+
+.toast.info {
+    background: var(--gold);
+    color: var(--navy-dark);
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(50px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .section-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .header-actions {
+        width: 100%;
+        justify-content: flex-end;
+    }
+
+    .courses-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .weeks-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+
+/* Week Editor */
+.week-subsection {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 15px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.week-subsection h4 {
+    color: var(--gold);
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.items-list {
+    margin-bottom: 15px;
+}
+
+.item-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    padding: 10px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    margin-bottom: 8px;
+}
+
+.item-row input, .item-row textarea {
+    flex: 1;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 8px 12px;
+    color: var(--text-primary);
+    font-size: 0.9em;
+}
+
+/* Course subsections (components, abbreviations) */
+.course-subsection {
+    background: rgba(0, 0, 0, 0.15);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.course-subsection h3 {
+    margin: 0;
+    font-size: 1.1em;
+}
+
+.course-subsection .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.form-hint {
+    display: block;
+    color: var(--text-secondary);
+    font-size: 0.85em;
+    margin-bottom: 10px;
+}
+
+/* Materials section */
+.materials-summary {
+    padding: 15px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+}
+
+.scan-result {
+    color: var(--text-primary);
+}
+
+.categories {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.category-badge {
+    background: rgba(212, 175, 55, 0.2);
+    color: var(--accent);
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 0.85em;
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-secondary);
+    font-size: 0.9em;
+    cursor: pointer;
+}
+
+.checkbox-label input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+/* Materials list */
+.materials-list {
+    max-height: 400px;
+    overflow-y: auto;
+    padding: 10px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+}
+
+.materials-category {
+    margin-bottom: 20px;
+}
+
+.materials-category h4 {
+    color: var(--accent);
+    margin-bottom: 10px;
+    font-size: 0.95em;
+}
+
+.materials-items {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.materials-items li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 6px;
+    margin-bottom: 6px;
+}
+
+.materials-items li:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.material-title {
+    color: var(--text-primary);
+    font-size: 0.9em;
+}
+
+.material-meta {
+    color: var(--text-secondary);
+    font-size: 0.8em;
+}
+
+/* Material picker in week editor */
+.material-picker {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-top: 10px;
+}
+
+.material-picker select {
+    flex: 1;
+    max-width: 400px;
+}
+
+.week-material-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 6px;
+    margin-bottom: 6px;
+}
+
+.week-material-row:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.material-type-badge {
+    background: var(--accent);
+    color: var(--bg-primary);
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 0.75em;
+    font-weight: 600;
+    text-transform: uppercase;
+    min-width: 60px;
+    text-align: center;
+}
+
+.material-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.material-info strong {
+    color: var(--text-primary);
+    font-size: 0.9em;
+}
+
+.material-info small {
+    color: var(--text-secondary);
+    font-size: 0.8em;
+}
+

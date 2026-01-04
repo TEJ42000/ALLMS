@@ -8,9 +8,10 @@ See Issue #29 for the implementation plan.
 """
 
 import logging
-from typing import List
+from typing import Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, Path, Query, status
+from pydantic import BaseModel
 
 from app.models.course_models import (
     Course,
@@ -20,8 +21,19 @@ from app.models.course_models import (
     Week,
     WeekCreate,
     LegalSkill,
+    MaterialsRegistry,
+    CoreTextbook,
+    Lecture,
+    CaseStudy,
+    MockExam,
 )
 from app.services.course_service import get_course_service
+from app.services.materials_scanner import (
+    scan_materials_folder,
+    enhance_titles_with_ai,
+    convert_to_materials_registry,
+    ScanResult,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -445,3 +457,265 @@ async def upsert_legal_skill(course_id: str, skill_id: str, skill: LegalSkill):
             detail=f"Failed to upsert legal skill: {str(e)}"
         )
 
+
+# ============================================================================
+# Materials Scanning Endpoints
+# ============================================================================
+
+
+class MaterialsScanRequest(BaseModel):
+    """Request options for materials scan."""
+    use_ai_titles: bool = False  # Whether to use AI to generate better titles
+
+
+class MaterialsScanResponse(BaseModel):
+    """Response from materials scan."""
+    course_id: str
+    subjects_scanned: List[str]
+    total_files: int
+    categories: Dict[str, int]
+    materials_updated: bool
+    message: str
+
+
+@router.post(
+    "/{course_id}/scan-materials",
+    response_model=MaterialsScanResponse,
+    summary="Scan and update course materials",
+    description="""
+    Scan the course's material folders and update the materials registry.
+
+    This endpoint:
+    1. Gets the course's materialSubjects (folder names)
+    2. Scans each folder for PDF, DOCX, and other documents
+    3. Categorizes files by folder (Lectures, Readings, Core_Materials, etc.)
+    4. Extracts week numbers from filenames
+    5. Optionally uses AI to generate better titles
+    6. Updates the course's materials in Firestore
+
+    **Note:** Folders named "LLS Essential" (metadata) are skipped.
+    """
+)
+async def scan_course_materials(
+    course_id: str = Path(..., description="Course ID"),
+    request: Optional[MaterialsScanRequest] = None
+):
+    """Scan material folders and update course materials registry."""
+    service = get_course_service()
+
+    # Get course
+    course = service.get_course(course_id, include_weeks=False)
+    if course is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Course not found: {course_id}"
+        )
+
+    subjects = course.materialSubjects or []
+    if not subjects:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Course has no materialSubjects configured"
+        )
+
+    # Scan all subject folders
+    all_materials = []
+    all_categories: Dict[str, int] = {}
+
+    for subject in subjects:
+        logger.info("Scanning materials for subject: %s", subject)
+        scan_result = scan_materials_folder(subject)
+        all_materials.extend(scan_result.materials)
+        for cat, count in scan_result.categories.items():
+            all_categories[cat] = all_categories.get(cat, 0) + count
+
+    if not all_materials:
+        return MaterialsScanResponse(
+            course_id=course_id,
+            subjects_scanned=subjects,
+            total_files=0,
+            categories={},
+            materials_updated=False,
+            message="No materials found in configured folders"
+        )
+
+    # Optionally enhance titles with AI
+    use_ai = request.use_ai_titles if request else False
+    if use_ai:
+        logger.info("Enhancing titles with AI for %d materials", len(all_materials))
+        all_materials = await enhance_titles_with_ai(all_materials)
+
+    # Convert to registry format
+    combined_result = ScanResult(
+        subject=",".join(subjects),
+        total_files=len(all_materials),
+        materials=all_materials,
+        categories=all_categories
+    )
+    registry = convert_to_materials_registry(combined_result)
+
+    # Update course in Firestore directly (materials is a complex nested dict)
+    try:
+        from datetime import datetime, timezone
+        doc_ref = service.db.collection("courses").document(course_id)
+        doc_ref.update({
+            "materials": registry,
+            "updatedAt": datetime.now(timezone.utc)
+        })
+        logger.info("Updated materials for course %s: %d files", course_id, len(all_materials))
+    except Exception as e:
+        logger.error("Failed to update materials for %s: %s", course_id, e)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update materials: {str(e)}"
+        )
+
+    return MaterialsScanResponse(
+        course_id=course_id,
+        subjects_scanned=subjects,
+        total_files=len(all_materials),
+        categories=all_categories,
+        materials_updated=True,
+        message=f"Successfully scanned and updated {len(all_materials)} materials"
+    )
+
+
+@router.get(
+    "/{course_id}/materials",
+    summary="Get course materials registry",
+    description="Returns the current materials registry for a course."
+)
+async def get_course_materials(
+    course_id: str = Path(..., description="Course ID")
+):
+    """Get the materials registry for a course."""
+    service = get_course_service()
+
+    course = service.get_course(course_id, include_weeks=False)
+    if course is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Course not found: {course_id}"
+        )
+
+    return {
+        "course_id": course_id,
+        "materials": course.materials.model_dump() if course.materials else None
+    }
+
+
+class SyncWeekMaterialsResponse(BaseModel):
+    """Response from syncing materials to weeks."""
+    course_id: str
+    weeks_updated: int
+    materials_linked: int
+    message: str
+
+
+@router.post(
+    "/{course_id}/sync-week-materials",
+    response_model=SyncWeekMaterialsResponse,
+    summary="Sync materials to course weeks",
+    description="""
+    Automatically link materials to course weeks based on week numbers.
+
+    This endpoint:
+    1. Gets the course's materials registry (lectures, readings with week numbers)
+    2. For each week, creates WeekMaterial entries for matching materials
+    3. Updates the week's materials list in Firestore
+
+    Materials are matched by their `week` field. Materials without a week number
+    are not automatically linked.
+    """
+)
+async def sync_week_materials(
+    course_id: str = Path(..., description="Course ID")
+):
+    """Auto-link materials to weeks based on week numbers."""
+    service = get_course_service()
+
+    # Get course with weeks
+    course = service.get_course(course_id, include_weeks=True)
+    if course is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Course not found: {course_id}"
+        )
+
+    materials = course.materials
+    if not materials:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Course has no materials. Run 'Scan Folders' first."
+        )
+
+    weeks = course.weeks or []
+    if not weeks:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Course has no weeks configured."
+        )
+
+    # Build week -> materials mapping
+    week_materials_map: Dict[int, List[Dict]] = {}
+
+    # Add lectures
+    for lecture in materials.lectures or []:
+        if lecture.week:
+            if lecture.week not in week_materials_map:
+                week_materials_map[lecture.week] = []
+            week_materials_map[lecture.week].append({
+                "type": "lecture",
+                "file": lecture.file,
+                "title": lecture.title
+            })
+
+    # Add readings if they exist
+    readings = getattr(materials, 'readings', None) or []
+    for reading in readings:
+        week = getattr(reading, 'week', None)
+        if week:
+            if week not in week_materials_map:
+                week_materials_map[week] = []
+            week_materials_map[week].append({
+                "type": "reading",
+                "file": reading.file,
+                "title": reading.title
+            })
+
+    # Update weeks with materials
+    weeks_updated = 0
+    materials_linked = 0
+
+    from datetime import datetime, timezone
+
+    for week in weeks:
+        week_num = week.weekNumber
+        if week_num in week_materials_map:
+            new_materials = week_materials_map[week_num]
+
+            # Convert to WeekMaterial format
+            week_material_list = [
+                {"type": m["type"], "file": m["file"]}
+                for m in new_materials
+            ]
+
+            # Update week in Firestore (document ID is "week-{n}")
+            try:
+                week_ref = service.db.collection("courses").document(course_id)\
+                    .collection("weeks").document(f"week-{week_num}")
+                week_ref.update({
+                    "materials": week_material_list,
+                    "updatedAt": datetime.now(timezone.utc)
+                })
+                weeks_updated += 1
+                materials_linked += len(new_materials)
+            except Exception as e:
+                logger.warning("Failed to update week %d: %s", week_num, e)
+
+    return SyncWeekMaterialsResponse(
+        course_id=course_id,
+        weeks_updated=weeks_updated,
+        materials_linked=materials_linked,
+        message=f"Linked {materials_linked} materials to {weeks_updated} weeks"
+    )
