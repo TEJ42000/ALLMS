@@ -301,7 +301,7 @@ async function generateQuiz() {
         const response = await fetch(`${API_BASE}/api/files-content/quiz`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({topic: topic === 'all' ? 'Criminal Law' : topic, num_questions, difficulty: 'medium'})
+            body: JSON.stringify({topic, num_questions, difficulty: 'medium'})
         });
 
         if (!response.ok) throw new Error(`API error: ${response.status}`);
@@ -377,21 +377,49 @@ async function generateStudyGuide() {
 
 // ========== Dashboard ==========
 function initDashboard() {
+    // Validate topics format (should be like "2/5")
+    const topicsValue = localStorage.getItem('lls_topics');
+    const validTopics = topicsValue && /^\d+\/\d+$/.test(topicsValue) ? topicsValue : '0/5';
+
     const stats = {
         points: parseInt(localStorage.getItem('lls_points'), 10) || 0,
         streak: parseInt(localStorage.getItem('lls_streak'), 10) || 0,
-        topics: localStorage.getItem('lls_topics') || '0/5',
+        topics: validTopics,
         quizzes: parseInt(localStorage.getItem('lls_quizzes'), 10) || 0
     };
 
-    document.getElementById('stat-points').textContent = stats.points;
-    document.getElementById('stat-streak').textContent = stats.streak;
-    document.getElementById('stat-topics').textContent = stats.topics;
-    document.getElementById('stat-quizzes').textContent = stats.quizzes;
+    // Safely update DOM elements with null checks
+    const statPoints = document.getElementById('stat-points');
+    const statStreak = document.getElementById('stat-streak');
+    const statTopics = document.getElementById('stat-topics');
+    const statQuizzes = document.getElementById('stat-quizzes');
 
+    if (statPoints) statPoints.textContent = stats.points;
+    if (statStreak) statStreak.textContent = stats.streak;
+    if (statTopics) statTopics.textContent = stats.topics;
+    if (statQuizzes) statQuizzes.textContent = stats.quizzes;
+
+    // Add topic card click handlers with context passing
     document.querySelectorAll('.topic-card').forEach(card => {
         card.addEventListener('click', () => {
-            document.querySelector('.nav-tab[data-tab="tutor"]').click();
+            const topic = card.dataset.topic;
+            const tutorTab = document.querySelector('.nav-tab[data-tab="tutor"]');
+            if (tutorTab) tutorTab.click();
+
+            // Set the context select to match the clicked topic
+            const contextSelect = document.getElementById('context-select');
+            if (contextSelect && topic) {
+                const topicMap = {
+                    'criminal': 'Criminal Law',
+                    'private': 'Private Law',
+                    'constitutional': 'Constitutional Law',
+                    'administrative': 'Administrative Law',
+                    'international': 'International Law'
+                };
+                if (topicMap[topic]) {
+                    contextSelect.value = topicMap[topic];
+                }
+            }
         });
     });
 }
@@ -459,19 +487,25 @@ function markCard(status) {
 }
 
 function updateFlashcardDisplay() {
+    const questionEl = document.getElementById('flashcard-question');
+    const answerEl = document.getElementById('flashcard-answer');
+
     if (flashcards.length === 0) {
-        document.getElementById('flashcard-question').textContent = 'No flashcards available';
-        document.getElementById('flashcard-answer').textContent = '';
+        if (questionEl) questionEl.textContent = 'No flashcards available';
+        if (answerEl) answerEl.textContent = '';
         return;
     }
 
     const card = flashcards[currentCardIndex];
-    document.getElementById('flashcard-question').textContent = card.question;
-    document.getElementById('flashcard-answer').textContent = card.answer;
+    if (questionEl) questionEl.textContent = card.question;
+    if (answerEl) answerEl.textContent = card.answer;
 }
 
 function updateFlashcardStats() {
     const mastered = flashcards.filter(card => card.known).length;
-    document.getElementById('cards-mastered').textContent = mastered;
-    document.getElementById('cards-total').textContent = flashcards.length;
+    const masteredEl = document.getElementById('cards-mastered');
+    const totalEl = document.getElementById('cards-total');
+
+    if (masteredEl) masteredEl.textContent = mastered;
+    if (totalEl) totalEl.textContent = flashcards.length;
 }
