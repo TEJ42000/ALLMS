@@ -11,7 +11,7 @@ import logging
 import pathlib
 from typing import Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException, Path, Query, status
+from fastapi import APIRouter, File, HTTPException, Path, Query, UploadFile, status
 from pydantic import BaseModel
 
 from app.models.course_models import (
@@ -27,6 +27,8 @@ from app.models.course_models import (
     Lecture,
     CaseStudy,
     MockExam,
+    UploadedMaterial,
+    MaterialUploadResponse,
 )
 from app.services.course_service import get_course_service
 from app.services.materials_scanner import (
@@ -46,6 +48,16 @@ from app.services.text_extractor import (
     extract_text,
     detect_file_type as detect_extraction_type,
     ExtractionResult,
+)
+from app.services.document_upload_service import (
+    save_uploaded_file,
+    delete_material_file,
+    list_course_materials,
+    get_supported_extensions,
+    get_tier_options,
+    get_category_options,
+    UploadError,
+    MAX_FILE_SIZE,
 )
 
 logger = logging.getLogger(__name__)
@@ -1222,4 +1234,327 @@ async def extract_batch_text(
         "folder": folder,
         "summary": summary,
         "files": file_results
+    }
+
+
+# ============================================================================
+# Document Upload Endpoints
+# ============================================================================
+
+
+@router.get("/upload/options")
+async def get_upload_options():
+    """Get available options for file uploads.
+
+    Returns supported file extensions, tier options, and category options
+    for populating the upload form.
+    """
+    return {
+        "supported_extensions": get_supported_extensions(),
+        "max_file_size_mb": MAX_FILE_SIZE // (1024 * 1024),
+        "tiers": get_tier_options(),
+        "categories": get_category_options()
+    }
+
+
+@router.post(
+    "/{course_id}/upload",
+    response_model=MaterialUploadResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Upload a material file to a course",
+    description="""
+    Upload a document (PDF, DOCX, image, text) to a course.
+
+    The file will be:
+    1. Validated (type, size)
+    2. Stored in the appropriate Materials folder
+    3. Text extracted automatically
+    4. Metadata stored in Firestore
+
+    **Supported file types:**
+    - PDF (.pdf)
+    - Word (.docx, .doc)
+    - Images (.png, .jpg, .jpeg, .gif, .bmp)
+    - Text (.txt, .md)
+    - HTML (.html, .htm)
+
+    **Maximum file size:** 50MB
+    """
+)
+async def upload_material(
+    course_id: str = Path(..., description="Course ID"),
+    file: UploadFile = File(..., description="File to upload"),
+    tier: str = Query("course_materials", description="Material tier"),
+    category: Optional[str] = Query(None, description="Category (for course_materials tier)"),
+    title: Optional[str] = Query(None, description="Display title"),
+    description: Optional[str] = Query(None, description="Material description"),
+    week_number: Optional[int] = Query(None, ge=1, le=52, description="Associated week number")
+):
+    """Upload a material file to a course."""
+    # Verify course exists
+    service = get_course_service()
+    course = service.get_course(course_id, include_weeks=False)
+    if course is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Course not found: {course_id}"
+        )
+
+    # Read file content
+    try:
+        content = await file.read()
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Failed to read file: {e}"
+        )
+
+    # Save file and extract text
+    try:
+        material = await save_uploaded_file(
+            file_content=content,
+            filename=file.filename or "unknown",
+            course_id=course_id,
+            tier=tier,
+            category=category,
+            title=title,
+            description=description,
+            week_number=week_number,
+            content_type=file.content_type
+        )
+    except UploadError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        logger.error("Upload failed for course %s: %s", course_id, e)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Upload failed: {e}"
+        )
+
+    # Store material record in Firestore
+    try:
+        from datetime import datetime, timezone
+        doc_ref = service.db.collection("courses").document(course_id)\
+            .collection("uploadedMaterials").document(material.id)
+        doc_ref.set(material.model_dump())
+        logger.info("Stored upload record for %s in course %s", material.filename, course_id)
+    except Exception as e:
+        logger.error("Failed to store upload record: %s", e)
+        # Don't fail the request - file is saved, just metadata failed
+
+    return MaterialUploadResponse(
+        id=material.id,
+        filename=material.filename,
+        storagePath=material.storagePath,
+        fileType=material.fileType,
+        fileSize=material.fileSize,
+        textExtracted=material.textExtracted,
+        textLength=material.textLength,
+        extractionError=material.extractionError
+    )
+
+
+@router.get("/{course_id}/uploads", summary="List uploaded materials for a course")
+async def list_uploads(
+    course_id: str = Path(..., description="Course ID")
+):
+    """List all materials uploaded to a course.
+
+    Returns materials from both the Firestore records and filesystem scan.
+    """
+    # Verify course exists
+    service = get_course_service()
+    course = service.get_course(course_id, include_weeks=False)
+    if course is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Course not found: {course_id}"
+        )
+
+    # Get records from Firestore
+    firestore_records = []
+    try:
+        docs = service.db.collection("courses").document(course_id)\
+            .collection("uploadedMaterials").stream()
+        for doc in docs:
+            data = doc.to_dict()
+            firestore_records.append(data)
+    except Exception as e:
+        logger.warning("Failed to get Firestore upload records: %s", e)
+
+    # Also scan filesystem for any files
+    filesystem_files = list_course_materials(course_id)
+
+    return {
+        "course_id": course_id,
+        "uploads": firestore_records,
+        "filesystem_files": filesystem_files,
+        "total_uploads": len(firestore_records),
+        "total_filesystem_files": len(filesystem_files)
+    }
+
+
+@router.get(
+    "/{course_id}/uploads/{material_id}",
+    response_model=UploadedMaterial,
+    summary="Get details of an uploaded material"
+)
+async def get_upload(
+    course_id: str = Path(..., description="Course ID"),
+    material_id: str = Path(..., description="Material ID")
+):
+    """Get details of a specific uploaded material including extracted text."""
+    service = get_course_service()
+
+    try:
+        doc = service.db.collection("courses").document(course_id)\
+            .collection("uploadedMaterials").document(material_id).get()
+
+        if not doc.exists:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Material not found: {material_id}"
+            )
+
+        return UploadedMaterial(**doc.to_dict())
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to get upload %s: %s", material_id, e)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get material: {e}"
+        )
+
+
+@router.delete(
+    "/{course_id}/uploads/{material_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete an uploaded material"
+)
+async def delete_upload(
+    course_id: str = Path(..., description="Course ID"),
+    material_id: str = Path(..., description="Material ID"),
+    delete_file: bool = Query(True, description="Also delete the file from disk")
+):
+    """Delete an uploaded material and optionally its file."""
+    service = get_course_service()
+
+    # Get the material record
+    try:
+        doc_ref = service.db.collection("courses").document(course_id)\
+            .collection("uploadedMaterials").document(material_id)
+        doc = doc_ref.get()
+
+        if not doc.exists:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Material not found: {material_id}"
+            )
+
+        material_data = doc.to_dict()
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to get material for deletion: %s", e)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get material: {e}"
+        )
+
+    # Delete file if requested
+    if delete_file and material_data.get("storagePath"):
+        try:
+            await delete_material_file(material_data["storagePath"])
+        except UploadError as e:
+            logger.warning("Failed to delete file: %s", e)
+
+    # Delete Firestore record
+    try:
+        doc_ref.delete()
+        logger.info("Deleted upload record %s from course %s", material_id, course_id)
+    except Exception as e:
+        logger.error("Failed to delete upload record: %s", e)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete material record: {e}"
+        )
+
+    return None
+
+
+@router.post(
+    "/{course_id}/uploads/{material_id}/re-extract",
+    summary="Re-extract text from an uploaded material"
+)
+async def re_extract_text(
+    course_id: str = Path(..., description="Course ID"),
+    material_id: str = Path(..., description="Material ID")
+):
+    """Re-run text extraction on an uploaded material.
+
+    Useful if extraction failed initially or text extractor was updated.
+    """
+    service = get_course_service()
+
+    # Get the material record
+    try:
+        doc_ref = service.db.collection("courses").document(course_id)\
+            .collection("uploadedMaterials").document(material_id)
+        doc = doc_ref.get()
+
+        if not doc.exists:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Material not found: {material_id}"
+            )
+
+        material_data = doc.to_dict()
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get material: {e}"
+        )
+
+    storage_path = material_data.get("storagePath")
+    if not storage_path:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Material has no storage path"
+        )
+
+    # Re-extract text
+    full_path = pathlib.Path(storage_path)
+    if not full_path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="File no longer exists on disk"
+        )
+
+    result = extract_text(full_path)
+
+    # Update Firestore record
+    from datetime import datetime, timezone
+    try:
+        doc_ref.update({
+            "textExtracted": result.success,
+            "extractedText": result.text if result.success else None,
+            "textLength": len(result.text) if result.success else None,
+            "extractionError": result.error if not result.success else None,
+            "pageCount": result.metadata.get("num_pages") if result.metadata else None,
+            "updatedAt": datetime.now(timezone.utc)
+        })
+    except Exception as e:
+        logger.error("Failed to update extraction results: %s", e)
+
+    return {
+        "material_id": material_id,
+        "success": result.success,
+        "text_length": len(result.text) if result.success else 0,
+        "error": result.error
     }

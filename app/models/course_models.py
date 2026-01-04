@@ -301,6 +301,67 @@ class Course(BaseModel):
 
 
 # ============================================================================
+# Uploaded Materials
+# ============================================================================
+
+
+class UploadedMaterial(BaseModel):
+    """Record of an uploaded material file.
+
+    Tracks files uploaded through the admin interface, including
+    their storage location and text extraction status.
+    """
+
+    id: str  # UUID
+    filename: str  # Original filename
+    storagePath: str  # Path in Materials/ folder
+    tier: str  # 'syllabus', 'course_materials', 'supplementary'
+    category: Optional[str] = None  # 'lecture', 'reading', 'case', etc.
+    fileType: str  # 'pdf', 'docx', 'image', etc.
+    fileSize: int  # Bytes
+    mimeType: str
+
+    # Timestamps
+    uploadedAt: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    uploadedBy: Optional[str] = None  # User ID when auth is implemented
+
+    # Text extraction
+    textExtracted: bool = False
+    extractedText: Optional[str] = None
+    textLength: Optional[int] = None
+    extractionError: Optional[str] = None
+    pageCount: Optional[int] = None
+
+    # Display metadata
+    title: Optional[str] = None  # Display title (defaults to filename)
+    description: Optional[str] = None
+    weekNumber: Optional[int] = None  # Link to specific week
+
+
+class MaterialUploadRequest(BaseModel):
+    """Request model for uploading a material."""
+
+    tier: str = "course_materials"  # 'syllabus', 'course_materials', 'supplementary'
+    category: Optional[str] = None  # 'lecture', 'reading', 'case', etc.
+    title: Optional[str] = None
+    description: Optional[str] = None
+    weekNumber: Optional[int] = None
+
+
+class MaterialUploadResponse(BaseModel):
+    """Response model for a successful upload."""
+
+    id: str
+    filename: str
+    storagePath: str
+    fileType: str
+    fileSize: int
+    textExtracted: bool
+    textLength: Optional[int] = None
+    extractionError: Optional[str] = None
+
+
+# ============================================================================
 # API Request/Response Models
 # ============================================================================
 
