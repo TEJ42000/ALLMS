@@ -55,6 +55,7 @@ class WeekMaterial(BaseModel):
 
     type: str  # reader, lecture, reading, case, etc.
     file: str  # Path relative to Materials/
+    title: Optional[str] = None  # Display title
     chapters: Optional[List[str]] = None
     fileId: Optional[str] = None  # Link to file_ids.json
 
