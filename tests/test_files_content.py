@@ -555,9 +555,12 @@ class TestCourseAwareStudyGuideEndpoint:
             assert data.get("course_id") == "LLS-2025-2026"
 
     def test_study_guide_with_course_id_and_weeks(self, client):
-        """Test study guide with course_id and multiple weeks."""
+        """Test study guide with course_id and multiple weeks uses batch method."""
         mock_service = MagicMock()
-        mock_service.get_files_for_course.return_value = ["lecture_week_2"]
+        # Should use get_files_for_course_weeks for multiple weeks (N+1 fix)
+        mock_service.get_files_for_course_weeks.return_value = [
+            "lecture_week_2", "lecture_week_3"
+        ]
         mock_service.generate_study_guide = AsyncMock(return_value={})
 
         with patch(
@@ -572,6 +575,21 @@ class TestCourseAwareStudyGuideEndpoint:
             assert response.status_code == 200
             data = response.json()
             assert data.get("weeks") == [2, 3]
+            # Verify batch method was called instead of individual calls
+            mock_service.get_files_for_course_weeks.assert_called_once_with(
+                "LLS-2025-2026",
+                week_numbers=[2, 3]
+            )
+
+    def test_study_guide_weeks_validation(self, client):
+        """Test study guide rejects invalid week numbers via Pydantic."""
+        response = client.post("/api/files-content/study-guide", json={
+            "course_id": "LLS-2025-2026",
+            "weeks": [0, 53]  # Invalid weeks
+        })
+
+        # Should return 422 Unprocessable Entity for validation error
+        assert response.status_code == 422
 
 
 class TestCourseAwareFlashcardsEndpoint:

@@ -676,6 +676,88 @@ Include:
         )
         return prioritized
 
+    def get_files_for_course_weeks(
+        self,
+        course_id: str,
+        week_numbers: List[int]
+    ) -> List[str]:
+        """
+        Get file keys for multiple weeks in a course with a single Firestore read.
+
+        This method avoids the N+1 query problem by fetching the course once
+        and filtering by multiple weeks locally.
+
+        Args:
+            course_id: Course ID (e.g., "LLS-2025-2026")
+            week_numbers: List of week numbers to get materials for
+
+        Returns:
+            List of unique file keys sorted by tier priority
+
+        Raises:
+            ValueError: If course not found
+        """
+        course_service = self._get_course_service()
+
+        # Single Firestore read - include_weeks=True to get all weeks
+        course = course_service.get_course(course_id, include_weeks=True)
+        if course is None:
+            raise ValueError(f"Course not found: {course_id}")
+
+        # Get material subjects from course
+        material_subjects = course.materialSubjects or []
+
+        if not material_subjects:
+            logger.warning("Course %s has no materialSubjects configured", course_id)
+            return []
+
+        # Collect all files for the course's material subjects
+        all_files = []
+        for subject in material_subjects:
+            subject_files = self.get_files_by_subject(subject)
+            all_files.extend(subject_files)
+
+        # Filter by requested weeks
+        if course.weeks and week_numbers:
+            week_material_files = []
+            for week_num in week_numbers:
+                week = next(
+                    (w for w in course.weeks if w.weekNumber == week_num),
+                    None
+                )
+                if week and week.materials:
+                    for material in week.materials:
+                        if hasattr(material, 'file') and material.file:
+                            matching_keys = [
+                                key for key in all_files
+                                if material.file in self.file_ids.get(key, {}).get("filename", "")
+                            ]
+                            week_material_files.extend(matching_keys)
+
+            if week_material_files:
+                all_files = week_material_files
+                logger.info(
+                    "Filtered to %d materials for weeks %s in course %s",
+                    len(all_files), week_numbers, course_id
+                )
+
+        # Remove duplicates while preserving order
+        seen = set()
+        unique_files = []
+        for f in all_files:
+            if f not in seen:
+                seen.add(f)
+                unique_files.append(f)
+
+        # Sort by tier priority
+        prioritized = self.get_prioritized_files(unique_files)
+
+        logger.info(
+            "Found %d files for course %s weeks %s",
+            len(prioritized), course_id, week_numbers
+        )
+        return prioritized
+
     def get_course_topics(self, course_id: str) -> List[Dict]:
         """
         Get topics covered in a course from Firestore.

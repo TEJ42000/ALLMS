@@ -14,7 +14,7 @@ import logging
 from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 
 from app.services.files_api_service import get_files_api_service
 
@@ -71,8 +71,15 @@ class FilesStudyGuideRequest(BaseModel):
     )
     weeks: Optional[List[int]] = Field(
         None,
-        description="Specific weeks to include"
+        description="Specific weeks to include (each must be 1-52)"
     )
+
+    @validator('weeks', each_item=True)
+    def validate_weeks_range(cls, week):  # noqa: N805
+        """Validate each week is within valid range (1-52)."""
+        if week < 1 or week > 52:
+            raise ValueError(f"Week {week} is invalid. Must be between 1 and 52.")
+        return week
 
 
 class ArticleExplainRequest(BaseModel):
@@ -336,27 +343,18 @@ async def generate_study_guide(request: FilesStudyGuideRequest):
     try:
         service = get_files_api_service()
 
-        # Validate weeks if provided
-        if request.weeks:
-            for week in request.weeks:
-                _validate_week_parameter(week)
+        # Note: weeks are validated by Pydantic @validator
 
         # Get files (supports both legacy and course-aware modes)
         if request.course_id:
-            # Course-aware mode: get all course files first, then filter if weeks specified
-            # This avoids N+1 queries by fetching course data once
+            # Course-aware mode: fetch course data once to avoid N+1 queries
             try:
                 if request.weeks:
-                    # Get files for multiple weeks in a single course lookup
-                    file_keys = []
-                    for week in request.weeks:
-                        week_files = service.get_files_for_course(
-                            request.course_id,
-                            week_number=week
-                        )
-                        file_keys.extend(week_files)
-                    # Remove duplicates while preserving order
-                    file_keys = list(dict.fromkeys(file_keys))
+                    # Use batch method for multiple weeks - single Firestore read
+                    file_keys = service.get_files_for_course_weeks(
+                        request.course_id,
+                        week_numbers=request.weeks
+                    )
                 else:
                     file_keys = service.get_files_for_course(request.course_id)
             except ValueError as e:
@@ -652,16 +650,17 @@ async def get_course_files(
         service = get_files_api_service()
         file_keys = service.get_files_for_course(course_id, week_number=week)
 
-        # Get file details
+        # Get file details - use .get() to avoid KeyError
         files_info = []
         for key in file_keys:
             try:
                 file_id = service.get_file_id(key)
+                file_info = service.file_ids.get(key, {})
                 files_info.append({
                     "key": key,
                     "file_id": file_id,
-                    "filename": service.file_ids[key].get("filename", ""),
-                    "tier": service.file_ids[key].get("tier", "unknown")
+                    "filename": file_info.get("filename", ""),
+                    "tier": file_info.get("tier", "unknown")
                 })
             except (KeyError, ValueError):
                 logger.warning("File key '%s' not found in file_ids.json", key)
