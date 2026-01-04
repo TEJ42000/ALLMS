@@ -102,9 +102,11 @@ class FilesAPIService:
 
 Difficulty: %s
 Requirements:
+- Use only information from the provided documents
+- Using information from provided documents, create further questions that are related to course content (Minimum of 20 Questions per Week)
 - Each question tests understanding of legal concepts
 - Include article citations (e.g., Art. 6:74 DCC)
-- Provide 4 answer options
+- Provide 4 multiple choice answer options
 - Mark correct answer
 - Include detailed explanation
 
@@ -191,12 +193,15 @@ Return ONLY valid JSON:
 
 Include:
 ## Key Concepts
-- Main legal principles
+- All core concepts mentioned in Materials
 - Important definitions
+- Detailed, well illustrated and visualised decision models
+- Prioritize making the study guide visual and easy to understand, while presenting all course information in great detail
 
 ## Important Articles
 - List with brief explanations
 - Include article numbers
+- Explain the articles purpose and context
 
 ## Common Mistakes
 - What students often get wrong (use ❌)
@@ -210,8 +215,7 @@ Include:
 - Example situations to analyze
 
 Use visual formatting:
-- ## for sections
-- ### for subsections with 💡
+- Use valid Markdown formatting 
 - ✅ for correct info
 - ❌ for mistakes
 - ⚠️ for warnings
