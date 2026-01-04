@@ -34,8 +34,11 @@ LLMRMS/
 │   │   └── pages.py            # HTML page serving
 │   ├── services/
 │   │   ├── __init__.py
-│   │   ├── anthropic_client.py # Anthropic API integration
-│   │   └── files_api_service.py # Files API service
+│   │   ├── anthropic_client.py  # Anthropic API integration
+│   │   ├── files_api_service.py # Files API service
+│   │   ├── text_extractor.py    # Unified text extraction (see TEXT-EXTRACTION-SERVICE.md)
+│   │   ├── slide_archive.py     # Slide archive viewer (ZIP-based PDFs)
+│   │   └── materials_scanner.py # Course materials folder scanner
 │   ├── models/
 │   │   ├── __init__.py
 │   │   └── schemas.py          # Pydantic models

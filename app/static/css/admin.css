@@ -578,6 +578,21 @@
     color: var(--text-secondary);
 }
 
+.syllabus-files {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 6px;
+}
+
+.file-tag {
+    font-size: 11px;
+    padding: 2px 6px;
+    background: var(--bg-secondary);
+    border-radius: 4px;
+    color: var(--text-secondary);
+}
+
 .weeks-preview {
     max-height: 200px;
     overflow-y: auto;
@@ -629,5 +644,120 @@
 
 .preview-btn:hover {
     background: var(--bg-hover);
+}
+
+/* Slide Viewer Styles */
+.slide-viewer-content {
+    max-width: 95vw;
+    width: 95vw;
+    max-height: 95vh;
+    height: 95vh;
+}
+
+.slide-viewer-body {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+}
+
+.slide-container {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: #1a1a2e;
+    position: relative;
+    overflow: auto;
+    padding: 20px;
+}
+
+.slide-container img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    border-radius: 4px;
+    transition: opacity 0.2s ease;
+}
+
+.slide-loading {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: var(--text-secondary);
+    font-size: 1.2em;
+    display: none;
+}
+
+.slide-text-panel {
+    width: 0;
+    overflow: hidden;
+    background: var(--bg-secondary);
+    border-left: 1px solid var(--border-color);
+    transition: width 0.3s ease;
+    display: flex;
+    flex-direction: column;
+}
+
+.slide-text-panel.visible {
+    width: 350px;
+    padding: 15px;
+}
+
+.slide-text-panel h4 {
+    margin: 0 0 10px 0;
+    color: var(--text-primary);
+    font-size: 0.9em;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.slide-text-panel pre {
+    flex: 1;
+    overflow-y: auto;
+    margin: 0;
+    font-family: inherit;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    font-size: 0.9em;
+    line-height: 1.5;
+    color: var(--text-secondary);
+}
+
+.slide-controls {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 20px;
+    padding: 15px 20px;
+    border-top: 1px solid var(--border-color);
+    background: var(--bg-card);
+}
+
+.slide-controls button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+#slide-page-info {
+    min-width: 120px;
+    text-align: center;
+    color: var(--text-secondary);
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    font-size: 28px;
+    cursor: pointer;
+    color: var(--text-secondary);
+    padding: 0 5px;
+    line-height: 1;
+}
+
+.close-btn:hover {
+    color: var(--text-primary);
 }
 

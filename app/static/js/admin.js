@@ -786,12 +786,12 @@ async function openSyllabusModal() {
     selectedSyllabus = null;
     extractedSyllabusData = null;
 
-    // Scan for syllabi
+    // Scan for syllabi folders
     try {
         const response = await fetch(`${API_BASE}/syllabi/scan`);
         if (!response.ok) throw new Error('Failed to scan syllabi');
         const data = await response.json();
-        renderSyllabiList(data.syllabi);
+        renderSyllabiFolders(data.folders);
     } catch (error) {
         document.getElementById('syllabi-list').innerHTML =
             `<p class="error">Error scanning syllabi: ${error.message}</p>`;
@@ -802,28 +802,31 @@ function closeSyllabusModal() {
     document.getElementById('syllabus-modal').classList.add('hidden');
 }
 
-function renderSyllabiList(syllabi) {
+function renderSyllabiFolders(folders) {
     const container = document.getElementById('syllabi-list');
-    if (!syllabi || syllabi.length === 0) {
-        container.innerHTML = '<p class="empty-state">No syllabus PDFs found in Materials/Syllabus/</p>';
+    if (!folders || folders.length === 0) {
+        container.innerHTML = '<p class="empty-state">No syllabus folders found in Materials/Syllabus/</p>';
         return;
     }
 
-    container.innerHTML = syllabi.map(s => `
-        <div class="syllabus-item" onclick="selectSyllabus('${s.path}', '${s.filename}', this)">
+    container.innerHTML = folders.map(f => `
+        <div class="syllabus-item" onclick="selectSyllabusFolder('${f.path}', '${f.subject}', this)">
             <div class="syllabus-info">
-                <strong>📄 ${s.filename}</strong>
-                <small>Subject: ${s.subject} | Pages: ${s.pages}</small>
+                <strong>📁 ${f.subject}</strong>
+                <small>${f.files.length} file(s) | ${f.total_pages} total pages</small>
+                <div class="syllabus-files">
+                    ${f.files.map(file => `<span class="file-tag">📄 ${file.filename}</span>`).join('')}
+                </div>
             </div>
         </div>
     `).join('');
 }
 
-function selectSyllabus(path, filename, element) {
+function selectSyllabusFolder(path, subject, element) {
     // Remove previous selection
     document.querySelectorAll('.syllabus-item').forEach(el => el.classList.remove('selected'));
     element.classList.add('selected');
-    selectedSyllabus = { path, filename };
+    selectedSyllabus = { path, subject };
     document.getElementById('syllabus-extract-btn').classList.remove('hidden');
 }
 
@@ -864,6 +867,7 @@ async function extractSyllabusData() {
         document.getElementById('extracted-institution').value = extractedSyllabusData.institution || '';
         document.getElementById('extracted-points').value = extractedSyllabusData.totalPoints || '';
         document.getElementById('extracted-threshold').value = extractedSyllabusData.passingThreshold || '';
+        document.getElementById('extracted-subjects').value = (extractedSyllabusData.materialSubjects || []).join(', ');
 
         // Show weeks preview
         const weeks = extractedSyllabusData.weeks || [];
@@ -909,8 +913,33 @@ async function importSyllabusData() {
         ? `${courseCode.replace(/[^a-zA-Z0-9]/g, '')}-${academicYear}`
         : `${courseName.replace(/[^a-zA-Z0-9]/g, '-').substring(0, 20)}-${academicYear}`;
 
+    // Parse material subjects from comma-separated input
+    const subjectsInput = document.getElementById('extracted-subjects').value;
+    const materialSubjects = subjectsInput
+        ? subjectsInput.split(',').map(s => s.trim()).filter(s => s)
+        : [];
+
     showLoading();
     try {
+        // Build syllabus data for storage
+        const syllabusData = {
+            sourceFolder: extractedSyllabusData.sourceFolder || '',
+            sourceFiles: extractedSyllabusData.sourceFiles || [],
+            rawText: extractedSyllabusData.rawText || '',
+            sections: extractedSyllabusData.sections || [],
+            courseDescription: extractedSyllabusData.courseDescription || null,
+            learningObjectives: extractedSyllabusData.learningObjectives || [],
+            prerequisites: extractedSyllabusData.prerequisites || null,
+            teachingMethods: extractedSyllabusData.teachingMethods || null,
+            assessmentInfo: extractedSyllabusData.assessmentInfo || null,
+            assessments: extractedSyllabusData.assessments || [],
+            lecturers: extractedSyllabusData.lecturers || [],
+            officeHours: null,
+            attendancePolicy: extractedSyllabusData.attendancePolicy || null,
+            academicIntegrity: extractedSyllabusData.academicIntegrity || null,
+            additionalNotes: extractedSyllabusData.additionalNotes || null
+        };
+
         // Create course
         const courseData = {
             id: courseId,
@@ -921,7 +950,8 @@ async function importSyllabusData() {
             totalPoints: parseInt(document.getElementById('extracted-points').value) || null,
             passingThreshold: parseInt(document.getElementById('extracted-threshold').value) || null,
             components: extractedSyllabusData.components || [],
-            materialSubjects: []
+            materialSubjects: materialSubjects,
+            syllabus: syllabusData
         };
 
         const response = await fetch(API_BASE, {
@@ -935,19 +965,22 @@ async function importSyllabusData() {
             throw new Error(error.detail || 'Failed to create course');
         }
 
-        // Create weeks if extracted
+        // Create weeks if extracted (using PUT upsert endpoint)
         const weeks = extractedSyllabusData.weeks || [];
         for (const week of weeks) {
+            const weekNumber = week.weekNumber;
+            if (!weekNumber) continue;
+
             const weekData = {
-                weekNumber: week.weekNumber,
-                title: week.title || `Week ${week.weekNumber}`,
+                weekNumber: weekNumber,
+                title: week.title || `Week ${weekNumber}`,
                 topics: week.topics || [],
                 materials: [],
                 keyConcepts: []
             };
 
-            await fetch(`${API_BASE}/${courseId}/weeks`, {
-                method: 'POST',
+            await fetch(`${API_BASE}/${courseId}/weeks/${weekNumber}`, {
+                method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(weekData)
             });
@@ -965,21 +998,180 @@ async function importSyllabusData() {
 }
 
 // ========== Material Preview ==========
-function openPreviewModal(filePath, title) {
-    const modal = document.getElementById('preview-modal');
-    const iframe = document.getElementById('preview-iframe');
-    const titleEl = document.getElementById('preview-title');
+let slideViewerState = {
+    filePath: null,
+    currentPage: 1,
+    totalPages: 0,
+    slides: []
+};
 
-    titleEl.textContent = `📄 ${title || filePath.split('/').pop()}`;
-    iframe.src = `${API_BASE}/materials/preview/${filePath}`;
+async function openPreviewModal(filePath, title) {
+    // First, check the file type using the info endpoint
+    const infoUrl = `${API_BASE}/materials/info/${encodeURIComponent(filePath).replace(/%2F/g, '/')}`;
+
+    try {
+        const response = await fetch(infoUrl);
+        if (!response.ok) {
+            throw new Error('Failed to get file info');
+        }
+
+        const info = await response.json();
+
+        if (info.file_type === 'slide_archive') {
+            // Open slide viewer
+            openSlideViewer(filePath, title, info);
+        } else if (info.file_type === 'pdf') {
+            // Open PDF in new tab
+            const previewUrl = `${API_BASE}/materials/preview/${encodeURIComponent(filePath).replace(/%2F/g, '/')}`;
+            window.open(previewUrl, '_blank');
+        } else {
+            // Unknown type - offer download
+            alert(`This file type (${info.file_type}) cannot be previewed. It may be corrupted or in an unsupported format.`);
+        }
+    } catch (error) {
+        console.error('Preview error:', error);
+        // Fallback: try opening as PDF
+        const previewUrl = `${API_BASE}/materials/preview/${encodeURIComponent(filePath).replace(/%2F/g, '/')}`;
+        window.open(previewUrl, '_blank');
+    }
+}
+
+function openSlideViewer(filePath, title, info) {
+    slideViewerState = {
+        filePath: filePath,
+        currentPage: 1,
+        totalPages: info.num_pages || 0,
+        slides: info.slides || []
+    };
+
+    // Create or get the slide viewer modal
+    let modal = document.getElementById('slide-viewer-modal');
+    if (!modal) {
+        modal = createSlideViewerModal();
+        document.body.appendChild(modal);
+    }
+
+    // Update title
+    document.getElementById('slide-viewer-title').textContent = title || filePath.split('/').pop();
+    document.getElementById('slide-page-info').textContent = `Page 1 of ${slideViewerState.totalPages}`;
+
+    // Load first slide
+    loadSlide(1);
+
+    // Show modal
     modal.classList.remove('hidden');
 }
 
+function createSlideViewerModal() {
+    const modal = document.createElement('div');
+    modal.id = 'slide-viewer-modal';
+    modal.className = 'modal';
+    modal.innerHTML = `
+        <div class="modal-content slide-viewer-content">
+            <div class="modal-header">
+                <h3 id="slide-viewer-title">Slide Viewer</h3>
+                <button class="close-btn" onclick="closeSlideViewer()">&times;</button>
+            </div>
+            <div class="slide-viewer-body">
+                <div class="slide-container">
+                    <img id="slide-image" src="" alt="Slide" />
+                    <div id="slide-loading" class="slide-loading">Loading...</div>
+                </div>
+                <div class="slide-text-panel" id="slide-text-panel">
+                    <h4>Slide Text</h4>
+                    <pre id="slide-text-content"></pre>
+                </div>
+            </div>
+            <div class="slide-controls">
+                <button class="btn" onclick="prevSlide()" id="prev-slide-btn">◀ Previous</button>
+                <span id="slide-page-info">Page 1 of 1</span>
+                <button class="btn" onclick="nextSlide()" id="next-slide-btn">Next ▶</button>
+                <button class="btn btn-secondary" onclick="toggleSlideText()" id="toggle-text-btn">Show Text</button>
+            </div>
+        </div>
+    `;
+    return modal;
+}
+
+async function loadSlide(pageNumber) {
+    const { filePath, totalPages } = slideViewerState;
+    if (pageNumber < 1 || pageNumber > totalPages) return;
+
+    slideViewerState.currentPage = pageNumber;
+
+    // Update UI
+    document.getElementById('slide-page-info').textContent = `Page ${pageNumber} of ${totalPages}`;
+    document.getElementById('prev-slide-btn').disabled = pageNumber <= 1;
+    document.getElementById('next-slide-btn').disabled = pageNumber >= totalPages;
+
+    // Show loading
+    const loadingEl = document.getElementById('slide-loading');
+    const imageEl = document.getElementById('slide-image');
+    loadingEl.style.display = 'block';
+    imageEl.style.opacity = '0.5';
+
+    // Load image
+    const imageUrl = `${API_BASE}/materials/slide/${encodeURIComponent(filePath).replace(/%2F/g, '/')}/page/${pageNumber}`;
+    imageEl.onload = () => {
+        loadingEl.style.display = 'none';
+        imageEl.style.opacity = '1';
+    };
+    imageEl.onerror = () => {
+        loadingEl.textContent = 'Failed to load slide';
+        imageEl.style.opacity = '0.5';
+    };
+    imageEl.src = imageUrl;
+
+    // Load text
+    try {
+        const textUrl = `${API_BASE}/materials/slide/${encodeURIComponent(filePath).replace(/%2F/g, '/')}/text?page=${pageNumber}`;
+        const response = await fetch(textUrl);
+        if (response.ok) {
+            const data = await response.json();
+            document.getElementById('slide-text-content').textContent = data.text || '(No text on this slide)';
+        }
+    } catch (e) {
+        document.getElementById('slide-text-content').textContent = '(Could not load text)';
+    }
+}
+
+function prevSlide() {
+    if (slideViewerState.currentPage > 1) {
+        loadSlide(slideViewerState.currentPage - 1);
+    }
+}
+
+function nextSlide() {
+    if (slideViewerState.currentPage < slideViewerState.totalPages) {
+        loadSlide(slideViewerState.currentPage + 1);
+    }
+}
+
+function toggleSlideText() {
+    const panel = document.getElementById('slide-text-panel');
+    const btn = document.getElementById('toggle-text-btn');
+    if (panel.classList.contains('visible')) {
+        panel.classList.remove('visible');
+        btn.textContent = 'Show Text';
+    } else {
+        panel.classList.add('visible');
+        btn.textContent = 'Hide Text';
+    }
+}
+
+function closeSlideViewer() {
+    const modal = document.getElementById('slide-viewer-modal');
+    if (modal) {
+        modal.classList.add('hidden');
+    }
+}
+
 function closePreviewModal() {
+    closeSlideViewer();
     const modal = document.getElementById('preview-modal');
-    const iframe = document.getElementById('preview-iframe');
-    iframe.src = '';
-    modal.classList.add('hidden');
+    if (modal) {
+        modal.classList.add('hidden');
+    }
 }
 
 // ========== Event Listeners ==========
