@@ -103,6 +103,59 @@ async function saveCourse() {
     } finally { hideLoading(); }
 }
 
+async function scanMaterials() {
+    if (!currentCourse?.id) {
+        showToast('Save the course first', 'error');
+        return;
+    }
+
+    const useAI = document.getElementById('use-ai-titles')?.checked || false;
+    showLoading();
+
+    try {
+        const response = await fetch(`${API_BASE}/${currentCourse.id}/scan-materials`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ use_ai_titles: useAI })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to scan materials');
+        }
+
+        const result = await response.json();
+        showToast(result.message, 'success');
+        renderMaterialsSummary(result);
+
+        // Refresh course data to get updated materials
+        await fetchCourse(currentCourse.id);
+    } catch (error) {
+        showToast('Error: ' + error.message, 'error');
+    } finally {
+        hideLoading();
+    }
+}
+
+function renderMaterialsSummary(scanResult) {
+    const container = document.getElementById('materials-summary');
+    if (!scanResult || scanResult.total_files === 0) {
+        container.innerHTML = '<p class="empty-state">No materials found. Check materialSubjects configuration.</p>';
+        return;
+    }
+
+    const categories = Object.entries(scanResult.categories || {})
+        .map(([cat, count]) => `<span class="category-badge">${cat}: ${count}</span>`)
+        .join(' ');
+
+    container.innerHTML = `
+        <div class="scan-result">
+            <p><strong>✅ Found ${scanResult.total_files} files</strong> in ${scanResult.subjects_scanned?.join(', ') || 'folders'}</p>
+            <div class="categories">${categories}</div>
+        </div>
+    `;
+}
+
 async function saveWeek() {
     if (!currentCourse) { showToast('No course selected', 'error'); return; }
     const weekData = getWeekFormData();
@@ -449,6 +502,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('add-week-btn').addEventListener('click', addNewWeek);
     document.getElementById('add-component-btn').addEventListener('click', addComponent);
     document.getElementById('add-abbreviation-btn').addEventListener('click', addAbbreviation);
+    document.getElementById('scan-materials-btn').addEventListener('click', scanMaterials);
 
     // Week actions
     document.getElementById('save-week-btn').addEventListener('click', saveWeek);

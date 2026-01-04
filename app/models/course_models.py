@@ -321,6 +321,7 @@ class CourseUpdate(BaseModel):
     components: Optional[List[CourseComponent]] = None
     materialSubjects: Optional[List[str]] = None
     abbreviations: Optional[Dict[str, str]] = None
+    materials: Optional[MaterialsRegistry] = None
     active: Optional[bool] = None
 
 
