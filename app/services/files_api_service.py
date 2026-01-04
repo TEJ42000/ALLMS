@@ -1,4 +1,9 @@
-"""Content Generation using Anthropic Files API for the LLS Study Portal."""
+"""Content Generation using Anthropic Files API for the LLS Study Portal.
+
+This service provides AI-powered content generation (quizzes, study guides, flashcards)
+using uploaded course materials. It can optionally integrate with CourseService to
+get course-specific materials from Firestore.
+"""
 
 import json
 import logging
@@ -16,7 +21,15 @@ DEFAULT_FALLBACK_COUNT = 5  # Number of files to return when no specific files f
 
 
 class FilesAPIService:
-    """Service for generating content using uploaded files via Anthropic Files API."""
+    """Service for generating content using uploaded files via Anthropic Files API.
+
+    This service can operate in two modes:
+    1. **Legacy mode**: Uses hardcoded topic mappings (backward compatible)
+    2. **Course-aware mode**: Uses CourseService to get course-specific materials
+
+    The course-aware mode is activated by passing a course_id to methods like
+    get_topic_files_for_course().
+    """
 
     def __init__(self, file_ids_path: str = "file_ids.json"):
         """
@@ -38,6 +51,16 @@ class FilesAPIService:
 
         # Beta header for Files API
         self.beta_header = "files-api-2025-04-14"
+
+        # Lazy-loaded CourseService reference
+        self._course_service = None
+
+    def _get_course_service(self):
+        """Get CourseService instance (lazy loading to avoid circular imports)."""
+        if self._course_service is None:
+            from app.services.course_service import get_course_service
+            self._course_service = get_course_service()
+        return self._course_service
 
     def get_file_id(self, key: str) -> str:
         """Get file_id for a course material."""
@@ -566,6 +589,287 @@ Include:
 
         logger.info("Found %d files for topic '%s'", len(prioritized_files), topic)
         return prioritized_files
+
+    # ========== Course-Aware Methods (Phase 3) ==========
+
+    def get_files_for_course(
+        self,
+        course_id: str,
+        week_number: Optional[int] = None
+    ) -> List[str]:
+        """
+        Get file keys for a course from Firestore, optionally filtered by week.
+
+        This method looks up the course in Firestore and returns files based on
+        the course's materialSubjects configuration.
+
+        Args:
+            course_id: Course ID (e.g., "LLS-2025-2026")
+            week_number: Optional week number to filter materials (1-52)
+
+        Returns:
+            List of file keys sorted by tier priority
+
+        Raises:
+            ValueError: If course not found
+        """
+        course_service = self._get_course_service()
+
+        # Get course from Firestore
+        course = course_service.get_course(course_id, include_weeks=week_number is not None)
+        if course is None:
+            raise ValueError(f"Course not found: {course_id}")
+
+        # Get material subjects from course
+        material_subjects = course.materialSubjects or []
+
+        if not material_subjects:
+            logger.warning("Course %s has no materialSubjects configured", course_id)
+            return []
+
+        # Collect all files for the course's material subjects
+        all_files = []
+        for subject in material_subjects:
+            subject_files = self.get_files_by_subject(subject)
+            all_files.extend(subject_files)
+
+        # If week-specific filtering requested
+        if week_number is not None and course.weeks:
+            # Find the week
+            week = next(
+                (w for w in course.weeks if w.weekNumber == week_number),
+                None
+            )
+            if week and week.materials:
+                # Filter to materials listed in the week
+                week_material_files = []
+                for material in week.materials:
+                    if hasattr(material, 'file') and material.file:
+                        # Try to find matching file key
+                        matching_keys = [
+                            key for key in all_files
+                            if material.file in self.file_ids.get(key, {}).get("filename", "")
+                        ]
+                        week_material_files.extend(matching_keys)
+
+                if week_material_files:
+                    all_files = week_material_files
+                    logger.info(
+                        "Filtered to %d week %d materials for course %s",
+                        len(all_files), week_number, course_id
+                    )
+
+        # Remove duplicates while preserving order
+        seen = set()
+        unique_files = []
+        for f in all_files:
+            if f not in seen:
+                seen.add(f)
+                unique_files.append(f)
+
+        # Sort by tier priority
+        prioritized = self.get_prioritized_files(unique_files)
+
+        logger.info(
+            "Found %d files for course %s (subjects: %s)",
+            len(prioritized), course_id, material_subjects
+        )
+        return prioritized
+
+    def get_files_for_course_weeks(
+        self,
+        course_id: str,
+        week_numbers: List[int]
+    ) -> List[str]:
+        """
+        Get file keys for multiple weeks in a course with a single Firestore read.
+
+        This method avoids the N+1 query problem by fetching the course once
+        and filtering by multiple weeks locally.
+
+        Args:
+            course_id: Course ID (e.g., "LLS-2025-2026")
+            week_numbers: List of week numbers to get materials for
+
+        Returns:
+            List of unique file keys sorted by tier priority
+
+        Raises:
+            ValueError: If course not found
+        """
+        course_service = self._get_course_service()
+
+        # Single Firestore read - include_weeks=True to get all weeks
+        course = course_service.get_course(course_id, include_weeks=True)
+        if course is None:
+            raise ValueError(f"Course not found: {course_id}")
+
+        # Get material subjects from course
+        material_subjects = course.materialSubjects or []
+
+        if not material_subjects:
+            logger.warning("Course %s has no materialSubjects configured", course_id)
+            return []
+
+        # Collect all files for the course's material subjects
+        all_files = []
+        for subject in material_subjects:
+            subject_files = self.get_files_by_subject(subject)
+            all_files.extend(subject_files)
+
+        # Filter by requested weeks
+        if course.weeks and week_numbers:
+            week_material_files = []
+            for week_num in week_numbers:
+                week = next(
+                    (w for w in course.weeks if w.weekNumber == week_num),
+                    None
+                )
+                if week and week.materials:
+                    for material in week.materials:
+                        if hasattr(material, 'file') and material.file:
+                            matching_keys = [
+                                key for key in all_files
+                                if material.file in self.file_ids.get(key, {}).get("filename", "")
+                            ]
+                            week_material_files.extend(matching_keys)
+
+            if week_material_files:
+                all_files = week_material_files
+                logger.info(
+                    "Filtered to %d materials for weeks %s in course %s",
+                    len(all_files), week_numbers, course_id
+                )
+
+        # Remove duplicates while preserving order
+        seen = set()
+        unique_files = []
+        for f in all_files:
+            if f not in seen:
+                seen.add(f)
+                unique_files.append(f)
+
+        # Sort by tier priority
+        prioritized = self.get_prioritized_files(unique_files)
+
+        logger.info(
+            "Found %d files for course %s weeks %s",
+            len(prioritized), course_id, week_numbers
+        )
+        return prioritized
+
+    def get_course_topics(self, course_id: str) -> List[Dict]:
+        """
+        Get topics covered in a course from Firestore.
+
+        Returns topics from all weeks in the course.
+
+        Args:
+            course_id: Course ID
+
+        Returns:
+            List of topic dictionaries with id, name, and description
+
+        Raises:
+            ValueError: If course not found
+        """
+        course_service = self._get_course_service()
+
+        course = course_service.get_course(course_id, include_weeks=True)
+        if course is None:
+            raise ValueError(f"Course not found: {course_id}")
+
+        topics = []
+        seen_topics = set()
+
+        # Extract topics from each week
+        for week in course.weeks or []:
+            for topic in week.topics or []:
+                # Create normalized topic id
+                topic_id = topic.lower().replace(" ", "_").replace("-", "_")
+                if topic_id not in seen_topics:
+                    seen_topics.add(topic_id)
+                    topics.append({
+                        "id": topic_id,
+                        "name": topic,
+                        "description": f"Week {week.weekNumber}: {week.title or 'No title'}",
+                        "week": week.weekNumber
+                    })
+
+        logger.info("Found %d topics for course %s", len(topics), course_id)
+        return topics
+
+    def get_week_key_concepts(
+        self,
+        course_id: str,
+        week_number: int
+    ) -> List[Dict]:
+        """
+        Get key concepts for a specific week in a course.
+
+        Args:
+            course_id: Course ID
+            week_number: Week number (1-52)
+
+        Returns:
+            List of key concept dictionaries
+
+        Raises:
+            ValueError: If course or week not found
+        """
+        course_service = self._get_course_service()
+
+        week = course_service.get_week(course_id, week_number)
+        if week is None:
+            raise ValueError(f"Week {week_number} not found in course {course_id}")
+
+        concepts = []
+        for concept in week.keyConcepts or []:
+            concepts.append({
+                "term": concept.term,
+                "definition": concept.definition,
+                "source": concept.source,
+                "citation": getattr(concept, 'citation', None)
+            })
+
+        logger.info(
+            "Found %d key concepts for week %d of course %s",
+            len(concepts), week_number, course_id
+        )
+        return concepts
+
+    def get_legal_skill_framework(
+        self,
+        course_id: str,
+        skill_id: str
+    ) -> Optional[Dict]:
+        """
+        Get a legal skill framework from a course.
+
+        Args:
+            course_id: Course ID
+            skill_id: Skill ID (e.g., "ecthr_case_analysis")
+
+        Returns:
+            Legal skill dictionary or None if not found
+        """
+        course_service = self._get_course_service()
+
+        skills = course_service.get_legal_skills(course_id)
+        skill = skills.get(skill_id)
+
+        if skill:
+            return {
+                "id": skill_id,
+                "name": skill.name,
+                "description": skill.description,
+                "steps": [
+                    {"step": s.step, "description": s.description}
+                    for s in (skill.decisionModel.steps if skill.decisionModel else [])
+                ]
+            }
+
+        return None
 
 
 # Singleton

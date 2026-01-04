@@ -1,8 +1,14 @@
-"""AI Tutor API Routes for the LLS Study Portal."""
+"""AI Tutor API Routes for the LLS Study Portal.
+
+Provides endpoints for AI-powered tutoring and topic discovery.
+Supports both legacy mode (hardcoded topics) and course-aware mode
+(topics from Firestore via CourseService).
+"""
 
 import logging
+from typing import Optional
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Query, status
 
 from app.models.schemas import ChatRequest, ChatResponse, ErrorResponse
 from app.services.anthropic_client import get_ai_tutor_response
@@ -16,6 +22,35 @@ router = APIRouter(
         500: {"model": ErrorResponse, "description": "Internal server error"}
     }
 )
+
+# Default topics for backward compatibility (legacy mode)
+DEFAULT_TOPICS = [
+    {
+        "id": "constitutional",
+        "name": "Constitutional Law",
+        "description": "Dutch Constitution, separation of powers, judicial review"
+    },
+    {
+        "id": "administrative",
+        "name": "Administrative Law",
+        "description": "GALA provisions, orders, appeals, legal protection"
+    },
+    {
+        "id": "criminal",
+        "name": "Criminal Law",
+        "description": "Trial procedures, decision models, defences"
+    },
+    {
+        "id": "private",
+        "name": "Private Law",
+        "description": "Contract law, damages, breach remedies"
+    },
+    {
+        "id": "international",
+        "name": "International Law",
+        "description": "ICJ, ECHR, treaties, customary law"
+    }
+]
 
 
 @router.post("/chat", response_model=ChatResponse)
@@ -93,40 +128,66 @@ async def chat_with_tutor(request: ChatRequest):
 
 
 @router.get("/topics")
-async def get_topics():
+async def get_topics(
+    course_id: Optional[str] = Query(
+        None,
+        description="Course ID to get topics from (e.g., 'LLS-2025-2026'). "
+                    "If not provided, returns default topics."
+    )
+):
     """
     Get list of available study topics.
-    
-    Returns a list of law topics covered by the LLS course.
-    """
-    return {
+
+    Returns a list of law topics. If course_id is provided, topics are
+    retrieved from the course in Firestore. Otherwise, returns default topics.
+
+    **Example Request (default topics):**
+    ```
+    GET /api/tutor/topics
+    ```
+
+    **Example Request (course-specific topics):**
+    ```
+    GET /api/tutor/topics?course_id=LLS-2025-2026
+    ```
+
+    **Example Response:**
+    ```json
+    {
         "topics": [
-            {
-                "id": "constitutional",
-                "name": "Constitutional Law",
-                "description": "Dutch Constitution, separation of powers, judicial review"
-            },
-            {
-                "id": "administrative",
-                "name": "Administrative Law",
-                "description": "GALA provisions, orders, appeals, legal protection"
-            },
-            {
-                "id": "criminal",
-                "name": "Criminal Law",
-                "description": "Trial procedures, decision models, defences"
-            },
-            {
-                "id": "private",
-                "name": "Private Law",
-                "description": "Contract law, damages, breach remedies"
-            },
-            {
-                "id": "international",
-                "name": "International Law",
-                "description": "ICJ, ECHR, treaties, customary law"
-            }
+            {"id": "constitutional", "name": "Constitutional Law", ...}
         ],
+        "course_id": "LLS-2025-2026",
+        "status": "success"
+    }
+    ```
+    """
+    if course_id:
+        try:
+            from app.services.files_api_service import get_files_api_service
+            service = get_files_api_service()
+            topics = service.get_course_topics(course_id)
+            return {
+                "topics": topics,
+                "course_id": course_id,
+                "status": "success"
+            }
+        except ValueError as e:
+            logger.warning("Course not found: %s", course_id)
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=str(e)
+            ) from e
+        except Exception as e:
+            logger.error("Error getting course topics: %s", str(e))
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to retrieve course topics"
+            ) from e
+
+    # Return default topics (backward compatibility)
+    return {
+        "topics": DEFAULT_TOPICS,
         "status": "success"
     }
 

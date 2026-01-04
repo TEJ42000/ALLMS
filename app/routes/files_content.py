@@ -1,10 +1,20 @@
-"""API Routes using Anthropic Files API for the LLS Study Portal."""
+"""API Routes using Anthropic Files API for the LLS Study Portal.
+
+Provides endpoints for AI-powered content generation (quizzes, study guides,
+flashcards, etc.) using uploaded course materials.
+
+Supports two modes:
+1. **Legacy mode**: Uses topic parameter with hardcoded mappings
+2. **Course-aware mode**: Uses course_id to get materials from Firestore
+
+The course-aware mode is activated by providing a course_id parameter.
+"""
 
 import logging
 from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 
 from app.services.files_api_service import get_files_api_service
 
@@ -19,21 +29,57 @@ router = APIRouter(
 # ========== Request Models ==========
 
 class FilesQuizRequest(BaseModel):
-    """Generate quiz using uploaded files."""
+    """Generate quiz using uploaded files.
 
-    topic: str = Field(
-        ..., description="Constitutional, Administrative, Criminal, Private, or International Law"
+    Supports both legacy mode (topic) and course-aware mode (course_id).
+    If course_id is provided, materials are retrieved from Firestore.
+    """
+
+    topic: Optional[str] = Field(
+        None,
+        description="Topic name (e.g., 'Constitutional Law'). "
+                    "Required if course_id is not provided."
     )
-    week: Optional[int] = Field(None, description="Week number (3, 4, or 6)")
+    course_id: Optional[str] = Field(
+        None,
+        description="Course ID (e.g., 'LLS-2025-2026'). "
+                    "If provided, materials are retrieved from Firestore."
+    )
+    week: Optional[int] = Field(
+        None,
+        ge=1,
+        le=52,
+        description="Week number to filter materials (1-52)"
+    )
     num_questions: int = Field(10, ge=1, le=50)
     difficulty: str = Field("medium", description="easy, medium, hard")
 
 
 class FilesStudyGuideRequest(BaseModel):
-    """Generate study guide from files."""
+    """Generate study guide from files.
 
-    topic: str
-    weeks: Optional[List[int]] = Field(None, description="Specific weeks to include")
+    Supports both legacy mode (topic) and course-aware mode (course_id).
+    """
+
+    topic: Optional[str] = Field(
+        None,
+        description="Topic name. Required if course_id is not provided."
+    )
+    course_id: Optional[str] = Field(
+        None,
+        description="Course ID for Firestore lookup."
+    )
+    weeks: Optional[List[int]] = Field(
+        None,
+        description="Specific weeks to include (each must be 1-52)"
+    )
+
+    @validator('weeks', each_item=True)
+    def validate_weeks_range(cls, week):  # noqa: N805
+        """Validate each week is within valid range (1-52)."""
+        if week < 1 or week > 52:
+            raise ValueError(f"Week {week} is invalid. Must be between 1 and 52.")
+        return week
 
 
 class ArticleExplainRequest(BaseModel):
@@ -41,20 +87,141 @@ class ArticleExplainRequest(BaseModel):
 
     article: str = Field(..., description="Article number (e.g., '6:74')")
     code: str = Field("DCC", description="DCC, GALA, PC, CCP, ECHR")
+    course_id: Optional[str] = Field(
+        None,
+        description="Course ID for context-aware explanation."
+    )
 
 
 class CaseAnalysisRequest(BaseModel):
     """Analyze case using files."""
 
     case_facts: str = Field(..., min_length=50)
-    topic: str
+    topic: Optional[str] = Field(
+        None,
+        description="Topic name. Required if course_id is not provided."
+    )
+    course_id: Optional[str] = Field(
+        None,
+        description="Course ID for Firestore lookup."
+    )
 
 
 class FlashcardsRequest(BaseModel):
-    """Generate flashcards from files."""
+    """Generate flashcards from files.
 
-    topic: str
+    Supports both legacy mode (topic) and course-aware mode (course_id).
+    """
+
+    topic: Optional[str] = Field(
+        None,
+        description="Topic name. Required if course_id is not provided."
+    )
+    course_id: Optional[str] = Field(
+        None,
+        description="Course ID for Firestore lookup."
+    )
+    week: Optional[int] = Field(
+        None,
+        ge=1,
+        le=52,
+        description="Week number to filter materials"
+    )
     num_cards: int = Field(20, ge=5, le=50)
+
+
+# ========== Helper Functions ==========
+
+def _validate_week_parameter(week: Optional[int]) -> None:
+    """
+    Validate week parameter is within valid range.
+
+    Args:
+        week: Week number to validate (1-52)
+
+    Raises:
+        HTTPException: If week is outside valid range
+    """
+    if week is not None and (week < 1 or week > 52):
+        raise HTTPException(
+            400,
+            detail="Week number must be between 1 and 52"
+        )
+
+
+def _add_course_context(
+    response: dict,
+    course_id: Optional[str] = None,
+    week: Optional[int] = None,
+    weeks: Optional[List[int]] = None
+) -> dict:
+    """
+    Add course context to response dictionary.
+
+    Args:
+        response: Response dictionary to augment
+        course_id: Optional course ID
+        week: Optional single week number
+        weeks: Optional list of week numbers
+
+    Returns:
+        Response dictionary with course context added
+    """
+    if course_id:
+        response["course_id"] = course_id
+    if week is not None:
+        response["week"] = week
+    if weeks:
+        response["weeks"] = weeks
+    return response
+
+
+def _get_file_keys(
+    service,
+    topic: Optional[str] = None,
+    course_id: Optional[str] = None,
+    week: Optional[int] = None
+) -> List[str]:
+    """
+    Get file keys based on topic or course_id.
+
+    Args:
+        service: FilesAPIService instance
+        topic: Topic name (legacy mode)
+        course_id: Course ID (course-aware mode)
+        week: Optional week number for filtering (1-52)
+
+    Returns:
+        List of file keys
+
+    Raises:
+        HTTPException: If neither topic nor course_id provided, course not found,
+                       or week is outside valid range
+    """
+    # Validate week parameter
+    _validate_week_parameter(week)
+
+    if course_id:
+        # Course-aware mode: get files from Firestore
+        try:
+            return service.get_files_for_course(course_id, week_number=week)
+        except ValueError as e:
+            logger.warning("Course not found: %s", course_id)
+            raise HTTPException(404, detail=str(e)) from e
+    elif topic:
+        # Legacy mode: use hardcoded topic mappings
+        file_keys = service.get_topic_files(topic)
+        # Add week-specific lecture if provided
+        if week:
+            lecture_key = f"lecture_week_{week}"
+            if lecture_key not in file_keys:
+                file_keys.insert(0, lecture_key)
+        return file_keys
+    else:
+        raise HTTPException(
+            400,
+            detail="Either 'topic' or 'course_id' must be provided"
+        )
 
 
 # ========== Routes ==========
@@ -71,10 +238,24 @@ async def generate_quiz_from_files(request: FilesQuizRequest):
     - No file re-upload needed
     - Claude can cite page numbers
 
-    **Example:**
+    **Modes:**
+    - **Legacy mode**: Provide `topic` parameter
+    - **Course-aware mode**: Provide `course_id` parameter
+
+    **Example (legacy):**
     ```json
     {
         "topic": "Administrative Law",
+        "week": 3,
+        "num_questions": 10,
+        "difficulty": "medium"
+    }
+    ```
+
+    **Example (course-aware):**
+    ```json
+    {
+        "course_id": "LLS-2025-2026",
         "week": 3,
         "num_questions": 10,
         "difficulty": "medium"
@@ -84,28 +265,44 @@ async def generate_quiz_from_files(request: FilesQuizRequest):
     try:
         service = get_files_api_service()
 
-        # Get file keys for topic and week
-        file_keys = service.get_topic_files(request.topic)
+        # Get file keys (supports both legacy and course-aware modes)
+        file_keys = _get_file_keys(
+            service,
+            topic=request.topic,
+            course_id=request.course_id,
+            week=request.week
+        )
 
-        # Add week-specific lecture if provided
-        if request.week:
-            lecture_key = "lecture_week_%d" % request.week
-            if lecture_key not in file_keys:
-                file_keys.insert(0, lecture_key)
+        # Determine topic for quiz generation
+        topic = request.topic or "Course Materials"
 
         quiz = await service.generate_quiz_from_files(
             file_keys=file_keys,
-            topic=request.topic,
+            topic=topic,
             num_questions=request.num_questions,
             difficulty=request.difficulty
         )
 
-        return {
+        response = {
             "quiz": quiz,
             "files_used": file_keys,
             "cached": True  # Files API auto-caches
         }
 
+        # Add course context to response
+        _add_course_context(response, course_id=request.course_id, week=request.week)
+
+        # Log successful generation
+        if request.course_id:
+            logger.info(
+                "Generated quiz for course %s, week %s, %d questions",
+                request.course_id, request.week, request.num_questions
+            )
+
+        return response
+
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("Error generating quiz: %s", e)
         raise HTTPException(500, detail=str(e)) from e
@@ -123,39 +320,89 @@ async def generate_study_guide(request: FilesStudyGuideRequest):
     - Exam tips
     - Practice scenarios
 
-    **Example:**
+    **Modes:**
+    - **Legacy mode**: Provide `topic` parameter
+    - **Course-aware mode**: Provide `course_id` parameter
+
+    **Example (legacy):**
     ```json
     {
         "topic": "Private Law",
         "weeks": [2]
     }
     ```
+
+    **Example (course-aware):**
+    ```json
+    {
+        "course_id": "LLS-2025-2026",
+        "weeks": [2, 3]
+    }
+    ```
     """
     try:
         service = get_files_api_service()
 
-        # Get files for topic
-        file_keys = service.get_topic_files(request.topic)
+        # Note: weeks are validated by Pydantic @validator
 
-        # Add week-specific content
-        if request.weeks:
-            for week in request.weeks:
-                if week in [3, 4, 6]:
-                    file_keys.append("lecture_week_%d" % week)
-                if week in [1, 2]:
-                    file_keys.append("readings_week_%d" % week)
+        # Get files (supports both legacy and course-aware modes)
+        if request.course_id:
+            # Course-aware mode: fetch course data once to avoid N+1 queries
+            try:
+                if request.weeks:
+                    # Use batch method for multiple weeks - single Firestore read
+                    file_keys = service.get_files_for_course_weeks(
+                        request.course_id,
+                        week_numbers=request.weeks
+                    )
+                else:
+                    file_keys = service.get_files_for_course(request.course_id)
+            except ValueError as e:
+                logger.warning("Course not found: %s", request.course_id)
+                raise HTTPException(404, detail=str(e)) from e
+        elif request.topic:
+            # Legacy mode
+            file_keys = service.get_topic_files(request.topic)
+            # Add week-specific content
+            if request.weeks:
+                for week in request.weeks:
+                    if week in [3, 4, 6]:
+                        file_keys.append(f"lecture_week_{week}")
+                    if week in [1, 2]:
+                        file_keys.append(f"readings_week_{week}")
+        else:
+            raise HTTPException(
+                400,
+                detail="Either 'topic' or 'course_id' must be provided"
+            )
+
+        topic = request.topic or "Course Materials"
 
         guide = await service.generate_study_guide(
-            topic=request.topic,
+            topic=topic,
             file_keys=file_keys
         )
 
-        return {
+        response = {
             "guide": guide,
-            "topic": request.topic,
+            "topic": topic,
             "files_used": file_keys
         }
 
+        # Add course context to response
+        _add_course_context(response, course_id=request.course_id, weeks=request.weeks)
+
+        # Log successful generation
+        if request.course_id:
+            logger.info(
+                "Generated study guide for course %s, weeks %s",
+                request.course_id, request.weeks
+            )
+
+        return response
+
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("Error generating study guide: %s", e)
         raise HTTPException(500, detail=str(e)) from e
@@ -253,10 +500,23 @@ async def generate_flashcards(request: FlashcardsRequest):
     - Key legal concepts
     - Important principles
 
-    **Example:**
+    **Modes:**
+    - **Legacy mode**: Provide `topic` parameter
+    - **Course-aware mode**: Provide `course_id` parameter
+
+    **Example (legacy):**
     ```json
     {
         "topic": "Criminal Law",
+        "num_cards": 20
+    }
+    ```
+
+    **Example (course-aware):**
+    ```json
+    {
+        "course_id": "LLS-2025-2026",
+        "week": 3,
         "num_cards": 20
     }
     ```
@@ -264,20 +524,42 @@ async def generate_flashcards(request: FlashcardsRequest):
     try:
         service = get_files_api_service()
 
-        file_keys = service.get_topic_files(request.topic)
+        # Get file keys (supports both legacy and course-aware modes)
+        file_keys = _get_file_keys(
+            service,
+            topic=request.topic,
+            course_id=request.course_id,
+            week=request.week
+        )
+
+        topic = request.topic or "Course Materials"
 
         flashcards = await service.generate_flashcards(
-            topic=request.topic,
+            topic=topic,
             file_keys=file_keys,
             num_cards=request.num_cards
         )
 
-        return {
+        response = {
             "flashcards": flashcards,
             "count": len(flashcards),
-            "topic": request.topic
+            "topic": topic
         }
 
+        # Add course context to response
+        _add_course_context(response, course_id=request.course_id, week=request.week)
+
+        # Log successful generation
+        if request.course_id:
+            logger.info(
+                "Generated %d flashcards for course %s, week %s",
+                len(flashcards), request.course_id, request.week
+            )
+
+        return response
+
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("Error generating flashcards: %s", e)
         raise HTTPException(500, detail=str(e)) from e
@@ -344,6 +626,62 @@ async def get_topic_files(topic: str):
 
     except Exception as e:
         logger.error("Error getting topic files: %s", e)
+        raise HTTPException(500, detail=str(e)) from e
+
+
+@router.get("/course-files/{course_id}")
+async def get_course_files(
+    course_id: str,
+    week: Optional[int] = None
+):
+    """
+    Get files for a specific course from Firestore.
+
+    Returns which uploaded files are relevant for the course,
+    optionally filtered by week number.
+
+    **Example:**
+    ```
+    GET /api/files-content/course-files/LLS-2025-2026
+    GET /api/files-content/course-files/LLS-2025-2026?week=3
+    ```
+    """
+    try:
+        service = get_files_api_service()
+        file_keys = service.get_files_for_course(course_id, week_number=week)
+
+        # Get file details - use .get() to avoid KeyError
+        files_info = []
+        for key in file_keys:
+            try:
+                file_id = service.get_file_id(key)
+                file_info = service.file_ids.get(key, {})
+                files_info.append({
+                    "key": key,
+                    "file_id": file_id,
+                    "filename": file_info.get("filename", ""),
+                    "tier": file_info.get("tier", "unknown")
+                })
+            except (KeyError, ValueError):
+                logger.warning("File key '%s' not found in file_ids.json", key)
+
+        response = {
+            "course_id": course_id,
+            "file_keys": file_keys,
+            "files": files_info,
+            "count": len(files_info)
+        }
+
+        if week:
+            response["week"] = week
+
+        return response
+
+    except ValueError as e:
+        logger.warning("Course not found: %s", course_id)
+        raise HTTPException(404, detail=str(e)) from e
+    except Exception as e:
+        logger.error("Error getting course files: %s", e)
         raise HTTPException(500, detail=str(e)) from e
 
 
