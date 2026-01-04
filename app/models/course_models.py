@@ -233,6 +233,37 @@ class LegalSkillsConfig(BaseModel):
 
 
 # ============================================================================
+# Uploaded Materials
+# ============================================================================
+
+
+class UploadedMaterial(BaseModel):
+    """Uploaded material record for course documents."""
+
+    id: str  # UUID
+    filename: str  # Original filename
+    storagePath: str  # Path in Materials/
+    tier: str  # 'syllabus', 'course_materials', 'supplementary'
+    category: Optional[str] = None  # 'lecture', 'reading', 'case', etc.
+    fileType: str  # 'pdf', 'docx', 'image', etc.
+    fileSize: int  # Bytes
+    mimeType: str
+    uploadedAt: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    uploadedBy: Optional[str] = None  # User ID when auth is implemented
+
+    # Text extraction
+    textExtracted: bool = False
+    extractedText: Optional[str] = None  # Stored text (or reference to external storage)
+    textLength: Optional[int] = None
+    extractionError: Optional[str] = None
+
+    # Metadata
+    title: Optional[str] = None  # Display title (defaults to filename)
+    description: Optional[str] = None
+    weekNumber: Optional[int] = None  # Link to specific week
+
+
+# ============================================================================
 # Main Course Model
 # ============================================================================
 

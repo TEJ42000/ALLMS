@@ -74,6 +74,11 @@ async function fetchCourse(courseId) {
         renderWeeksList();
         renderCourseMaterialsList(currentCourse.materials);
         showView('course-detail');
+
+        // Initialize upload functionality for this course
+        if (typeof initUpload === 'function') {
+            initUpload(courseId);
+        }
     } catch (error) {
         showToast('Error loading course: ' + error.message, 'error');
     } finally { hideLoading(); }
