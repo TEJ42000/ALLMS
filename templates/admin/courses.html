@@ -75,7 +75,8 @@
                     </div>
                     <div class="form-group">
                         <label for="course-subjects">Material Subjects (comma-separated)</label>
-                        <input type="text" id="course-subjects" class="form-input" placeholder="e.g., Criminal Law, Constitutional Law, Private Law">
+                        <input type="text" id="course-subjects" class="form-input" placeholder="e.g., LLS, Criminal_Law">
+                        <small class="form-hint">Folder names from Materials/Course_Materials/ (links to file_ids.json)</small>
                     </div>
                     <div class="form-group">
                         <label>
@@ -83,6 +84,30 @@
                         </label>
                     </div>
                 </form>
+
+                <!-- Components Section -->
+                <div class="course-subsection">
+                    <div class="section-header">
+                        <h3>🧩 Course Components</h3>
+                        <button id="add-component-btn" class="btn btn-secondary btn-sm">+ Add Component</button>
+                    </div>
+                    <p class="form-hint">Course parts with points (e.g., Part A: Law - 100 points, Part B: Skills - 100 points)</p>
+                    <div id="components-list" class="items-list">
+                        <p class="empty-state">No components defined</p>
+                    </div>
+                </div>
+
+                <!-- Abbreviations Section -->
+                <div class="course-subsection">
+                    <div class="section-header">
+                        <h3>📚 Legal Abbreviations</h3>
+                        <button id="add-abbreviation-btn" class="btn btn-secondary btn-sm">+ Add Abbreviation</button>
+                    </div>
+                    <p class="form-hint">Legal abbreviations and their full names (e.g., GALA → General Administrative Law Act)</p>
+                    <div id="abbreviations-list" class="items-list">
+                        <p class="empty-state">No abbreviations defined</p>
+                    </div>
+                </div>
 
                 <div class="weeks-section">
                     <div class="section-header">

@@ -279,3 +279,30 @@
     font-size: 0.9em;
 }
 
+/* Course subsections (components, abbreviations) */
+.course-subsection {
+    background: rgba(0, 0, 0, 0.15);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.course-subsection h3 {
+    margin: 0;
+    font-size: 1.1em;
+}
+
+.course-subsection .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.form-hint {
+    display: block;
+    color: var(--text-secondary);
+    font-size: 0.85em;
+    margin-bottom: 10px;
+}
+

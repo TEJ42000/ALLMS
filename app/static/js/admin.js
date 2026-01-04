@@ -134,6 +134,8 @@ function getCourseFormData() {
         academicYear: document.getElementById('course-year').value.trim(),
         ectsPoints: parseInt(document.getElementById('course-points').value) || null,
         materialSubjects: document.getElementById('course-subjects').value.split(',').map(s => s.trim()).filter(Boolean),
+        components: collectComponents(),
+        abbreviations: collectAbbreviations(),
         isActive: document.getElementById('course-active').checked
     };
 }
@@ -150,11 +152,32 @@ function getWeekFormData() {
 }
 
 function collectTopics() {
+    // Topics are List[str] - simple strings, not objects
     const rows = document.querySelectorAll('#topics-list .item-row');
+    return Array.from(rows).map(row =>
+        row.querySelector('.topic-text')?.value.trim() || ''
+    ).filter(t => t);
+}
+
+function collectComponents() {
+    const rows = document.querySelectorAll('#components-list .item-row');
     return Array.from(rows).map(row => ({
-        name: row.querySelector('.topic-name')?.value.trim() || '',
-        description: row.querySelector('.topic-desc')?.value.trim() || ''
-    })).filter(t => t.name);
+        id: row.querySelector('.comp-id')?.value.trim() || '',
+        name: row.querySelector('.comp-name')?.value.trim() || '',
+        maxPoints: parseInt(row.querySelector('.comp-points')?.value) || 0,
+        description: row.querySelector('.comp-desc')?.value.trim() || ''
+    })).filter(c => c.id && c.name);
+}
+
+function collectAbbreviations() {
+    const rows = document.querySelectorAll('#abbreviations-list .item-row');
+    const abbrevs = {};
+    rows.forEach(row => {
+        const key = row.querySelector('.abbrev-key')?.value.trim() || '';
+        const value = row.querySelector('.abbrev-value')?.value.trim() || '';
+        if (key && value) abbrevs[key] = value;
+    });
+    return abbrevs;
 }
 
 function collectMaterials() {
@@ -208,6 +231,33 @@ function renderCourseForm() {
     document.getElementById('course-subjects').value = (currentCourse.materialSubjects || []).join(', ');
     document.getElementById('course-active').checked = (currentCourse.active ?? currentCourse.isActive) !== false;
     document.getElementById('course-id').disabled = true;
+    renderComponentsList();
+    renderAbbreviationsList();
+}
+
+function renderComponentsList() {
+    const components = currentCourse?.components || [];
+    document.getElementById('components-list').innerHTML = components.map((c, i) => `
+        <div class="item-row" data-idx="${i}">
+            <input type="text" value="${c.id || ''}" placeholder="ID (e.g., part-a)" class="comp-id" style="width:100px">
+            <input type="text" value="${c.name || ''}" placeholder="Name (e.g., Law)" class="comp-name">
+            <input type="number" value="${c.maxPoints || ''}" placeholder="Points" class="comp-points" style="width:80px">
+            <input type="text" value="${c.description || ''}" placeholder="Description" class="comp-desc">
+            <button type="button" class="btn-remove" onclick="removeComponent(${i})">✕</button>
+        </div>
+    `).join('') || '<p class="empty-state">No components defined</p>';
+}
+
+function renderAbbreviationsList() {
+    const abbrevs = currentCourse?.abbreviations || {};
+    const entries = Object.entries(abbrevs);
+    document.getElementById('abbreviations-list').innerHTML = entries.map(([key, value], i) => `
+        <div class="item-row" data-idx="${i}">
+            <input type="text" value="${key}" placeholder="Abbreviation (e.g., GALA)" class="abbrev-key" style="width:120px">
+            <input type="text" value="${value}" placeholder="Full name" class="abbrev-value">
+            <button type="button" class="btn-remove" onclick="removeAbbreviation('${key}')">✕</button>
+        </div>
+    `).join('') || '<p class="empty-state">No abbreviations defined</p>';
 }
 
 function renderWeeksList() {
@@ -243,11 +293,11 @@ function renderWeekForm() {
 }
 
 function renderTopicsList() {
+    // Topics are List[str] - simple strings, not objects
     const topics = currentWeek?.topics || [];
-    document.getElementById('topics-list').innerHTML = topics.map((t, i) => `
+    document.getElementById('topics-list').innerHTML = topics.map((topic, i) => `
         <div class="item-row" data-idx="${i}">
-            <input type="text" value="${t.name || ''}" placeholder="Topic name" class="topic-name">
-            <input type="text" value="${t.description || ''}" placeholder="Description" class="topic-desc">
+            <input type="text" value="${typeof topic === 'string' ? topic : (topic.name || '')}" placeholder="Topic name" class="topic-text">
             <button type="button" class="btn-remove" onclick="removeTopic(${i})">✕</button>
         </div>
     `).join('') || '<p class="empty-state">No topics</p>';
@@ -295,6 +345,8 @@ function createNewCourse() {
     document.getElementById('course-points').value = '';
     document.getElementById('course-subjects').value = '';
     document.getElementById('course-active').checked = true;
+    document.getElementById('components-list').innerHTML = '<p class="empty-state">Save the course first to add components.</p>';
+    document.getElementById('abbreviations-list').innerHTML = '<p class="empty-state">Save the course first to add abbreviations.</p>';
     elements.weeksList.innerHTML = '<p class="empty-state">Save the course first to add weeks.</p>';
     showView('course-detail');
 }
@@ -311,7 +363,7 @@ function addNewWeek() {
 function addTopic() {
     if (!currentWeek) currentWeek = { topics: [] };
     if (!currentWeek.topics) currentWeek.topics = [];
-    currentWeek.topics.push({ name: '', description: '' });
+    currentWeek.topics.push('');  // Topics are simple strings
     renderTopicsList();
 }
 
@@ -350,6 +402,37 @@ function removeConcept(idx) {
     }
 }
 
+// Course component/abbreviation add/remove functions
+function addComponent() {
+    if (!currentCourse) { showToast('Save the course first', 'error'); return; }
+    if (!currentCourse.components) currentCourse.components = [];
+    currentCourse.components.push({ id: '', name: '', maxPoints: 0, description: '' });
+    renderComponentsList();
+}
+
+function removeComponent(idx) {
+    if (currentCourse?.components) {
+        currentCourse.components.splice(idx, 1);
+        renderComponentsList();
+    }
+}
+
+function addAbbreviation() {
+    if (!currentCourse) { showToast('Save the course first', 'error'); return; }
+    if (!currentCourse.abbreviations) currentCourse.abbreviations = {};
+    // Add a placeholder that will be replaced when saved
+    const placeholder = `NEW_${Date.now()}`;
+    currentCourse.abbreviations[placeholder] = '';
+    renderAbbreviationsList();
+}
+
+function removeAbbreviation(key) {
+    if (currentCourse?.abbreviations && key in currentCourse.abbreviations) {
+        delete currentCourse.abbreviations[key];
+        renderAbbreviationsList();
+    }
+}
+
 // ========== Event Listeners ==========
 document.addEventListener('DOMContentLoaded', () => {
     fetchCourses();
@@ -364,6 +447,8 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('save-course-btn').addEventListener('click', saveCourse);
     document.getElementById('back-to-list-btn').addEventListener('click', () => { showView('courses'); fetchCourses(); });
     document.getElementById('add-week-btn').addEventListener('click', addNewWeek);
+    document.getElementById('add-component-btn').addEventListener('click', addComponent);
+    document.getElementById('add-abbreviation-btn').addEventListener('click', addAbbreviation);
 
     // Week actions
     document.getElementById('save-week-btn').addEventListener('click', saveWeek);
