@@ -210,6 +210,10 @@ async function renderCourseMaterialsList(materials, uploadedMaterials = null) {
         return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
     };
 
+    // Build a set of uploaded file paths for deduplication
+    const uploadedFilePaths = new Set();
+    const uploadedMaterialIds = {};
+
     // Convert uploaded materials to the scanned format and merge by category
     if (uploadedMaterials && uploadedMaterials.length > 0) {
         uploadedMaterials.forEach(um => {
@@ -219,12 +223,18 @@ async function renderCourseMaterialsList(materials, uploadedMaterials = null) {
                 filePath = filePath.substring('Materials/'.length);
             }
 
+            // Track uploaded paths for deduplication
+            uploadedFilePaths.add(filePath);
+            uploadedFilePaths.add(um.filename);  // Also track by filename
+            uploadedMaterialIds[filePath] = um.id;
+
             const converted = {
                 title: um.title || um.filename,
                 file: filePath,
                 size: formatSize(um.fileSize),
                 week: um.weekNumber,
                 isUploaded: true,  // Mark as uploaded for styling
+                materialId: um.id,  // Store ID for delete functionality
                 summary: um.summary,
                 summaryGenerated: um.summaryGenerated,
                 textExtracted: um.textExtracted,
@@ -254,12 +264,34 @@ async function renderCourseMaterialsList(materials, uploadedMaterials = null) {
         });
     }
 
-    // Helper to render a material item with uploaded badges
+    // Deduplicate: remove scanned materials that match uploaded materials
+    const deduplicateArray = (arr) => {
+        if (!arr) return arr;
+        return arr.filter(m => {
+            if (m.isUploaded) return true;  // Keep uploaded materials
+            const filename = m.file ? m.file.split('/').pop() : '';
+            return !uploadedFilePaths.has(m.file) && !uploadedFilePaths.has(filename);
+        });
+    };
+
+    materials.coreTextbooks = deduplicateArray(materials.coreTextbooks);
+    materials.lectures = deduplicateArray(materials.lectures);
+    materials.readings = deduplicateArray(materials.readings);
+    materials.caseStudies = deduplicateArray(materials.caseStudies);
+    materials.mockExams = deduplicateArray(materials.mockExams);
+    materials.other = deduplicateArray(materials.other);
+
+    // Helper to render a material item with uploaded badges and delete button
     const renderMaterialItem = (m, weekHint = null) => {
         const uploadedBadge = m.isUploaded ? '<span class="material-badge badge-uploaded">📤 Uploaded</span>' : '';
         const summaryBadge = m.summaryGenerated ? '<span class="material-badge badge-summary">✨ AI Summary</span>' : '';
         const textBadge = m.textExtracted ? '<span class="material-badge badge-extracted">✓ Text</span>' : '';
         const badges = [uploadedBadge, summaryBadge, textBadge].filter(b => b).join(' ');
+
+        // Delete button only for uploaded materials
+        const deleteBtn = m.isUploaded && m.materialId
+            ? `<button class="delete-btn" onclick="event.stopPropagation(); deleteMaterial('${m.materialId}')" title="Delete">🗑️</button>`
+            : '';
 
         return `
             <li class="${m.isUploaded ? 'uploaded-item' : ''}">
@@ -269,7 +301,10 @@ async function renderCourseMaterialsList(materials, uploadedMaterials = null) {
                     ${badges ? `<div class="material-badges">${badges}</div>` : ''}
                     ${m.summary ? `<div class="material-summary-inline" title="${m.summary.replace(/"/g, '&quot;')}">📝 ${m.summary.substring(0, 100)}${m.summary.length > 100 ? '...' : ''}</div>` : ''}
                 </div>
-                ${previewBtn(m.file, m.title)}
+                <div class="material-actions-inline">
+                    ${previewBtn(m.file, m.title)}
+                    ${deleteBtn}
+                </div>
             </li>
         `;
     };
@@ -1234,6 +1269,42 @@ function closePreviewModal() {
     const modal = document.getElementById('preview-modal');
     if (modal) {
         modal.classList.add('hidden');
+    }
+}
+
+// ========== Delete Material ==========
+async function deleteMaterial(materialId) {
+    if (!currentCourse?.id) {
+        showToast('No course selected', 'error');
+        return;
+    }
+
+    if (!confirm('Are you sure you want to delete this material? This action cannot be undone.')) {
+        return;
+    }
+
+    try {
+        showLoading();
+        const response = await fetch(`${API_BASE}/courses/${currentCourse.id}/materials/uploads/${materialId}`, {
+            method: 'DELETE'
+        });
+
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.detail || 'Failed to delete material');
+        }
+
+        showToast('Material deleted successfully', 'success');
+
+        // Refresh the materials list
+        if (currentCourse?.materials) {
+            await renderCourseMaterialsList(currentCourse.materials);
+        }
+    } catch (error) {
+        console.error('Delete error:', error);
+        showToast(`Failed to delete: ${error.message}`, 'error');
+    } finally {
+        hideLoading();
     }
 }
 

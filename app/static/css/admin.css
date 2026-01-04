@@ -632,18 +632,34 @@
     background: var(--bg-hover);
 }
 
-.preview-btn {
+.material-actions-inline {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.preview-btn, .delete-btn {
     padding: 4px 8px;
     font-size: 0.8em;
     background: var(--bg-secondary);
     border: 1px solid var(--border-color);
     border-radius: 4px;
     cursor: pointer;
-    margin-left: 10px;
 }
 
 .preview-btn:hover {
     background: var(--bg-hover);
+}
+
+.delete-btn {
+    background: #fee2e2;
+    border-color: #fca5a5;
+    color: #dc2626;
+}
+
+.delete-btn:hover {
+    background: #fecaca;
 }
 
 /* Slide Viewer Styles */
