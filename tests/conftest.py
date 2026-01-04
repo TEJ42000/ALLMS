@@ -122,3 +122,61 @@ def sample_assessment_request_minimal():
             "valid under the law."
         )
     }
+
+
+@pytest.fixture
+def mock_text_extraction():
+    """Mock text extraction service for testing."""
+    with patch('app.services.text_extractor.extract_text') as mock_extract:
+        mock_extract.return_value = "This is extracted text from the document."
+        yield mock_extract
+
+
+@pytest.fixture
+def sample_extraction_status():
+    """Sample extraction status data for UI testing."""
+    from datetime import datetime, timezone
+    return {
+        "path": "Course_Materials/LLS/lecture_week_1.pdf",
+        "extracted": True,
+        "charCount": 12000,
+        "fileType": "pdf",
+        "extractionDate": datetime.now(timezone.utc).isoformat(),
+        "error": None
+    }
+
+
+@pytest.fixture
+def sample_extraction_metrics():
+    """Sample extraction metrics for dashboard testing."""
+    return {
+        "total": 42,
+        "extracted": 36,
+        "failed": 2,
+        "pending": 4,
+        "coverage": 86,
+        "totalChars": 1250000,
+        "byType": {
+            "pdf": {"total": 35, "extracted": 30},
+            "docx": {"total": 5, "extracted": 5},
+            "png": {"total": 2, "extracted": 1}
+        }
+    }
+
+
+@pytest.fixture
+def mock_firestore_cache():
+    """Mock Firestore cache service."""
+    with patch('app.services.text_cache_service.TextCacheService') as mock_cache:
+        mock_instance = MagicMock()
+        mock_instance.get_cached_text.return_value = None
+        mock_instance.cache_text.return_value = True
+        mock_instance.get_stats.return_value = MagicMock(
+            total_entries=0,
+            total_characters=0,
+            total_size_bytes=0,
+            by_file_type={},
+            cache_hit_rate=None
+        )
+        mock_cache.return_value = mock_instance
+        yield mock_instance
