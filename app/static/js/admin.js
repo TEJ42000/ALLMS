@@ -213,9 +213,15 @@ async function renderCourseMaterialsList(materials, uploadedMaterials = null) {
     // Convert uploaded materials to the scanned format and merge by category
     if (uploadedMaterials && uploadedMaterials.length > 0) {
         uploadedMaterials.forEach(um => {
+            // Strip 'Materials/' prefix from storagePath for preview API compatibility
+            let filePath = um.storagePath || '';
+            if (filePath.startsWith('Materials/')) {
+                filePath = filePath.substring('Materials/'.length);
+            }
+
             const converted = {
                 title: um.title || um.filename,
-                file: um.storagePath,
+                file: filePath,
                 size: formatSize(um.fileSize),
                 week: um.weekNumber,
                 isUploaded: true,  // Mark as uploaded for styling
