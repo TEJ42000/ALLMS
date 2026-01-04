@@ -1924,9 +1924,12 @@ async def batch_process_materials(
 
             # Extract text if needed
             if process_text and not material.textExtracted:
-                file_path = pathlib.Path("Materials") / material.storagePath
+                storage_path = material.storagePath
+                logger.debug(f"Processing material: {material.filename}, storagePath: {storage_path}")
+                file_path = pathlib.Path("Materials") / storage_path
+                logger.debug(f"Full file path: {file_path}")
                 if file_path.exists():
-                    extraction = extract_text(str(file_path))
+                    extraction = extract_text(file_path)  # Pass Path object, not string
                     if extraction.success:
                         service.update_text_extraction(
                             course_id=course_id,
@@ -1983,7 +1986,9 @@ async def batch_process_materials(
         )
 
     except Exception as e:
+        import traceback
         logger.error(f"Failed to batch process materials: {e}")
+        logger.error(traceback.format_exc())
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to batch process: {str(e)}"
