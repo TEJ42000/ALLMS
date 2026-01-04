@@ -230,10 +230,10 @@ pytest
 
 ## 📝 License
 
-University of Groningen - Law & Legal Skills Course
+Proprietary
 
 ## 👥 Contributors
-
+- Matej G. Monteleone (@TEJ42000)
 - Matthew G. Monteleone (@mgmonteleone)
 
 ## 🆘 Support
