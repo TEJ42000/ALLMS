@@ -1,120 +1,229 @@
-{% extends "base.html" %}
-
-{% block title %}{{ title }} - Law & Legal Skills{% endblock %}
-
-{% block content %}
-<div class="welcome-section">
-    <h1>🎓 Welcome to LLS Study Portal</h1>
-    <p class="subtitle">AI-Powered Learning for Law & Legal Skills</p>
-</div>
-
-<!-- AI Tutor Tab -->
-<div id="tutor-tab" class="tab-content active">
-    <div class="card">
-        <h2>💬 AI Tutor</h2>
-        <p>Ask questions about Criminal Law, Administrative Law, Private Law, and more!</p>
-        
-        <div class="chat-container">
-            <div id="chat-messages" class="chat-messages"></div>
-            
-            <div class="input-group">
-                <select id="context-select" class="form-select">
-                    <option value="Criminal Law">Criminal Law</option>
-                    <option value="Administrative Law">Administrative Law</option>
-                    <option value="Private Law">Private Law</option>
-                    <option value="Constitutional Law">Constitutional Law</option>
-                    <option value="International Law">International Law</option>
-                </select>
-                <textarea id="tutor-input" class="form-input" placeholder="Ask a question..." rows="3"></textarea>
-                <button id="ask-btn" class="btn btn-primary">Ask AI Tutor</button>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LLS Study Portal - Law & Legal Skills</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <header class="nav-header">
+            <h1 class="nav-title">⚖️ LLS Study Portal</h1>
+            <div class="nav-tabs">
+                <button class="nav-tab active" data-tab="dashboard">📊 Dashboard</button>
+                <button class="nav-tab" data-tab="tutor">🤖 AI Tutor</button>
+                <button class="nav-tab" data-tab="assessment">📝 Assessment</button>
+                <button class="nav-tab" data-tab="quiz">🎯 Quiz</button>
+                <button class="nav-tab" data-tab="flashcards">🗂️ Flashcards</button>
+                <button class="nav-tab" data-tab="study">📚 Study Guide</button>
             </div>
+        </header>
+        <main id="main-content">
+            <section id="dashboard-section" class="section active">
+                <div class="dashboard-header">
+                    <h2>Welcome Back! 🎓</h2>
+                    <div class="exam-info">
+                        <p>Your personalized study dashboard</p>
+                        <p class="exam-date">Track your progress and master LLS topics</p>
+                    </div>
+                </div>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon">🏆</div>
+                        <div class="stat-value" id="stat-points">0</div>
+                        <div class="stat-label">Total Points</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">🔥</div>
+                        <div class="stat-value" id="stat-streak">0</div>
+                        <div class="stat-label">Day Streak</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">📚</div>
+                        <div class="stat-value" id="stat-topics">0/5</div>
+                        <div class="stat-label">Topics Studied</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">✅</div>
+                        <div class="stat-value" id="stat-quizzes">0</div>
+                        <div class="stat-label">Quizzes Completed</div>
+                    </div>
+                </div>
+                <h3 class="section-subtitle">📖 Quick Access Topics</h3>
+                <div class="topics-grid">
+                    <div class="topic-card" data-topic="criminal">
+                        <h4>⚖️ Criminal Law</h4>
+                        <p>Trial procedures, decision models, defences</p>
+                        <div class="topic-progress">
+                            <div class="progress-bar"><div class="progress-fill" style="width: 0%"></div></div>
+                            <span class="progress-text">0% Complete</span>
+                        </div>
+                    </div>
+                    <div class="topic-card" data-topic="private">
+                        <h4>📜 Private Law</h4>
+                        <p>Contract law, damages, breach remedies</p>
+                        <div class="topic-progress">
+                            <div class="progress-bar"><div class="progress-fill" style="width: 0%"></div></div>
+                            <span class="progress-text">0% Complete</span>
+                        </div>
+                    </div>
+                    <div class="topic-card" data-topic="constitutional">
+                        <h4>🏛️ Constitutional Law</h4>
+                        <p>Dutch Constitution, separation of powers</p>
+                        <div class="topic-progress">
+                            <div class="progress-bar"><div class="progress-fill" style="width: 0%"></div></div>
+                            <span class="progress-text">0% Complete</span>
+                        </div>
+                    </div>
+                    <div class="topic-card" data-topic="administrative">
+                        <h4>🏢 Administrative Law</h4>
+                        <p>GALA provisions, orders, appeals</p>
+                        <div class="topic-progress">
+                            <div class="progress-bar"><div class="progress-fill" style="width: 0%"></div></div>
+                            <span class="progress-text">0% Complete</span>
+                        </div>
+                    </div>
+                    <div class="topic-card" data-topic="international">
+                        <h4>🌍 International Law</h4>
+                        <p>ICJ, ECHR, treaties, customary law</p>
+                        <div class="topic-progress">
+                            <div class="progress-bar"><div class="progress-fill" style="width: 0%"></div></div>
+                            <span class="progress-text">0% Complete</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            <section id="tutor-section" class="section">
+                <h2 class="section-title">🤖 AI Tutor</h2>
+                <p class="section-description">Ask questions about any LLS topic and get detailed explanations</p>
+                <div class="chat-container">
+                    <div id="chat-messages" class="chat-messages"></div>
+                    <div class="chat-input-area">
+                        <select id="context-select" class="form-select">
+                            <option value="Criminal Law">Criminal Law</option>
+                            <option value="Private Law">Private Law</option>
+                            <option value="Constitutional Law">Constitutional Law</option>
+                            <option value="Administrative Law">Administrative Law</option>
+                            <option value="International Law">International Law</option>
+                        </select>
+                        <textarea id="tutor-input" placeholder="Ask about concepts, cases, frameworks..." rows="2"></textarea>
+                        <button id="ask-btn" class="btn btn-primary">Ask Question</button>
+                    </div>
+                </div>
+            </section>
+            <section id="assessment-section" class="section">
+                <h2 class="section-title">📝 Assessment</h2>
+                <p class="section-description">Get your answers graded with detailed AI feedback</p>
+                <div class="assessment-form">
+                    <div class="form-group">
+                        <label for="assessment-topic">Topic</label>
+                        <select id="assessment-topic" class="form-select">
+                            <option value="Criminal Law">Criminal Law</option>
+                            <option value="Private Law">Private Law</option>
+                            <option value="Constitutional Law">Constitutional Law</option>
+                            <option value="Administrative Law">Administrative Law</option>
+                            <option value="International Law">International Law</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="assessment-question">Question (Optional)</label>
+                        <textarea id="assessment-question" placeholder="Enter the question or prompt..." rows="2"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="assessment-answer">Your Answer</label>
+                        <textarea id="assessment-answer" placeholder="Enter your answer here..." rows="8"></textarea>
+                    </div>
+                    <button id="assess-btn" class="btn btn-primary">Get Assessment</button>
+                    <div id="assessment-result" class="result-box"></div>
+                </div>
+            </section>
+            <section id="quiz-section" class="section">
+                <h2 class="section-title">🎯 Interactive Quiz</h2>
+                <p class="section-description">Test your knowledge with practice questions</p>
+                <div id="quiz-container">
+                    <div class="quiz-controls">
+                        <div class="form-group">
+                            <label for="quiz-topic-select">Select Topic</label>
+                            <select id="quiz-topic-select" class="form-select">
+                                <option value="all">All Topics</option>
+                                <option value="criminal">Criminal Law</option>
+                                <option value="private">Private Law</option>
+                                <option value="constitutional">Constitutional Law</option>
+                                <option value="administrative">Administrative Law</option>
+                                <option value="international">International Law</option>
+                            </select>
+                        </div>
+                        <button id="start-quiz-btn" class="btn btn-primary">Start Quiz</button>
+                    </div>
+                    <div id="quiz-content" class="quiz-content hidden">
+                        <div class="quiz-header">
+                            <div class="quiz-progress"><span id="quiz-current">1</span> / <span id="quiz-total">10</span></div>
+                            <div class="quiz-score">Score: <span id="quiz-score">0</span></div>
+                        </div>
+                        <div id="quiz-question-container"></div>
+                    </div>
+                </div>
+            </section>
+            <section id="flashcards-section" class="section">
+                <h2 class="section-title">🗂️ Flashcards</h2>
+                <p class="section-description">Memorize key concepts and cases</p>
+                <div id="flashcards-container">
+                    <div class="flashcard-controls">
+                        <div class="flashcard-stats">
+                            <span>Cards Mastered: <strong id="cards-mastered">0</strong> / <strong id="cards-total">0</strong></span>
+                        </div>
+                        <div class="form-group">
+                            <label for="flashcard-category">Category</label>
+                            <select id="flashcard-category" class="form-select">
+                                <option value="all">All Categories</option>
+                                <option value="criminal">Criminal Law</option>
+                                <option value="private">Private Law</option>
+                                <option value="constitutional">Constitutional Law</option>
+                                <option value="administrative">Administrative Law</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="flashcard-display">
+                        <div id="flashcard" class="flashcard">
+                            <div class="flashcard-inner">
+                                <div class="flashcard-front"><p id="flashcard-question">Loading flashcards...</p></div>
+                                <div class="flashcard-back"><p id="flashcard-answer"></p></div>
+                            </div>
+                        </div>
+                        <div class="flashcard-actions">
+                            <button id="prev-card-btn" class="btn btn-secondary">← Previous</button>
+                            <button id="flip-card-btn" class="btn btn-primary">Flip Card</button>
+                            <button id="next-card-btn" class="btn btn-secondary">Next →</button>
+                        </div>
+                        <div class="flashcard-knowledge">
+                            <button id="know-btn" class="btn btn-success">✓ I Know This</button>
+                            <button id="study-btn" class="btn btn-warning">↻ Need to Study</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            <section id="study-section" class="section">
+                <h2 class="section-title">📚 Study Guide Generator</h2>
+                <p class="section-description">Generate comprehensive study guides from course materials</p>
+                <div class="study-form">
+                    <div class="form-group">
+                        <label for="study-topic">Topic</label>
+                        <input type="text" id="study-topic" placeholder="e.g., Criminal Law Week 2" class="form-input" />
+                    </div>
+                    <button id="generate-study-btn" class="btn btn-primary">Generate Study Guide</button>
+                    <div id="study-result" class="result-box"></div>
+                </div>
+            </section>
+        </main>
+        <div id="loading" class="loading hidden">
+            <div class="spinner"></div>
+            <p>Processing...</p>
         </div>
     </div>
-</div>
-
-<!-- Assessment Tab -->
-<div id="assessment-tab" class="tab-content">
-    <div class="card">
-        <h2>📝 AI Assessment</h2>
-        <p>Get your answers graded with detailed feedback!</p>
-        
-        <div class="form-group">
-            <label>Topic:</label>
-            <select id="assessment-topic" class="form-select">
-                <option value="Criminal Law">Criminal Law</option>
-                <option value="Administrative Law">Administrative Law</option>
-                <option value="Private Law">Private Law</option>
-                <option value="Constitutional Law">Constitutional Law</option>
-                <option value="International Law">International Law</option>
-            </select>
-        </div>
-        
-        <div class="form-group">
-            <label>Question (optional):</label>
-            <textarea id="assessment-question" class="form-input" rows="2" placeholder="Enter the question..."></textarea>
-        </div>
-        
-        <div class="form-group">
-            <label>Your Answer:</label>
-            <textarea id="assessment-answer" class="form-input" rows="6" placeholder="Enter your answer..."></textarea>
-        </div>
-        
-        <button id="assess-btn" class="btn btn-primary">Get Assessment</button>
-        
-        <div id="assessment-result" class="result-container"></div>
-    </div>
-</div>
-
-<!-- Quiz Generator Tab -->
-<div id="quiz-tab" class="tab-content">
-    <div class="card">
-        <h2>🎯 Quiz Generator</h2>
-        <p>Generate practice quizzes from course materials!</p>
-        
-        <div class="form-group">
-            <label>Topic:</label>
-            <select id="quiz-topic" class="form-select">
-                <option value="Criminal Law">Criminal Law</option>
-                <option value="Administrative Law">Administrative Law</option>
-                <option value="Private Law">Private Law</option>
-            </select>
-        </div>
-        
-        <div class="form-group">
-            <label>Number of Questions:</label>
-            <input type="number" id="quiz-count" class="form-input" value="10" min="5" max="20">
-        </div>
-        
-        <button id="generate-quiz-btn" class="btn btn-primary">Generate Quiz</button>
-        
-        <div id="quiz-result" class="result-container"></div>
-    </div>
-</div>
-
-<!-- Study Guide Tab -->
-<div id="study-tab" class="tab-content">
-    <div class="card">
-        <h2>📚 Study Guide Generator</h2>
-        <p>Create comprehensive study guides from course materials!</p>
-        
-        <div class="form-group">
-            <label>Topic:</label>
-            <select id="study-topic" class="form-select">
-                <option value="Criminal Law">Criminal Law</option>
-                <option value="Administrative Law">Administrative Law</option>
-                <option value="Private Law">Private Law</option>
-            </select>
-        </div>
-        
-        <button id="generate-study-btn" class="btn btn-primary">Generate Study Guide</button>
-        
-        <div id="study-result" class="result-container"></div>
-    </div>
-</div>
-
-<div id="loading" class="loading hidden">
-    <div class="spinner"></div>
-    <p>Processing...</p>
-</div>
-{% endblock %}
-
+    <footer class="footer">
+        <p>&copy; 2026 LLS Study Portal | University of Groningen | v2.0.0</p>
+    </footer>
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

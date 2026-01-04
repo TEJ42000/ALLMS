@@ -5,17 +5,7 @@ const API_BASE = '';  // Empty for same origin
 // ========== Tab Navigation ==========
 document.addEventListener('DOMContentLoaded', () => {
     const tabs = document.querySelectorAll('.nav-tab');
-    const tabContents = document.querySelectorAll('.tab-content');
-    const mobileMenuBtn = document.getElementById('mobile-menu-btn');
-    const navTabs = document.getElementById('nav-tabs');
-
-    // Mobile menu toggle
-    if (mobileMenuBtn && navTabs) {
-        mobileMenuBtn.addEventListener('click', () => {
-            mobileMenuBtn.classList.toggle('active');
-            navTabs.classList.toggle('active');
-        });
-    }
+    const sections = document.querySelectorAll('.section');
 
     tabs.forEach(tab => {
         tab.addEventListener('click', () => {
@@ -25,37 +15,23 @@ document.addEventListener('DOMContentLoaded', () => {
             tabs.forEach(t => t.classList.remove('active'));
             tab.classList.add('active');
 
-            // Show corresponding content
-            tabContents.forEach(content => {
-                content.classList.remove('active');
-                if (content.id === `${tabName}-tab`) {
-                    content.classList.add('active');
+            // Show corresponding section
+            sections.forEach(section => {
+                section.classList.remove('active');
+                if (section.id === `${tabName}-section`) {
+                    section.classList.add('active');
                 }
             });
-
-            // Close mobile menu after selecting a tab
-            if (mobileMenuBtn && navTabs) {
-                mobileMenuBtn.classList.remove('active');
-                navTabs.classList.remove('active');
-            }
         });
     });
 
-    // Close mobile menu when clicking outside
-    document.addEventListener('click', (e) => {
-        if (mobileMenuBtn && navTabs &&
-            !mobileMenuBtn.contains(e.target) &&
-            !navTabs.contains(e.target)) {
-            mobileMenuBtn.classList.remove('active');
-            navTabs.classList.remove('active');
-        }
-    });
-
     // Initialize event listeners
+    initDashboard();
     initTutorListeners();
     initAssessmentListeners();
     initQuizListeners();
     initStudyListeners();
+    initFlashcardListeners();
 });
 
 // ========== Loading State ==========
@@ -374,3 +350,103 @@ async function generateStudyGuide() {
     }
 }
 
+// ========== Dashboard ==========
+function initDashboard() {
+    const stats = {
+        points: localStorage.getItem('lls_points') || 0,
+        streak: localStorage.getItem('lls_streak') || 0,
+        topics: localStorage.getItem('lls_topics') || '0/5',
+        quizzes: localStorage.getItem('lls_quizzes') || 0
+    };
+
+    document.getElementById('stat-points').textContent = stats.points;
+    document.getElementById('stat-streak').textContent = stats.streak;
+    document.getElementById('stat-topics').textContent = stats.topics;
+    document.getElementById('stat-quizzes').textContent = stats.quizzes;
+
+    document.querySelectorAll('.topic-card').forEach(card => {
+        card.addEventListener('click', () => {
+            document.querySelector('.nav-tab[data-tab="tutor"]').click();
+        });
+    });
+}
+
+// ========== Flashcards ==========
+let flashcards = [];
+let currentCardIndex = 0;
+
+function initFlashcardListeners() {
+    const flipBtn = document.getElementById('flip-card-btn');
+    const prevBtn = document.getElementById('prev-card-btn');
+    const nextBtn = document.getElementById('next-card-btn');
+    const knowBtn = document.getElementById('know-btn');
+    const studyBtn = document.getElementById('study-btn');
+    const categorySelect = document.getElementById('flashcard-category');
+
+    if (flipBtn) flipBtn.addEventListener('click', flipCard);
+    if (prevBtn) prevBtn.addEventListener('click', () => navigateCard(-1));
+    if (nextBtn) nextBtn.addEventListener('click', () => navigateCard(1));
+    if (knowBtn) knowBtn.addEventListener('click', () => markCard('known'));
+    if (studyBtn) studyBtn.addEventListener('click', () => markCard('study'));
+    if (categorySelect) categorySelect.addEventListener('change', loadFlashcards);
+
+    loadFlashcards();
+}
+
+function loadFlashcards() {
+    flashcards = [
+        {question: "What is the principle of legality in criminal law?", answer: "No punishment without law (nullum crimen sine lege). A person can only be punished if their act was criminally punishable at the time it was committed.", category: "criminal", known: false},
+        {question: "What are the three elements of a crime?", answer: "1) Actus reus (criminal act), 2) Mens rea (criminal intent), 3) No justification or excuse", category: "criminal", known: false},
+        {question: "What is breach of contract?", answer: "Failure to perform a contractual obligation without lawful excuse. It gives rise to remedies including damages, specific performance, or termination.", category: "private", known: false},
+        {question: "What is the Trias Politica?", answer: "The separation of powers into three branches: Legislative (makes laws), Executive (enforces laws), and Judicial (interprets laws).", category: "constitutional", known: false},
+        {question: "What is an administrative order (beschikking)?", answer: "A written decision by an administrative authority concerning a public law matter, directed at a specific person or situation.", category: "administrative", known: false}
+    ];
+
+    const category = document.getElementById('flashcard-category').value;
+    if (category !== 'all') {
+        flashcards = flashcards.filter(card => card.category === category);
+    }
+
+    currentCardIndex = 0;
+    updateFlashcardDisplay();
+    updateFlashcardStats();
+}
+
+function flipCard() {
+    document.getElementById('flashcard').classList.toggle('flipped');
+}
+
+function navigateCard(direction) {
+    currentCardIndex += direction;
+    if (currentCardIndex < 0) currentCardIndex = flashcards.length - 1;
+    if (currentCardIndex >= flashcards.length) currentCardIndex = 0;
+
+    document.getElementById('flashcard').classList.remove('flipped');
+    updateFlashcardDisplay();
+}
+
+function markCard(status) {
+    if (flashcards[currentCardIndex]) {
+        flashcards[currentCardIndex].known = (status === 'known');
+        updateFlashcardStats();
+        navigateCard(1);
+    }
+}
+
+function updateFlashcardDisplay() {
+    if (flashcards.length === 0) {
+        document.getElementById('flashcard-question').textContent = 'No flashcards available';
+        document.getElementById('flashcard-answer').textContent = '';
+        return;
+    }
+
+    const card = flashcards[currentCardIndex];
+    document.getElementById('flashcard-question').textContent = card.question;
+    document.getElementById('flashcard-answer').textContent = card.answer;
+}
+
+function updateFlashcardStats() {
+    const mastered = flashcards.filter(card => card.known).length;
+    document.getElementById('cards-mastered').textContent = mastered;
+    document.getElementById('cards-total').textContent = flashcards.length;
+}
