@@ -1301,7 +1301,7 @@ async def upload_course_material(
     try:
         # Verify course exists
         service = get_course_service()
-        course = await service.get_course(course_id)
+        course = service.get_course(course_id)
         if not course:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -1374,7 +1374,7 @@ async def list_uploaded_materials(
     try:
         # Verify course exists
         service = get_course_service()
-        course = await service.get_course(course_id)
+        course = service.get_course(course_id)
         if not course:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
