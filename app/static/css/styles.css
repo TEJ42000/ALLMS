@@ -1,5 +1,8 @@
 /* LLS Study Portal - Enhanced Styles */
 * { margin: 0; padding: 0; box-sizing: border-box; }
+
+/* Accessibility: Visually hidden but accessible to screen readers */
+.visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 :root {
     --navy-dark: #1a1f35; --navy-medium: #2d3561; --gold: #d4af37; --gold-light: #ffd700;
     --text-primary: #e0e6ed; --text-secondary: #a0aec0; --success: #48bb78; --warning: #ecc94b;

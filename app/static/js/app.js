@@ -376,16 +376,22 @@ async function generateStudyGuide() {
 }
 
 // ========== Dashboard ==========
+// Helper to safely parse integer from localStorage with NaN validation
+function safeParseInt(value, fallback = 0) {
+    const parsed = parseInt(value, 10);
+    return isNaN(parsed) ? fallback : parsed;
+}
+
 function initDashboard() {
     // Validate topics format (should be like "2/5")
     const topicsValue = localStorage.getItem('lls_topics');
     const validTopics = topicsValue && /^\d+\/\d+$/.test(topicsValue) ? topicsValue : '0/5';
 
     const stats = {
-        points: parseInt(localStorage.getItem('lls_points'), 10) || 0,
-        streak: parseInt(localStorage.getItem('lls_streak'), 10) || 0,
+        points: safeParseInt(localStorage.getItem('lls_points')),
+        streak: safeParseInt(localStorage.getItem('lls_streak')),
         topics: validTopics,
-        quizzes: parseInt(localStorage.getItem('lls_quizzes'), 10) || 0
+        quizzes: safeParseInt(localStorage.getItem('lls_quizzes'))
     };
 
     // Safely update DOM elements with null checks
@@ -425,9 +431,16 @@ function initDashboard() {
 }
 
 // ========== Flashcards ==========
+// NOTE: Flashcard data is currently static for the MVP.
+// TODO: Issue #XX - Implement /api/files-content/flashcards endpoint to load flashcards dynamically
+// TODO: Persist flashcard progress (known/unknown) to localStorage
+
 let flashcards = [];
 let currentCardIndex = 0;
 
+/**
+ * Initialize event listeners for flashcard navigation and interaction
+ */
 function initFlashcardListeners() {
     const flipBtn = document.getElementById('flip-card-btn');
     const prevBtn = document.getElementById('prev-card-btn');

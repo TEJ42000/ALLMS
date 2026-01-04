@@ -51,6 +51,8 @@
                     </div>
                 </div>
                 <h3 class="section-subtitle">📖 Quick Access Topics</h3>
+                <!-- TODO: Progress tracking will be implemented in a future release.
+                     Progress bars are currently static placeholders. -->
                 <div class="topics-grid">
                     <div class="topic-card" data-topic="criminal">
                         <h4>⚖️ Criminal Law</h4>
@@ -100,14 +102,16 @@
                 <div class="chat-container">
                     <div id="chat-messages" class="chat-messages"></div>
                     <div class="chat-input-area">
-                        <select id="context-select" class="form-select">
+                        <label for="context-select" class="visually-hidden">Select Topic Context</label>
+                        <select id="context-select" class="form-select" aria-label="Select topic context for your question">
                             <option value="Criminal Law">Criminal Law</option>
                             <option value="Private Law">Private Law</option>
                             <option value="Constitutional Law">Constitutional Law</option>
                             <option value="Administrative Law">Administrative Law</option>
                             <option value="International Law">International Law</option>
                         </select>
-                        <textarea id="tutor-input" placeholder="Ask about concepts, cases, frameworks..." rows="2"></textarea>
+                        <label for="tutor-input" class="visually-hidden">Your question for the AI Tutor</label>
+                        <textarea id="tutor-input" placeholder="Ask about concepts, cases, frameworks..." rows="2" aria-label="Enter your question for the AI Tutor"></textarea>
                         <button id="ask-btn" class="btn btn-primary">Ask Question</button>
                     </div>
                 </div>
