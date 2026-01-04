@@ -116,34 +116,32 @@ class TestDiscoverMaterials:
             for info in result.values():
                 assert info["tier"] == "Syllabus"  # Normalized
 
-    def test_discover_materials_duplicate_keys(self):
-        """Test handling of duplicate file keys."""
+    def test_discover_materials_unique_keys_across_tiers(self):
+        """Test that files with same name in different tiers get unique keys."""
         with tempfile.TemporaryDirectory() as tmpdir:
             materials_dir = Path(tmpdir)
-            
-            # Create two files that would generate the same key
+
+            # Create files with same name in different tiers
             dir1 = materials_dir / "Syllabus" / "Subject"
             dir1.mkdir(parents=True)
             (dir1 / "file.pdf").write_text("test1")
-            
+
             dir2 = materials_dir / "Course_Materials" / "Subject"
             dir2.mkdir(parents=True)
             (dir2 / "file.pdf").write_text("test2")
-            
-            with patch('upload_files_script.logger') as mock_logger:
-                result = discover_materials(str(materials_dir))
-                
-                # Should log a warning about duplicate
-                mock_logger.warning.assert_called()
-                warning_call = str(mock_logger.warning.call_args_list[0])
-                assert "duplicate" in warning_call.lower()
-            
-            # Should find both files with unique keys
+
+            result = discover_materials(str(materials_dir))
+
+            # Should find both files
             assert len(result) == 2
-            
-            # Keys should be different
+
+            # Keys should be different (tier name makes them different)
             keys = list(result.keys())
             assert keys[0] != keys[1]
+
+            # One should have "syllabus" and one should have "course_materials"
+            assert any("syllabus" in key for key in keys)
+            assert any("course_materials" in key for key in keys)
 
     def test_discover_materials_metadata(self):
         """Test that file metadata is correctly captured."""
