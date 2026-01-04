@@ -43,24 +43,140 @@ function hideLoading() {
 
 // ========== Markdown Formatting ==========
 function formatMarkdown(text) {
-    // Basic markdown formatting
-    text = text.replace(/## (.*?)$/gm, '<h2>$1</h2>');
-    text = text.replace(/### (.*?)$/gm, '<h3>$1</h3>');
-    text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-    text = text.replace(/\*(.*?)\*/g, '<em>$1</em>');
-    text = text.replace(/`(.*?)`/g, '<code>$1</code>');
-    
-    // Lists
-    text = text.replace(/^- (.*?)$/gm, '<li>$1</li>');
-    text = text.replace(/^(\d+)\. (.*?)$/gm, '<li>$2</li>');
-    
-    // Emojis and special formatting
-    text = text.replace(/✅/g, '<span class="emoji-check">✅</span>');
-    text = text.replace(/❌/g, '<span class="emoji-cross">❌</span>');
-    text = text.replace(/⚠️/g, '<span class="emoji-warning">⚠️</span>');
-    text = text.replace(/💡/g, '<span class="emoji-tip">💡</span>');
-    
+    if (!text) return '';
+
+    // Split into lines for processing
+    const lines = text.split('\n');
+    let html = '';
+    let inList = false;
+    let inNumberedList = false;
+
+    for (let i = 0; i < lines.length; i++) {
+        let line = lines[i];
+
+        // Skip empty lines but add spacing
+        if (line.trim() === '') {
+            if (inList) {
+                html += '</ul>';
+                inList = false;
+            }
+            if (inNumberedList) {
+                html += '</ol>';
+                inNumberedList = false;
+            }
+            html += '<br>';
+            continue;
+        }
+
+        // Headers
+        if (line.startsWith('## ')) {
+            if (inList) { html += '</ul>'; inList = false; }
+            if (inNumberedList) { html += '</ol>'; inNumberedList = false; }
+            html += `<h2 class="md-h2">${escapeHtml(line.substring(3))}</h2>`;
+            continue;
+        }
+        if (line.startsWith('### ')) {
+            if (inList) { html += '</ul>'; inList = false; }
+            if (inNumberedList) { html += '</ol>'; inNumberedList = false; }
+            html += `<h3 class="md-h3">${escapeHtml(line.substring(4))}</h3>`;
+            continue;
+        }
+
+        // Special callout boxes
+        if (line.startsWith('💡 ')) {
+            if (inList) { html += '</ul>'; inList = false; }
+            if (inNumberedList) { html += '</ol>'; inNumberedList = false; }
+            html += `<div class="callout callout-tip">💡 ${formatInline(line.substring(3))}</div>`;
+            continue;
+        }
+        if (line.startsWith('✅ ')) {
+            if (inList) { html += '</ul>'; inList = false; }
+            if (inNumberedList) { html += '</ol>'; inNumberedList = false; }
+            html += `<div class="callout callout-success">✅ ${formatInline(line.substring(3))}</div>`;
+            continue;
+        }
+        if (line.startsWith('❌ ')) {
+            if (inList) { html += '</ul>'; inList = false; }
+            if (inNumberedList) { html += '</ol>'; inNumberedList = false; }
+            html += `<div class="callout callout-error">❌ ${formatInline(line.substring(3))}</div>`;
+            continue;
+        }
+        if (line.startsWith('⚠️ ')) {
+            if (inList) { html += '</ul>'; inList = false; }
+            if (inNumberedList) { html += '</ol>'; inNumberedList = false; }
+            html += `<div class="callout callout-warning">⚠️ ${formatInline(line.substring(3))}</div>`;
+            continue;
+        }
+        if (line.startsWith('❓ ')) {
+            if (inList) { html += '</ul>'; inList = false; }
+            if (inNumberedList) { html += '</ol>'; inNumberedList = false; }
+            html += `<div class="callout callout-question">❓ ${formatInline(line.substring(3))}</div>`;
+            continue;
+        }
+
+        // STEP markers
+        if (line.match(/^STEP \d+:/)) {
+            if (inList) { html += '</ul>'; inList = false; }
+            if (inNumberedList) { html += '</ol>'; inNumberedList = false; }
+            html += `<div class="step-marker">${formatInline(line)}</div>`;
+            continue;
+        }
+
+        // Bullet lists (• or -)
+        if (line.match(/^[•\-] /)) {
+            if (inNumberedList) { html += '</ol>'; inNumberedList = false; }
+            if (!inList) {
+                html += '<ul class="md-list">';
+                inList = true;
+            }
+            html += `<li>${formatInline(line.substring(2))}</li>`;
+            continue;
+        }
+
+        // Numbered lists
+        if (line.match(/^\d+\. /)) {
+            if (inList) { html += '</ul>'; inList = false; }
+            if (!inNumberedList) {
+                html += '<ol class="md-list-numbered">';
+                inNumberedList = true;
+            }
+            const content = line.replace(/^\d+\. /, '');
+            html += `<li>${formatInline(content)}</li>`;
+            continue;
+        }
+
+        // Regular paragraph
+        if (inList) { html += '</ul>'; inList = false; }
+        if (inNumberedList) { html += '</ol>'; inNumberedList = false; }
+        html += `<p class="md-p">${formatInline(line)}</p>`;
+    }
+
+    // Close any open lists
+    if (inList) html += '</ul>';
+    if (inNumberedList) html += '</ol>';
+
+    return html;
+}
+
+// Format inline markdown (bold, italic, code, etc.)
+function formatInline(text) {
+    // Bold
+    text = text.replace(/\*\*(.*?)\*\*/g, '<strong class="md-bold">$1</strong>');
+    // Italic
+    text = text.replace(/\*(.*?)\*/g, '<em class="md-italic">$1</em>');
+    // Code/Articles
+    text = text.replace(/`(.*?)`/g, '<code class="md-code">$1</code>');
+    // Article references (Art. X:XX format)
+    text = text.replace(/Art\. ([\d:]+\s+[A-Z]+)/g, '<span class="article-ref">Art. $1</span>');
+
     return text;
+}
+
+// Escape HTML to prevent XSS
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
 }
 
 // ========== AI Tutor ==========
