@@ -116,20 +116,24 @@ class TestGetWeek:
         assert data["title"] == "Introduction to Law"
 
     def test_get_week_not_found(self, client, mock_course_service):
-        """Should return 404 for nonexistent week."""
+        """Should return 404 for nonexistent week within valid range."""
         mock_course_service.get_week.return_value = None
 
-        response = client.get("/api/admin/courses/LLS-2025-2026/weeks/99")
+        response = client.get("/api/admin/courses/LLS-2025-2026/weeks/50")
 
         assert response.status_code == 404
 
-    def test_get_week_invalid_week_number(self, client, mock_course_service):
-        """Should return 400 for invalid week number."""
-        mock_course_service.get_week.side_effect = ValueError("Invalid week number")
-
+    def test_get_week_invalid_week_number_too_high(self, client, mock_course_service):
+        """Should return 422 for week number > 52 (Path validation)."""
         response = client.get("/api/admin/courses/LLS-2025-2026/weeks/100")
 
-        assert response.status_code == 400
+        assert response.status_code == 422  # Unprocessable Entity from Path validation
+
+    def test_get_week_invalid_week_number_zero(self, client, mock_course_service):
+        """Should return 422 for week number < 1 (Path validation)."""
+        response = client.get("/api/admin/courses/LLS-2025-2026/weeks/0")
+
+        assert response.status_code == 422  # Unprocessable Entity from Path validation
 
 
 class TestDeactivateCourse:
@@ -151,3 +155,124 @@ class TestDeactivateCourse:
 
         assert response.status_code == 404
 
+
+class TestCreateCourse:
+    """Tests for POST /api/admin/courses."""
+
+    def test_create_course_success(self, client, mock_course_service):
+        """Should return 201 on successful creation."""
+        mock_course_service.create_course.return_value = Course(
+            id="NEW-COURSE-2026",
+            name="New Course",
+            academicYear="2025-2026",
+        )
+
+        response = client.post("/api/admin/courses", json={
+            "id": "NEW-COURSE-2026",
+            "name": "New Course",
+            "academicYear": "2025-2026"
+        })
+
+        assert response.status_code == 201
+        assert response.json()["id"] == "NEW-COURSE-2026"
+
+    def test_create_duplicate_course(self, client, mock_course_service):
+        """Should return 400 when trying to create duplicate course."""
+        mock_course_service.create_course.side_effect = ValueError(
+            "Course with ID 'LLS-2025-2026' already exists"
+        )
+
+        response = client.post("/api/admin/courses", json={
+            "id": "LLS-2025-2026",
+            "name": "Duplicate Course",
+            "academicYear": "2025-2026"
+        })
+
+        assert response.status_code == 400
+        assert "already exists" in response.json()["detail"]
+
+
+class TestUpsertWeek:
+    """Tests for PUT /api/admin/courses/{course_id}/weeks/{week_number}."""
+
+    def test_upsert_week_success(self, client, mock_course_service):
+        """Should return 200 on successful upsert."""
+        mock_course_service.upsert_week.return_value = Week(
+            weekNumber=1,
+            title="Week 1 Title",
+            topics=["Topic 1"]
+        )
+
+        response = client.put("/api/admin/courses/LLS-2025-2026/weeks/1", json={
+            "weekNumber": 1,
+            "title": "Week 1 Title",
+            "topics": ["Topic 1"]
+        })
+
+        assert response.status_code == 200
+        assert response.json()["weekNumber"] == 1
+
+    def test_upsert_week_number_mismatch(self, client, mock_course_service):
+        """Should return 400 when URL week number doesn't match body."""
+        response = client.put("/api/admin/courses/LLS-2025-2026/weeks/1", json={
+            "weekNumber": 2,  # Mismatched - URL says 1, body says 2
+            "title": "Week Title",
+            "topics": ["Topic"]
+        })
+
+        assert response.status_code == 400
+        assert "mismatch" in response.json()["detail"].lower()
+
+    def test_upsert_week_invalid_number_too_high(self, client, mock_course_service):
+        """Should return 422 for week number > 52 (Path validation)."""
+        response = client.put("/api/admin/courses/LLS-2025-2026/weeks/100", json={
+            "weekNumber": 100,
+            "title": "Invalid Week",
+            "topics": []
+        })
+
+        assert response.status_code == 422  # Unprocessable Entity from Path validation
+
+    def test_upsert_week_invalid_number_zero(self, client, mock_course_service):
+        """Should return 422 for week number < 1 (Path validation)."""
+        response = client.put("/api/admin/courses/LLS-2025-2026/weeks/0", json={
+            "weekNumber": 0,
+            "title": "Invalid Week",
+            "topics": []
+        })
+
+        assert response.status_code == 422  # Unprocessable Entity from Path validation
+
+
+class TestIncludeWeeksParameter:
+    """Tests for include_weeks query parameter."""
+
+    def test_get_course_without_weeks(self, client, mock_course_service):
+        """Should call service with include_weeks=False."""
+        mock_course_service.get_course.return_value = Course(
+            id="LLS-2025-2026",
+            name="Law and Legal Skills",
+            academicYear="2025-2026",
+        )
+
+        client.get("/api/admin/courses/LLS-2025-2026?include_weeks=false")
+
+        mock_course_service.get_course.assert_called_with(
+            "LLS-2025-2026",
+            include_weeks=False
+        )
+
+    def test_get_course_with_weeks_default(self, client, mock_course_service):
+        """Should default to include_weeks=True."""
+        mock_course_service.get_course.return_value = Course(
+            id="LLS-2025-2026",
+            name="Law and Legal Skills",
+            academicYear="2025-2026",
+        )
+
+        client.get("/api/admin/courses/LLS-2025-2026")
+
+        mock_course_service.get_course.assert_called_with(
+            "LLS-2025-2026",
+            include_weeks=True
+        )

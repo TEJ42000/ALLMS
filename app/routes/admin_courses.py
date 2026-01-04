@@ -2,12 +2,15 @@
 
 Provides CRUD endpoints for managing courses, weeks, and legal skills.
 These endpoints are intended for administrative use only.
+
+Note: Authentication middleware will be added in Phase 5.
+See Issue #29 for the implementation plan.
 """
 
 import logging
-from typing import List, Optional
+from typing import List
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, HTTPException, Path, Query, status
 
 from app.models.course_models import (
     Course,
@@ -31,6 +34,11 @@ router = APIRouter(
         500: {"description": "Internal server error"},
     }
 )
+
+
+# Week number constraints
+MIN_WEEK = 1
+MAX_WEEK = 52
 
 
 # ============================================================================
@@ -69,12 +77,28 @@ async def get_course(
     Get a course by ID.
 
     Returns full course details including weeks, legal skills, and materials.
+
+    **Parameters:**
+    - `course_id`: The unique course identifier (e.g., "LLS-2025-2026")
+    - `include_weeks`: Whether to include weeks and legal skills (default: true)
+
+    **Example Response:**
+    ```json
+    {
+        "id": "LLS-2025-2026",
+        "name": "Law and Legal Skills",
+        "academicYear": "2025-2026",
+        "weeks": [...],
+        "legalSkills": {...}
+    }
+    ```
     """
     try:
         service = get_course_service()
         course = service.get_course(course_id, include_weeks=include_weeks)
 
         if course is None:
+            logger.warning("Course not found: %s", course_id)
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Course not found: {course_id}"
@@ -83,6 +107,7 @@ async def get_course(
         logger.info("Retrieved course: %s", course_id)
         return course
     except ValueError as e:
+        logger.warning("Invalid course ID: %s - %s", course_id, e)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
@@ -104,6 +129,20 @@ async def create_course(course_data: CourseCreate):
 
     The course ID must be unique and follow the pattern: alphanumeric with hyphens
     and underscores (e.g., "LLS-2025-2026", "Criminal_Law_101").
+
+    **Example Request:**
+    ```json
+    {
+        "id": "Criminal_Law-2025-2026",
+        "name": "Criminal Law",
+        "academicYear": "2025-2026",
+        "program": "European Law School",
+        "institution": "University of Groningen",
+        "materialSubjects": ["Criminal_Law"]
+    }
+    ```
+
+    **Returns:** The created course object with timestamps.
     """
     try:
         service = get_course_service()
@@ -111,6 +150,7 @@ async def create_course(course_data: CourseCreate):
         logger.info("Created course: %s", course_data.id)
         return course
     except ValueError as e:
+        logger.warning("Invalid course data: %s", e)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
@@ -135,6 +175,7 @@ async def update_course(course_id: str, updates: CourseUpdate):
         course = service.update_course(course_id, updates)
 
         if course is None:
+            logger.warning("Course not found for update: %s", course_id)
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Course not found: {course_id}"
@@ -143,6 +184,7 @@ async def update_course(course_id: str, updates: CourseUpdate):
         logger.info("Updated course: %s", course_id)
         return course
     except ValueError as e:
+        logger.warning("Invalid update for course %s: %s", course_id, e)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
@@ -163,12 +205,14 @@ async def deactivate_course(course_id: str):
     Deactivate a course (soft delete).
 
     The course will be hidden from normal listings but can be restored.
+    Use `include_inactive=true` on list endpoint to see deactivated courses.
     """
     try:
         service = get_course_service()
         success = service.deactivate_course(course_id)
 
         if not success:
+            logger.warning("Course not found for deactivation: %s", course_id)
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Course not found: {course_id}"
@@ -177,6 +221,7 @@ async def deactivate_course(course_id: str):
         logger.info("Deactivated course: %s", course_id)
         return None
     except ValueError as e:
+        logger.warning("Invalid course ID for deactivation: %s", course_id)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
@@ -222,7 +267,10 @@ async def list_weeks(course_id: str):
 
 
 @router.get("/{course_id}/weeks/{week_number}", response_model=Week)
-async def get_week(course_id: str, week_number: int):
+async def get_week(
+    course_id: str,
+    week_number: int = Path(..., ge=MIN_WEEK, le=MAX_WEEK, description="Week number (1-52)")
+):
     """
     Get a specific week by number.
 
@@ -233,6 +281,7 @@ async def get_week(course_id: str, week_number: int):
         week = service.get_week(course_id, week_number)
 
         if week is None:
+            logger.warning("Week %d not found in course %s", week_number, course_id)
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Week {week_number} not found in course {course_id}"
@@ -241,6 +290,7 @@ async def get_week(course_id: str, week_number: int):
         logger.info("Retrieved week %d for course %s", week_number, course_id)
         return week
     except ValueError as e:
+        logger.warning("Invalid request for week: %s", e)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
@@ -256,13 +306,30 @@ async def get_week(course_id: str, week_number: int):
 
 
 @router.put("/{course_id}/weeks/{week_number}", response_model=Week)
-async def upsert_week(course_id: str, week_number: int, week_data: WeekCreate):
+async def upsert_week(
+    course_id: str,
+    week_number: int = Path(..., ge=MIN_WEEK, le=MAX_WEEK, description="Week number (1-52)"),
+    week_data: WeekCreate = ...
+):
     """
     Create or update a week.
 
     If the week exists, it will be replaced. If not, it will be created.
     The week_number in the URL must match the weekNumber in the request body.
+
+    **Example Request:**
+    ```json
+    {
+        "weekNumber": 1,
+        "title": "Introduction to Legal Systems",
+        "topics": ["Legal Sources", "Court Hierarchy"],
+        "materials": [],
+        "keyConcepts": []
+    }
+    ```
     """
+    # Validate URL week_number first (already validated by Path constraints)
+    # Then check it matches the body
     if week_data.weekNumber != week_number:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -288,7 +355,10 @@ async def upsert_week(course_id: str, week_number: int, week_data: WeekCreate):
 
 
 @router.delete("/{course_id}/weeks/{week_number}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_week(course_id: str, week_number: int):
+async def delete_week(
+    course_id: str,
+    week_number: int = Path(..., ge=MIN_WEEK, le=MAX_WEEK, description="Week number (1-52)")
+):
     """
     Delete a week from a course.
     """
@@ -297,6 +367,7 @@ async def delete_week(course_id: str, week_number: int):
         success = service.delete_week(course_id, week_number)
 
         if not success:
+            logger.warning("Week %d not found for deletion in course %s", week_number, course_id)
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Week {week_number} not found in course {course_id}"
@@ -305,6 +376,7 @@ async def delete_week(course_id: str, week_number: int):
         logger.info("Deleted week %d from course %s", week_number, course_id)
         return None
     except ValueError as e:
+        logger.warning("Invalid delete week request: %s", e)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
