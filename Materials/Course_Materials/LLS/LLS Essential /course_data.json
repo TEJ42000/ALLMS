@@ -1,0 +1,635 @@
+{
+  "course": {
+    "id": "LLS-2025-2026",
+    "name": "Law and Legal Skills",
+    "program": "International and European Law",
+    "institution": "University of Groningen",
+    "academicYear": "2025-2026",
+    "totalPoints": 200,
+    "passingThreshold": 110,
+    "components": [
+      {
+        "id": "part-a",
+        "name": "Law",
+        "maxPoints": 100,
+        "description": "Substantive legal knowledge across six legal domains"
+      },
+      {
+        "id": "part-b",
+        "name": "Legal Skills",
+        "maxPoints": 100,
+        "description": "Legal research, analysis, writing, and case analysis competencies"
+      }
+    ]
+  },
+  "weeks": [
+    {
+      "weekNumber": 1,
+      "title": "Dutch Legal Systems & Constitutional Law",
+      "topics": [
+        "Trias Politica (separation of powers)",
+        "Sources of law hierarchy",
+        "Constitutional rights and freedoms",
+        "Parliamentary systems"
+      ],
+      "materials": [
+        {
+          "type": "reader",
+          "file": "Core_Materials/LLSReaderwithcoursecontentandquestions_20252026.pdf",
+          "chapters": ["1", "2"]
+        },
+        {
+          "type": "reading",
+          "file": "Weekly_Readings/Readings_Law__week_1_compressed.pdf"
+        }
+      ],
+      "keyConcepts": [
+        {
+          "term": "Trias Politica",
+          "definition": "The separation of powers into legislative, executive, and judicial branches",
+          "source": "LLS Reader Chapter 1"
+        },
+        {
+          "term": "Grondwet",
+          "definition": "Dutch Constitution - supreme law of the Netherlands",
+          "source": "LLS Reader Chapter 1"
+        }
+      ]
+    },
+    {
+      "weekNumber": 2,
+      "title": "Administrative Law",
+      "topics": [
+        "GALA framework (Algemene wet bestuursrecht)",
+        "Administrative decisions (besluiten)",
+        "Appeals procedures (bezwaar and beroep)",
+        "Judicial review standards"
+      ],
+      "materials": [
+        {
+          "type": "reader",
+          "file": "Core_Materials/LLSReaderwithcoursecontentandquestions_20252026.pdf",
+          "chapters": ["3"]
+        },
+        {
+          "type": "lecture",
+          "file": "Lectures/LLS_2526_Lecture_week_3_Administrative_law_Final.pdf"
+        },
+        {
+          "type": "reading",
+          "file": "Weekly_Readings/Readings20Law2020week202_compressed.pdf"
+        }
+      ],
+      "keyConcepts": [
+        {
+          "term": "Besluit",
+          "definition": "Administrative decision - a written decision of an administrative body concerning a public law matter",
+          "source": "Article 1:3 GALA",
+          "citation": "Article 1:3 Algemene wet bestuursrecht"
+        },
+        {
+          "term": "Belanghebbende",
+          "definition": "Interested party - person whose interest is directly affected by an administrative decision",
+          "source": "Article 1:2 GALA",
+          "citation": "Article 1:2 Algemene wet bestuursrecht"
+        },
+        {
+          "term": "Bezwaar",
+          "definition": "Objection - administrative remedy filed within 6 weeks of notification",
+          "source": "Article 7:1 GALA",
+          "citation": "Article 7:1 Algemene wet bestuursrecht"
+        },
+        {
+          "term": "Beroep",
+          "definition": "Appeal to administrative court following unsuccessful bezwaar",
+          "source": "GALA Title 8",
+          "citation": "Algemene wet bestuursrecht, Title 8"
+        }
+      ],
+      "decisionModel": {
+        "name": "Administrative Law Appeals Process",
+        "steps": [
+          {
+            "stepNumber": 1,
+            "question": "Is there a 'besluit' (administrative decision)?",
+            "legalBasis": "Article 1:3 GALA",
+            "guidance": "A besluit must be: (1) written, (2) from administrative body, (3) concerning public law matter"
+          },
+          {
+            "stepNumber": 2,
+            "question": "Is the appellant a 'belanghebbende' (interested party)?",
+            "legalBasis": "Article 1:2 GALA",
+            "guidance": "The person's interest must be directly affected by the decision"
+          },
+          {
+            "stepNumber": 3,
+            "question": "Has bezwaar (objection) been filed?",
+            "legalBasis": "Article 7:1 GALA",
+            "guidance": "Must be filed within 6 weeks of notification of the decision"
+          },
+          {
+            "stepNumber": 4,
+            "question": "If bezwaar unsuccessful, has beroep (appeal) been filed?",
+            "legalBasis": "GALA Title 8",
+            "guidance": "Filed with appropriate administrative court within 6 weeks of bezwaar decision"
+          },
+          {
+            "stepNumber": 5,
+            "question": "What is the standard of review?",
+            "legalBasis": "Administrative law principles",
+            "guidance": "Determine whether full review (volle toetsing) or marginal review applies"
+          }
+        ]
+      }
+    },
+    {
+      "weekNumber": 3,
+      "title": "Criminal Law",
+      "topics": [
+        "Dutch Criminal Code (Wetboek van Strafrecht)",
+        "Elements of criminal offenses",
+        "Actus reus and mens rea",
+        "Grounds for justification and excuse",
+        "Criminal responsibility"
+      ],
+      "materials": [
+        {
+          "type": "reader",
+          "file": "Core_Materials/LLSReaderwithcoursecontentandquestions_20252026.pdf",
+          "chapters": ["4"]
+        },
+        {
+          "type": "lecture",
+          "file": "Lectures/LLS_2526_Lecture_week_4_Criminal_law__Copy.pdf"
+        }
+      ],
+      "keyConcepts": [
+        {
+          "term": "Actus reus",
+          "definition": "The guilty act - the physical element of a crime",
+          "source": "Criminal law principles"
+        },
+        {
+          "term": "Mens rea",
+          "definition": "The guilty mind - the mental element of a crime (intent or negligence)",
+          "source": "Criminal law principles"
+        },
+        {
+          "term": "Justification grounds",
+          "definition": "Circumstances that make otherwise criminal conduct lawful (e.g., self-defense, necessity)",
+          "source": "Dutch Criminal Code"
+        },
+        {
+          "term": "Excuse grounds",
+          "definition": "Circumstances that excuse criminal responsibility (e.g., insanity, duress)",
+          "source": "Dutch Criminal Code"
+        }
+      ],
+      "decisionModel": {
+        "name": "Criminal Law 8-Question Framework",
+        "steps": [
+          {
+            "stepNumber": 1,
+            "question": "What is X charged with?",
+            "guidance": "Identify the specific offense from the Dutch Criminal Code"
+          },
+          {
+            "stepNumber": 2,
+            "question": "What are the elements of the offense?",
+            "guidance": "List all required elements (both actus reus and mens rea components)"
+          },
+          {
+            "stepNumber": 3,
+            "question": "Has the actus reus been committed?",
+            "guidance": "Analyze whether the prohibited act occurred"
+          },
+          {
+            "stepNumber": 4,
+            "question": "Was there mens rea?",
+            "guidance": "Determine if required mental state (intent or negligence) is present"
+          },
+          {
+            "stepNumber": 5,
+            "question": "Are there grounds for justification?",
+            "guidance": "Consider self-defense, necessity, official duty, or other justifications"
+          },
+          {
+            "stepNumber": 6,
+            "question": "Are there grounds for excuse?",
+            "guidance": "Consider insanity, duress, mistake of law or fact"
+          },
+          {
+            "stepNumber": 7,
+            "question": "Can X be held criminally responsible?",
+            "guidance": "Synthesize answers to determine overall criminal liability"
+          },
+          {
+            "stepNumber": 8,
+            "question": "What are the procedural considerations?",
+            "guidance": "Address jurisdiction, evidence requirements, procedure"
+          }
+        ]
+      }
+    },
+    {
+      "weekNumber": 4,
+      "title": "Private Law - Law of Obligations",
+      "topics": [
+        "Dutch Civil Code Book 6 (Law of Obligations)",
+        "Contract law - formation and breach",
+        "Tort law (onrechtmatige daad)",
+        "Remedies and damages"
+      ],
+      "materials": [
+        {
+          "type": "reader",
+          "file": "Core_Materials/LLSReaderwithcoursecontentandquestions_20252026.pdf",
+          "chapters": ["5"]
+        },
+        {
+          "type": "lecture",
+          "file": "Lectures/LLS_20252025_Private_Law__law_of_obligations__basic_contract_law.pdf"
+        }
+      ],
+      "keyConcepts": [
+        {
+          "term": "Aanbod",
+          "definition": "Offer - a proposal to enter into a contract",
+          "source": "Dutch Civil Code Book 6",
+          "citation": "Burgerlijk Wetboek Book 6"
+        },
+        {
+          "term": "Aanvaarding",
+          "definition": "Acceptance - agreeing to the terms of an offer",
+          "source": "Dutch Civil Code Book 6",
+          "citation": "Burgerlijk Wetboek Book 6"
+        },
+        {
+          "term": "Onrechtmatige daad",
+          "definition": "Tort - unlawful act that causes damage to another",
+          "source": "Article 6:162 BW",
+          "citation": "Article 6:162 Burgerlijk Wetboek"
+        },
+        {
+          "term": "Wanprestatie",
+          "definition": "Breach of contract - failure to perform contractual obligations",
+          "source": "Dutch Civil Code Book 6",
+          "citation": "Burgerlijk Wetboek Book 6"
+        }
+      ]
+    },
+    {
+      "weekNumber": 5,
+      "title": "European Union Law",
+      "topics": [
+        "EU institutional framework",
+        "Sources of EU law (Treaties, Regulations, Directives)",
+        "Supremacy and direct effect",
+        "Preliminary rulings (Article 267 TFEU)"
+      ],
+      "materials": [
+        {
+          "type": "reader",
+          "file": "Core_Materials/LLSReaderwithcoursecontentandquestions_20252026.pdf",
+          "chapters": ["6"]
+        }
+      ],
+      "keyConcepts": [
+        {
+          "term": "Supremacy",
+          "definition": "EU law takes precedence over conflicting national law",
+          "source": "EU law principles"
+        },
+        {
+          "term": "Direct effect",
+          "definition": "EU law provisions can be invoked directly by individuals in national courts",
+          "source": "EU law principles"
+        },
+        {
+          "term": "Preliminary ruling",
+          "definition": "Procedure allowing national courts to ask CJEU for interpretation of EU law",
+          "source": "Article 267 TFEU",
+          "citation": "Article 267 Treaty on the Functioning of the European Union"
+        }
+      ]
+    },
+    {
+      "weekNumber": 6,
+      "title": "International Law",
+      "topics": [
+        "Sources of international law (Article 38 ICJ Statute)",
+        "Treaty law (Vienna Convention)",
+        "State sovereignty and jurisdiction",
+        "International organizations"
+      ],
+      "materials": [
+        {
+          "type": "reader",
+          "file": "Core_Materials/LLSReaderwithcoursecontentandquestions_20252026.pdf",
+          "chapters": ["7"]
+        },
+        {
+          "type": "lecture",
+          "file": "Lectures/LLS20256International20law20wk6.pdf"
+        }
+      ],
+      "keyConcepts": [
+        {
+          "term": "Treaty",
+          "definition": "International agreement between states governed by international law",
+          "source": "Vienna Convention on the Law of Treaties",
+          "citation": "Vienna Convention on the Law of Treaties (1969)"
+        },
+        {
+          "term": "Customary international law",
+          "definition": "Law derived from consistent state practice and opinio juris",
+          "source": "Article 38(1)(b) ICJ Statute",
+          "citation": "Article 38(1)(b) Statute of the International Court of Justice"
+        },
+        {
+          "term": "State sovereignty",
+          "definition": "Supreme authority of a state over its territory and domestic affairs",
+          "source": "International law principles"
+        }
+      ]
+    }
+  ],
+  "legalSkills": {
+    "ecthrCaseAnalysis": {
+      "name": "ECtHR Case Analysis 5-Question Framework",
+      "description": "Systematic methodology for analyzing European Court of Human Rights cases",
+      "steps": [
+        {
+          "stepNumber": 1,
+          "question": "Standing/Victim Status",
+          "legalBasis": "Article 34 ECHR",
+          "guidance": "Is the applicant a 'victim' of the alleged violation? Must show direct and personal impact.",
+          "citation": "Article 34 European Convention on Human Rights"
+        },
+        {
+          "stepNumber": 2,
+          "question": "Jurisdiction",
+          "legalBasis": "Article 1 ECHR",
+          "guidance": "Is the matter within temporal, territorial, and personal jurisdiction of the ECtHR?",
+          "citation": "Article 1 European Convention on Human Rights"
+        },
+        {
+          "stepNumber": 3,
+          "question": "Admissibility",
+          "legalBasis": "Articles 34-35 ECHR",
+          "guidance": "Check: (1) Exhaustion of domestic remedies, (2) 6-month rule, (3) Not manifestly ill-founded, (4) Not anonymous, (5) Not abuse of right of petition",
+          "citation": "Articles 34-35 European Convention on Human Rights"
+        },
+        {
+          "stepNumber": 4,
+          "question": "Interference with Convention Right",
+          "legalBasis": "Relevant ECHR Article",
+          "guidance": "Identify which Convention right is allegedly violated. Determine if state action constitutes an interference with this right. Note: Interference ≠ Violation",
+          "citation": "Specific ECHR Article (e.g., Article 8, 10, 11)"
+        },
+        {
+          "stepNumber": 5,
+          "question": "Justification Assessment (if interference found)",
+          "legalBasis": "Convention limitation clauses",
+          "guidance": "Three-part test: (1) Prescribed by law? (2) Legitimate aim? (3) Necessary in a democratic society (proportionality)?",
+          "citation": "Relevant ECHR Article limitation clause"
+        }
+      ],
+      "criticalDistinctions": [
+        {
+          "concept": "Interference vs. Violation",
+          "explanation": "An interference is merely state action affecting a right. A violation occurs only when interference is not justified under the Convention's limitation criteria."
+        }
+      ],
+      "exampleCase": {
+        "file": "Case_Law/CASE_OF_OSMANOG_LU_AND_KOCABAS__v__SWITZERLAND.pdf",
+        "citation": "Osmanoğlu and Kocabaş v. Switzerland, App. No. 29086/12"
+      }
+    },
+    "statutoryInterpretation": {
+      "methods": [
+        {
+          "name": "Grammatical Interpretation",
+          "description": "Plain meaning of the text",
+          "when": "Starting point for all interpretation"
+        },
+        {
+          "name": "Systematic Interpretation",
+          "description": "Meaning in context of broader legal framework",
+          "when": "When grammatical meaning is ambiguous or leads to absurd results"
+        },
+        {
+          "name": "Historical Interpretation",
+          "description": "Legislative history and intent",
+          "when": "When systematic interpretation is insufficient"
+        },
+        {
+          "name": "Teleological Interpretation",
+          "description": "Purpose and objectives of the law",
+          "when": "To determine the underlying goal of legislation"
+        }
+      ]
+    },
+    "legalCitation": {
+      "formats": [
+        {
+          "type": "Dutch Legislation",
+          "format": "Article [number] [Code abbreviation]",
+          "example": "Article 6:162 BW",
+          "notes": "BW = Burgerlijk Wetboek (Civil Code), Sr = Wetboek van Strafrecht (Criminal Code)"
+        },
+        {
+          "type": "ECtHR Cases",
+          "format": "[Case name] v. [State], App. No. [number], [date]",
+          "example": "Osmanoğlu and Kocabaş v. Switzerland, App. No. 29086/12, 10 January 2017"
+        },
+        {
+          "type": "Dutch Supreme Court",
+          "format": "HR [date], ECLI:NL:HR:[year]:[number]",
+          "example": "HR 1 January 2020, ECLI:NL:HR:2020:1"
+        },
+        {
+          "type": "Academic Sources",
+          "format": "[Author], [Title], [Publication] [Year], p. [page]",
+          "example": "Smith, J., 'Contract Formation', Law Review 2020, p. 45"
+        }
+      ]
+    },
+    "legalResearch": {
+      "sourceHierarchy": [
+        {
+          "level": 1,
+          "type": "Primary Sources",
+          "sources": [
+            "Statutory provisions",
+            "Case law",
+            "Treaties and international instruments"
+          ],
+          "authority": "Highest - binding law"
+        },
+        {
+          "level": 2,
+          "type": "Secondary Sources",
+          "sources": [
+            "Legal textbooks",
+            "Law review articles",
+            "Academic commentaries",
+            "Official legal publications"
+          ],
+          "authority": "Persuasive - interpretive guidance"
+        },
+        {
+          "level": 3,
+          "type": "Tertiary Sources",
+          "sources": [
+            "Study guides",
+            "Case digests",
+            "Legal encyclopedias"
+          ],
+          "authority": "Informational - learning aids"
+        }
+      ]
+    }
+  },
+  "materials": {
+    "coreTextbooks": [
+      {
+        "title": "LLS Reader with Course Content and Questions 2025-2026",
+        "file": "Core_Materials/LLSReaderwithcoursecontentandquestions_20252026.pdf",
+        "size": "8.2MB",
+        "type": "primary",
+        "description": "Official course reader covering all substantive law topics"
+      },
+      {
+        "title": "ELSA Notes",
+        "file": "Core_Materials/ELSA_NOTES_.pdf",
+        "size": "13MB",
+        "type": "supplementary",
+        "description": "Comprehensive study notes from European Law Students' Association"
+      }
+    ],
+    "lectures": [
+      {
+        "title": "Administrative Law",
+        "week": 3,
+        "file": "Lectures/LLS_2526_Lecture_week_3_Administrative_law_Final.pdf",
+        "size": "6.8MB"
+      },
+      {
+        "title": "Criminal Law",
+        "week": 4,
+        "file": "Lectures/LLS_2526_Lecture_week_4_Criminal_law__Copy.pdf",
+        "size": "5.5MB"
+      },
+      {
+        "title": "Private Law - Law of Obligations",
+        "week": 4,
+        "file": "Lectures/LLS_20252025_Private_Law__law_of_obligations__basic_contract_law.pdf",
+        "size": "2.5MB"
+      },
+      {
+        "title": "International Law",
+        "week": 6,
+        "file": "Lectures/LLS20256International20law20wk6.pdf",
+        "size": "4.8MB"
+      }
+    ],
+    "caseStudies": [
+      {
+        "title": "Osmanoğlu and Kocabaş v. Switzerland",
+        "court": "ECtHR",
+        "appNumber": "29086/12",
+        "file": "Case_Law/CASE_OF_OSMANOG_LU_AND_KOCABAS__v__SWITZERLAND.pdf",
+        "size": "5.0MB",
+        "relevantRights": ["Article 9 ECHR - Freedom of religion"],
+        "topics": ["Religious freedom", "State interference", "Proportionality"]
+      }
+    ],
+    "mockExams": [
+      {
+        "title": "Mock Exam - Legal Skills",
+        "file": "Mock_Exams/Mock_Exam_Skills.pdf",
+        "size": "193KB",
+        "type": "practice"
+      },
+      {
+        "title": "Mock Exam Answers - Law 2024-2025",
+        "file": "Mock_Exams/AnswersMockexamLAW2425.pdf",
+        "size": "1.1MB",
+        "type": "answer_key"
+      }
+    ],
+    "studyTools": [
+      {
+        "title": "LLS Study Portal",
+        "file": "Study_Tools/lls-study-portal-FINAL-WORKING.html",
+        "size": "270KB",
+        "type": "interactive",
+        "features": [
+          "Quiz functionality",
+          "Progress tracking",
+          "AI tutor integration",
+          "Searchable article database"
+        ]
+      }
+    ]
+  },
+  "abbreviations": {
+    "BW": "Burgerlijk Wetboek (Dutch Civil Code)",
+    "Sr": "Wetboek van Strafrecht (Dutch Criminal Code)",
+    "GALA": "Algemene wet bestuursrecht (General Administrative Law Act)",
+    "ECHR": "European Convention on Human Rights",
+    "ECtHR": "European Court of Human Rights",
+    "TFEU": "Treaty on the Functioning of the European Union",
+    "ICJ": "International Court of Justice",
+    "ECLI": "European Case Law Identifier",
+    "HR": "Hoge Raad (Dutch Supreme Court)",
+    "LLS": "Law and Legal Skills",
+    "CJEU": "Court of Justice of the European Union"
+  },
+  "externalResources": {
+    "legalDatabases": [
+      {
+        "name": "EUR-Lex",
+        "url": "https://eur-lex.europa.eu/",
+        "coverage": "EU law - Treaties, Regulations, Directives, Case law"
+      },
+      {
+        "name": "HUDOC",
+        "url": "https://hudoc.echr.coe.int/",
+        "coverage": "European Court of Human Rights case law"
+      },
+      {
+        "name": "Rechtspraak.nl",
+        "url": "https://www.rechtspraak.nl/",
+        "coverage": "Dutch court decisions"
+      },
+      {
+        "name": "Wetten.nl",
+        "url": "https://wetten.overheid.nl/",
+        "coverage": "Dutch legislation"
+      }
+    ]
+  },
+  "academicIntegrity": {
+    "citationRequirements": [
+      "All legal statements must cite specific sources",
+      "Include exact article numbers or case citations",
+      "Distinguish between settled law and academic opinion",
+      "Note conflicts between sources",
+      "Prioritize most recent authoritative sources"
+    ],
+    "prohibitedSources": [
+      "Wikipedia (for legal analysis)",
+      "General encyclopedias",
+      "Non-academic blogs or forums",
+      "Uncited AI-generated content"
+    ],
+    "hallucinationPrevention": [
+      "Verify all statements against source documents",
+      "Include complete citation information",
+      "Distinguish mandatory law from interpretive commentary",
+      "No speculation beyond explicit source statements"
+    ]
+  }
+}
