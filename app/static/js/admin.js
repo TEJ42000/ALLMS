@@ -182,6 +182,29 @@ function renderCourseMaterialsList(materials) {
         return `<button class="preview-btn" onclick="event.stopPropagation(); openPreviewModal('${escapedFile}', '${escapedTitle}')">👁️ Preview</button>`;
     };
 
+    // Helper to create extraction status badge
+    const extractionBadge = (file) => {
+        if (!file) return '';
+        const status = extractionCache.get(file);
+        if (!status) {
+            return '<span class="extraction-status-badge not-extracted">Not Checked</span>';
+        }
+
+        if (status.error) {
+            return `<span class="extraction-status-badge failed" onclick="event.stopPropagation(); showToast('Error: ${status.error}', 'error')">Failed</span>`;
+        }
+
+        if (status.extracted) {
+            const escapedFile = file.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+            return `<span class="extraction-status-badge extracted" onclick="event.stopPropagation(); openTextPreviewModal('${escapedFile}')">
+                Extracted
+                <span class="extraction-metadata">${formatNumber(status.charCount)} chars</span>
+            </span>`;
+        }
+
+        return '<span class="extraction-status-badge not-extracted">Not Extracted</span>';
+    };
+
     const sections = [];
 
     // Core Textbooks
@@ -194,6 +217,7 @@ function renderCourseMaterialsList(materials) {
                         <li>
                             <span class="material-title">${t.title}</span>
                             <span class="material-meta">${getWeekDisplay(t.file, null)} · ${t.size || ''}</span>
+                            ${extractionBadge(t.file)}
                             ${previewBtn(t.file, t.title)}
                         </li>
                     `).join('')}
@@ -212,6 +236,7 @@ function renderCourseMaterialsList(materials) {
                         <li>
                             <span class="material-title">${l.title}</span>
                             <span class="material-meta">${getWeekDisplay(l.file, l.week)} · ${l.size || ''}</span>
+                            ${extractionBadge(l.file)}
                             ${previewBtn(l.file, l.title)}
                         </li>
                     `).join('')}
@@ -230,6 +255,7 @@ function renderCourseMaterialsList(materials) {
                         <li>
                             <span class="material-title">${r.title}</span>
                             <span class="material-meta">${getWeekDisplay(r.file, r.week)} · ${r.size || ''}</span>
+                            ${extractionBadge(r.file)}
                             ${previewBtn(r.file, r.title)}
                         </li>
                     `).join('')}
@@ -248,6 +274,7 @@ function renderCourseMaterialsList(materials) {
                         <li>
                             <span class="material-title">${c.title}</span>
                             <span class="material-meta">${getWeekDisplay(c.file, null)} · ${c.court || ''}</span>
+                            ${extractionBadge(c.file)}
                             ${previewBtn(c.file, c.title)}
                         </li>
                     `).join('')}
@@ -266,6 +293,7 @@ function renderCourseMaterialsList(materials) {
                         <li>
                             <span class="material-title">${e.title}</span>
                             <span class="material-meta">${getWeekDisplay(e.file, null)} · ${e.size || ''}</span>
+                            ${extractionBadge(e.file)}
                             ${previewBtn(e.file, e.title)}
                         </li>
                     `).join('')}
@@ -1181,6 +1209,319 @@ function closePreviewModal() {
     }
 }
 
+// ========== Text Extraction Status UI ==========
+let extractionCache = new Map(); // Cache extraction status for files
+let extractionInProgress = false;
+let extractionAbortController = null;
+
+async function refreshExtractionDashboard() {
+    if (!currentCourse?.materials) {
+        showToast('No materials loaded', 'error');
+        return;
+    }
+
+    showLoading();
+    try {
+        // Get all file paths from materials
+        const filePaths = getAllMaterialFilePaths(currentCourse.materials);
+
+        // Fetch extraction status for all files
+        const statusPromises = filePaths.map(path => getExtractionStatus(path));
+        const statuses = await Promise.all(statusPromises);
+
+        // Calculate metrics
+        const metrics = calculateExtractionMetrics(statuses);
+
+        // Update dashboard
+        updateExtractionDashboard(metrics);
+
+        // Update badges in materials list
+        renderCourseMaterialsList(currentCourse.materials);
+
+    } catch (error) {
+        showToast('Error refreshing extraction stats: ' + error.message, 'error');
+    } finally {
+        hideLoading();
+    }
+}
+
+function getAllMaterialFilePaths(materials) {
+    const paths = [];
+    if (materials.coreTextbooks) paths.push(...materials.coreTextbooks.map(m => m.file).filter(Boolean));
+    if (materials.lectures) paths.push(...materials.lectures.map(m => m.file).filter(Boolean));
+    if (materials.caseStudies) paths.push(...materials.caseStudies.map(m => m.file).filter(Boolean));
+    if (materials.mockExams) paths.push(...materials.mockExams.map(m => m.file).filter(Boolean));
+    if (materials.readings) paths.push(...materials.readings.map(m => m.file).filter(Boolean));
+    return [...new Set(paths)]; // Remove duplicates
+}
+
+async function getExtractionStatus(filePath) {
+    // Check cache first
+    if (extractionCache.has(filePath)) {
+        return extractionCache.get(filePath);
+    }
+
+    try {
+        const response = await fetch(`/api/admin/cache/file/${encodeURIComponent(filePath)}`);
+        if (response.ok) {
+            const data = await response.json();
+            const status = {
+                path: filePath,
+                extracted: data.cached,
+                charCount: data.text_length || 0,
+                fileType: data.file_type || 'unknown',
+                extractionDate: data.cached_at || null,
+                error: null
+            };
+            extractionCache.set(filePath, status);
+            return status;
+        } else if (response.status === 404) {
+            const status = {
+                path: filePath,
+                extracted: false,
+                charCount: 0,
+                fileType: 'unknown',
+                extractionDate: null,
+                error: null
+            };
+            extractionCache.set(filePath, status);
+            return status;
+        } else {
+            throw new Error('Failed to fetch status');
+        }
+    } catch (error) {
+        return {
+            path: filePath,
+            extracted: false,
+            charCount: 0,
+            fileType: 'unknown',
+            extractionDate: null,
+            error: error.message
+        };
+    }
+}
+
+function calculateExtractionMetrics(statuses) {
+    const total = statuses.length;
+    const extracted = statuses.filter(s => s.extracted).length;
+    const failed = statuses.filter(s => s.error).length;
+    const totalChars = statuses.reduce((sum, s) => sum + s.charCount, 0);
+
+    // Group by file type
+    const byType = {};
+    statuses.forEach(s => {
+        if (!byType[s.fileType]) {
+            byType[s.fileType] = { total: 0, extracted: 0 };
+        }
+        byType[s.fileType].total++;
+        if (s.extracted) byType[s.fileType].extracted++;
+    });
+
+    return {
+        total,
+        extracted,
+        failed,
+        pending: total - extracted - failed,
+        coverage: total > 0 ? Math.round((extracted / total) * 100) : 0,
+        totalChars,
+        byType
+    };
+}
+
+function updateExtractionDashboard(metrics) {
+    document.getElementById('extraction-coverage').textContent = `${metrics.coverage}%`;
+    document.getElementById('extraction-total-files').textContent = metrics.total;
+    document.getElementById('extraction-extracted').textContent = metrics.extracted;
+    document.getElementById('extraction-failed').textContent = metrics.failed;
+    document.getElementById('extraction-total-chars').textContent = formatNumber(metrics.totalChars);
+
+    // Update by-type breakdown
+    const typeContainer = document.getElementById('extraction-by-type');
+    if (Object.keys(metrics.byType).length === 0) {
+        typeContainer.innerHTML = '<p class="empty-state">No files found</p>';
+    } else {
+        typeContainer.innerHTML = Object.entries(metrics.byType)
+            .map(([type, stats]) => `
+                <div class="type-stat">
+                    <span class="type-stat-label">${type.toUpperCase()}</span>
+                    <span class="type-stat-value">${stats.extracted}/${stats.total}</span>
+                </div>
+            `).join('');
+    }
+}
+
+function formatNumber(num) {
+    if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+    if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+    return num.toString();
+}
+
+async function extractAllMaterials() {
+    if (!currentCourse?.materials) {
+        showToast('No materials loaded', 'error');
+        return;
+    }
+
+    if (extractionInProgress) {
+        showToast('Extraction already in progress', 'warning');
+        return;
+    }
+
+    const filePaths = getAllMaterialFilePaths(currentCourse.materials);
+    if (filePaths.length === 0) {
+        showToast('No materials to extract', 'warning');
+        return;
+    }
+
+    extractionInProgress = true;
+    extractionAbortController = new AbortController();
+
+    // Show progress container
+    const progressContainer = document.getElementById('extraction-progress-container');
+    progressContainer.style.display = 'block';
+
+    const progressBar = document.getElementById('extraction-progress-bar');
+    const progressText = document.getElementById('extraction-progress-text');
+    const progressStats = document.getElementById('extraction-progress-stats');
+    const errorsContainer = document.getElementById('extraction-errors-summary');
+
+    let processed = 0;
+    let errors = [];
+
+    try {
+        for (const filePath of filePaths) {
+            if (extractionAbortController.signal.aborted) {
+                showToast('Extraction cancelled', 'warning');
+                break;
+            }
+
+            progressText.textContent = `Processing: ${filePath.split('/').pop()}`;
+            progressStats.textContent = `${processed} / ${filePaths.length} files`;
+
+            try {
+                await extractSingleFile(filePath);
+                processed++;
+            } catch (error) {
+                errors.push({ file: filePath, error: error.message });
+                processed++;
+            }
+
+            const progress = Math.round((processed / filePaths.length) * 100);
+            progressBar.style.width = `${progress}%`;
+            progressBar.textContent = `${progress}%`;
+        }
+
+        // Show results
+        if (errors.length > 0) {
+            errorsContainer.style.display = 'block';
+            document.getElementById('download-error-report-btn').onclick = () => downloadErrorReport(errors);
+            showToast(`Extraction complete with ${errors.length} errors`, 'warning');
+        } else {
+            showToast('All files extracted successfully!', 'success');
+        }
+
+        // Refresh dashboard
+        await refreshExtractionDashboard();
+
+    } catch (error) {
+        showToast('Extraction failed: ' + error.message, 'error');
+    } finally {
+        extractionInProgress = false;
+        extractionAbortController = null;
+
+        // Hide progress after 3 seconds
+        setTimeout(() => {
+            progressContainer.style.display = 'none';
+            errorsContainer.style.display = 'none';
+        }, 3000);
+    }
+}
+
+async function extractSingleFile(filePath) {
+    const response = await fetch(`/api/admin/cache/populate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            folder_path: filePath,
+            force_refresh: false,
+            recursive: false
+        })
+    });
+
+    if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || 'Extraction failed');
+    }
+
+    // Clear cache for this file
+    extractionCache.delete(filePath);
+}
+
+function downloadErrorReport(errors) {
+    const csv = 'File,Error\n' + errors.map(e => `"${e.file}","${e.error}"`).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `extraction-errors-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+async function openTextPreviewModal(filePath) {
+    const modal = document.getElementById('text-preview-modal');
+    modal.classList.remove('hidden');
+
+    // Show loading
+    document.getElementById('preview-text-container').innerHTML = '<p class="empty-state">Loading...</p>';
+
+    try {
+        const response = await fetch(`/api/admin/cache/file/${encodeURIComponent(filePath)}`);
+        if (!response.ok) throw new Error('Failed to load extracted text');
+
+        const data = await response.json();
+
+        // Update metadata
+        document.getElementById('preview-file-path').textContent = filePath;
+        document.getElementById('preview-file-type').textContent = data.file_type || 'unknown';
+        document.getElementById('preview-extraction-date').textContent = data.cached_at ? new Date(data.cached_at).toLocaleString() : 'N/A';
+        document.getElementById('preview-char-count').textContent = formatNumber(data.text_length || 0);
+        document.getElementById('preview-page-count').textContent = data.metadata?.num_pages || 'N/A';
+        document.getElementById('preview-extraction-method').textContent = data.file_type || 'N/A';
+
+        // Show text (first 500 chars by default)
+        const text = data.text || 'No text extracted';
+        const previewContainer = document.getElementById('preview-text-container');
+        previewContainer.textContent = text.substring(0, 500);
+        previewContainer.classList.add('collapsed');
+
+        // Setup buttons
+        document.getElementById('copy-text-btn').onclick = () => {
+            navigator.clipboard.writeText(data.text || '');
+            showToast('Text copied to clipboard!', 'success');
+        };
+
+        document.getElementById('show-full-text-btn').onclick = () => {
+            if (previewContainer.classList.contains('collapsed')) {
+                previewContainer.textContent = text;
+                previewContainer.classList.remove('collapsed');
+                document.getElementById('show-full-text-btn').textContent = '📖 Show Less';
+            } else {
+                previewContainer.textContent = text.substring(0, 500);
+                previewContainer.classList.add('collapsed');
+                document.getElementById('show-full-text-btn').textContent = '📖 Show Full Text';
+            }
+        };
+
+    } catch (error) {
+        document.getElementById('preview-text-container').innerHTML = `<p class="error-text">Error: ${error.message}</p>`;
+    }
+}
+
+function closeTextPreviewModal() {
+    document.getElementById('text-preview-modal').classList.add('hidden');
+}
+
 // ========== Event Listeners ==========
 document.addEventListener('DOMContentLoaded', () => {
     fetchCourses();
@@ -1200,6 +1541,10 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('scan-materials-btn').addEventListener('click', scanMaterials);
     document.getElementById('sync-week-materials-btn').addEventListener('click', syncWeekMaterials);
     document.getElementById('import-syllabus-btn').addEventListener('click', openSyllabusModal);
+
+    // Extraction actions
+    document.getElementById('extract-all-btn').addEventListener('click', extractAllMaterials);
+    document.getElementById('refresh-extraction-stats-btn').addEventListener('click', refreshExtractionDashboard);
 
     // Week actions
     document.getElementById('save-week-btn').addEventListener('click', saveWeek);
