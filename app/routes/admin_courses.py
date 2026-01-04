@@ -236,11 +236,22 @@ async def get_course(
 
         logger.info("Retrieved course: %s", course_id)
         return course
-    except ValueError as e:
+    except CourseNotFoundError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+    except ServiceValidationError as e:
         logger.warning("Invalid course ID: %s - %s", course_id, e)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
+        )
+    except FirestoreOperationError as e:
+        logger.error("Firestore error getting course %s: %s", course_id, e)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Database temporarily unavailable: {str(e)}"
         )
     except HTTPException:
         raise
@@ -279,11 +290,22 @@ async def create_course(course_data: CourseCreate):
         course = service.create_course(course_data)
         logger.info("Created course: %s", course_data.id)
         return course
-    except ValueError as e:
+    except CourseAlreadyExistsError as e:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(e)
+        )
+    except ServiceValidationError as e:
         logger.warning("Invalid course data: %s", e)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
+        )
+    except FirestoreOperationError as e:
+        logger.error("Firestore error creating course: %s", e)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Database temporarily unavailable: {str(e)}"
         )
     except Exception as e:
         logger.error("Error creating course: %s", e)
