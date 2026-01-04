@@ -29,7 +29,7 @@ class KeyConcept(BaseModel):
 
     term: str
     definition: str
-    source: str
+    source: Optional[str] = None  # Made optional for UI flexibility
     citation: Optional[str] = None
 
 
