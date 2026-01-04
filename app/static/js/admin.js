@@ -72,7 +72,7 @@ async function fetchCourse(courseId) {
         currentCourse = await response.json();
         renderCourseForm();
         renderWeeksList();
-        renderMaterialsList(currentCourse.materials);
+        renderCourseMaterialsList(currentCourse.materials);
         showView('course-detail');
     } catch (error) {
         showToast('Error loading course: ' + error.message, 'error');
@@ -130,7 +130,7 @@ async function scanMaterials() {
 
         // Refresh course data to get updated materials and render list
         await fetchCourse(currentCourse.id);
-        renderMaterialsList(currentCourse.materials);
+        renderCourseMaterialsList(currentCourse.materials);
     } catch (error) {
         showToast('Error: ' + error.message, 'error');
     } finally {
@@ -138,8 +138,10 @@ async function scanMaterials() {
     }
 }
 
-function renderMaterialsList(materials) {
-    const container = document.getElementById('materials-list');
+function renderCourseMaterialsList(materials) {
+    const container = document.getElementById('course-materials-list');
+    if (!container) return;  // Guard for when not on course detail view
+
     if (!materials) {
         container.innerHTML = '<p class="empty-state">No materials loaded. Click "Scan Folders" to discover materials.</p>';
         return;
