@@ -2,6 +2,35 @@
 
 const API_BASE = '';  // Empty for same origin
 
+// ========== Course Context ==========
+// Get course context from window object (set by template)
+const COURSE_ID = window.COURSE_CONTEXT?.courseId || null;
+const COURSE_NAME = window.COURSE_CONTEXT?.courseName || 'LLS';
+const COURSE = window.COURSE_CONTEXT?.course || null;
+
+/**
+ * Add course_id parameter to API requests if in course context
+ */
+function addCourseContext(params = {}) {
+    if (COURSE_ID) {
+        params.course_id = COURSE_ID;
+    }
+    return params;
+}
+
+/**
+ * Build URL with query parameters
+ */
+function buildUrl(endpoint, params = {}) {
+    const url = new URL(endpoint, window.location.origin);
+    Object.keys(params).forEach(key => {
+        if (params[key] !== null && params[key] !== undefined) {
+            url.searchParams.append(key, params[key]);
+        }
+    });
+    return url.toString();
+}
+
 // ========== Tab Navigation ==========
 document.addEventListener('DOMContentLoaded', () => {
     const tabs = document.querySelectorAll('.nav-tab');
@@ -214,7 +243,7 @@ async function askTutor() {
         const response = await fetch(`${API_BASE}/api/tutor/chat`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({message, context})
+            body: JSON.stringify(addCourseContext({message, context}))
         });
         
         if (!response.ok) throw new Error(`API error: ${response.status}`);
@@ -261,7 +290,7 @@ async function assessAnswer() {
         const response = await fetch(`${API_BASE}/api/assessment/assess`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({topic, question: question || null, answer})
+            body: JSON.stringify(addCourseContext({topic, question: question || null, answer}))
         });
         
         if (!response.ok) throw new Error(`API error: ${response.status}`);
@@ -301,7 +330,7 @@ async function generateQuiz() {
         const response = await fetch(`${API_BASE}/api/files-content/quiz`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({topic, num_questions, difficulty: 'medium'})
+            body: JSON.stringify(addCourseContext({topic, num_questions, difficulty: 'medium'}))
         });
 
         if (!response.ok) throw new Error(`API error: ${response.status}`);
@@ -358,7 +387,7 @@ async function generateStudyGuide() {
         const response = await fetch(`${API_BASE}/api/files-content/study-guide`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({topic})
+            body: JSON.stringify(addCourseContext({topic}))
         });
         
         if (!response.ok) throw new Error(`API error: ${response.status}`);

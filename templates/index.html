@@ -3,13 +3,42 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LLS Study Portal - Law & Legal Skills</title>
+    <title>{{ title }}</title>
     <link rel="stylesheet" href="/static/css/styles.css">
+    <!-- Course Context -->
+    <script>
+        // Store course context for JavaScript access
+        window.COURSE_CONTEXT = {
+            courseId: {{ course_id|tojson if course_id else 'null' }},
+            courseName: {{ course_name|tojson if course_name else '"LLS"' }},
+            {% if course %}
+            course: {
+                id: {{ course.id|tojson }},
+                name: {{ course.name|tojson }},
+                program: {{ course.program|tojson if course.program else 'null' }},
+                institution: {{ course.institution|tojson if course.institution else 'null' }},
+                academicYear: {{ course.academicYear|tojson if course.academicYear else 'null' }},
+                ects: {{ course.ects if course.ects else 0 }}
+            }
+            {% else %}
+            course: null
+            {% endif %}
+        };
+    </script>
 </head>
 <body>
     <div class="container">
         <header class="nav-header">
-            <h1 class="nav-title">⚖️ LLS Study Portal</h1>
+            <div class="header-top">
+                <h1 class="nav-title">⚖️ {{ course_name if course_name else 'LLS' }} Study Portal</h1>
+                {% if course_id %}
+                <div class="course-badge">
+                    <span class="course-badge-label">Course:</span>
+                    <span class="course-badge-id">{{ course_id }}</span>
+                    <a href="/" class="change-course-link" title="Change Course">🔄</a>
+                </div>
+                {% endif %}
+            </div>
             <div class="nav-tabs">
                 <button class="nav-tab active" data-tab="dashboard">📊 Dashboard</button>
                 <button class="nav-tab" data-tab="tutor">🤖 AI Tutor</button>
@@ -24,8 +53,8 @@
                 <div class="dashboard-header">
                     <h2>Welcome Back! 🎓</h2>
                     <div class="exam-info">
-                        <p>Your personalized study dashboard</p>
-                        <p class="exam-date">Track your progress and master LLS topics</p>
+                        <p>Your personalized study dashboard{% if course %} for {{ course.name }}{% endif %}</p>
+                        <p class="exam-date">Track your progress and master {% if course_name %}{{ course_name }}{% else %}LLS{% endif %} topics</p>
                     </div>
                 </div>
                 <div class="stats-grid">
