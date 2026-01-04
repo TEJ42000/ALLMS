@@ -6,15 +6,25 @@ const API_BASE = '';  // Empty for same origin
 document.addEventListener('DOMContentLoaded', () => {
     const tabs = document.querySelectorAll('.nav-tab');
     const tabContents = document.querySelectorAll('.tab-content');
-    
+    const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+    const navTabs = document.getElementById('nav-tabs');
+
+    // Mobile menu toggle
+    if (mobileMenuBtn && navTabs) {
+        mobileMenuBtn.addEventListener('click', () => {
+            mobileMenuBtn.classList.toggle('active');
+            navTabs.classList.toggle('active');
+        });
+    }
+
     tabs.forEach(tab => {
         tab.addEventListener('click', () => {
             const tabName = tab.dataset.tab;
-            
+
             // Update active tab
             tabs.forEach(t => t.classList.remove('active'));
             tab.classList.add('active');
-            
+
             // Show corresponding content
             tabContents.forEach(content => {
                 content.classList.remove('active');
@@ -22,9 +32,25 @@ document.addEventListener('DOMContentLoaded', () => {
                     content.classList.add('active');
                 }
             });
+
+            // Close mobile menu after selecting a tab
+            if (mobileMenuBtn && navTabs) {
+                mobileMenuBtn.classList.remove('active');
+                navTabs.classList.remove('active');
+            }
         });
     });
-    
+
+    // Close mobile menu when clicking outside
+    document.addEventListener('click', (e) => {
+        if (mobileMenuBtn && navTabs &&
+            !mobileMenuBtn.contains(e.target) &&
+            !navTabs.contains(e.target)) {
+            mobileMenuBtn.classList.remove('active');
+            navTabs.classList.remove('active');
+        }
+    });
+
     // Initialize event listeners
     initTutorListeners();
     initAssessmentListeners();
