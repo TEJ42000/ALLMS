@@ -25,6 +25,9 @@ logger = logging.getLogger(__name__)
 # Supported file extensions
 SUPPORTED_EXTENSIONS = {'.pdf', '.docx', '.md', '.txt'}
 
+# Files to exclude from upload (documentation files, not course materials)
+EXCLUDED_FILENAMES = {'README.md', 'FILE_INDEX.md', 'PACKAGE_CONTENTS.md'}
+
 # Tier priorities for AI system (1 = highest authority)
 TIER_PRIORITIES = {
     "Syllabus": 1,
@@ -70,6 +73,11 @@ def discover_materials(materials_dir: str = "./Materials") -> Dict[str, Dict]:
         # Use specific glob patterns for each extension for better performance
         for ext in SUPPORTED_EXTENSIONS:
             for file_path in tier_dir.rglob("*%s" % ext):
+                # Skip excluded files (documentation, not course materials)
+                if file_path.name in EXCLUDED_FILENAMES:
+                    logger.debug("Skipping excluded file: %s", file_path.name)
+                    continue
+
                 # Generate a unique key for this file
                 # Format: tier_subject_category_filename
                 relative_path = file_path.relative_to(tier_dir)
