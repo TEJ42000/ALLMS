@@ -1726,8 +1726,43 @@ async function extractSingleFile(filePath) {
     return await response.json();
 }
 
+/**
+ * Sanitize CSV cell value to prevent formula injection attacks
+ * @param {string} value - The value to sanitize
+ * @returns {string} - Sanitized value safe for CSV
+ */
+function sanitizeCSVValue(value) {
+    if (!value) return '';
+
+    const str = String(value);
+
+    // Check if value starts with dangerous characters that could trigger formula execution
+    // Dangerous prefixes: = + - @ \t \r (equals, plus, minus, at-sign, tab, carriage return)
+    const dangerousChars = ['=', '+', '-', '@', '\t', '\r'];
+
+    if (dangerousChars.some(char => str.startsWith(char))) {
+        // Prefix with single quote to prevent formula injection
+        // Also escape any existing quotes
+        return "'" + str.replace(/"/g, '""');
+    }
+
+    // Escape double quotes by doubling them (CSV standard)
+    return str.replace(/"/g, '""');
+}
+
+/**
+ * Download error report as CSV file with proper sanitization
+ * @param {Array} errors - Array of error objects with file and error properties
+ */
 function downloadErrorReport(errors) {
-    const csv = 'File,Error\n' + errors.map(e => `"${e.file}","${e.error}"`).join('\n');
+    // Sanitize all values to prevent CSV injection attacks
+    const csvRows = errors.map(e => {
+        const sanitizedFile = sanitizeCSVValue(e.file);
+        const sanitizedError = sanitizeCSVValue(e.error);
+        return `"${sanitizedFile}","${sanitizedError}"`;
+    });
+
+    const csv = 'File,Error\n' + csvRows.join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
