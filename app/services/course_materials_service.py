@@ -20,15 +20,19 @@ logger = logging.getLogger(__name__)
 # Collection name for unified materials
 MATERIALS_COLLECTION = "materials"
 
+# Firestore batch limit
+FIRESTORE_BATCH_LIMIT = 500
+
 
 def generate_material_id(storage_path: str) -> str:
     """Generate a unique ID from the storage path.
-    
-    Uses MD5 hash of the path to ensure:
+
+    Uses SHA-256 hash of the path to ensure:
     - Same file always gets same ID (deduplication)
     - ID is URL-safe and consistent length
+    - Cryptographically secure (unlike MD5)
     """
-    return hashlib.md5(storage_path.encode()).hexdigest()
+    return hashlib.sha256(storage_path.encode()).hexdigest()[:32]
 
 
 class CourseMaterialsService:
@@ -200,12 +204,12 @@ class CourseMaterialsService:
             batch.set(doc_ref, material.model_dump(mode="json"))
             count += 1
 
-            # Firestore batch limit is 500
-            if count % 500 == 0:
+            # Firestore batch limit
+            if count % FIRESTORE_BATCH_LIMIT == 0:
                 batch.commit()
                 batch = self.db.batch()
 
-        if count % 500 != 0:
+        if count % FIRESTORE_BATCH_LIMIT != 0:
             batch.commit()
 
         logger.info("Bulk upserted %d materials in course %s", count, course_id)

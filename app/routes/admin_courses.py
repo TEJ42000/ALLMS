@@ -552,6 +552,7 @@ class MaterialsScanResponse(BaseModel):
     categories: Dict[str, int]
     materials_updated: bool
     message: str
+    warnings: Optional[List[str]] = None
 
 
 @router.post(
@@ -609,7 +610,8 @@ async def scan_course_materials(
         # Convert to unified CourseMaterial format
         from app.services.materials_scanner import convert_to_course_materials
         course_materials = convert_to_course_materials(scan_result, subject)
-        all_course_materials.extend(course_materials)
+        if course_materials:
+            all_course_materials.extend(course_materials)
 
     if not all_materials:
         return MaterialsScanResponse(
@@ -658,6 +660,7 @@ async def scan_course_materials(
         )
 
     # Store in unified materials collection
+    warnings = []
     try:
         from app.services.course_materials_service import get_course_materials_service
         materials_service = get_course_materials_service()
@@ -665,7 +668,7 @@ async def scan_course_materials(
         logger.info("Upserted %d materials to unified collection for course %s", count, course_id)
     except Exception as e:
         logger.error("Failed to upsert unified materials for %s: %s", course_id, e)
-        # Don't fail the whole operation, just log the error
+        warnings.append(f"Failed to update unified materials collection: {str(e)}")
 
     return MaterialsScanResponse(
         course_id=course_id,
@@ -673,7 +676,8 @@ async def scan_course_materials(
         total_files=len(all_materials),
         categories=all_categories,
         materials_updated=True,
-        message=f"Successfully scanned and updated {len(all_materials)} materials"
+        message=f"Successfully scanned and updated {len(all_materials)} materials",
+        warnings=warnings if warnings else None
     )
 
 
@@ -1775,8 +1779,8 @@ async def extract_material_text(
                 detail=f"Material not found: {material_id}"
             )
 
-        # Build full file path
-        file_path = pathlib.Path("Materials") / material.storagePath
+        # Build full file path with security validation
+        file_path = validate_materials_path(material.storagePath)
         if not file_path.exists():
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -1784,7 +1788,7 @@ async def extract_material_text(
             )
 
         # Extract text
-        result = extract_text(str(file_path))
+        result = extract_text(file_path)
 
         if result.success:
             updated = service.update_text_extraction(
@@ -1926,28 +1930,34 @@ async def batch_process_materials(
             if process_text and not material.textExtracted:
                 storage_path = material.storagePath
                 logger.debug(f"Processing material: {material.filename}, storagePath: {storage_path}")
-                file_path = pathlib.Path("Materials") / storage_path
-                logger.debug(f"Full file path: {file_path}")
-                if file_path.exists():
-                    extraction = extract_text(file_path)  # Pass Path object, not string
-                    if extraction.success:
-                        service.update_text_extraction(
-                            course_id=course_id,
-                            material_id=material.id,
-                            extracted_text=extraction.text,
-                            text_length=len(extraction.text)
-                        )
-                        result["text_extracted"] = True
-                        result["text_length"] = len(extraction.text)
-                        material.extractedText = extraction.text
-                        material.textExtracted = True
+                try:
+                    # Validate path to prevent path traversal
+                    file_path = validate_materials_path(storage_path)
+                    logger.debug(f"Full file path: {file_path}")
+                    if file_path.exists():
+                        extraction = extract_text(file_path)
+                        if extraction.success:
+                            service.update_text_extraction(
+                                course_id=course_id,
+                                material_id=material.id,
+                                extracted_text=extraction.text,
+                                text_length=len(extraction.text)
+                            )
+                            result["text_extracted"] = True
+                            result["text_length"] = len(extraction.text)
+                            material.extractedText = extraction.text
+                            material.textExtracted = True
+                        else:
+                            result["text_extracted"] = False
+                            result["text_error"] = extraction.error
+                            errors += 1
                     else:
                         result["text_extracted"] = False
-                        result["text_error"] = extraction.error
-                        errors += 1
-                else:
+                        result["text_error"] = "File not found"
+                except HTTPException as e:
                     result["text_extracted"] = False
-                    result["text_error"] = "File not found"
+                    result["text_error"] = f"Invalid path: {e.detail}"
+                    errors += 1
                     errors += 1
             elif material.textExtracted:
                 result["text_extracted"] = True
@@ -2021,9 +2031,9 @@ async def delete_unified_material(
                 detail=f"Material not found: {material_id}"
             )
 
-        # Optionally delete the file
+        # Optionally delete the file (with path validation for security)
         if delete_file:
-            file_path = pathlib.Path("Materials") / material.storagePath
+            file_path = validate_materials_path(material.storagePath)
             if file_path.exists():
                 file_path.unlink()
                 logger.info(f"Deleted file: {file_path}")

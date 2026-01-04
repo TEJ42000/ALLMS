@@ -15,7 +15,7 @@ Usage:
 import argparse
 import sys
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -96,8 +96,8 @@ def migrate_uploaded_materials(dry_run: bool = False):
                     textLength=len(um_data.get("extractedText", "") or ""),
                     summary=um_data.get("summary"),
                     summaryGenerated=um_data.get("summaryGenerated", False),
-                    createdAt=um_data.get("uploadedAt", datetime.utcnow()),
-                    updatedAt=datetime.utcnow()
+                    createdAt=um_data.get("uploadedAt", datetime.now(timezone.utc)),
+                    updatedAt=datetime.now(timezone.utc)
                 )
                 
                 if dry_run:
