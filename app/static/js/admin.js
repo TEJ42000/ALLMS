@@ -147,6 +147,27 @@ function renderCourseMaterialsList(materials) {
         return;
     }
 
+    // Build a map of file -> weeks that reference it
+    const fileToWeeks = {};
+    (currentCourse?.weeks || []).forEach(week => {
+        (week.materials || []).forEach(m => {
+            if (!fileToWeeks[m.file]) fileToWeeks[m.file] = [];
+            fileToWeeks[m.file].push(week.weekNumber);
+        });
+    });
+
+    // Helper to get week display for a material
+    const getWeekDisplay = (file, hintWeek) => {
+        const linkedWeeks = fileToWeeks[file] || [];
+        if (linkedWeeks.length > 0) {
+            return `Weeks: ${linkedWeeks.sort((a,b) => a-b).join(', ')}`;
+        } else if (hintWeek) {
+            return `Week ${hintWeek} (hint)`;
+        } else {
+            return 'Course-wide';
+        }
+    };
+
     const sections = [];
 
     // Core Textbooks
@@ -158,7 +179,7 @@ function renderCourseMaterialsList(materials) {
                     ${materials.coreTextbooks.map(t => `
                         <li>
                             <span class="material-title">${t.title}</span>
-                            <span class="material-meta">${t.size || ''} · ${t.type || 'textbook'}</span>
+                            <span class="material-meta">${getWeekDisplay(t.file, null)} · ${t.size || ''}</span>
                         </li>
                     `).join('')}
                 </ul>
@@ -175,7 +196,7 @@ function renderCourseMaterialsList(materials) {
                     ${materials.lectures.map(l => `
                         <li>
                             <span class="material-title">${l.title}</span>
-                            <span class="material-meta">${l.week ? 'Week ' + l.week : 'No week'} · ${l.size || ''}</span>
+                            <span class="material-meta">${getWeekDisplay(l.file, l.week)} · ${l.size || ''}</span>
                         </li>
                     `).join('')}
                 </ul>
@@ -192,7 +213,7 @@ function renderCourseMaterialsList(materials) {
                     ${materials.readings.map(r => `
                         <li>
                             <span class="material-title">${r.title}</span>
-                            <span class="material-meta">${r.week ? 'Week ' + r.week : 'No week'} · ${r.size || ''}</span>
+                            <span class="material-meta">${getWeekDisplay(r.file, r.week)} · ${r.size || ''}</span>
                         </li>
                     `).join('')}
                 </ul>
@@ -209,7 +230,7 @@ function renderCourseMaterialsList(materials) {
                     ${materials.caseStudies.map(c => `
                         <li>
                             <span class="material-title">${c.title}</span>
-                            <span class="material-meta">${c.court || ''}</span>
+                            <span class="material-meta">${getWeekDisplay(c.file, null)} · ${c.court || ''}</span>
                         </li>
                     `).join('')}
                 </ul>
@@ -226,7 +247,7 @@ function renderCourseMaterialsList(materials) {
                     ${materials.mockExams.map(e => `
                         <li>
                             <span class="material-title">${e.title}</span>
-                            <span class="material-meta">${e.size || ''}</span>
+                            <span class="material-meta">${getWeekDisplay(e.file, null)} · ${e.size || ''}</span>
                         </li>
                     `).join('')}
                 </ul>
@@ -243,7 +264,7 @@ function renderCourseMaterialsList(materials) {
                     ${materials.other.map(o => `
                         <li>
                             <span class="material-title">${o.title}</span>
-                            <span class="material-meta">${o.category || ''} · ${o.size || ''}</span>
+                            <span class="material-meta">${getWeekDisplay(o.file, null)} · ${o.category || ''}</span>
                         </li>
                     `).join('')}
                 </ul>
