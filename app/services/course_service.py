@@ -2,10 +2,17 @@
 
 This service provides CRUD operations for courses, weeks, and legal skills
 using Firestore as the data store.
+
+Firestore Index Requirements:
+    The following composite indexes are required for production:
+    - Collection: courses, Fields: active (Ascending)
+
+    See firestore.indexes.json for the full index configuration.
 """
 
 import logging
-from datetime import datetime
+import re
+from datetime import datetime, timezone
 from typing import Dict, List, Optional
 
 from google.cloud.firestore_v1 import FieldFilter
@@ -27,6 +34,63 @@ logger = logging.getLogger(__name__)
 COURSES_COLLECTION = "courses"
 WEEKS_SUBCOLLECTION = "weeks"
 LEGAL_SKILLS_SUBCOLLECTION = "legalSkills"
+
+# Validation patterns
+# Course IDs: alphanumeric, hyphens, underscores, 1-100 chars
+COURSE_ID_PATTERN = re.compile(r"^[a-zA-Z0-9_-]{1,100}$")
+# Week numbers: positive integers 1-52
+MIN_WEEK_NUMBER = 1
+MAX_WEEK_NUMBER = 52
+
+
+def validate_course_id(course_id: str) -> str:
+    """
+    Validate and sanitize a course ID.
+
+    Args:
+        course_id: The course ID to validate
+
+    Returns:
+        The validated course ID
+
+    Raises:
+        ValueError: If the course ID is invalid
+    """
+    if not course_id:
+        raise ValueError("Course ID cannot be empty")
+
+    if not COURSE_ID_PATTERN.match(course_id):
+        raise ValueError(
+            f"Invalid course ID '{course_id}'. "
+            "Must be 1-100 characters, alphanumeric with hyphens and underscores only."
+        )
+
+    return course_id
+
+
+def validate_week_number(week_number: int) -> int:
+    """
+    Validate a week number.
+
+    Args:
+        week_number: The week number to validate
+
+    Returns:
+        The validated week number
+
+    Raises:
+        ValueError: If the week number is invalid
+    """
+    if not isinstance(week_number, int):
+        raise ValueError(f"Week number must be an integer, got {type(week_number).__name__}")
+
+    if week_number < MIN_WEEK_NUMBER or week_number > MAX_WEEK_NUMBER:
+        raise ValueError(
+            f"Week number must be between {MIN_WEEK_NUMBER} and {MAX_WEEK_NUMBER}, "
+            f"got {week_number}"
+        )
+
+    return week_number
 
 
 class CourseService:
@@ -85,11 +149,15 @@ class CourseService:
 
         Args:
             course_id: The course ID
-            include_weeks: Whether to include weeks subcollection
 
         Returns:
             Course object or None if not found
+
+        Raises:
+            ValueError: If course_id is invalid
         """
+        course_id = validate_course_id(course_id)
+
         doc_ref = self.db.collection(COURSES_COLLECTION).document(course_id)
         doc = doc_ref.get()
 
@@ -114,8 +182,8 @@ class CourseService:
             externalResources=data.get("externalResources"),
             materials=data.get("materials"),
             active=data.get("active", True),
-            createdAt=data.get("createdAt", datetime.utcnow()),
-            updatedAt=data.get("updatedAt", datetime.utcnow()),
+            createdAt=data.get("createdAt", datetime.now(timezone.utc)),
+            updatedAt=data.get("updatedAt", datetime.now(timezone.utc)),
         )
 
         # Load weeks if requested
@@ -135,14 +203,19 @@ class CourseService:
 
         Returns:
             Created course object
+
+        Raises:
+            ValueError: If course_id is invalid or course already exists
         """
-        doc_ref = self.db.collection(COURSES_COLLECTION).document(course_data.id)
+        course_id = validate_course_id(course_data.id)
+
+        doc_ref = self.db.collection(COURSES_COLLECTION).document(course_id)
 
         # Check if already exists
         if doc_ref.get().exists:
-            raise ValueError(f"Course already exists: {course_data.id}")
+            raise ValueError(f"Course already exists: {course_id}")
 
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         data = {
             **course_data.model_dump(),
             "active": True,
@@ -151,9 +224,9 @@ class CourseService:
         }
 
         doc_ref.set(data)
-        logger.info("Created course: %s", course_data.id)
+        logger.info("Created course: %s", course_id)
 
-        return self.get_course(course_data.id, include_weeks=False)
+        return self.get_course(course_id, include_weeks=False)
 
     def update_course(self, course_id: str, updates: CourseUpdate) -> Optional[Course]:
         """
@@ -165,7 +238,12 @@ class CourseService:
 
         Returns:
             Updated course or None if not found
+
+        Raises:
+            ValueError: If course_id is invalid
         """
+        course_id = validate_course_id(course_id)
+
         doc_ref = self.db.collection(COURSES_COLLECTION).document(course_id)
 
         if not doc_ref.get().exists:
@@ -174,7 +252,7 @@ class CourseService:
 
         # Only include non-None fields
         update_data = {k: v for k, v in updates.model_dump().items() if v is not None}
-        update_data["updatedAt"] = datetime.utcnow()
+        update_data["updatedAt"] = datetime.now(timezone.utc)
 
         doc_ref.update(update_data)
         logger.info("Updated course: %s", course_id)
@@ -190,7 +268,12 @@ class CourseService:
 
         Returns:
             True if deactivated, False if not found
+
+        Raises:
+            ValueError: If course_id is invalid
         """
+        course_id = validate_course_id(course_id)
+
         doc_ref = self.db.collection(COURSES_COLLECTION).document(course_id)
 
         if not doc_ref.get().exists:
@@ -198,7 +281,7 @@ class CourseService:
 
         doc_ref.update({
             "active": False,
-            "updatedAt": datetime.utcnow()
+            "updatedAt": datetime.now(timezone.utc)
         })
         logger.info("Deactivated course: %s", course_id)
         return True
@@ -243,7 +326,13 @@ class CourseService:
 
         Returns:
             Week object or None if not found
+
+        Raises:
+            ValueError: If course_id or week_number is invalid
         """
+        course_id = validate_course_id(course_id)
+        week_number = validate_week_number(week_number)
+
         doc_ref = (
             self.db.collection(COURSES_COLLECTION)
             .document(course_id)
@@ -267,7 +356,13 @@ class CourseService:
 
         Returns:
             Created/updated week
+
+        Raises:
+            ValueError: If course_id or week_number is invalid
         """
+        course_id = validate_course_id(course_id)
+        validate_week_number(week_data.weekNumber)
+
         doc_ref = (
             self.db.collection(COURSES_COLLECTION)
             .document(course_id)
@@ -279,7 +374,7 @@ class CourseService:
 
         # Update course's updatedAt
         self.db.collection(COURSES_COLLECTION).document(course_id).update({
-            "updatedAt": datetime.utcnow()
+            "updatedAt": datetime.now(timezone.utc)
         })
 
         logger.info("Upserted week %d for course %s", week_data.weekNumber, course_id)
@@ -295,7 +390,13 @@ class CourseService:
 
         Returns:
             True if deleted, False if not found
+
+        Raises:
+            ValueError: If course_id or week_number is invalid
         """
+        course_id = validate_course_id(course_id)
+        week_number = validate_week_number(week_number)
+
         doc_ref = (
             self.db.collection(COURSES_COLLECTION)
             .document(course_id)
@@ -351,7 +452,18 @@ class CourseService:
 
         Returns:
             Created/updated legal skill
+
+        Raises:
+            ValueError: If course_id or skill_id is invalid
         """
+        course_id = validate_course_id(course_id)
+        # Validate skill_id using same pattern as course_id
+        if not COURSE_ID_PATTERN.match(skill_id):
+            raise ValueError(
+                f"Invalid skill ID '{skill_id}'. "
+                "Must be 1-100 characters, alphanumeric with hyphens and underscores only."
+            )
+
         doc_ref = (
             self.db.collection(COURSES_COLLECTION)
             .document(course_id)
@@ -363,7 +475,7 @@ class CourseService:
 
         # Update course's updatedAt
         self.db.collection(COURSES_COLLECTION).document(course_id).update({
-            "updatedAt": datetime.utcnow()
+            "updatedAt": datetime.now(timezone.utc)
         })
 
         logger.info("Upserted legal skill '%s' for course %s", skill_id, course_id)

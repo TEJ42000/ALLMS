@@ -4,7 +4,7 @@ Based on the schema from Materials/Course_Materials/LLS/LLS Essential/course_dat
 These models represent the course structure stored in Firestore.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
@@ -281,8 +281,8 @@ class Course(BaseModel):
     active: bool = True
 
     # Timestamps
-    createdAt: datetime = Field(default_factory=datetime.utcnow)
-    updatedAt: datetime = Field(default_factory=datetime.utcnow)
+    createdAt: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updatedAt: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     # These are typically loaded from subcollections
     weeks: List[Week] = []
