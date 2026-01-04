@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }} - LLS Admin</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <link rel="stylesheet" href="/static/css/admin.css">
+</head>
+<body>
+    <div class="container">
+        <header class="nav-header">
+            <div class="header-row">
+                <h1 class="nav-title">⚙️ LLS Admin Portal</h1>
+                <a href="/" class="btn btn-secondary">← Back to Study Portal</a>
+            </div>
+            <div class="nav-tabs">
+                <button class="nav-tab active" data-view="courses">📚 Courses</button>
+                <button class="nav-tab" data-view="course-detail" id="course-detail-tab" style="display:none;">📝 Course Details</button>
+                <button class="nav-tab" data-view="week-editor" id="week-editor-tab" style="display:none;">📅 Week Editor</button>
+            </div>
+        </header>
+
+        <main id="main-content">
+            <!-- Courses List View -->
+            <section id="courses-view" class="admin-section active">
+                <div class="section-header">
+                    <h2 class="section-title">📚 Courses</h2>
+                    <button id="create-course-btn" class="btn btn-primary">+ New Course</button>
+                </div>
+                <div id="courses-list" class="courses-grid">
+                    <div class="loading-placeholder">Loading courses...</div>
+                </div>
+            </section>
+
+            <!-- Course Detail View -->
+            <section id="course-detail-view" class="admin-section">
+                <div class="section-header">
+                    <h2 class="section-title">📝 Course Details</h2>
+                    <div class="header-actions">
+                        <button id="back-to-list-btn" class="btn btn-secondary">← Back to List</button>
+                        <button id="save-course-btn" class="btn btn-primary">💾 Save Changes</button>
+                    </div>
+                </div>
+                <form id="course-form" class="course-form">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="course-id">Course ID</label>
+                            <input type="text" id="course-id" class="form-input" placeholder="e.g., LLS-2025-2026" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="course-name">Course Name</label>
+                            <input type="text" id="course-name" class="form-input" placeholder="e.g., Law and Legal Skills" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="course-program">Program</label>
+                            <input type="text" id="course-program" class="form-input" placeholder="e.g., Bachelor of Laws">
+                        </div>
+                        <div class="form-group">
+                            <label for="course-institution">Institution</label>
+                            <input type="text" id="course-institution" class="form-input" placeholder="e.g., University of Groningen">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="course-year">Academic Year</label>
+                            <input type="text" id="course-year" class="form-input" placeholder="e.g., 2025-2026">
+                        </div>
+                        <div class="form-group">
+                            <label for="course-points">ECTS Points</label>
+                            <input type="number" id="course-points" class="form-input" placeholder="e.g., 15" min="1" max="60">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="course-subjects">Material Subjects (comma-separated)</label>
+                        <input type="text" id="course-subjects" class="form-input" placeholder="e.g., Criminal Law, Constitutional Law, Private Law">
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="course-active" checked> Active
+                        </label>
+                    </div>
+                </form>
+
+                <div class="weeks-section">
+                    <div class="section-header">
+                        <h3>📅 Course Weeks</h3>
+                        <button id="add-week-btn" class="btn btn-secondary">+ Add Week</button>
+                    </div>
+                    <div id="weeks-list" class="weeks-grid">
+                        <p class="empty-state">No weeks configured. Click "Add Week" to create one.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Week Editor View -->
+            <section id="week-editor-view" class="admin-section">
+                <div class="section-header">
+                    <h2 class="section-title">📅 Week Editor</h2>
+                    <div class="header-actions">
+                        <button id="back-to-course-btn" class="btn btn-secondary">← Back to Course</button>
+                        <button id="save-week-btn" class="btn btn-primary">💾 Save Week</button>
+                    </div>
+                </div>
+                <form id="week-form" class="week-form">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="week-number">Week Number</label>
+                            <input type="number" id="week-number" class="form-input" min="1" max="52" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="week-title">Week Title</label>
+                            <input type="text" id="week-title" class="form-input" placeholder="e.g., Introduction to Criminal Law">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="week-description">Description</label>
+                        <textarea id="week-description" class="form-input" rows="3" placeholder="Week overview..."></textarea>
+                    </div>
+                </form>
+
+                <div class="week-subsection">
+                    <h4>📖 Topics</h4>
+                    <div id="topics-list" class="items-list"></div>
+                    <button id="add-topic-btn" class="btn btn-secondary btn-sm">+ Add Topic</button>
+                </div>
+
+                <div class="week-subsection">
+                    <h4>📚 Materials</h4>
+                    <div id="materials-list" class="items-list"></div>
+                    <button id="add-material-btn" class="btn btn-secondary btn-sm">+ Add Material</button>
+                </div>
+
+                <div class="week-subsection">
+                    <h4>🔑 Key Concepts</h4>
+                    <div id="concepts-list" class="items-list"></div>
+                    <button id="add-concept-btn" class="btn btn-secondary btn-sm">+ Add Concept</button>
+                </div>
+            </section>
+        </main>
+
+        <div id="loading" class="loading hidden">
+            <div class="spinner"></div>
+            <p>Processing...</p>
+        </div>
+
+        <div id="toast" class="toast hidden"></div>
+    </div>
+
+    <footer class="footer">
+        <p>&copy; 2026 LLS Study Portal Admin | v{{ version }}</p>
+    </footer>
+
+    <script>
+        // Pass course_id from server if editing specific course
+        window.initialCourseId = "{{ course_id | default('') }}";
+    </script>
+    <script src="/static/js/admin.js"></script>
+</body>
+</html>
+
