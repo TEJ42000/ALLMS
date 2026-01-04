@@ -197,6 +197,7 @@ class ECHRSearchRequest(BaseModel):
     importance: Optional[int] = Field(None, ge=1, le=4, description="Filter by importance level")
     document_type: Optional[str] = Field(None, description="Filter by document type")
     violation: Optional[bool] = Field(None, description="Filter cases with violations")
+    use_cache: bool = Field(True, description="Use local cache (faster, may be slightly outdated)")
     page: int = Field(1, ge=1, description="Page number")
     limit: int = Field(20, ge=1, le=100, description="Results per page")
 

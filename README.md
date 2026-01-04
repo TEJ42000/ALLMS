@@ -203,6 +203,7 @@ See `.env.example` for all available configuration options:
 - `GCP_PROJECT_ID` - Google Cloud project ID
 - `GCP_REGION` - Deployment region (default: europe-west4)
 - `PORT` - Application port (default: 8080)
+- `ECHR_CACHE_DIR` - Directory for ECHR case law cache (default: data/echr_cache)
 
 ### Google Cloud Settings
 

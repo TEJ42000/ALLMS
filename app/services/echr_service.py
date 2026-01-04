@@ -15,7 +15,9 @@ import asyncio
 import json
 import logging
 import os
+import re
 import sqlite3
+from collections import OrderedDict
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from functools import lru_cache
@@ -117,7 +119,8 @@ class ECHRService:
         self._client: Optional[httpx.AsyncClient] = None
         self._db_initialized = False
         self._sync_in_progress = False
-        self._memory_cache: Dict[str, ECHRCase] = {}
+        # Use OrderedDict for proper LRU cache behavior
+        self._memory_cache: OrderedDict[str, ECHRCase] = OrderedDict()
 
     async def initialize(self) -> None:
         """Initialize the service (HTTP client and database)."""
@@ -305,20 +308,23 @@ class ECHRService:
             )
             conn.commit()
 
-        # Also update memory cache
-        self._memory_cache[case.item_id] = case
+        # Also update memory cache with LRU behavior
+        # Move to end if already exists (mark as recently used)
+        if case.item_id in self._memory_cache:
+            self._memory_cache.move_to_end(case.item_id)
+        else:
+            self._memory_cache[case.item_id] = case
 
-        # Limit memory cache size
-        if len(self._memory_cache) > MEMORY_CACHE_SIZE:
-            # Remove oldest entries
-            oldest_keys = list(self._memory_cache.keys())[: len(self._memory_cache) - MEMORY_CACHE_SIZE]
-            for key in oldest_keys:
-                del self._memory_cache[key]
+        # Limit memory cache size - remove oldest (first) entries
+        while len(self._memory_cache) > MEMORY_CACHE_SIZE:
+            self._memory_cache.popitem(last=False)  # Remove oldest (FIFO/LRU)
 
     def _get_cached_case(self, item_id: str) -> Optional[ECHRCase]:
         """Get a case from cache (memory first, then SQLite)."""
         # Check memory cache first
         if item_id in self._memory_cache:
+            # Move to end to mark as recently used (LRU)
+            self._memory_cache.move_to_end(item_id)
             return self._memory_cache[item_id]
 
         # Check SQLite
@@ -426,7 +432,12 @@ class ECHRService:
         """Search for cases with filters.
 
         Note: The ECHR Open Data API has limited search capabilities.
-        This method fetches cases and filters locally for advanced queries.
+        This method can use either the local cache or fetch from the API.
+
+        **Performance Warning**: When use_cache=False, this method may fetch up to 10,000
+        cases into memory (10 pages × 1000 cases/page) for client-side filtering.
+        For better performance, use use_cache=True (default) to query the local SQLite
+        database directly.
 
         Args:
             request: Search request with filters
@@ -434,11 +445,31 @@ class ECHRService:
         Returns:
             ECHRSearchResponse with matching cases
         """
-        # For now, fetch cases and filter locally
+        # Use cached search if requested (default and recommended)
+        if request.use_cache:
+            cases = self.search_cached_cases(
+                query=request.query,
+                articles=request.articles,
+                respondent=request.respondent,
+                limit=request.limit,
+                offset=(request.page - 1) * request.limit,
+            )
+            total = self.get_cached_case_count()
+            has_more = (request.page * request.limit) < total
+
+            return ECHRSearchResponse(
+                cases=cases,
+                total=total,
+                page=request.page,
+                limit=request.limit,
+                has_more=has_more,
+            )
+
+        # Otherwise, fetch from API and filter locally
         # TODO: Implement more sophisticated search when API supports it
         all_cases = []
         page = 1
-        max_pages = 10  # Limit to avoid too many requests
+        max_pages = 10  # Limit to avoid too many requests (max 10,000 cases in memory)
 
         while page <= max_pages:
             cases, _ = await self.get_cases(page=page, limit=MAX_PAGE_LIMIT)
@@ -626,6 +657,7 @@ class ECHRService:
         self._sync_in_progress = True
         start_time = datetime.now(timezone.utc)
         cases_synced = 0
+        total_cases = 0  # Initialize to avoid unbounded variable error
         error_msg = None
 
         try:
@@ -694,7 +726,7 @@ class ECHRService:
 
         return ECHRSyncStatus(
             last_sync=start_time,
-            total_cases=total_cases if "total_cases" in dir() else 0,
+            total_cases=total_cases,
             cases_synced=cases_synced,
             sync_in_progress=False,
             error=error_msg,
@@ -727,6 +759,22 @@ class ECHRService:
     # ========================================================================
     # Local Search (cached data)
     # ========================================================================
+
+    @staticmethod
+    def _validate_article_format(article: str) -> bool:
+        """Validate article format to prevent SQL injection.
+
+        Valid formats: "6", "6-1", "P1-1", etc.
+
+        Args:
+            article: Article identifier to validate
+
+        Returns:
+            True if valid, False otherwise
+        """
+        # Allow alphanumeric, hyphens, and periods only
+        # Typical formats: "6", "6-1", "P1-1", "P4-2"
+        return bool(re.match(r'^[A-Za-z0-9\-\.]+$', article))
 
     def search_cached_cases(
         self,
@@ -764,12 +812,19 @@ class ECHRService:
             params.append(f"%{respondent}%")
 
         if articles:
+            # Validate article format before using in query
+            validated_articles = [a for a in articles if self._validate_article_format(a)]
+            if not validated_articles:
+                logger.warning("No valid articles provided after validation: %s", articles)
+
             # Search in JSON array
             article_conditions = []
-            for article in articles:
+            for article in validated_articles:
                 article_conditions.append("articles LIKE ?")
                 params.append(f'%"{article}"%')
-            sql += f" AND ({' OR '.join(article_conditions)})"
+
+            if article_conditions:
+                sql += f" AND ({' OR '.join(article_conditions)})"
 
         sql += " ORDER BY judgment_date DESC NULLS LAST LIMIT ? OFFSET ?"
         params.extend([limit, offset])
@@ -813,20 +868,22 @@ class ECHRService:
 
     def _parse_case(self, data: Dict[str, Any]) -> ECHRCase:
         """Parse API response into ECHRCase model."""
+        item_id = data.get("itemid", "unknown")
+
         # Handle date parsing
         judgment_date = None
         if data.get("judgementdate"):
             try:
                 judgment_date = datetime.fromisoformat(data["judgementdate"].replace("Z", "+00:00"))
-            except (ValueError, AttributeError):
-                pass
+            except (ValueError, AttributeError) as e:
+                logger.debug("Failed to parse judgment date for case %s: %s", item_id, e)
 
         decision_date = None
         if data.get("decisiondate"):
             try:
                 decision_date = datetime.fromisoformat(data["decisiondate"].replace("Z", "+00:00"))
-            except (ValueError, AttributeError):
-                pass
+            except (ValueError, AttributeError) as e:
+                logger.debug("Failed to parse decision date for case %s: %s", item_id, e)
 
         # Parse articles (could be string or list)
         articles = data.get("article", [])
