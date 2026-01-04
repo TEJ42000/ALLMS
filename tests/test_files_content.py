@@ -1,6 +1,9 @@
 """Tests for Files API Content endpoints."""
 
+import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+from app.services.files_api_service import FilesAPIService
 
 
 class TestFilesContentQuizEndpoint:
@@ -218,3 +221,221 @@ class TestFilesContentInfoEndpoints:
         assert "quiz" in data
         assert "study_guide" in data
         assert "explain_article" in data
+
+
+class TestThreeTierMaterialsStructure:
+    """Tests for three-tier materials structure functionality."""
+
+    def test_get_files_by_tier(self):
+        """Test get_files_by_tier() method."""
+        service = FilesAPIService()
+        service.file_ids = {
+            "syllabus_criminal_law_part_a": {"tier": "Syllabus", "tier_priority": 1},
+            "course_materials_criminal_law_lecture": {"tier": "Course_Materials", "tier_priority": 2},
+            "supplementary_sources_case_law": {"tier": "Supplementary_Sources", "tier_priority": 3},
+            "syllabus_admin_law": {"tier": "Syllabus", "tier_priority": 1}
+        }
+
+        # Test Tier 1 (Syllabus)
+        result = service.get_files_by_tier("Syllabus")
+        assert len(result) == 2
+        assert "syllabus_criminal_law_part_a" in result
+        assert "syllabus_admin_law" in result
+
+        # Test Tier 2 (Course_Materials)
+        result = service.get_files_by_tier("Course_Materials")
+        assert len(result) == 1
+        assert "course_materials_criminal_law_lecture" in result
+
+        # Test Tier 3 (Supplementary_Sources)
+        result = service.get_files_by_tier("Supplementary_Sources")
+        assert len(result) == 1
+        assert "supplementary_sources_case_law" in result
+
+        # Test non-existent tier
+        result = service.get_files_by_tier("NonExistent")
+        assert len(result) == 0
+
+    def test_get_files_by_subject(self):
+        """Test get_files_by_subject() method."""
+        service = FilesAPIService()
+        service.file_ids = {
+            "syllabus_crim_law": {"subject": "Criminal_Law", "tier": "Syllabus"},
+            "course_crim_law_lecture": {"subject": "Criminal_Law", "tier": "Course_Materials"},
+            "syllabus_admin_law": {"subject": "Administrative_Law", "tier": "Syllabus"},
+            "course_private_law": {"subject": "Private_Law", "tier": "Course_Materials"}
+        }
+
+        # Test Criminal Law
+        result = service.get_files_by_subject("Criminal_Law")
+        assert len(result) == 2
+        assert "syllabus_crim_law" in result
+        assert "course_crim_law_lecture" in result
+
+        # Test case-insensitive matching
+        result = service.get_files_by_subject("criminal_law")
+        assert len(result) == 2
+
+        # Test Administrative Law
+        result = service.get_files_by_subject("Administrative_Law")
+        assert len(result) == 1
+        assert "syllabus_admin_law" in result
+
+        # Test non-existent subject
+        result = service.get_files_by_subject("NonExistent")
+        assert len(result) == 0
+
+    def test_get_prioritized_files(self):
+        """Test get_prioritized_files() method."""
+        service = FilesAPIService()
+        service.file_ids = {
+            "tier3_file": {"tier": "Supplementary_Sources", "tier_priority": 3},
+            "tier1_file": {"tier": "Syllabus", "tier_priority": 1},
+            "tier2_file": {"tier": "Course_Materials", "tier_priority": 2},
+            "tier1_file2": {"tier": "Syllabus", "tier_priority": 1}
+        }
+
+        # Test prioritization
+        result = service.get_prioritized_files(["tier3_file", "tier1_file", "tier2_file", "tier1_file2"])
+
+        # Should be sorted by tier_priority (1, 1, 2, 3)
+        assert result[0] in ["tier1_file", "tier1_file2"]  # Both have priority 1
+        assert result[1] in ["tier1_file", "tier1_file2"]
+        assert result[2] == "tier2_file"
+        assert result[3] == "tier3_file"
+
+        # Test with empty list
+        result = service.get_prioritized_files([])
+        assert result == []
+
+        # Test with files not in file_ids (should go to end with priority 999)
+        result = service.get_prioritized_files(["tier1_file", "unknown_file", "tier3_file"])
+        assert result[0] == "tier1_file"
+        assert result[1] == "tier3_file"
+        assert result[2] == "unknown_file"
+
+    def test_get_topic_files_with_three_tier_structure(self):
+        """Test get_topic_files() with three-tier structure."""
+        service = FilesAPIService()
+        service.file_ids = {
+            "syllabus_criminal_law_part_a": {
+                "tier": "Syllabus",
+                "tier_priority": 1,
+                "subject": "Criminal_Law"
+            },
+            "course_materials_criminal_law_lecture": {
+                "tier": "Course_Materials",
+                "tier_priority": 2,
+                "subject": "Criminal_Law"
+            },
+            "supplementary_sources_case_law_echr": {
+                "tier": "Supplementary_Sources",
+                "tier_priority": 3,
+                "subject": "Criminal_Law"
+            },
+            "syllabus_admin_law": {
+                "tier": "Syllabus",
+                "tier_priority": 1,
+                "subject": "Administrative_Law"
+            }
+        }
+
+        # Test Criminal Law - should return files sorted by tier priority
+        result = service.get_topic_files("Criminal Law")
+        assert len(result) == 3
+        # First should be Syllabus (tier 1)
+        assert result[0] == "syllabus_criminal_law_part_a"
+        # Second should be Course_Materials (tier 2)
+        assert result[1] == "course_materials_criminal_law_lecture"
+        # Third should be Supplementary_Sources (tier 3)
+        assert result[2] == "supplementary_sources_case_law_echr"
+
+        # Test Administrative Law
+        result = service.get_topic_files("Administrative Law")
+        assert len(result) == 1
+        assert result[0] == "syllabus_admin_law"
+
+        # Test unrecognized topic - should return all files sorted by priority
+        result = service.get_topic_files("Unknown Topic")
+        assert len(result) == 4
+        # Should start with Syllabus files (tier 1)
+        assert result[0] in ["syllabus_criminal_law_part_a", "syllabus_admin_law"]
+
+        # Test topic with no files - should return empty list
+        service.file_ids = {}
+        result = service.get_topic_files("Criminal Law")
+        assert result == []
+
+
+class TestInputValidation:
+    """Tests for input validation in Files API service."""
+
+    @pytest.mark.asyncio
+    async def test_generate_quiz_empty_file_keys(self):
+        """Test that generate_quiz_from_files raises ValueError for empty file_keys."""
+        service = FilesAPIService()
+
+        with pytest.raises(ValueError, match="file_keys cannot be empty"):
+            await service.generate_quiz_from_files(
+                file_keys=[],
+                topic="Criminal Law",
+                num_questions=10
+            )
+
+    @pytest.mark.asyncio
+    async def test_generate_quiz_invalid_file_keys_type(self):
+        """Test that generate_quiz_from_files raises TypeError for non-string file_keys."""
+        service = FilesAPIService()
+
+        with pytest.raises(TypeError, match="All file_keys must be strings"):
+            await service.generate_quiz_from_files(
+                file_keys=["valid_key", 123, "another_key"],
+                topic="Criminal Law",
+                num_questions=10
+            )
+
+    @pytest.mark.asyncio
+    async def test_generate_study_guide_empty_file_keys(self):
+        """Test that generate_study_guide raises ValueError for empty file_keys."""
+        service = FilesAPIService()
+
+        with pytest.raises(ValueError, match="file_keys cannot be empty"):
+            await service.generate_study_guide(
+                topic="Criminal Law",
+                file_keys=[]
+            )
+
+    @pytest.mark.asyncio
+    async def test_generate_study_guide_invalid_file_keys_type(self):
+        """Test that generate_study_guide raises TypeError for non-string file_keys."""
+        service = FilesAPIService()
+
+        with pytest.raises(TypeError, match="All file_keys must be strings"):
+            await service.generate_study_guide(
+                topic="Criminal Law",
+                file_keys=["valid_key", None, "another_key"]
+            )
+
+    @pytest.mark.asyncio
+    async def test_generate_flashcards_empty_file_keys(self):
+        """Test that generate_flashcards raises ValueError for empty file_keys."""
+        service = FilesAPIService()
+
+        with pytest.raises(ValueError, match="file_keys cannot be empty"):
+            await service.generate_flashcards(
+                topic="Criminal Law",
+                file_keys=[],
+                num_cards=20
+            )
+
+    @pytest.mark.asyncio
+    async def test_generate_flashcards_invalid_file_keys_type(self):
+        """Test that generate_flashcards raises TypeError for non-string file_keys."""
+        service = FilesAPIService()
+
+        with pytest.raises(TypeError, match="All file_keys must be strings"):
+            await service.generate_flashcards(
+                topic="Criminal Law",
+                file_keys=[123, 456],
+                num_cards=20
+            )

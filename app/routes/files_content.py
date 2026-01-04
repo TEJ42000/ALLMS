@@ -331,7 +331,9 @@ async def get_topic_files(topic: str):
                     "file_id": file_id,
                     "filename": service.file_ids[key].get("filename", "")
                 })
-            except KeyError:
+            except (KeyError, ValueError):
+                # Skip files that don't exist in file_ids.json
+                logger.warning("File key '%s' not found in file_ids.json", key)
                 pass
 
         return {

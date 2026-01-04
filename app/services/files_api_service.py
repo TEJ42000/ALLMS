@@ -10,6 +10,9 @@ from anthropic import AsyncAnthropic
 
 logger = logging.getLogger(__name__)
 
+# Constants
+DEFAULT_FALLBACK_COUNT = 5  # Number of files to return when no specific files found
+
 
 class FilesAPIService:
     """Service for generating content using uploaded files via Anthropic Files API."""
@@ -60,7 +63,17 @@ class FilesAPIService:
 
         Returns:
             Dictionary with quiz questions
+
+        Raises:
+            ValueError: If file_keys is empty
+            TypeError: If file_keys contains non-string values
         """
+        # Input validation
+        if not file_keys:
+            raise ValueError("file_keys cannot be empty")
+        if not all(isinstance(k, str) for k in file_keys):
+            raise TypeError("All file_keys must be strings")
+
         logger.info("Generating quiz: %d questions, files: %s", num_questions, file_keys)
 
         # Build content blocks
@@ -68,16 +81,20 @@ class FilesAPIService:
 
         # Add all requested files
         for key in file_keys:
-            file_id = self.get_file_id(key)
-            content_blocks.append({
-                "type": "document",
-                "source": {
-                    "type": "file",
-                    "file_id": file_id
-                },
-                "title": key.replace("_", " ").title(),
-                "citations": {"enabled": True}
-            })
+            try:
+                file_id = self.get_file_id(key)
+                content_blocks.append({
+                    "type": "document",
+                    "source": {
+                        "type": "file",
+                        "file_id": file_id
+                    },
+                    "title": key.replace("_", " ").title(),
+                    "citations": {"enabled": True}
+                })
+            except ValueError as e:
+                logger.warning("Skipping file '%s': %s", key, e)
+                continue
 
         # Add text prompt
         prompt_text = """Generate %d multiple choice quiz questions about %s from these documents.
@@ -141,19 +158,33 @@ Return ONLY valid JSON:
 
         Returns:
             Formatted study guide
+
+        Raises:
+            ValueError: If file_keys is empty
+            TypeError: If file_keys contains non-string values
         """
+        # Input validation
+        if not file_keys:
+            raise ValueError("file_keys cannot be empty")
+        if not all(isinstance(k, str) for k in file_keys):
+            raise TypeError("All file_keys must be strings")
+
         logger.info("Generating study guide for %s using %d files", topic, len(file_keys))
 
         # Build content
         content_blocks = []
 
         for key in file_keys:
-            file_id = self.get_file_id(key)
-            content_blocks.append({
-                "type": "document",
-                "source": {"type": "file", "file_id": file_id},
-                "citations": {"enabled": True}
-            })
+            try:
+                file_id = self.get_file_id(key)
+                content_blocks.append({
+                    "type": "document",
+                    "source": {"type": "file", "file_id": file_id},
+                    "citations": {"enabled": True}
+                })
+            except ValueError as e:
+                logger.warning("Skipping file '%s': %s", key, e)
+                continue
 
         prompt_text = """Create a comprehensive study guide for %s.
 
@@ -284,13 +315,21 @@ Cite page numbers if available.""" % (article, code)
         # Use relevant files or default to reader
         if relevant_files:
             for key in relevant_files:
-                file_id = self.get_file_id(key)
-                content_blocks.append({
-                    "type": "document",
-                    "source": {"type": "file", "file_id": file_id}
-                })
+                try:
+                    file_id = self.get_file_id(key)
+                    content_blocks.append({
+                        "type": "document",
+                        "source": {"type": "file", "file_id": file_id}
+                    })
+                except ValueError as e:
+                    logger.warning("Skipping file '%s': %s", key, e)
+                    continue
         elif "lls_reader" in self.file_ids:
-            reader_id = self.get_file_id("lls_reader")
+            try:
+                reader_id = self.get_file_id("lls_reader")
+            except ValueError as e:
+                logger.error("Failed to get lls_reader: %s", e)
+                raise
             content_blocks.append({
                 "type": "document",
                 "source": {"type": "file", "file_id": reader_id}
@@ -335,15 +374,39 @@ Use proper legal analysis method and cite articles.""" % (topic, case_facts)
         file_keys: List[str],
         num_cards: int = 20
     ) -> List[Dict]:
-        """Generate flashcards from files."""
+        """
+        Generate flashcards from files.
+
+        Args:
+            topic: Topic name
+            file_keys: Files to use
+            num_cards: Number of flashcards to generate
+
+        Returns:
+            List of flashcard dictionaries
+
+        Raises:
+            ValueError: If file_keys is empty
+            TypeError: If file_keys contains non-string values
+        """
+        # Input validation
+        if not file_keys:
+            raise ValueError("file_keys cannot be empty")
+        if not all(isinstance(k, str) for k in file_keys):
+            raise TypeError("All file_keys must be strings")
+
         content_blocks = []
 
         for key in file_keys:
-            file_id = self.get_file_id(key)
-            content_blocks.append({
-                "type": "document",
-                "source": {"type": "file", "file_id": file_id}
-            })
+            try:
+                file_id = self.get_file_id(key)
+                content_blocks.append({
+                    "type": "document",
+                    "source": {"type": "file", "file_id": file_id}
+                })
+            except ValueError as e:
+                logger.warning("Skipping file '%s': %s", key, e)
+                continue
 
         prompt_text = """Generate %d flashcards for %s.
 
@@ -420,17 +483,84 @@ Include:
             logger.error("Text was: %s", text[:500])
             raise ValueError("Invalid JSON response: %s" % e) from e
 
+    def get_files_by_tier(self, tier: str) -> List[str]:
+        """Get all file keys for a specific tier."""
+        return [key for key, info in self.file_ids.items()
+                if info.get("tier") == tier]
+
+    def get_files_by_subject(self, subject: str) -> List[str]:
+        """Get all file keys for a specific subject."""
+        return [key for key, info in self.file_ids.items()
+                if info.get("subject", "").lower() == subject.lower()]
+
+    def get_prioritized_files(self, file_keys: List[str]) -> List[str]:
+        """
+        Sort file keys by tier priority (Syllabus first, then Course_Materials, then Supplementary_Sources).
+
+        Args:
+            file_keys: List of file keys to sort
+
+        Returns:
+            Sorted list with highest priority (lowest tier_priority number) first
+        """
+        def get_priority(key: str) -> int:
+            file_info = self.file_ids.get(key, {})
+            return file_info.get("tier_priority", 999)  # Default to low priority if not found
+
+        return sorted(file_keys, key=get_priority)
+
     def get_topic_files(self, topic: str) -> List[str]:
-        """Get recommended file keys for a topic."""
-        topic_map = {
-            "Constitutional Law": ["lls_reader", "elsa_notes"],
-            "Administrative Law": ["lls_reader", "lecture_week_3", "elsa_notes"],
-            "Criminal Law": ["lls_reader", "lecture_week_4", "elsa_notes"],
-            "Private Law": ["lls_reader", "readings_week_2", "elsa_notes"],
-            "International Law": ["lls_reader", "lecture_week_6", "elsa_notes"]
+        """
+        Get recommended file keys for a topic, prioritized by tier.
+
+        Now uses the three-tier structure:
+        - Tier 1 (Syllabus): Highest priority
+        - Tier 2 (Course_Materials): Medium priority
+        - Tier 3 (Supplementary_Sources): Lowest priority
+
+        Args:
+            topic: Topic name (e.g., "Criminal Law", "Administrative Law")
+
+        Returns:
+            List of file keys sorted by tier priority
+        """
+
+        # Map topics to subjects in the new structure
+        topic_to_subject = {
+            "Criminal Law": "Criminal_Law",
+            "Administrative Law": "Administrative_Law",
+            "Private Law": "Private_Law",
+            "Constitutional Law": "Constitutional_Law",
+            "International Law": "International_Law"
         }
 
-        return topic_map.get(topic, ["lls_reader"])
+        subject = topic_to_subject.get(topic)
+
+        if not subject:
+            # If topic not recognized, return all files sorted by priority
+            logger.warning("Topic '%s' not recognized, returning all files", topic)
+            all_keys = list(self.file_ids.keys())
+            return self.get_prioritized_files(all_keys)
+
+        # Get files for this subject
+        subject_files = self.get_files_by_subject(subject)
+
+        if not subject_files:
+            # Fallback: try to find files with topic name in key
+            logger.warning("No files found for subject '%s', searching by keyword", subject)
+            subject_files = [key for key in self.file_ids.keys()
+                           if topic.lower().replace(" ", "_") in key.lower()]
+
+        # Sort by tier priority (Syllabus first, then Course_Materials, then Supplementary_Sources)
+        prioritized_files = self.get_prioritized_files(subject_files)
+
+        if not prioritized_files:
+            # No files found for this topic - return empty list with clear logging
+            logger.warning("No files found for topic '%s', returning empty list", topic)
+            return []
+
+        logger.info("Found %d files for topic '%s'", len(prioritized_files), topic)
+        return prioritized_files
 
 
 # Singleton

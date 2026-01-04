@@ -3,39 +3,121 @@
 Upload Course Materials to Anthropic Files API.
 
 Run this once to upload all your course PDFs to Anthropic.
+
+This script automatically discovers files from the three-tier Materials structure:
+- Tier 1: Syllabus/ - Official course syllabi
+- Tier 2: Course_Materials/ - Primary learning materials
+- Tier 3: Supplementary_Sources/ - External and supplementary materials
 """
 
 import json
+import logging
 import os
 from pathlib import Path
+from typing import Dict
 
 from anthropic import Anthropic
 
-# Course files to upload
-COURSE_FILES = {
-    "lls_reader": "LLSReaderwithcoursecontentandquestions_20252026.pdf",
-    "readings_week_1": "Readings_Law__week_1_compressed.pdf",
-    "readings_week_2": "Readings20Law2020week202_compressed.pdf",
-    "lecture_week_3": "LLS_2526_Lecture_week_3_Administrative_law_Final.pdf",
-    "lecture_week_4": "LLS_2526_Lecture_week_4_Criminal_law__Copy.pdf",
-    "lecture_week_6": "LLS20256International20law20wk6.pdf",
-    "elsa_notes": "ELSA_NOTES_.pdf",
-    "mock_exam": "Mock_Exam_Skills.pdf",
-    "mock_answers": "AnswersMockexamLAW2425.pdf",
-    "legal_skills_review": "Copy_of_Legal_skills_review.docx",
-    "law_review": "Law_review-tijana.docx"
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Supported file extensions
+SUPPORTED_EXTENSIONS = {'.pdf', '.docx', '.md', '.txt'}
+
+# Tier priorities for AI system (1 = highest authority)
+TIER_PRIORITIES = {
+    "Syllabus": 1,
+    "Course_Materials": 2,
+    "Supplementary_Sources": 3
 }
 
 
-def upload_course_files(files_directory: str = "./course-materials"):
+def discover_materials(materials_dir: str = "./Materials") -> Dict[str, Dict]:
     """
-    Upload all course files to Anthropic Files API.
-
-    Args:
-        files_directory: Directory containing course files
+    Discover all course materials from the three-tier directory structure.
 
     Returns:
-        Dictionary of file_ids
+        Dictionary mapping file keys to file metadata including path, tier, and subject
+    """
+    materials_path = Path(materials_dir)
+
+    if not materials_path.exists():
+        print(f"❌ Error: Materials directory not found: {materials_dir}")
+        return {}
+
+    discovered_files = {}
+
+    # Traverse the three-tier structure
+    for tier_dir in materials_path.iterdir():
+        if not tier_dir.is_dir():
+            continue
+
+        tier_name = tier_dir.name
+
+        # Case-insensitive tier name handling with validation
+        tier_name_normalized = tier_name.title()
+        if tier_name_normalized in TIER_PRIORITIES:
+            if tier_name != tier_name_normalized:
+                logger.warning("Directory '%s' should be '%s' (case matters)", tier_name, tier_name_normalized)
+            # Use the normalized name for consistency
+            tier_name = tier_name_normalized
+        else:
+            logger.debug("Skipping non-tier directory: %s", tier_name)
+            continue
+
+        # Recursively find all supported files in this tier
+        # Use specific glob patterns for each extension for better performance
+        for ext in SUPPORTED_EXTENSIONS:
+            for file_path in tier_dir.rglob("*%s" % ext):
+                # Generate a unique key for this file
+                # Format: tier_subject_category_filename
+                relative_path = file_path.relative_to(tier_dir)
+                parts = list(relative_path.parts)
+
+                # Create a readable key
+                key_parts = [tier_name.lower()]
+                if len(parts) > 1:
+                    # Add subject and category
+                    key_parts.extend([p.lower().replace(" ", "_").replace("-", "_")
+                                     for p in parts[:-1]])
+
+                # Add filename without extension
+                filename_base = file_path.stem.lower().replace(" ", "_").replace("-", "_")
+                key_parts.append(filename_base)
+
+                key = "_".join(key_parts)
+
+                # Check for duplicate keys
+                if key in discovered_files:
+                    logger.warning("Duplicate key '%s' for file '%s'", key, file_path)
+                    # Add hash suffix to make key unique
+                    key = "%s_%s" % (key, hash(str(file_path)) % 100000000)
+                    logger.info("Using unique key: '%s'", key)
+
+                # Store file metadata
+                discovered_files[key] = {
+                    "path": str(file_path),
+                    "filename": file_path.name,
+                    "tier": tier_name,
+                    "tier_priority": TIER_PRIORITIES[tier_name],
+                    "subject": parts[0] if len(parts) > 1 else "General",
+                    "category": parts[1] if len(parts) > 2 else "General",
+                    "size_bytes": file_path.stat().st_size
+                }
+
+    return discovered_files
+
+
+def upload_course_files(materials_directory: str = "./Materials"):
+    """
+    Upload all course files to Anthropic Files API from the three-tier structure.
+
+    Args:
+        materials_directory: Root Materials directory with three-tier structure
+
+    Returns:
+        Dictionary of file_ids with metadata
     """
     # Initialize client
     api_key = os.getenv("ANTHROPIC_API_KEY")
@@ -45,15 +127,31 @@ def upload_course_files(files_directory: str = "./course-materials"):
         return {}
 
     client = Anthropic(api_key=api_key)
-    files_dir = Path(files_directory)
 
-    if not files_dir.exists():
-        print("❌ Error: Directory not found: %s" % files_directory)
+    print("=" * 60)
+    print("📚 LLS Course Materials Upload - Three-Tier Structure")
+    print("=" * 60)
+    print()
+
+    # Discover files from three-tier structure
+    print("🔍 Discovering materials from three-tier structure...")
+    discovered_files = discover_materials(materials_directory)
+
+    if not discovered_files:
+        print("❌ No files found in Materials directory!")
         return {}
 
-    print("=" * 60)
-    print("📚 LLS Course Materials Upload")
-    print("=" * 60)
+    print("   Found %d files across all tiers" % len(discovered_files))
+
+    # Group by tier for display
+    tier_counts = {}
+    for file_info in discovered_files.values():
+        tier = file_info["tier"]
+        tier_counts[tier] = tier_counts.get(tier, 0) + 1
+
+    for tier, count in sorted(tier_counts.items(), key=lambda x: TIER_PRIORITIES[x[0]]):
+        print("   - Tier %d (%s): %d files" % (TIER_PRIORITIES[tier], tier, count))
+
     print()
 
     # Check what's already uploaded
@@ -74,14 +172,9 @@ def upload_course_files(files_directory: str = "./course-materials"):
     skipped_count = 0
     error_count = 0
 
-    for key, filename in COURSE_FILES.items():
-        filepath = files_dir / filename
-
-        # Check if file exists
-        if not filepath.exists():
-            print("⚠️  Skipped: %s (not found)" % filename)
-            skipped_count += 1
-            continue
+    for key, file_info in discovered_files.items():
+        filepath = Path(file_info["path"])
+        filename = file_info["filename"]
 
         # Check if already uploaded
         if filename in existing_filenames:
@@ -89,13 +182,17 @@ def upload_course_files(files_directory: str = "./course-materials"):
             file_ids[key] = {
                 "file_id": existing_filenames[filename],
                 "filename": filename,
+                "tier": file_info["tier"],
+                "tier_priority": file_info["tier_priority"],
+                "subject": file_info["subject"],
+                "category": file_info["category"],
                 "status": "existing"
             }
             skipped_count += 1
             continue
 
         # Upload file
-        print("📤 Uploading: %s" % filename)
+        print("📤 Uploading: %s (Tier %d - %s)" % (filename, file_info['tier_priority'], file_info['tier']))
         try:
             uploaded_file = client.beta.files.upload(
                 file=filepath
@@ -106,6 +203,10 @@ def upload_course_files(files_directory: str = "./course-materials"):
                 "filename": uploaded_file.filename,
                 "size_bytes": uploaded_file.size_bytes,
                 "created_at": uploaded_file.created_at,
+                "tier": file_info["tier"],
+                "tier_priority": file_info["tier_priority"],
+                "subject": file_info["subject"],
+                "category": file_info["category"],
                 "status": "uploaded"
             }
 
@@ -136,13 +237,13 @@ def upload_course_files(files_directory: str = "./course-materials"):
     print("💾 File IDs saved to: %s" % output_file)
     print()
 
-    # Print file IDs table
-    if file_ids:
-        print("📋 Uploaded Files:")
-        print("-" * 60)
-        for key, info in file_ids.items():
-            print("%-20s %s" % (key, info['file_id']))
-        print("-" * 60)
+    # Print tier summary
+    print("📊 Files by Tier:")
+    print("-" * 60)
+    for tier in sorted(TIER_PRIORITIES.keys(), key=lambda x: TIER_PRIORITIES[x]):
+        tier_files = [k for k, v in file_ids.items() if v.get("tier") == tier]
+        print("Tier %d (%s): %d files" % (TIER_PRIORITIES[tier], tier, len(tier_files)))
+    print("-" * 60)
 
     return file_ids
 
@@ -238,13 +339,18 @@ if __name__ == "__main__":
         elif command == "delete":
             delete_all_files()
         elif command == "upload":
-            directory = sys.argv[2] if len(sys.argv) > 2 else "./course-materials"
+            directory = sys.argv[2] if len(sys.argv) > 2 else "./Materials"
             upload_course_files(directory)
         else:
             print("Usage:")
-            print("  python upload_files.py upload [directory]  - Upload files")
-            print("  python upload_files.py list                - List uploaded files")
-            print("  python upload_files.py delete              - Delete all files")
+            print("  python upload_files_script.py upload [directory]  - Upload files from Materials/")
+            print("  python upload_files_script.py list                - List uploaded files")
+            print("  python upload_files_script.py delete              - Delete all files")
+            print()
+            print("The script automatically discovers files from the three-tier structure:")
+            print("  - Tier 1: Syllabus/ (highest priority)")
+            print("  - Tier 2: Course_Materials/")
+            print("  - Tier 3: Supplementary_Sources/")
     else:
-        # Default: upload files
+        # Default: upload files from Materials directory
         upload_course_files()
