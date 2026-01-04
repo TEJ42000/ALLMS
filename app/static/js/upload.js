@@ -5,6 +5,14 @@
 let selectedFiles = [];
 let currentCourseId = null;
 
+// Helper function to escape HTML special characters
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
 // Initialize upload functionality
 function initUpload(courseId) {
     currentCourseId = courseId;
