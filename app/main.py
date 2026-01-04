@@ -9,7 +9,7 @@ import os
 from dotenv import load_dotenv
 
 # Import routers
-from app.routes import ai_tutor, assessment, pages
+from app.routes import ai_tutor, assessment, pages, files_content
 
 # Load environment variables
 load_dotenv()
@@ -42,21 +42,7 @@ templates = Jinja2Templates(directory="templates")
 app.include_router(pages.router)
 app.include_router(ai_tutor.router)
 app.include_router(assessment.router)
-
-# Health check endpoint (required for Cloud Run)
-@app.get("/health")
-async def health_check():
-    """Health check endpoint for Cloud Run"""
-    return {"status": "healthy", "service": "lls-study-portal"}
-
-# Root endpoint
-@app.get("/")
-async def root(request: Request):
-    """Serve main application page"""
-    return templates.TemplateResponse(
-        "index.html",
-        {"request": request, "title": "LLS Study Portal"}
-    )
+app.include_router(files_content.router)
 
 # Startup event
 @app.on_event("startup")

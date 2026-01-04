@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} - Law & Legal Skills{% endblock %}
+
+{% block content %}
+<div class="welcome-section">
+    <h1>🎓 Welcome to LLS Study Portal</h1>
+    <p class="subtitle">AI-Powered Learning for Law & Legal Skills</p>
+</div>
+
+<!-- AI Tutor Tab -->
+<div id="tutor-tab" class="tab-content active">
+    <div class="card">
+        <h2>💬 AI Tutor</h2>
+        <p>Ask questions about Criminal Law, Administrative Law, Private Law, and more!</p>
+        
+        <div class="chat-container">
+            <div id="chat-messages" class="chat-messages"></div>
+            
+            <div class="input-group">
+                <select id="context-select" class="form-select">
+                    <option value="Criminal Law">Criminal Law</option>
+                    <option value="Administrative Law">Administrative Law</option>
+                    <option value="Private Law">Private Law</option>
+                    <option value="Constitutional Law">Constitutional Law</option>
+                    <option value="International Law">International Law</option>
+                </select>
+                <textarea id="tutor-input" class="form-input" placeholder="Ask a question..." rows="3"></textarea>
+                <button id="ask-btn" class="btn btn-primary">Ask AI Tutor</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Assessment Tab -->
+<div id="assessment-tab" class="tab-content">
+    <div class="card">
+        <h2>📝 AI Assessment</h2>
+        <p>Get your answers graded with detailed feedback!</p>
+        
+        <div class="form-group">
+            <label>Topic:</label>
+            <select id="assessment-topic" class="form-select">
+                <option value="Criminal Law">Criminal Law</option>
+                <option value="Administrative Law">Administrative Law</option>
+                <option value="Private Law">Private Law</option>
+                <option value="Constitutional Law">Constitutional Law</option>
+                <option value="International Law">International Law</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label>Question (optional):</label>
+            <textarea id="assessment-question" class="form-input" rows="2" placeholder="Enter the question..."></textarea>
+        </div>
+        
+        <div class="form-group">
+            <label>Your Answer:</label>
+            <textarea id="assessment-answer" class="form-input" rows="6" placeholder="Enter your answer..."></textarea>
+        </div>
+        
+        <button id="assess-btn" class="btn btn-primary">Get Assessment</button>
+        
+        <div id="assessment-result" class="result-container"></div>
+    </div>
+</div>
+
+<!-- Quiz Generator Tab -->
+<div id="quiz-tab" class="tab-content">
+    <div class="card">
+        <h2>🎯 Quiz Generator</h2>
+        <p>Generate practice quizzes from course materials!</p>
+        
+        <div class="form-group">
+            <label>Topic:</label>
+            <select id="quiz-topic" class="form-select">
+                <option value="Criminal Law">Criminal Law</option>
+                <option value="Administrative Law">Administrative Law</option>
+                <option value="Private Law">Private Law</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label>Number of Questions:</label>
+            <input type="number" id="quiz-count" class="form-input" value="10" min="5" max="20">
+        </div>
+        
+        <button id="generate-quiz-btn" class="btn btn-primary">Generate Quiz</button>
+        
+        <div id="quiz-result" class="result-container"></div>
+    </div>
+</div>
+
+<!-- Study Guide Tab -->
+<div id="study-tab" class="tab-content">
+    <div class="card">
+        <h2>📚 Study Guide Generator</h2>
+        <p>Create comprehensive study guides from course materials!</p>
+        
+        <div class="form-group">
+            <label>Topic:</label>
+            <select id="study-topic" class="form-select">
+                <option value="Criminal Law">Criminal Law</option>
+                <option value="Administrative Law">Administrative Law</option>
+                <option value="Private Law">Private Law</option>
+            </select>
+        </div>
+        
+        <button id="generate-study-btn" class="btn btn-primary">Generate Study Guide</button>
+        
+        <div id="study-result" class="result-container"></div>
+    </div>
+</div>
+
+<div id="loading" class="loading hidden">
+    <div class="spinner"></div>
+    <p>Processing...</p>
+</div>
+{% endblock %}
+

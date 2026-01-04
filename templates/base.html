@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}LLS Study Portal{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/styles.css') }}">
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <header>
+        <nav class="header-content">
+            <div class="logo">
+                ⚖️ LLS Study Portal
+            </div>
+            <div class="nav-tabs">
+                <button class="nav-tab active" data-tab="tutor">AI Tutor</button>
+                <button class="nav-tab" data-tab="assessment">Assessment</button>
+                <button class="nav-tab" data-tab="quiz">Quiz Generator</button>
+                <button class="nav-tab" data-tab="study">Study Guide</button>
+            </div>
+        </nav>
+    </header>
+    
+    <main class="container">
+        {% block content %}{% endblock %}
+    </main>
+    
+    <footer>
+        <p>&copy; 2026 LLS Study Portal | University of Groningen | v{{ version }}</p>
+    </footer>
+    
+    <script src="{{ url_for('static', path='/js/app.js') }}"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>
+
