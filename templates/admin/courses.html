@@ -112,11 +112,56 @@
                     </div>
                 </div>
 
+                <!-- Text Extraction Dashboard -->
+                <div class="course-subsection">
+                    <div class="section-header">
+                        <h3>📊 Text Extraction Dashboard</h3>
+                        <button id="refresh-extraction-stats-btn" class="btn btn-secondary btn-sm">🔄 Refresh</button>
+                    </div>
+                    <div id="extraction-dashboard" class="extraction-dashboard">
+                        <div class="dashboard-metrics">
+                            <div class="metric-card">
+                                <div class="metric-value" id="extraction-coverage">--</div>
+                                <div class="metric-label">Coverage</div>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-value" id="extraction-total-files">--</div>
+                                <div class="metric-label">Total Files</div>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-value" id="extraction-extracted">--</div>
+                                <div class="metric-label">Extracted</div>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-value" id="extraction-failed">--</div>
+                                <div class="metric-label">Failed</div>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-value" id="extraction-total-chars">--</div>
+                                <div class="metric-label">Total Characters</div>
+                            </div>
+                        </div>
+                        <div class="dashboard-breakdown">
+                            <h4>📁 By File Type</h4>
+                            <div id="extraction-by-type" class="type-breakdown">
+                                <p class="empty-state">Loading...</p>
+                            </div>
+                        </div>
+                        <div class="dashboard-activity">
+                            <h4>📝 Recent Activity</h4>
+                            <div id="extraction-activity-log" class="activity-log">
+                                <p class="empty-state">No recent activity</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Materials Section -->
                 <div class="course-subsection">
                     <div class="section-header">
                         <h3>📁 Course Materials</h3>
                         <div class="header-actions">
+                            <button id="extract-all-btn" class="btn btn-primary btn-sm">⚡ Extract All</button>
                             <button id="upload-material-btn" class="btn btn-primary btn-sm">📤 Upload Files</button>
                             <label class="checkbox-label">
                                 <input type="checkbox" id="use-ai-titles"> Use AI for titles
@@ -126,10 +171,30 @@
                         </div>
                     </div>
                     <p class="form-hint">
+                        <strong>Extract All:</strong> Extract text from all materials for LLM processing.<br>
                         <strong>Upload Files:</strong> Upload new documents (PDF, DOCX, images) to course materials.<br>
                         <strong>Scan Folders:</strong> Discovers files from materialSubjects folders.<br>
                         <strong>Sync to Weeks:</strong> Auto-links materials to weeks based on week numbers in filenames.
                     </p>
+
+                    <!-- Bulk Extraction Progress -->
+                    <div id="extraction-progress-container" class="extraction-progress-container" style="display: none;">
+                        <div class="progress-header">
+                            <h4>⚡ Extracting Text...</h4>
+                            <button id="cancel-extraction-btn" class="btn btn-secondary btn-sm">✕ Cancel</button>
+                        </div>
+                        <div class="progress-bar-container">
+                            <div id="extraction-progress-bar" class="progress-bar"></div>
+                        </div>
+                        <div class="progress-details">
+                            <span id="extraction-progress-text">Processing...</span>
+                            <span id="extraction-progress-stats">0 / 0 files</span>
+                        </div>
+                        <div id="extraction-errors-summary" class="errors-summary" style="display: none;">
+                            <p class="error-text">Some files failed to extract. <button id="download-error-report-btn" class="btn-link">Download Error Report</button></p>
+                        </div>
+                    </div>
+
                     <div id="course-materials-list" class="materials-list">
                         <p class="empty-state">No materials loaded. Click "Scan Folders" to discover materials or "Upload Files" to add new materials.</p>
                     </div>
@@ -372,6 +437,53 @@
     <footer class="footer">
         <p>&copy; 2026 LLS Study Portal Admin | v{{ version }}</p>
     </footer>
+
+    <!-- Text Preview Modal -->
+    <div id="text-preview-modal" class="modal hidden">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h3>📄 Extracted Text Preview</h3>
+                <button class="modal-close" onclick="closeTextPreviewModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="text-preview-metadata">
+                    <div class="metadata-row">
+                        <span class="metadata-label">File:</span>
+                        <span id="preview-file-path" class="metadata-value">--</span>
+                    </div>
+                    <div class="metadata-row">
+                        <span class="metadata-label">File Type:</span>
+                        <span id="preview-file-type" class="metadata-value">--</span>
+                    </div>
+                    <div class="metadata-row">
+                        <span class="metadata-label">Extraction Date:</span>
+                        <span id="preview-extraction-date" class="metadata-value">--</span>
+                    </div>
+                    <div class="metadata-row">
+                        <span class="metadata-label">Character Count:</span>
+                        <span id="preview-char-count" class="metadata-value">--</span>
+                    </div>
+                    <div class="metadata-row">
+                        <span class="metadata-label">Pages:</span>
+                        <span id="preview-page-count" class="metadata-value">--</span>
+                    </div>
+                    <div class="metadata-row">
+                        <span class="metadata-label">Extraction Method:</span>
+                        <span id="preview-extraction-method" class="metadata-value">--</span>
+                    </div>
+                </div>
+                <div class="text-preview-actions">
+                    <button id="copy-text-btn" class="btn btn-secondary btn-sm">📋 Copy to Clipboard</button>
+                    <button id="show-full-text-btn" class="btn btn-secondary btn-sm">📖 Show Full Text</button>
+                </div>
+                <div class="text-preview-content">
+                    <div id="preview-text-container" class="preview-text-container">
+                        <p class="empty-state">Loading...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <script>
         // Pass course_id from server if editing specific course

@@ -202,6 +202,29 @@ async function renderCourseMaterialsList(materials, uploadedMaterials = null) {
         return `<button class="preview-btn" onclick="event.stopPropagation(); openPreviewModal('${escapedFile}', '${escapedTitle}')">👁️ Preview</button>`;
     };
 
+    // Helper to create extraction status badge
+    const extractionBadge = (file) => {
+        if (!file) return '';
+        const status = extractionCache.get(file);
+        if (!status) {
+            return '<span class="extraction-status-badge not-extracted">Not Checked</span>';
+        }
+
+        if (status.error) {
+            return `<span class="extraction-status-badge failed" onclick="event.stopPropagation(); showToast('Error: ${status.error}', 'error')">Failed</span>`;
+        }
+
+        if (status.extracted) {
+            const escapedFile = file.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+            return `<span class="extraction-status-badge extracted" onclick="event.stopPropagation(); openTextPreviewModal('${escapedFile}')">
+                Extracted
+                <span class="extraction-metadata">${formatNumber(status.charCount)} chars</span>
+            </span>`;
+        }
+
+        return '<span class="extraction-status-badge not-extracted">Not Extracted</span>';
+    };
+
     // Helper to format file size
     const formatSize = (bytes) => {
         if (!bytes) return '';
@@ -281,7 +304,7 @@ async function renderCourseMaterialsList(materials, uploadedMaterials = null) {
     materials.mockExams = deduplicateArray(materials.mockExams);
     materials.other = deduplicateArray(materials.other);
 
-    // Helper to render a material item with uploaded badges and delete button
+    // Helper to render a material item with uploaded badges, extraction status, and delete button
     const renderMaterialItem = (m, weekHint = null) => {
         const uploadedBadge = m.isUploaded ? '<span class="material-badge badge-uploaded">📤 Uploaded</span>' : '';
         const summaryBadge = m.summaryGenerated ? '<span class="material-badge badge-summary">✨ AI Summary</span>' : '';
@@ -302,6 +325,7 @@ async function renderCourseMaterialsList(materials, uploadedMaterials = null) {
                     ${m.summary ? `<div class="material-summary-inline" title="${m.summary.replace(/"/g, '&quot;')}">📝 ${m.summary.substring(0, 100)}${m.summary.length > 100 ? '...' : ''}</div>` : ''}
                 </div>
                 <div class="material-actions-inline">
+                    ${extractionBadge(m.file)}
                     ${previewBtn(m.file, m.title)}
                     ${deleteBtn}
                 </div>
@@ -1308,6 +1332,508 @@ async function deleteMaterial(materialId) {
     }
 }
 
+// ========== Text Extraction Status UI ==========
+
+// Configuration constants
+const EXTRACTION_CONFIG = {
+    // UI Display
+    PREVIEW_CHAR_LIMIT: 500,              // Characters to show in preview before "Show More"
+    ACTIVITY_LOG_LIMIT: 10,               // Number of recent activities to display
+    PROGRESS_HIDE_DELAY: 3000,            // Milliseconds to wait before hiding progress (3 seconds)
+
+    // Performance
+    DEBOUNCE_DELAY: 500,                  // Milliseconds to debounce refresh button (0.5 seconds)
+    MAX_CONCURRENT_EXTRACTIONS: 3,        // Maximum parallel extraction operations
+
+    // Time calculations (in seconds)
+    SECONDS_PER_MINUTE: 60,
+    SECONDS_PER_HOUR: 3600,
+    SECONDS_PER_DAY: 86400,
+    SECONDS_PER_WEEK: 604800,
+
+    // Number formatting
+    THOUSAND: 1000,
+    MILLION: 1000000
+};
+
+let extractionCache = new Map(); // Cache extraction status for files
+let extractionInProgress = false;
+let extractionAbortController = null;
+let refreshDebounceTimer = null;  // Timer for debouncing refresh
+
+/**
+ * Debounced wrapper for refreshExtractionDashboard
+ * Prevents rapid-fire API requests when users click refresh multiple times
+ */
+function refreshExtractionDashboard() {
+    // Clear existing timer
+    if (refreshDebounceTimer) {
+        clearTimeout(refreshDebounceTimer);
+    }
+
+    // Set new timer
+    refreshDebounceTimer = setTimeout(() => {
+        refreshExtractionDashboardImmediate();
+    }, EXTRACTION_CONFIG.DEBOUNCE_DELAY);
+}
+
+/**
+ * Immediate refresh without debouncing (for internal use)
+ */
+async function refreshExtractionDashboardImmediate() {
+    if (!currentCourse?.materials) {
+        showToast('No materials loaded', 'error');
+        return;
+    }
+
+    showLoading();
+    try {
+        // Get all file paths from materials
+        const filePaths = getAllMaterialFilePaths(currentCourse.materials);
+
+        // Fetch extraction status for all files
+        const statusPromises = filePaths.map(path => getExtractionStatus(path));
+        const statuses = await Promise.all(statusPromises);
+
+        // Calculate metrics
+        const metrics = calculateExtractionMetrics(statuses);
+
+        // Update dashboard
+        updateExtractionDashboard(metrics);
+
+        // Update badges in materials list
+        renderCourseMaterialsList(currentCourse.materials);
+
+    } catch (error) {
+        showToast('Error refreshing extraction stats: ' + error.message, 'error');
+    } finally {
+        hideLoading();
+    }
+}
+
+function getAllMaterialFilePaths(materials) {
+    const paths = [];
+    if (materials.coreTextbooks) paths.push(...materials.coreTextbooks.map(m => m.file).filter(Boolean));
+    if (materials.lectures) paths.push(...materials.lectures.map(m => m.file).filter(Boolean));
+    if (materials.caseStudies) paths.push(...materials.caseStudies.map(m => m.file).filter(Boolean));
+    if (materials.mockExams) paths.push(...materials.mockExams.map(m => m.file).filter(Boolean));
+    if (materials.readings) paths.push(...materials.readings.map(m => m.file).filter(Boolean));
+    return [...new Set(paths)]; // Remove duplicates
+}
+
+async function getExtractionStatus(filePath) {
+    // Check cache first
+    if (extractionCache.has(filePath)) {
+        return extractionCache.get(filePath);
+    }
+
+    try {
+        const response = await fetch(`/api/admin/cache/file/${encodeURIComponent(filePath)}`);
+        if (response.ok) {
+            const data = await response.json();
+            const status = {
+                path: filePath,
+                extracted: data.cached,
+                charCount: data.text_length || 0,
+                fileType: data.file_type || 'unknown',
+                extractionDate: data.cached_at || null,
+                error: null
+            };
+            extractionCache.set(filePath, status);
+            return status;
+        } else if (response.status === 404) {
+            const status = {
+                path: filePath,
+                extracted: false,
+                charCount: 0,
+                fileType: 'unknown',
+                extractionDate: null,
+                error: null
+            };
+            extractionCache.set(filePath, status);
+            return status;
+        } else {
+            throw new Error('Failed to fetch status');
+        }
+    } catch (error) {
+        return {
+            path: filePath,
+            extracted: false,
+            charCount: 0,
+            fileType: 'unknown',
+            extractionDate: null,
+            error: error.message
+        };
+    }
+}
+
+function calculateExtractionMetrics(statuses) {
+    const total = statuses.length;
+    const extracted = statuses.filter(s => s.extracted).length;
+    const failed = statuses.filter(s => s.error).length;
+    const totalChars = statuses.reduce((sum, s) => sum + s.charCount, 0);
+
+    // Group by file type
+    const byType = {};
+    statuses.forEach(s => {
+        if (!byType[s.fileType]) {
+            byType[s.fileType] = { total: 0, extracted: 0 };
+        }
+        byType[s.fileType].total++;
+        if (s.extracted) byType[s.fileType].extracted++;
+    });
+
+    return {
+        total,
+        extracted,
+        failed,
+        pending: total - extracted - failed,
+        coverage: total > 0 ? Math.round((extracted / total) * 100) : 0,
+        totalChars,
+        byType
+    };
+}
+
+function updateExtractionDashboard(metrics) {
+    document.getElementById('extraction-coverage').textContent = `${metrics.coverage}%`;
+    document.getElementById('extraction-total-files').textContent = metrics.total;
+    document.getElementById('extraction-extracted').textContent = metrics.extracted;
+    document.getElementById('extraction-failed').textContent = metrics.failed;
+    document.getElementById('extraction-total-chars').textContent = formatNumber(metrics.totalChars);
+
+    // Update by-type breakdown
+    const typeContainer = document.getElementById('extraction-by-type');
+    if (Object.keys(metrics.byType).length === 0) {
+        typeContainer.innerHTML = '<p class="empty-state">No files found</p>';
+    } else {
+        typeContainer.innerHTML = Object.entries(metrics.byType)
+            .map(([type, stats]) => `
+                <div class="type-stat">
+                    <span class="type-stat-label">${type.toUpperCase()}</span>
+                    <span class="type-stat-value">${stats.extracted}/${stats.total}</span>
+                </div>
+            `).join('');
+    }
+
+    // Update activity log
+    updateActivityLog();
+}
+
+function updateActivityLog() {
+    const activityContainer = document.getElementById('extraction-activity-log');
+
+    // Get recent extraction activities from cache
+    const activities = [];
+    extractionCache.forEach((status, filePath) => {
+        if (status.extracted && status.extractionDate) {
+            activities.push({
+                file: filePath.split('/').pop(),
+                date: new Date(status.extractionDate),
+                chars: status.charCount
+            });
+        }
+    });
+
+    // Sort by date descending and take last N activities
+    activities.sort((a, b) => b.date - a.date);
+    const recentActivities = activities.slice(0, EXTRACTION_CONFIG.ACTIVITY_LOG_LIMIT);
+
+    if (recentActivities.length === 0) {
+        activityContainer.innerHTML = '<p class="empty-state">No recent activity</p>';
+    } else {
+        activityContainer.innerHTML = recentActivities.map(activity => {
+            const timeAgo = getTimeAgo(activity.date);
+            return `
+                <div class="activity-item">
+                    <div class="activity-item-time">${timeAgo}</div>
+                    <div class="activity-item-text">Extracted ${activity.file} (${formatNumber(activity.chars)} chars)</div>
+                </div>
+            `;
+        }).join('');
+    }
+}
+
+function getTimeAgo(date) {
+    const seconds = Math.floor((new Date() - date) / 1000);
+
+    if (seconds < EXTRACTION_CONFIG.SECONDS_PER_MINUTE) return 'Just now';
+    if (seconds < EXTRACTION_CONFIG.SECONDS_PER_HOUR) return `${Math.floor(seconds / EXTRACTION_CONFIG.SECONDS_PER_MINUTE)} minutes ago`;
+    if (seconds < EXTRACTION_CONFIG.SECONDS_PER_DAY) return `${Math.floor(seconds / EXTRACTION_CONFIG.SECONDS_PER_HOUR)} hours ago`;
+    if (seconds < EXTRACTION_CONFIG.SECONDS_PER_WEEK) return `${Math.floor(seconds / EXTRACTION_CONFIG.SECONDS_PER_DAY)} days ago`;
+
+    return date.toLocaleDateString();
+}
+
+function formatNumber(num) {
+    if (num >= EXTRACTION_CONFIG.MILLION) return (num / EXTRACTION_CONFIG.MILLION).toFixed(1) + 'M';
+    if (num >= EXTRACTION_CONFIG.THOUSAND) return (num / EXTRACTION_CONFIG.THOUSAND).toFixed(1) + 'K';
+    return num.toString();
+}
+
+/**
+ * Extract all materials with concurrent processing (max 3 at a time)
+ * This significantly improves performance over sequential processing
+ */
+async function extractAllMaterials() {
+    if (!currentCourse?.materials) {
+        showToast('No materials loaded', 'error');
+        return;
+    }
+
+    if (extractionInProgress) {
+        showToast('Extraction already in progress', 'warning');
+        return;
+    }
+
+    const filePaths = getAllMaterialFilePaths(currentCourse.materials);
+    if (filePaths.length === 0) {
+        showToast('No materials to extract', 'warning');
+        return;
+    }
+
+    extractionInProgress = true;
+    extractionAbortController = new AbortController();
+
+    // Show progress container
+    const progressContainer = document.getElementById('extraction-progress-container');
+    progressContainer.style.display = 'block';
+
+    const progressBar = document.getElementById('extraction-progress-bar');
+    const progressText = document.getElementById('extraction-progress-text');
+    const progressStats = document.getElementById('extraction-progress-stats');
+    const errorsContainer = document.getElementById('extraction-errors-summary');
+
+    let processed = 0;
+    let errors = [];
+    let currentlyProcessing = [];
+
+    try {
+        // Process files with concurrency limiting
+        await processConcurrentExtractions(
+            filePaths,
+            async (filePath) => {
+                // Update UI with currently processing files
+                currentlyProcessing.push(filePath.split('/').pop());
+                if (currentlyProcessing.length > EXTRACTION_CONFIG.MAX_CONCURRENT_EXTRACTIONS) {
+                    currentlyProcessing.shift();
+                }
+                progressText.textContent = `Processing: ${currentlyProcessing.join(', ')}`;
+                progressStats.textContent = `${processed} / ${filePaths.length} files`;
+
+                try {
+                    await extractSingleFile(filePath);
+                    processed++;
+                } catch (error) {
+                    errors.push({ file: filePath, error: error.message });
+                    processed++;
+                }
+
+                // Update progress bar
+                const progress = Math.round((processed / filePaths.length) * 100);
+                progressBar.style.width = `${progress}%`;
+                progressBar.textContent = `${progress}%`;
+
+                // Remove from currently processing
+                const idx = currentlyProcessing.indexOf(filePath.split('/').pop());
+                if (idx > -1) currentlyProcessing.splice(idx, 1);
+            },
+            EXTRACTION_CONFIG.MAX_CONCURRENT_EXTRACTIONS,
+            extractionAbortController.signal
+        );
+
+        // Show results
+        if (errors.length > 0) {
+            errorsContainer.style.display = 'block';
+            document.getElementById('download-error-report-btn').onclick = () => downloadErrorReport(errors);
+            showToast(`Extraction complete with ${errors.length} errors`, 'warning');
+        } else {
+            showToast('All files extracted successfully!', 'success');
+        }
+
+        // Refresh dashboard
+        await refreshExtractionDashboardImmediate();
+
+    } catch (error) {
+        if (error.name === 'AbortError') {
+            showToast('Extraction cancelled', 'warning');
+        } else {
+            showToast('Extraction failed: ' + error.message, 'error');
+        }
+    } finally {
+        extractionInProgress = false;
+        extractionAbortController = null;
+
+        // Hide progress after configured delay
+        setTimeout(() => {
+            progressContainer.style.display = 'none';
+            errorsContainer.style.display = 'none';
+        }, EXTRACTION_CONFIG.PROGRESS_HIDE_DELAY);
+    }
+}
+
+/**
+ * Process items concurrently with a maximum concurrency limit
+ * @param {Array} items - Array of items to process
+ * @param {Function} processor - Async function to process each item
+ * @param {number} maxConcurrent - Maximum number of concurrent operations
+ * @param {AbortSignal} signal - Optional abort signal
+ */
+async function processConcurrentExtractions(items, processor, maxConcurrent, signal) {
+    const results = [];
+    const executing = [];
+
+    for (const item of items) {
+        // Check if aborted
+        if (signal?.aborted) {
+            throw new DOMException('Aborted', 'AbortError');
+        }
+
+        // Create promise for this item
+        const promise = processor(item).then(result => {
+            // Remove from executing array when done
+            executing.splice(executing.indexOf(promise), 1);
+            return result;
+        });
+
+        results.push(promise);
+        executing.push(promise);
+
+        // If we've reached max concurrency, wait for one to finish
+        if (executing.length >= maxConcurrent) {
+            await Promise.race(executing);
+        }
+    }
+
+    // Wait for all remaining promises to complete
+    return Promise.all(results);
+}
+
+async function extractSingleFile(filePath) {
+    // Use the correct endpoint for individual file extraction
+    const response = await fetch(`/api/admin/cache/file/${encodeURIComponent(filePath)}/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+    });
+
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ detail: 'Extraction failed' }));
+        throw new Error(error.detail || 'Extraction failed');
+    }
+
+    // Clear cache for this file to force refresh
+    extractionCache.delete(filePath);
+
+    return await response.json();
+}
+
+/**
+ * Sanitize CSV cell value to prevent formula injection attacks
+ * @param {string} value - The value to sanitize
+ * @returns {string} - Sanitized value safe for CSV
+ */
+function sanitizeCSVValue(value) {
+    if (!value) return '';
+
+    const str = String(value);
+
+    // Check if value starts with dangerous characters that could trigger formula execution
+    // Dangerous prefixes: = + - @ \t \r (equals, plus, minus, at-sign, tab, carriage return)
+    const dangerousChars = ['=', '+', '-', '@', '\t', '\r'];
+
+    if (dangerousChars.some(char => str.startsWith(char))) {
+        // Prefix with single quote to prevent formula injection
+        // Also escape any existing quotes
+        return "'" + str.replace(/"/g, '""');
+    }
+
+    // Escape double quotes by doubling them (CSV standard)
+    return str.replace(/"/g, '""');
+}
+
+/**
+ * Download error report as CSV file with proper sanitization
+ * @param {Array} errors - Array of error objects with file and error properties
+ */
+function downloadErrorReport(errors) {
+    // Sanitize all values to prevent CSV injection attacks
+    const csvRows = errors.map(e => {
+        const sanitizedFile = sanitizeCSVValue(e.file);
+        const sanitizedError = sanitizeCSVValue(e.error);
+        return `"${sanitizedFile}","${sanitizedError}"`;
+    });
+
+    const csv = 'File,Error\n' + csvRows.join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `extraction-errors-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+async function openTextPreviewModal(filePath) {
+    const modal = document.getElementById('text-preview-modal');
+    modal.classList.remove('hidden');
+
+    // Show loading
+    document.getElementById('preview-text-container').innerHTML = '<p class="empty-state">Loading...</p>';
+
+    try {
+        const response = await fetch(`/api/admin/cache/file/${encodeURIComponent(filePath)}`);
+        if (!response.ok) throw new Error('Failed to load extracted text');
+
+        const data = await response.json();
+
+        // Update metadata
+        document.getElementById('preview-file-path').textContent = filePath;
+        document.getElementById('preview-file-type').textContent = data.file_type || 'unknown';
+        document.getElementById('preview-extraction-date').textContent = data.cached_at ? new Date(data.cached_at).toLocaleString() : 'N/A';
+        document.getElementById('preview-char-count').textContent = formatNumber(data.text_length || 0);
+        document.getElementById('preview-page-count').textContent = data.metadata?.num_pages || 'N/A';
+        document.getElementById('preview-extraction-method').textContent = data.file_type || 'N/A';
+
+        // Show text (first N chars by default)
+        const text = data.text || 'No text extracted';
+        const previewContainer = document.getElementById('preview-text-container');
+        previewContainer.textContent = text.substring(0, EXTRACTION_CONFIG.PREVIEW_CHAR_LIMIT);
+        previewContainer.classList.add('collapsed');
+
+        // Setup buttons
+        document.getElementById('copy-text-btn').onclick = () => {
+            navigator.clipboard.writeText(data.text || '');
+            showToast('Text copied to clipboard!', 'success');
+        };
+
+        document.getElementById('show-full-text-btn').onclick = () => {
+            if (previewContainer.classList.contains('collapsed')) {
+                previewContainer.textContent = text;
+                previewContainer.classList.remove('collapsed');
+                document.getElementById('show-full-text-btn').textContent = '📖 Show Less';
+            } else {
+                previewContainer.textContent = text.substring(0, EXTRACTION_CONFIG.PREVIEW_CHAR_LIMIT);
+                previewContainer.classList.add('collapsed');
+                document.getElementById('show-full-text-btn').textContent = '📖 Show Full Text';
+            }
+        };
+
+    } catch (error) {
+        document.getElementById('preview-text-container').innerHTML = `<p class="error-text">Error: ${error.message}</p>`;
+    }
+}
+
+function closeTextPreviewModal() {
+    document.getElementById('text-preview-modal').classList.add('hidden');
+}
+
+// Close modal when clicking outside
+document.addEventListener('click', (e) => {
+    const modal = document.getElementById('text-preview-modal');
+    if (modal && e.target === modal) {
+        closeTextPreviewModal();
+    }
+});
+
 // ========== Event Listeners ==========
 document.addEventListener('DOMContentLoaded', () => {
     fetchCourses();
@@ -1327,6 +1853,16 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('scan-materials-btn').addEventListener('click', scanMaterials);
     document.getElementById('sync-week-materials-btn').addEventListener('click', syncWeekMaterials);
     document.getElementById('import-syllabus-btn').addEventListener('click', openSyllabusModal);
+
+    // Extraction actions
+    document.getElementById('extract-all-btn').addEventListener('click', extractAllMaterials);
+    document.getElementById('refresh-extraction-stats-btn').addEventListener('click', refreshExtractionDashboard);
+    document.getElementById('cancel-extraction-btn').addEventListener('click', () => {
+        if (extractionAbortController) {
+            extractionAbortController.abort();
+            showToast('Cancelling extraction...', 'info');
+        }
+    });
 
     // Week actions
     document.getElementById('save-week-btn').addEventListener('click', saveWeek);
