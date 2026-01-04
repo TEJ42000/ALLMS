@@ -31,7 +31,13 @@ from app.models.course_models import (
     UploadedMaterial,
     CourseMaterial,
 )
-from app.services.course_service import get_course_service
+from app.services.course_service import (
+    get_course_service,
+    CourseNotFoundError,
+    CourseAlreadyExistsError,
+    FirestoreOperationError,
+    ValidationError as ServiceValidationError,
+)
 from app.services.materials_scanner import (
     scan_materials_folder,
     enhance_titles_with_ai,
@@ -128,26 +134,62 @@ router = APIRouter(
 MIN_WEEK = 1
 MAX_WEEK = 52
 
+# Pagination defaults
+DEFAULT_PAGE_LIMIT = 50
+MAX_PAGE_LIMIT = 100
+
+
+class PaginatedCoursesResponse(BaseModel):
+    """Paginated response for course listings."""
+    items: List[CourseSummary]
+    total: int
+    limit: int
+    offset: int
+    has_more: bool
+
 
 # ============================================================================
 # Course Endpoints
 # ============================================================================
 
 
-@router.get("", response_model=List[CourseSummary])
+@router.get("", response_model=PaginatedCoursesResponse)
 async def list_courses(
-    include_inactive: bool = Query(False, description="Include inactive courses")
+    include_inactive: bool = Query(False, description="Include inactive courses"),
+    limit: int = Query(DEFAULT_PAGE_LIMIT, ge=1, le=MAX_PAGE_LIMIT, description="Maximum number of courses to return"),
+    offset: int = Query(0, ge=0, description="Number of courses to skip")
 ):
     """
-    List all courses.
+    List all courses with pagination.
 
-    Returns a summary of each course including name, program, and week count.
+    Returns a paginated summary of each course including name, program, and week count.
+
+    **Parameters:**
+    - `include_inactive`: Include inactive courses (default: false)
+    - `limit`: Maximum number of courses to return (1-100, default: 50)
+    - `offset`: Number of courses to skip for pagination (default: 0)
     """
     try:
         service = get_course_service()
-        courses = service.get_all_courses(include_inactive=include_inactive)
-        logger.info("Listed %d courses", len(courses))
-        return courses
+        courses, total = service.get_all_courses(
+            include_inactive=include_inactive,
+            limit=limit,
+            offset=offset
+        )
+        logger.info("Listed %d courses (total: %d)", len(courses), total)
+        return PaginatedCoursesResponse(
+            items=courses,
+            total=total,
+            limit=limit,
+            offset=offset,
+            has_more=(offset + len(courses)) < total
+        )
+    except FirestoreOperationError as e:
+        logger.error("Firestore error listing courses: %s", e)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Database temporarily unavailable: {str(e)}"
+        )
     except Exception as e:
         logger.error("Error listing courses: %s", e)
         raise HTTPException(
