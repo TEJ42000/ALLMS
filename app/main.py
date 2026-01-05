@@ -4,8 +4,10 @@ import logging
 import os
 
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.exceptions import HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -43,6 +45,43 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# =============================================================================
+# Exception Handlers for Auth Errors
+# =============================================================================
+
+# Template engine for error pages
+error_templates = Jinja2Templates(directory="templates")
+
+
+@app.exception_handler(401)
+async def unauthorized_exception_handler(request: Request, exc: HTTPException):
+    """Handle 401 Unauthorized errors with custom HTML page."""
+    # Return JSON for API requests, HTML for browser requests
+    accept = request.headers.get("accept", "")
+    if "application/json" in accept or request.url.path.startswith("/api/"):
+        return exc
+
+    return HTMLResponse(
+        content=error_templates.get_template("errors/401.html").render(),
+        status_code=401
+    )
+
+
+@app.exception_handler(403)
+async def forbidden_exception_handler(request: Request, exc: HTTPException):
+    """Handle 403 Forbidden errors with custom HTML page."""
+    # Return JSON for API requests, HTML for browser requests
+    accept = request.headers.get("accept", "")
+    if "application/json" in accept or request.url.path.startswith("/api/"):
+        return exc
+
+    return HTMLResponse(
+        content=error_templates.get_template("errors/403.html").render(),
+        status_code=403
+    )
+
 
 # Mount static files
 app.mount("/static", StaticFiles(directory="app/static"), name="static")

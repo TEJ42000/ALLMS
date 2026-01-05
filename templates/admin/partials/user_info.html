@@ -1,0 +1,56 @@
+{# User info component for admin header #}
+{# Usage: {% include "admin/partials/user_info.html" %} #}
+{# Expects: user object with email, domain, is_admin properties #}
+
+<div class="user-info" style="display: flex; align-items: center; gap: 0.5rem;">
+    {# User avatar - first letter of email #}
+    <div class="user-avatar" style="
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+        font-size: 0.875rem;
+    ">
+        {% if user and user.email %}
+            {{ user.email[0]|upper }}
+        {% else %}
+            ?
+        {% endif %}
+    </div>
+    
+    {# User email and badge #}
+    <div class="user-details" style="display: flex; flex-direction: column; gap: 0.125rem;">
+        <span class="user-email" style="
+            font-size: 0.875rem;
+            color: #e4e4e7;
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        ">
+            {% if user and user.email %}
+                {{ user.email }}
+            {% else %}
+                Not signed in
+            {% endif %}
+        </span>
+        
+        {% if user and user.is_admin %}
+        <span class="user-badge" style="
+            font-size: 0.625rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #22c55e;
+            font-weight: 600;
+        ">
+            Admin
+        </span>
+        {% endif %}
+    </div>
+</div>
+

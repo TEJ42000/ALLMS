@@ -12,7 +12,12 @@
         <header class="nav-header">
             <div class="header-row">
                 <h1 class="nav-title">⚙️ LLS Admin Portal</h1>
-                <a href="/" class="btn btn-secondary">← Back to Study Portal</a>
+                <div style="display: flex; align-items: center; gap: 1rem;">
+                    {% if user %}
+                    {% include "admin/partials/user_info.html" %}
+                    {% endif %}
+                    <a href="/" class="btn btn-secondary">← Back to Study Portal</a>
+                </div>
             </div>
             <div class="nav-tabs">
                 <button class="nav-tab active" data-view="courses">📚 Courses</button>
