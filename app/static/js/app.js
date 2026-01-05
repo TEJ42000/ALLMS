@@ -33,6 +33,20 @@ function buildUrl(endpoint, params = {}) {
 
 // ========== Tab Navigation ==========
 document.addEventListener('DOMContentLoaded', () => {
+    // Verify course context is set
+    if (!COURSE_ID) {
+        console.error('No course ID set - redirecting to course selection');
+        window.location.href = '/';
+        return;
+    }
+
+    // Log course context for debugging
+    console.log('✅ Course Context Loaded:', {
+        courseId: COURSE_ID,
+        courseName: COURSE_NAME,
+        course: COURSE
+    });
+
     const tabs = document.querySelectorAll('.nav-tab');
     const sections = document.querySelectorAll('.section');
 
@@ -1060,6 +1074,33 @@ function safeParseInt(value, fallback = 0) {
 }
 
 function initDashboard() {
+    // Add course-specific information banner to dashboard
+    const dashboardSection = document.getElementById('dashboard-section');
+    if (dashboardSection && COURSE_ID) {
+        // Check if course info banner already exists
+        let courseInfoBanner = dashboardSection.querySelector('.course-info-banner');
+        if (!courseInfoBanner) {
+            courseInfoBanner = document.createElement('div');
+            courseInfoBanner.className = 'course-info-banner';
+            courseInfoBanner.style.cssText = 'background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px 20px; border-radius: 8px; margin-bottom: 20px; display: flex; align-items: center; gap: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);';
+            courseInfoBanner.innerHTML = `
+                <span style="font-size: 24px;">📚</span>
+                <div style="flex: 1;">
+                    <div style="font-weight: 600; font-size: 16px;">Active Course: ${escapeHtml(COURSE_NAME)}</div>
+                    <div style="font-size: 13px; opacity: 0.9;">Course ID: ${escapeHtml(COURSE_ID)}</div>
+                </div>
+                <span style="background: rgba(255,255,255,0.2); padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;">✓ Course-Specific Content</span>
+            `;
+            // Insert at the top of the dashboard section
+            const sectionTitle = dashboardSection.querySelector('.section-title');
+            if (sectionTitle && sectionTitle.nextSibling) {
+                dashboardSection.insertBefore(courseInfoBanner, sectionTitle.nextSibling);
+            } else {
+                dashboardSection.insertBefore(courseInfoBanner, dashboardSection.firstChild);
+            }
+        }
+    }
+
     // Validate topics format (should be like "2/5")
     const topicsValue = localStorage.getItem('lls_topics');
     const validTopics = topicsValue && /^\d+\/\d+$/.test(topicsValue) ? topicsValue : '0/5';
