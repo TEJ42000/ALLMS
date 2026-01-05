@@ -95,3 +95,28 @@ async def admin_course_detail(
         }
     )
 
+
+@router.get("/users", response_class=HTMLResponse)
+async def admin_users(
+    request: Request,
+    user: User = Depends(require_mgms_domain)
+):
+    """
+    User allow list management page.
+
+    Requires @mgms.eu domain authentication.
+
+    Allows admins to:
+    - View all allowed external users
+    - Add new users to the allow list
+    - Edit or remove existing users
+    """
+    return templates.TemplateResponse(
+        "admin/users.html",
+        {
+            "request": request,
+            "title": "User Management",
+            "version": "2.0.0",
+            "user": user
+        }
+    )
