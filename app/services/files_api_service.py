@@ -460,53 +460,64 @@ Return ONLY valid JSON:
         )
         return quiz_data
 
-    async def generate_study_guide(
+    async def generate_study_guide_from_course(
         self,
+        course_id: str,
         topic: str,
-        file_keys: List[str]
+        week_number: Optional[int] = None
     ) -> str:
-        """
-        Generate comprehensive study guide from files.
+        """Generate comprehensive study guide using Firestore materials with text extraction.
+
+        This method uses the materials subcollection in Firestore and
+        extracts text from local files to send as content blocks.
 
         Args:
-            topic: Topic name
-            file_keys: Files to use
+            course_id: Course ID
+            topic: Topic description for the study guide
+            week_number: Optional week filter
 
         Returns:
-            Formatted study guide
+            Formatted study guide in Markdown
 
         Raises:
-            ValueError: If file_keys is empty
-            TypeError: If file_keys contains non-string values
+            ValueError: If no materials found
         """
-        # Input validation
-        if not file_keys:
-            raise ValueError("file_keys cannot be empty")
-        if not all(isinstance(k, str) for k in file_keys):
-            raise TypeError("All file_keys must be strings")
+        logger.info(
+            "Generating study guide from course %s, week=%s",
+            course_id, week_number
+        )
 
-        logger.info("Generating study guide for %s using %d files", topic, len(file_keys))
+        # Get materials with their extracted text content
+        materials_with_text = await self.get_course_materials_with_text(
+            course_id=course_id,
+            week_number=week_number,
+            limit=15  # Allow more materials for comprehensive study guide
+        )
 
-        # Build content
+        if not materials_with_text:
+            raise ValueError(f"No materials found for course {course_id}")
+
+        # Build content blocks using extracted text
         content_blocks = []
 
-        for key in file_keys:
-            try:
-                file_id = self.get_file_id(key)
-                content_blocks.append({
-                    "type": "document",
-                    "source": {"type": "file", "file_id": file_id},
-                    "citations": {"enabled": True}
-                })
-            except ValueError as e:
-                logger.warning("Skipping file '%s': %s", key, e)
-                continue
+        # Add each document's content as a text block with clear labeling
+        for material, text in materials_with_text:
+            title = material.title or material.filename
+            document_block = f"""
+=== DOCUMENT: {title} ===
+{text}
+=== END OF {title} ===
+"""
+            content_blocks.append({
+                "type": "text",
+                "text": document_block
+            })
 
-        prompt_text = """Create a comprehensive study guide for %s.
+        prompt_text = f"""Based on the documents provided above, create a comprehensive study guide for {topic}.
 
 Include:
 ## Key Concepts
-- All core concepts mentioned in Materials
+- All core concepts mentioned in the materials
 - Important definitions
 - Detailed, well illustrated and visualised decision models
 - Prioritize making the study guide visual and easy to understand, while presenting all course information in great detail
@@ -528,27 +539,29 @@ Include:
 - Example situations to analyze
 
 Use visual formatting:
-- Use valid Markdown formatting 
+- Use valid Markdown formatting
 - ✅ for correct info
 - ❌ for mistakes
 - ⚠️ for warnings
 - Bold **key terms**
-- Cite articles properly""" % topic
+- Cite articles properly"""
 
         content_blocks.append({
             "type": "text",
             "text": prompt_text
         })
 
-        response = await self.client.beta.messages.create(
+        response = await self.client.messages.create(
             model="claude-sonnet-4-20250514",
-            max_tokens=3000,
-            betas=[self.beta_header],
+            max_tokens=4000,
             messages=[{"role": "user", "content": content_blocks}]
         )
 
         guide = response.content[0].text
-        logger.info("Generated study guide: %d characters", len(guide))
+        logger.info(
+            "Generated study guide: %d characters from %d materials",
+            len(guide), len(materials_with_text)
+        )
         return guide
 
     async def explain_article(

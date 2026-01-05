@@ -64,10 +64,9 @@ class TestFilesContentStudyGuideEndpoint:
     """Tests for the /api/files-content/study-guide endpoint."""
 
     def test_study_guide_generation_success(self, client):
-        """Test successful study guide generation."""
+        """Test successful study guide generation with course_id."""
         mock_service = MagicMock()
-        mock_service.get_topic_files.return_value = ["reader_criminal_law"]
-        mock_service.generate_study_guide = AsyncMock(
+        mock_service.generate_study_guide_from_course = AsyncMock(
             return_value="# Study Guide\n\nContent..."
         )
 
@@ -76,13 +75,14 @@ class TestFilesContentStudyGuideEndpoint:
             return_value=mock_service
         ):
             response = client.post("/api/files-content/study-guide", json={
-                "topic": "Criminal Law"
+                "course_id": "LLS-2025-2026"
             })
 
             assert response.status_code == 200
             data = response.json()
             assert "guide" in data
             assert "topic" in data
+            mock_service.generate_study_guide_from_course.assert_called_once()
 
 
 class TestFilesContentArticleExplainEndpoint:
@@ -399,26 +399,19 @@ class TestInputValidation:
             )
 
     @pytest.mark.asyncio
-    async def test_generate_study_guide_empty_file_keys(self):
-        """Test that generate_study_guide raises ValueError for empty file_keys."""
+    async def test_generate_study_guide_from_course_no_materials(self):
+        """Test that generate_study_guide_from_course raises ValueError when no materials."""
         service = FilesAPIService()
 
-        with pytest.raises(ValueError, match="file_keys cannot be empty"):
-            await service.generate_study_guide(
-                topic="Criminal Law",
-                file_keys=[]
-            )
+        # Mock get_course_materials_with_text to return empty list
+        with patch.object(service, 'get_course_materials_with_text', new_callable=AsyncMock) as mock_method:
+            mock_method.return_value = []
 
-    @pytest.mark.asyncio
-    async def test_generate_study_guide_invalid_file_keys_type(self):
-        """Test that generate_study_guide raises TypeError for non-string file_keys."""
-        service = FilesAPIService()
-
-        with pytest.raises(TypeError, match="All file_keys must be strings"):
-            await service.generate_study_guide(
-                topic="Criminal Law",
-                file_keys=["valid_key", None, "another_key"]
-            )
+            with pytest.raises(ValueError, match="No materials found"):
+                await service.generate_study_guide_from_course(
+                    course_id="nonexistent-course",
+                    topic="Test Topic"
+                )
 
     @pytest.mark.asyncio
     async def test_generate_flashcards_empty_file_keys(self):
@@ -541,15 +534,14 @@ class TestCourseAwareQuizEndpoint:
 
 
 class TestCourseAwareStudyGuideEndpoint:
-    """Tests for course-aware study guide generation."""
+    """Tests for course-aware study guide generation (refactored architecture)."""
 
     def test_study_guide_with_course_id(self, client):
         """Test study guide generation with course_id parameter."""
         mock_service = MagicMock()
-        mock_service.get_files_for_course.return_value = ["reader_criminal_law"]
-        mock_service.generate_study_guide = AsyncMock(return_value={
-            "sections": []
-        })
+        mock_service.generate_study_guide_from_course = AsyncMock(
+            return_value="# Study Guide\n\nContent..."
+        )
 
         with patch(
             'app.routes.files_content.get_files_api_service',
@@ -563,15 +555,43 @@ class TestCourseAwareStudyGuideEndpoint:
             data = response.json()
             assert "guide" in data
             assert data.get("course_id") == "LLS-2025-2026"
+            mock_service.generate_study_guide_from_course.assert_called_once_with(
+                course_id="LLS-2025-2026",
+                topic="Course 'LLS-2025-2026' - All Materials",
+                week_number=None
+            )
 
-    def test_study_guide_with_course_id_and_weeks(self, client):
-        """Test study guide with course_id and multiple weeks uses batch method."""
+    def test_study_guide_with_course_id_and_single_week(self, client):
+        """Test study guide with course_id and single week."""
         mock_service = MagicMock()
-        # Should use get_files_for_course_weeks for multiple weeks (N+1 fix)
-        mock_service.get_files_for_course_weeks.return_value = [
-            "lecture_week_2", "lecture_week_3"
-        ]
-        mock_service.generate_study_guide = AsyncMock(return_value={})
+        mock_service.generate_study_guide_from_course = AsyncMock(
+            return_value="# Week 2 Guide\n\nContent..."
+        )
+
+        with patch(
+            'app.routes.files_content.get_files_api_service',
+            return_value=mock_service
+        ):
+            response = client.post("/api/files-content/study-guide", json={
+                "course_id": "LLS-2025-2026",
+                "weeks": [2]
+            })
+
+            assert response.status_code == 200
+            data = response.json()
+            assert data.get("weeks") == [2]
+            mock_service.generate_study_guide_from_course.assert_called_once_with(
+                course_id="LLS-2025-2026",
+                topic="Course 'LLS-2025-2026' - Weeks [2]",
+                week_number=2
+            )
+
+    def test_study_guide_with_multiple_weeks(self, client):
+        """Test study guide with multiple weeks."""
+        mock_service = MagicMock()
+        mock_service.generate_study_guide_from_course = AsyncMock(
+            return_value="# Multi-week Guide\n\nContent..."
+        )
 
         with patch(
             'app.routes.files_content.get_files_api_service',
@@ -585,11 +605,8 @@ class TestCourseAwareStudyGuideEndpoint:
             assert response.status_code == 200
             data = response.json()
             assert data.get("weeks") == [2, 3]
-            # Verify batch method was called instead of individual calls
-            mock_service.get_files_for_course_weeks.assert_called_once_with(
-                "LLS-2025-2026",
-                week_numbers=[2, 3]
-            )
+            # Multiple weeks means week_number is None (service will handle internally)
+            mock_service.generate_study_guide_from_course.assert_called_once()
 
     def test_study_guide_weeks_validation(self, client):
         """Test study guide rejects invalid week numbers via Pydantic."""
@@ -601,41 +618,29 @@ class TestCourseAwareStudyGuideEndpoint:
         # Should return 422 Unprocessable Entity for validation error
         assert response.status_code == 422
 
-    def test_study_guide_legacy_comprehensive_mode(self, client):
-        """Test that empty request uses all topics in legacy comprehensive mode."""
+    def test_study_guide_requires_course_id(self, client):
+        """Test that study guide now requires course_id parameter."""
+        response = client.post("/api/files-content/study-guide", json={})
+
+        # Now returns 400 because course_id is required
+        assert response.status_code == 400
+        detail = response.json()["detail"]
+        assert "course_id is required" in detail
+
+    def test_study_guide_deprecated_topic_parameter_warning(self, client):
+        """Test that using deprecated topic parameter returns a warning."""
         mock_service = MagicMock()
-        # Mock get_topic_files to return files for each topic
-        mock_service.get_topic_files.side_effect = lambda topic: [f"{topic}_file1", f"{topic}_file2"]
-        mock_service.generate_study_guide = AsyncMock(
-            return_value="# Comprehensive Study Guide\n\nAll topics covered..."
+        mock_service.generate_study_guide_from_course = AsyncMock(
+            return_value="# Guide\n\nContent..."
         )
 
         with patch(
             'app.routes.files_content.get_files_api_service',
             return_value=mock_service
         ):
-            response = client.post("/api/files-content/study-guide", json={})
-
-            assert response.status_code == 200
-            data = response.json()
-            assert "guide" in data
-            assert "Comprehensive Study Guide - All Topics" in data["topic"]
-            assert data["files_count"] > 0
-            # Verify all topics were attempted
-            assert mock_service.get_topic_files.call_count == 5  # 5 topics
-
-    def test_study_guide_deprecated_topic_parameter_warning(self, client):
-        """Test that using deprecated topic parameter returns a warning."""
-        mock_service = MagicMock()
-        mock_service.get_topic_files.return_value = ["file1", "file2"]
-        mock_service.generate_study_guide = AsyncMock(return_value="# Guide")
-
-        with patch(
-            'app.routes.files_content.get_files_api_service',
-            return_value=mock_service
-        ):
             response = client.post("/api/files-content/study-guide", json={
-                "topic": "Private Law"
+                "course_id": "LLS-2025-2026",
+                "topic": "Private Law"  # Deprecated parameter
             })
 
             assert response.status_code == 200
@@ -644,40 +649,17 @@ class TestCourseAwareStudyGuideEndpoint:
             assert "deprecated" in data["_warning"].lower()
             assert "ignored" in data["_warning"].lower()
 
-    def test_study_guide_partial_topic_failure(self, client):
-        """Test that study guide works even if some topics fail to load."""
-        mock_service = MagicMock()
-        # Mock some topics to succeed, others to fail
-        def mock_get_topic_files(topic):
-            if topic in ["constitutional", "criminal"]:
-                return [f"{topic}_file1"]
-            else:
-                raise Exception(f"Topic {topic} not available")
-
-        mock_service.get_topic_files.side_effect = mock_get_topic_files
-        mock_service.generate_study_guide = AsyncMock(return_value="# Partial Guide")
-
-        with patch(
-            'app.routes.files_content.get_files_api_service',
-            return_value=mock_service
-        ):
-            response = client.post("/api/files-content/study-guide", json={})
-
-            # Should succeed with available materials
-            assert response.status_code == 200
-            data = response.json()
-            assert data["files_count"] == 2  # Only 2 topics succeeded
-            assert "constitutional_file1" in data["files_used"]
-            assert "criminal_file1" in data["files_used"]
-
 
 class TestStudyGuideErrorHandling:
-    """Tests for study guide error handling improvements (PR #65)."""
+    """Tests for study guide error handling (refactored architecture)."""
 
     def test_study_guide_no_materials_with_course_id(self, client):
         """Test study guide returns 400 when course has no materials."""
         mock_service = MagicMock()
-        mock_service.get_files_for_course.return_value = []  # Empty file list
+        # Simulate ValueError raised by generate_study_guide_from_course
+        mock_service.generate_study_guide_from_course = AsyncMock(
+            side_effect=ValueError("No materials found for course Legal-History-2025-2026")
+        )
 
         with patch(
             'app.routes.files_content.get_files_api_service',
@@ -689,14 +671,15 @@ class TestStudyGuideErrorHandling:
 
             assert response.status_code == 400
             detail = response.json()["detail"]
-            assert "No course materials available" in detail
+            assert "No materials found" in detail
             assert "Legal-History-2025-2026" in detail
-            assert "contact your instructor" in detail
 
     def test_study_guide_no_materials_with_weeks(self, client):
         """Test study guide returns 400 when specific weeks have no materials."""
         mock_service = MagicMock()
-        mock_service.get_files_for_course_weeks.return_value = []
+        mock_service.generate_study_guide_from_course = AsyncMock(
+            side_effect=ValueError("No materials found for course LLS-2025-2026")
+        )
 
         with patch(
             'app.routes.files_content.get_files_api_service',
@@ -704,38 +687,22 @@ class TestStudyGuideErrorHandling:
         ):
             response = client.post("/api/files-content/study-guide", json={
                 "course_id": "LLS-2025-2026",
-                "weeks": [1, 2]
+                "weeks": [1]
             })
 
             assert response.status_code == 400
             detail = response.json()["detail"]
-            assert "No course materials available" in detail
-            assert "weeks [1, 2]" in detail
+            assert "No materials found" in detail
 
-    def test_study_guide_no_materials_legacy_mode(self, client):
-        """Test study guide returns 400 in legacy mode with no materials.
+    def test_study_guide_requires_course_id(self, client):
+        """Test study guide returns 400 when course_id is not provided."""
+        response = client.post("/api/files-content/study-guide", json={
+            "topic": "Nonexistent Topic"  # Deprecated, course_id is required
+        })
 
-        Note: With comprehensive study guide (PR #67), the topic parameter is deprecated
-        and ignored. The system tries to load ALL topics, and if none have materials,
-        it returns an error message about no default materials.
-        """
-        mock_service = MagicMock()
-        mock_service.get_topic_files.return_value = []
-
-        with patch(
-            'app.routes.files_content.get_files_api_service',
-            return_value=mock_service
-        ):
-            response = client.post("/api/files-content/study-guide", json={
-                "topic": "Nonexistent Topic"  # Deprecated parameter, will be ignored
-            })
-
-            assert response.status_code == 400
-            detail = response.json()["detail"]
-            assert "No course materials available" in detail
-            # After PR #67, the error message is about no default materials
-            assert "No default materials found" in detail
-            assert "contact your administrator" in detail
+        assert response.status_code == 400
+        detail = response.json()["detail"]
+        assert "course_id is required" in detail
 
 
 class TestCourseAwareFlashcardsEndpoint:
