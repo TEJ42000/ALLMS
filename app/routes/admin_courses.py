@@ -153,8 +153,20 @@ def validate_materials_path(file_path: str, try_resolve: bool = True) -> pathlib
     if not full_path.exists() and try_resolve:
         corrected_path = resolve_incomplete_path(file_path)
         if corrected_path:
-            # Recursively validate the corrected path (with try_resolve=False to avoid loops)
-            return validate_materials_path(corrected_path, try_resolve=False)
+            # Validate the corrected path exists before returning it
+            corrected_full_path = (MATERIALS_BASE / corrected_path).resolve()
+            # Security check: ensure corrected path is also under MATERIALS_BASE
+            try:
+                corrected_full_path.relative_to(MATERIALS_BASE)
+            except ValueError:
+                logger.warning("Corrected path outside materials directory: %s", corrected_full_path)
+                return full_path
+            
+            # Only return corrected path if file actually exists
+            if corrected_full_path.exists():
+                return corrected_full_path
+            else:
+                logger.warning("Corrected path does not exist: %s", corrected_full_path)
 
     return full_path
 
@@ -2001,12 +2013,21 @@ async def batch_process_materials(
                     # Check if path needs resolution (incomplete path)
                     corrected_path = resolve_incomplete_path(storage_path)
                     if corrected_path:
-                        # Fix the storagePath in Firestore
-                        service.update_storage_path(course_id, material.id, corrected_path)
-                        storage_path = corrected_path
-                        result["path_corrected"] = True
-                        result["corrected_path"] = corrected_path
-                        logger.info(f"Corrected storagePath for {material.filename}: {corrected_path}")
+                        # Validate the corrected path exists before updating Firestore
+                        corrected_full_path = (MATERIALS_BASE / corrected_path).resolve()
+                        try:
+                            corrected_full_path.relative_to(MATERIALS_BASE)
+                            if corrected_full_path.exists():
+                                # Only update Firestore if corrected path actually exists
+                                service.update_storage_path(course_id, material.id, corrected_path)
+                                storage_path = corrected_path
+                                result["path_corrected"] = True
+                                result["corrected_path"] = corrected_path
+                                logger.info("Corrected storagePath for %s: %s", material.filename, corrected_path)
+                            else:
+                                logger.warning("Corrected path does not exist, skipping Firestore update: %s", corrected_full_path)
+                        except ValueError:
+                            logger.warning("Corrected path outside materials directory: %s", corrected_full_path)
 
                     # Validate path to prevent path traversal
                     file_path = validate_materials_path(storage_path)
