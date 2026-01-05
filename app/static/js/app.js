@@ -1111,6 +1111,10 @@ function initDashboard() {
 // Course-aware flashcard system - loads flashcards dynamically from backend API
 // Flashcards are generated from actual course materials using FilesAPIService
 
+// Constants
+const DEFAULT_FLASHCARD_COUNT = 20;
+
+// State
 let flashcards = [];
 let currentCardIndex = 0;
 let isLoadingFlashcards = false;
@@ -1148,6 +1152,7 @@ async function loadFlashcards() {
     // Prevent multiple simultaneous requests
     if (isLoadingFlashcards) {
         console.log('Flashcards already loading');
+        showFlashcardError('Flashcards are already loading. Please wait...');
         return;
     }
 
@@ -1162,7 +1167,7 @@ async function loadFlashcards() {
     try {
         // Build request with course context
         const requestBody = addCourseContext({
-            num_cards: 20  // Default number of flashcards
+            num_cards: DEFAULT_FLASHCARD_COUNT
         });
 
         const response = await fetch(`${API_BASE}/api/files-content/flashcards`, {
@@ -1179,7 +1184,12 @@ async function loadFlashcards() {
 
         const data = await response.json();
 
-        if (!data.flashcards || data.flashcards.length === 0) {
+        // Validate response format
+        if (!data.flashcards || !Array.isArray(data.flashcards)) {
+            throw new Error('Invalid flashcards format from server');
+        }
+
+        if (data.flashcards.length === 0) {
             throw new Error('No flashcards generated. Please try again.');
         }
 

@@ -34,6 +34,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_FALLBACK_COUNT = 5  # Number of files to return when no specific files found
 MATERIALS_ROOT = Path("Materials")
 MAX_TEXT_LENGTH = 100000  # Maximum characters per document to avoid context overflow
+MAX_MATERIALS_PER_GENERATION = 10  # Limit materials to avoid context overflow in AI generation
 
 
 class FilesAPIService:
@@ -210,7 +211,14 @@ class FilesAPIService:
                 len(text),
                 MAX_TEXT_LENGTH
             )
-            text = text[:MAX_TEXT_LENGTH] + "\n\n[... content truncated ...]"
+            # Try to truncate at last period within limit to avoid breaking mid-sentence
+            truncate_at = text.rfind('.', 0, MAX_TEXT_LENGTH)
+            # Only use sentence boundary if it's within 10% of the limit
+            if truncate_at > MAX_TEXT_LENGTH * 0.9:
+                text = text[:truncate_at + 1] + "\n\n[... content truncated ...]"
+            else:
+                # Fall back to hard truncation if no good sentence boundary found
+                text = text[:MAX_TEXT_LENGTH] + "\n\n[... content truncated ...]"
 
         logger.info(
             "Extracted %d chars from %s (type: %s)",
@@ -413,7 +421,7 @@ Return ONLY valid JSON:
         materials_with_text = await self.get_course_materials_with_text(
             course_id=course_id,
             week_number=week_number,
-            limit=10  # Limit to avoid context overflow
+            limit=MAX_MATERIALS_PER_GENERATION
         )
 
         if not materials_with_text:
@@ -811,15 +819,23 @@ Include:
         Args:
             course_id: Course ID
             topic: Topic name for the flashcards
-            num_cards: Number of flashcards to generate
+            num_cards: Number of flashcards to generate (5-50)
             week_number: Optional week filter
 
         Returns:
             List of flashcard dictionaries with 'front' and 'back' keys
 
         Raises:
-            ValueError: If no materials found
+            ValueError: If no materials found or invalid parameters
         """
+        # Input validation
+        if not course_id or not course_id.strip():
+            raise ValueError("course_id is required and cannot be empty")
+        if not 5 <= num_cards <= 50:
+            raise ValueError("num_cards must be between 5 and 50")
+        if week_number is not None and not 1 <= week_number <= 52:
+            raise ValueError("week_number must be between 1 and 52")
+
         logger.info(
             "Generating flashcards from course %s: %d cards, week=%s",
             course_id, num_cards, week_number
@@ -829,7 +845,7 @@ Include:
         materials_with_text = await self.get_course_materials_with_text(
             course_id=course_id,
             week_number=week_number,
-            limit=10  # Limit to avoid context overflow
+            limit=MAX_MATERIALS_PER_GENERATION
         )
 
         if not materials_with_text:
