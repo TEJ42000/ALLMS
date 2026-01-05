@@ -93,11 +93,63 @@ if (typeof mermaid !== 'undefined') {
 }
 
 /**
+ * Pre-process text to wrap ASCII art diagrams in code fences
+ * Detects box-drawing characters and wraps them properly
+ */
+function preprocessAsciiArt(text) {
+    if (!text) return text;
+
+    // Box-drawing characters pattern
+    const boxChars = /[┌┐└┘├┤┬┴┼─│═║╔╗╚╝╠╣╦╩╬]/;
+
+    const lines = text.split('\n');
+    const result = [];
+    let inAsciiBlock = false;
+    let asciiBuffer = [];
+
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const hasBoxChars = boxChars.test(line);
+
+        if (hasBoxChars && !inAsciiBlock) {
+            // Start of ASCII art block
+            inAsciiBlock = true;
+            asciiBuffer = [line];
+        } else if (hasBoxChars && inAsciiBlock) {
+            // Continue ASCII art block
+            asciiBuffer.push(line);
+        } else if (!hasBoxChars && inAsciiBlock) {
+            // End of ASCII art block - wrap in code fence
+            result.push('```');
+            result.push(...asciiBuffer);
+            result.push('```');
+            result.push(line);
+            inAsciiBlock = false;
+            asciiBuffer = [];
+        } else {
+            result.push(line);
+        }
+    }
+
+    // Handle case where ASCII art is at the end
+    if (inAsciiBlock && asciiBuffer.length > 0) {
+        result.push('```');
+        result.push(...asciiBuffer);
+        result.push('```');
+    }
+
+    return result.join('\n');
+}
+
+/**
  * Format markdown text using marked.js library
  * Falls back to simple formatting if marked is not available
  */
 function formatMarkdown(text) {
     if (!text) return '';
+
+    // Pre-process to wrap ASCII art in code fences
+    text = preprocessAsciiArt(text);
 
     // Use marked.js if available
     if (typeof marked !== 'undefined') {
