@@ -100,11 +100,13 @@
                     <div class="chat-input-area">
                         <label for="context-select" class="visually-hidden">Select Topic Context</label>
                         <select id="context-select" class="form-select" aria-label="Select topic context for your question">
-                            <option value="Criminal Law">Criminal Law</option>
-                            <option value="Private Law">Private Law</option>
-                            <option value="Constitutional Law">Constitutional Law</option>
-                            <option value="Administrative Law">Administrative Law</option>
-                            <option value="International Law">International Law</option>
+                            {% if topics %}
+                            {% for topic in topics %}
+                            <option value="{{ topic.name }}">Week {{ topic.weekNumber }}: {{ topic.name }}</option>
+                            {% endfor %}
+                            {% else %}
+                            <option value="General">General</option>
+                            {% endif %}
                         </select>
                         <label for="tutor-input" class="visually-hidden">Your question for the AI Tutor</label>
                         <textarea id="tutor-input" placeholder="Ask about concepts, cases, frameworks..." rows="2" aria-label="Enter your question for the AI Tutor"></textarea>
@@ -119,11 +121,13 @@
                     <div class="form-group">
                         <label for="assessment-topic">Topic</label>
                         <select id="assessment-topic" class="form-select">
-                            <option value="Criminal Law">Criminal Law</option>
-                            <option value="Private Law">Private Law</option>
-                            <option value="Constitutional Law">Constitutional Law</option>
-                            <option value="Administrative Law">Administrative Law</option>
-                            <option value="International Law">International Law</option>
+                            {% if topics %}
+                            {% for topic in topics %}
+                            <option value="{{ topic.name }}">Week {{ topic.weekNumber }}: {{ topic.name }}</option>
+                            {% endfor %}
+                            {% else %}
+                            <option value="General">General</option>
+                            {% endif %}
                         </select>
                     </div>
                     <div class="form-group">
@@ -164,11 +168,11 @@
                                     <label for="quiz-topic-select">Select Topic</label>
                                     <select id="quiz-topic-select" class="form-select">
                                         <option value="all">All Topics</option>
-                                        <option value="criminal">Criminal Law</option>
-                                        <option value="private">Private Law</option>
-                                        <option value="constitutional">Constitutional Law</option>
-                                        <option value="administrative">Administrative Law</option>
-                                        <option value="international">International Law</option>
+                                        {% if topics %}
+                                        {% for topic in topics %}
+                                        <option value="week-{{ topic.weekNumber }}">Week {{ topic.weekNumber }}: {{ topic.name }}</option>
+                                        {% endfor %}
+                                        {% endif %}
                                     </select>
                                 </div>
                                 <div class="form-group">
@@ -223,10 +227,11 @@
                             <label for="flashcard-category">Category</label>
                             <select id="flashcard-category" class="form-select">
                                 <option value="all">All Categories</option>
-                                <option value="criminal">Criminal Law</option>
-                                <option value="private">Private Law</option>
-                                <option value="constitutional">Constitutional Law</option>
-                                <option value="administrative">Administrative Law</option>
+                                {% if topics %}
+                                {% for topic in topics %}
+                                <option value="week-{{ topic.weekNumber }}">Week {{ topic.weekNumber }}: {{ topic.name }}</option>
+                                {% endfor %}
+                                {% endif %}
                             </select>
                         </div>
                     </div>

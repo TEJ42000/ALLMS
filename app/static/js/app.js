@@ -683,14 +683,43 @@ async function generateQuiz() {
     const topicSelect = document.getElementById('quiz-topic-select');
     const difficultySelect = document.getElementById('quiz-difficulty-select');
     const numQuestionsSelect = document.getElementById('quiz-num-questions');
-    const topic = topicSelect ? topicSelect.value : 'all';
+    const topicValue = topicSelect ? topicSelect.value : 'all';
     const difficulty = difficultySelect ? difficultySelect.value : 'medium';
     const num_questions = numQuestionsSelect ? parseInt(numQuestionsSelect.value) : 10;
+
+    // Parse topic value - if it starts with "week-", extract week number
+    let topic = topicValue;
+    let week = null;
+    if (topicValue.startsWith('week-')) {
+        week = parseInt(topicValue.replace('week-', ''));
+        // Get the topic name from the selected option text
+        const selectedOption = topicSelect.options[topicSelect.selectedIndex];
+        if (selectedOption) {
+            // Extract topic name after "Week X: "
+            const optionText = selectedOption.text;
+            const colonIndex = optionText.indexOf(': ');
+            topic = colonIndex > 0 ? optionText.substring(colonIndex + 2) : topicValue;
+        }
+    }
 
     isGeneratingQuiz = true;
     showLoading();
 
     try {
+        // Build request body with optional week filter
+        const requestBody = {
+            course_id: COURSE_ID,
+            topic: topic,
+            num_questions: num_questions,
+            difficulty: difficulty,
+            allow_duplicate: false
+        };
+
+        // Add week filter if a specific week was selected
+        if (week !== null) {
+            requestBody.week = week;
+        }
+
         // Use the new quiz persistence API
         const response = await fetch(`${API_BASE}/api/quizzes/courses/${COURSE_ID}`, {
             method: 'POST',
@@ -698,13 +727,7 @@ async function generateQuiz() {
                 'Content-Type': 'application/json',
                 'X-User-ID': getUserId()
             },
-            body: JSON.stringify({
-                course_id: COURSE_ID,
-                topic: topic,
-                num_questions: num_questions,
-                difficulty: difficulty,
-                allow_duplicate: false
-            })
+            body: JSON.stringify(requestBody)
         });
 
         if (!response.ok) {

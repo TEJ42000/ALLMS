@@ -45,15 +45,26 @@ async def course_study_portal(request: Request, course_id: str):
         course_id: The unique identifier for the course
     """
     try:
-        # Verify course exists
+        # Load course with weeks to get topics
         service = get_course_service()
-        course = service.get_course(course_id, include_weeks=False)
+        course = service.get_course(course_id, include_weeks=True)
 
         if not course:
             raise HTTPException(status_code=404, detail=f"Course '{course_id}' not found")
 
         if not course.active:
             logger.warning("Attempted to access inactive course: %s", course_id)
+
+        # Extract topics from weeks for the dropdowns
+        # Each week has a title which represents the topic for that week
+        topics = []
+        for week in course.weeks:
+            if week.title:
+                topics.append({
+                    "id": f"week-{week.weekNumber}",
+                    "name": week.title,
+                    "weekNumber": week.weekNumber
+                })
 
         user = get_user_from_request(request)
         return templates.TemplateResponse(
@@ -65,6 +76,7 @@ async def course_study_portal(request: Request, course_id: str):
                 "course_id": course_id,
                 "course_name": course.name,
                 "course": course,
+                "topics": topics,
                 "user": user
             }
         )
