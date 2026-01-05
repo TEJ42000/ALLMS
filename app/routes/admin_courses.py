@@ -1,10 +1,7 @@
 """Admin API Routes for Course Management.
 
 Provides CRUD endpoints for managing courses, weeks, and legal skills.
-These endpoints are intended for administrative use only.
-
-Note: Authentication middleware will be added in Phase 5.
-See Issue #29 for the implementation plan.
+These endpoints require @mgms.eu domain authentication.
 """
 
 import logging
@@ -12,7 +9,10 @@ import pathlib
 import re
 from typing import Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException, Path, Query, status, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, status, UploadFile, File, Form
+
+from app.dependencies.auth import require_mgms_domain
+from app.models.auth_models import User
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
@@ -183,8 +183,11 @@ def validate_materials_path(file_path: str, try_resolve: bool = True) -> pathlib
 router = APIRouter(
     prefix="/api/admin/courses",
     tags=["Admin - Courses"],
+    dependencies=[Depends(require_mgms_domain)],  # All admin routes require @mgms.eu domain
     responses={
         400: {"description": "Bad request - Invalid input"},
+        401: {"description": "Not authenticated"},
+        403: {"description": "Forbidden - requires @mgms.eu domain"},
         404: {"description": "Resource not found"},
         500: {"description": "Internal server error"},
     }
