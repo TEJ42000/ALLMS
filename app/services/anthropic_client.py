@@ -124,8 +124,10 @@ async def get_ai_tutor_response(
             user_content += "Use the following course materials to inform your response:\n\n"
             for mat in materials_content[:5]:  # Limit to 5 materials
                 user_content += f"=== DOCUMENT: {mat['title']} ===\n"
-                # Truncate text to avoid token limits
-                text = mat['text'][:8000] if len(mat['text']) > 8000 else mat['text']
+                # Truncate text to avoid token limits, ensuring we don't cut mid-word
+                text = mat['text']
+                if len(text) > 8000:
+                    text = text[:8000].rsplit(' ', 1)[0] + '...'
                 user_content += f"{text}\n"
                 user_content += f"=== END OF {mat['title']} ===\n\n"
             user_content += "---\n\n"

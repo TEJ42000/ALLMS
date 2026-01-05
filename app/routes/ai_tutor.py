@@ -29,9 +29,12 @@ CACHE_TTL_HOURS = 24  # Cache responses for 24 hours
 
 
 def _generate_cache_key(course_id: str, context: str, message: str, week: Optional[int]) -> str:
-    """Generate a cache key from request parameters."""
+    """Generate a cache key from request parameters.
+
+    Uses full SHA-256 hash (64 chars) to minimize collision risk.
+    """
     key_string = f"{course_id}:{context}:{message.lower().strip()}:{week or 'all'}"
-    return hashlib.sha256(key_string.encode()).hexdigest()[:32]
+    return hashlib.sha256(key_string.encode()).hexdigest()
 
 
 def _get_cached_response(cache_key: str) -> Optional[str]:
@@ -52,12 +55,22 @@ def _get_cached_response(cache_key: str) -> Optional[str]:
 
         # Check TTL
         if created_at:
+            # Ensure timezone awareness for Firestore timestamps
+            if created_at.tzinfo is None:
+                created_at = created_at.replace(tzinfo=timezone.utc)
             age_hours = (datetime.now(timezone.utc) - created_at).total_seconds() / 3600
             if age_hours > CACHE_TTL_HOURS:
                 logger.info("Cache expired for key %s (age: %.1f hours)", cache_key, age_hours)
                 return None
 
         logger.info("Cache HIT for tutor response: %s", cache_key)
+
+        # Update hit count (best effort, don't fail on stats update)
+        try:
+            doc_ref.update({"hit_count": (data.get("hit_count", 0) or 0) + 1})
+        except Exception:
+            pass
+
         return data.get("response")
 
     except Exception as e:
@@ -194,7 +207,8 @@ async def chat_with_tutor(
                 for msg in request.conversation_history
             ]
 
-        # Check cache first (only for course-aware requests without history)
+        # Check cache first (only for course-aware single-turn queries)
+        # Conversations with history are unique and should not be cached
         materials_content = None
         cache_key = None
         if effective_course_id and not history:
