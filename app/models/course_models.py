@@ -108,11 +108,19 @@ class WeekMaterial(BaseModel):
 
 
 class Week(BaseModel):
-    """Course week with topics, materials, and concepts."""
+    """Course week with topic, materials, and concepts.
+
+    Each week has one main topic represented by:
+    - title: Short topic title (e.g., "Criminal Law Fundamentals")
+    - topicDescription: 3-5 sentence description of what the topic covers
+
+    The 'topics' list is deprecated - use title and topicDescription instead.
+    """
 
     weekNumber: int
-    title: str
-    topics: List[str] = []
+    title: str  # Short topic title for the week
+    topicDescription: Optional[str] = None  # 3-5 sentence topic description
+    topics: List[str] = []  # Deprecated: use title/topicDescription instead
     materials: List[WeekMaterial] = []
     keyConcepts: List[KeyConcept] = []
     decisionModel: Optional[DecisionModel] = None
@@ -491,9 +499,18 @@ class WeekCreate(BaseModel):
     """Request model for creating/updating a week."""
 
     weekNumber: int
-    title: str
-    topics: List[str] = []
+    title: str  # Short topic title for the week
+    topicDescription: Optional[str] = None  # 3-5 sentence topic description
+    topics: List[str] = []  # Deprecated: use title/topicDescription instead
     materials: List[WeekMaterial] = []
     keyConcepts: List[KeyConcept] = []
     decisionModel: Optional[DecisionModel] = None
+
+
+# ============================================================================
+# Course Configuration Constants
+# ============================================================================
+
+# Default number of weeks per course (configurable per course if needed)
+DEFAULT_WEEKS_PER_COURSE: int = 6
 
