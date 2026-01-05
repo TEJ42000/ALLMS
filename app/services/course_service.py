@@ -84,9 +84,6 @@ FIRESTORE_BATCH_LIMIT = 500
 MAX_RETRY_DELAY_SECONDS = 8.0
 RETRY_MULTIPLIER = 2.0
 
-# Firestore batch limit
-FIRESTORE_BATCH_LIMIT = 500
-
 
 # ============================================================================
 # Retry Logic
@@ -224,6 +221,16 @@ class CourseService:
     ) -> Tuple[List[CourseSummary], int]:
         """
         Get all courses as summaries with pagination.
+
+        Uses Firestore native offset() and limit() for efficient pagination.
+        The weekCount field is read from the course document (denormalized)
+        to avoid N+1 queries on the weeks subcollection.
+
+        Performance Notes:
+            - For datasets up to ~10,000 documents, offset-based pagination is acceptable
+            - For larger datasets (10k+), consider cursor-based pagination for better performance
+            - Total count query uses select([]) to minimize bandwidth
+            - Each page request requires 2 queries: one for count, one for data
 
         Args:
             include_inactive: Whether to include inactive courses
