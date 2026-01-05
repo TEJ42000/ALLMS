@@ -197,6 +197,11 @@ async def extract_topics_from_syllabus(
     course_name: Optional[str] = None
 ) -> Dict[str, Any]:
     """
+    DEPRECATED: Use extract_course_data_with_topics() instead.
+
+    Topics are now extracted as part of week data (week.title and week.topicDescription),
+    not as a separate collection. This function is maintained for backward compatibility.
+
     Extract detailed topics from syllabus text using AI.
 
     This function focuses specifically on topic extraction with descriptions,
@@ -211,6 +216,14 @@ async def extract_topics_from_syllabus(
         - topics: List of topic dicts with id, name, description, weekNumbers, confidence
         - extractionNotes: Any notes about the extraction process
     """
+    import warnings
+    warnings.warn(
+        "extract_topics_from_syllabus is deprecated. "
+        "Topics are now part of week data. Use extract_course_data_with_topics() instead.",
+        DeprecationWarning,
+        stacklevel=2
+    )
+
     try:
         # Truncate if too long
         if len(syllabus_text) > MAX_SYLLABUS_TEXT_LENGTH:

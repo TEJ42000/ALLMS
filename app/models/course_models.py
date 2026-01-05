@@ -512,5 +512,5 @@ class WeekCreate(BaseModel):
 # ============================================================================
 
 # Default number of weeks per course (configurable per course if needed)
-DEFAULT_WEEKS_PER_COURSE = 6
+DEFAULT_WEEKS_PER_COURSE: int = 6
 

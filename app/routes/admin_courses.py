@@ -1019,7 +1019,13 @@ class ExtractedTopicData(BaseModel):
 
 
 class ExtractedWeekData(BaseModel):
-    """Extracted week data from syllabus with topic information."""
+    """Extracted week data from syllabus with topic information.
+
+    Topic data hierarchy:
+    - title: Main topic name (use this)
+    - topicDescription: Detailed description (use this)
+    - topics: DEPRECATED sub-topics list (ignore, kept for backward compatibility)
+    """
     weekNumber: int
     title: str = Field(..., description="Short topic title (3-10 words)")
     topicDescription: Optional[str] = Field(
@@ -1249,7 +1255,7 @@ async def list_topics(
         )
 
 
-@router.get("/{course_id}/topics/{topic_id}", response_model=CourseTopic)
+@router.get("/{course_id}/topics/{topic_id}", response_model=CourseTopic, deprecated=True)
 async def get_topic(
     course_id: str = Path(..., description="Course ID"),
     topic_id: str = Path(..., description="Topic ID"),
@@ -1282,7 +1288,7 @@ async def get_topic(
         )
 
 
-@router.post("/{course_id}/topics", response_model=CourseTopic, status_code=status.HTTP_201_CREATED)
+@router.post("/{course_id}/topics", response_model=CourseTopic, status_code=status.HTTP_201_CREATED, deprecated=True)
 async def create_topic(
     course_id: str = Path(..., description="Course ID"),
     topic_data: TopicCreate = ...,
@@ -1315,7 +1321,7 @@ async def create_topic(
         )
 
 
-@router.put("/{course_id}/topics/{topic_id}", response_model=CourseTopic)
+@router.put("/{course_id}/topics/{topic_id}", response_model=CourseTopic, deprecated=True)
 async def update_topic(
     course_id: str = Path(..., description="Course ID"),
     topic_id: str = Path(..., description="Topic ID"),
@@ -1353,7 +1359,7 @@ async def update_topic(
         )
 
 
-@router.delete("/{course_id}/topics/{topic_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{course_id}/topics/{topic_id}", status_code=status.HTTP_204_NO_CONTENT, deprecated=True)
 async def delete_topic(
     course_id: str = Path(..., description="Course ID"),
     topic_id: str = Path(..., description="Topic ID"),
@@ -1385,7 +1391,7 @@ async def delete_topic(
         )
 
 
-@router.post("/{course_id}/topics/regenerate", response_model=TopicRegenerateResponse)
+@router.post("/{course_id}/topics/regenerate", response_model=TopicRegenerateResponse, deprecated=True)
 async def regenerate_topics(
     course_id: str = Path(..., description="Course ID"),
     request: TopicRegenerateRequest = TopicRegenerateRequest(),
