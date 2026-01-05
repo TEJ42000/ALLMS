@@ -482,11 +482,16 @@ async def list_essay_assessments(
 
 
 @router.get("/essay/courses/{course_id}/{assessment_id}")
-async def get_essay_assessment(course_id: str, assessment_id: str):
+async def get_essay_assessment(
+    course_id: str,
+    assessment_id: str,
+    x_user_id: str = Header(..., alias="X-User-ID")
+):
     """
     Get a specific essay assessment with all details.
 
     Returns the question, topic, and all previous attempts.
+    Users can only view their own assessments.
     """
     try:
         persistence = get_assessment_persistence_service()
@@ -495,8 +500,17 @@ async def get_essay_assessment(course_id: str, assessment_id: str):
         if not assessment:
             raise HTTPException(404, detail=f"Assessment {assessment_id} not found")
 
-        # Get all attempts for this assessment
-        attempts = await persistence.get_assessment_attempts(course_id, assessment_id)
+        # Authorization check: users can only view their own assessments
+        if assessment.get("userId") != x_user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to view this assessment"
+            )
+
+        # Get attempts only for this user
+        attempts = await persistence.get_assessment_attempts(
+            course_id, assessment_id, user_id=x_user_id
+        )
 
         return {
             "assessment": assessment,
@@ -515,14 +529,23 @@ async def get_essay_assessment(course_id: str, assessment_id: str):
 async def get_essay_history(
     user_id: str,
     course_id: Optional[str] = Query(None, description="Filter by course"),
-    limit: int = Query(20, ge=1, le=100, description="Max results")
+    limit: int = Query(20, ge=1, le=100, description="Max results"),
+    x_user_id: str = Header(..., alias="X-User-ID")
 ):
     """
     Get a user's essay assessment history.
 
     Returns list of past essay attempts with grades and timestamps.
+    Users can only view their own history.
     """
     try:
+        # Authorization check: users can only view their own history
+        if user_id != x_user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to view this user's history"
+            )
+
         persistence = get_assessment_persistence_service()
         history = await persistence.get_user_assessment_history(
             user_id=user_id,
@@ -572,11 +595,15 @@ async def get_my_essay_history(
 
 
 @router.get("/essay/attempt/{attempt_id}")
-async def get_essay_attempt(attempt_id: str):
+async def get_essay_attempt(
+    attempt_id: str,
+    x_user_id: str = Header(..., alias="X-User-ID")
+):
     """
     Get details of a specific essay attempt.
 
     Returns the answer, grade, feedback, and all evaluation details.
+    Users can only view their own attempts.
     """
     try:
         persistence = get_assessment_persistence_service()
@@ -584,6 +611,13 @@ async def get_essay_attempt(attempt_id: str):
 
         if not attempt:
             raise HTTPException(404, detail=f"Attempt {attempt_id} not found")
+
+        # Authorization check: users can only view their own attempts
+        if attempt.get("userId") != x_user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to view this attempt"
+            )
 
         return {"attempt": attempt}
 

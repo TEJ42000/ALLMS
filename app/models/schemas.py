@@ -107,8 +107,18 @@ class AssessmentResponse(BaseModel):
 class GenerateEssayQuestionRequest(BaseModel):
     """Request model for generating an essay question."""
 
-    course_id: str = Field(..., min_length=1, max_length=100, description="Course ID")
-    topic: Optional[str] = Field(None, description="Specific topic for the question")
+    course_id: str = Field(
+        ...,
+        min_length=1,
+        max_length=100,
+        pattern=r'^[a-zA-Z0-9_-]+$',
+        description="Course ID (alphanumeric, underscore, hyphen only)"
+    )
+    topic: Optional[str] = Field(
+        None,
+        max_length=200,
+        description="Specific topic for the question"
+    )
     week_number: Optional[int] = Field(None, ge=1, le=52, description="Week number filter")
 
 
@@ -181,8 +191,18 @@ class EssayAttempt(BaseModel):
 class SubmitEssayAnswerRequest(BaseModel):
     """Request model for submitting an essay answer."""
 
-    assessment_id: str = Field(..., description="Assessment ID")
-    course_id: str = Field(..., description="Course ID")
+    assessment_id: str = Field(
+        ...,
+        pattern=r'^[a-f0-9-]{36}$',
+        description="Assessment ID (UUID format)"
+    )
+    course_id: str = Field(
+        ...,
+        min_length=1,
+        max_length=100,
+        pattern=r'^[a-zA-Z0-9_-]+$',
+        description="Course ID (alphanumeric, underscore, hyphen only)"
+    )
     answer: str = Field(
         ...,
         min_length=100,

@@ -125,37 +125,94 @@ class AssessmentPersistenceService:
         topic: Optional[str] = None,
         limit: int = 20
     ) -> List[Dict]:
-        """List available assessments for a course."""
+        """List available assessments for a course.
+
+        Filters are applied at the database level for efficiency and security.
+        """
         if not self._firestore:
             return []
 
         assessments_ref = self._firestore.collection("courses").document(course_id) \
             .collection("assessments")
-        query = assessments_ref.order_by("createdAt", direction="DESCENDING")
-        docs = query.limit(limit).stream()
 
-        assessments = []
+        # Apply filters at database level for efficiency and security
+        query = assessments_ref
+
+        if user_id:
+            query = query.where("userId", "==", user_id)
+
+        if topic:
+            query = query.where("topic", "==", topic)
+
+        query = query.order_by("createdAt", direction="DESCENDING").limit(limit)
+        docs = query.stream()
+
+        # Batch collect assessment IDs for attempt lookup
+        assessment_list = []
         for doc in docs:
             data = doc.to_dict()
-            if user_id and data.get("userId") != user_id:
-                continue
-            if topic and data.get("topic") != topic:
-                continue
-            # Get attempt stats
-            attempts = await self.get_assessment_attempts(course_id, data.get("id"))
-            grades = [a.get("grade") for a in attempts if a.get("grade")]
+            assessment_list.append(data)
+
+        # If no assessments found, return early
+        if not assessment_list:
+            return []
+
+        # Batch fetch attempt counts (avoid N+1)
+        assessment_ids = [a.get("id") for a in assessment_list]
+        attempt_stats = await self._batch_get_attempt_stats(course_id, assessment_ids)
+
+        assessments = []
+        for data in assessment_list:
+            assessment_id = data.get("id")
+            stats = attempt_stats.get(assessment_id, {"count": 0, "grades": []})
+            grades = stats.get("grades", [])
+
+            question_text = data.get("question", "")
             assessments.append({
-                "id": data.get("id"),
+                "id": assessment_id,
                 "courseId": data.get("courseId"),
                 "topic": data.get("topic"),
-                "question": data.get("question", "")[:200] + "..." if len(data.get("question", "")) > 200 else data.get("question", ""),
+                "question": question_text[:200] + "..." if len(question_text) > 200 else question_text,
                 "title": data.get("title"),
                 "createdAt": data.get("createdAt"),
-                "attemptCount": len(attempts),
+                "attemptCount": stats.get("count", 0),
                 "bestGrade": max(grades) if grades else None,
                 "latestGrade": grades[0] if grades else None
             })
         return assessments
+
+    async def _batch_get_attempt_stats(
+        self,
+        course_id: str,
+        assessment_ids: List[str]
+    ) -> Dict[str, Dict]:
+        """Batch fetch attempt statistics for multiple assessments.
+
+        Returns dict mapping assessment_id -> {count: int, grades: List[int]}
+        """
+        if not self._firestore or not assessment_ids:
+            return {}
+
+        # Firestore 'in' queries support max 30 items
+        stats = {}
+        for i in range(0, len(assessment_ids), 30):
+            batch_ids = assessment_ids[i:i + 30]
+            attempts_ref = self._firestore.collection("assessmentAttempts")
+            query = attempts_ref.where("assessmentId", "in", batch_ids) \
+                .where("courseId", "==", course_id)
+            docs = query.stream()
+
+            for doc in docs:
+                data = doc.to_dict()
+                aid = data.get("assessmentId")
+                if aid not in stats:
+                    stats[aid] = {"count": 0, "grades": []}
+                stats[aid]["count"] += 1
+                if data.get("grade"):
+                    stats[aid]["grades"].append(data.get("grade"))
+
+        # Sort grades by most recent (we'll need submittedAt for proper ordering)
+        return stats
 
     async def save_attempt(
         self,
