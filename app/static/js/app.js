@@ -171,27 +171,65 @@ function formatMarkdown(text) {
 async function renderMermaidDiagrams(container) {
     if (typeof mermaid === 'undefined') return;
 
+    // Mermaid diagram type keywords
+    const mermaidKeywords = [
+        'graph ', 'graph\n', 'flowchart ', 'flowchart\n',
+        'sequenceDiagram', 'classDiagram', 'stateDiagram',
+        'erDiagram', 'gantt', 'pie', 'journey', 'gitGraph',
+        'mindmap', 'timeline', 'quadrantChart', 'xychart'
+    ];
+
     // Find all code blocks that might be mermaid
     const codeBlocks = container.querySelectorAll('pre code');
     for (const block of codeBlocks) {
         const text = block.textContent.trim();
-        // Check if it looks like a mermaid diagram
-        if (text.startsWith('graph ') || text.startsWith('flowchart ') ||
-            text.startsWith('sequenceDiagram') || text.startsWith('classDiagram') ||
-            text.startsWith('stateDiagram') || text.startsWith('erDiagram') ||
-            text.startsWith('gantt') || text.startsWith('pie')) {
 
+        // Check if text contains mermaid keywords (anywhere, not just at start)
+        // This handles cases where there's a title before the diagram definition
+        const isMermaid = mermaidKeywords.some(keyword => text.includes(keyword));
+
+        if (isMermaid) {
             try {
                 const pre = block.parentElement;
                 const id = 'mermaid-' + Math.random().toString(36).substr(2, 9);
-                const { svg } = await mermaid.render(id, text);
 
+                // Extract just the mermaid code (skip title lines before graph/flowchart)
+                let mermaidCode = text;
+                const lines = text.split('\n');
+                const diagramStartIndex = lines.findIndex(line =>
+                    mermaidKeywords.some(kw => line.trim().startsWith(kw.trim()))
+                );
+                if (diagramStartIndex > 0) {
+                    // There's a title - extract just the diagram part
+                    mermaidCode = lines.slice(diagramStartIndex).join('\n');
+                }
+
+                const { svg } = await mermaid.render(id, mermaidCode);
+
+                // Create container with optional title
                 const div = document.createElement('div');
-                div.className = 'mermaid';
-                div.innerHTML = svg;
+                div.className = 'mermaid-container';
+
+                // Add title if present
+                if (diagramStartIndex > 0) {
+                    const title = lines.slice(0, diagramStartIndex).join(' ').trim();
+                    if (title) {
+                        const titleEl = document.createElement('div');
+                        titleEl.className = 'mermaid-title';
+                        titleEl.textContent = title;
+                        div.appendChild(titleEl);
+                    }
+                }
+
+                const diagramDiv = document.createElement('div');
+                diagramDiv.className = 'mermaid';
+                diagramDiv.innerHTML = svg;
+                div.appendChild(diagramDiv);
+
                 pre.replaceWith(div);
             } catch (e) {
                 console.warn('Mermaid rendering failed:', e);
+                // Leave the code block as-is for debugging
             }
         }
     }

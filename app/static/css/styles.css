@@ -459,9 +459,96 @@ textarea { resize: vertical; font-family: inherit; }
 
 /* Study Guide */
 .study-guide { padding: 15px; }
-.study-form { max-width: 600px; margin-bottom: 20px; }
 .assessment-form { max-width: 800px; }
 .assessment-feedback { padding: 10px; }
+
+/* Study Guide Form */
+.study-form {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 15px;
+    padding: 20px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    margin-bottom: 20px;
+}
+
+.study-form .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 150px;
+}
+
+.study-form label {
+    font-size: 0.9em;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.study-form select,
+.study-form .form-control {
+    padding: 10px 14px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg);
+    color: var(--text-primary);
+    font-size: 0.95em;
+    min-width: 140px;
+    cursor: pointer;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.study-form select:hover,
+.study-form .form-control:hover {
+    border-color: var(--gold);
+}
+
+.study-form select:focus,
+.study-form .form-control:focus {
+    outline: none;
+    border-color: var(--gold);
+    box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.15);
+}
+
+/* Study Guide Sub-tabs */
+#study-section .quiz-sub-tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+#study-section .quiz-sub-tab {
+    padding: 10px 20px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-card);
+    color: var(--text-secondary);
+    font-size: 0.95em;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+#study-section .quiz-sub-tab:hover {
+    border-color: var(--gold);
+    color: var(--text-primary);
+}
+
+#study-section .quiz-sub-tab.active {
+    background: linear-gradient(135deg, var(--gold) 0%, #b8941f 100%);
+    color: var(--navy-dark);
+    border-color: var(--gold);
+}
+
+/* Generate Study Guide Button */
+#generate-study-btn {
+    padding: 12px 24px;
+    font-weight: 600;
+    white-space: nowrap;
+}
 
 /* Study Guide Content - Full Width */
 .study-guide-content {
@@ -601,12 +688,24 @@ textarea { resize: vertical; font-family: inherit; }
 }
 
 /* Mermaid Diagrams */
+.study-guide-content .mermaid-container {
+    margin: 1.5em 0;
+}
+
+.study-guide-content .mermaid-title {
+    font-weight: 600;
+    font-size: 1.1em;
+    color: var(--text-primary);
+    margin-bottom: 0.5em;
+    text-align: center;
+}
+
 .study-guide-content .mermaid {
     background: white;
     padding: 20px;
     border-radius: 8px;
-    margin: 1.5em 0;
     text-align: center;
+    overflow-x: auto;
 }
 
 /* Callout Boxes for Study Guide */
