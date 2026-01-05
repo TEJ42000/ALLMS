@@ -336,29 +336,52 @@ function initTutorListeners() {
 
 async function askTutor() {
     const message = document.getElementById('tutor-input').value.trim();
-    const context = document.getElementById('context-select').value;
+    const contextSelect = document.getElementById('context-select');
+    const contextValue = contextSelect.value;
     const messagesDiv = document.getElementById('chat-messages');
-    
+
     if (!message) return;
-    
+
+    // Parse context value to extract week number if present
+    // Format from template: "Week X: Topic Name" stored as topic name,
+    // but option value could be topic name directly
+    let context = contextValue;
+    let week_number = null;
+
+    // Check if a week-specific option was selected by looking at the option text
+    const selectedOption = contextSelect.options[contextSelect.selectedIndex];
+    if (selectedOption && selectedOption.text.startsWith('Week ')) {
+        // Extract week number from "Week X: Topic Name"
+        const weekMatch = selectedOption.text.match(/^Week (\d+):/);
+        if (weekMatch) {
+            week_number = parseInt(weekMatch[1]);
+        }
+    }
+
     // Add user message
     addMessage('user', message);
     document.getElementById('tutor-input').value = '';
-    
+
     showLoading();
-    
+
     try {
+        // Build request with optional week_number
+        const requestBody = addCourseContext({message, context});
+        if (week_number !== null) {
+            requestBody.week_number = week_number;
+        }
+
         const response = await fetch(`${API_BASE}/api/tutor/chat`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(addCourseContext({message, context}))
+            body: JSON.stringify(requestBody)
         });
-        
+
         if (!response.ok) throw new Error(`API error: ${response.status}`);
-        
+
         const data = await response.json();
         addMessage('assistant', data.content);
-        
+
     } catch (error) {
         console.error('Error:', error);
         addMessage('error', 'Sorry, there was an error processing your request.');

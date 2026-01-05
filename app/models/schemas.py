@@ -22,6 +22,8 @@ class ChatRequest(BaseModel):
 
     message: str = Field(..., min_length=1, max_length=5000, description="User's message")
     context: str = Field(default="Law & Legal Skills", description="Subject area context")
+    course_id: Optional[str] = Field(None, description="Course ID for course-specific context")
+    week_number: Optional[int] = Field(None, ge=1, le=52, description="Week number for filtering materials")
     conversation_history: Optional[List[ConversationMessage]] = Field(
         default=None, description="Previous conversation"
     )

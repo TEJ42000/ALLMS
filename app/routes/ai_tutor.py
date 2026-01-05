@@ -3,17 +3,88 @@
 Provides endpoints for AI-powered tutoring and topic discovery.
 Supports both legacy mode (hardcoded topics) and course-aware mode
 (topics from Firestore via CourseService).
+
+Features:
+- Course-aware mode with actual materials from FilesAPIService
+- Response caching to reduce API costs
+- Week/topic filtering for relevant materials
 """
 
+import hashlib
 import logging
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query, status
 
 from app.models.schemas import ChatRequest, ChatResponse, ErrorResponse
 from app.services.anthropic_client import get_ai_tutor_response
+from app.services.gcp_service import get_firestore_client
 
 logger = logging.getLogger(__name__)
+
+# Cache settings
+CACHE_COLLECTION = "tutor_response_cache"
+CACHE_TTL_HOURS = 24  # Cache responses for 24 hours
+
+
+def _generate_cache_key(course_id: str, context: str, message: str, week: Optional[int]) -> str:
+    """Generate a cache key from request parameters."""
+    key_string = f"{course_id}:{context}:{message.lower().strip()}:{week or 'all'}"
+    return hashlib.sha256(key_string.encode()).hexdigest()[:32]
+
+
+def _get_cached_response(cache_key: str) -> Optional[str]:
+    """Check cache for existing response."""
+    try:
+        db = get_firestore_client()
+        if not db:
+            return None
+
+        doc_ref = db.collection(CACHE_COLLECTION).document(cache_key)
+        doc = doc_ref.get()
+
+        if not doc.exists:
+            return None
+
+        data = doc.to_dict()
+        created_at = data.get("created_at")
+
+        # Check TTL
+        if created_at:
+            age_hours = (datetime.now(timezone.utc) - created_at).total_seconds() / 3600
+            if age_hours > CACHE_TTL_HOURS:
+                logger.info("Cache expired for key %s (age: %.1f hours)", cache_key, age_hours)
+                return None
+
+        logger.info("Cache HIT for tutor response: %s", cache_key)
+        return data.get("response")
+
+    except Exception as e:
+        logger.warning("Error checking cache: %s", e)
+        return None
+
+
+def _cache_response(cache_key: str, response: str, course_id: str, context: str) -> None:
+    """Cache a response for future use."""
+    try:
+        db = get_firestore_client()
+        if not db:
+            return
+
+        doc_ref = db.collection(CACHE_COLLECTION).document(cache_key)
+        doc_ref.set({
+            "response": response,
+            "course_id": course_id,
+            "context": context,
+            "created_at": datetime.now(timezone.utc),
+            "hit_count": 0
+        })
+        logger.info("Cached tutor response: %s", cache_key)
+
+    except Exception as e:
+        logger.warning("Error caching response: %s", e)
+
 
 router = APIRouter(
     prefix="/api/tutor",
@@ -106,9 +177,13 @@ async def chat_with_tutor(
     ```
     """
     try:
+        # Support course_id from body (frontend) or query param (API docs)
+        effective_course_id = request.course_id or course_id
+        week_number = request.week_number
+
         logger.info(
-            "AI Tutor request - Context: %s, Course: %s, Message length: %d",
-            request.context, course_id or "default", len(request.message)
+            "AI Tutor request - Context: %s, Course: %s, Week: %s, Message length: %d",
+            request.context, effective_course_id or "default", week_number, len(request.message)
         )
 
         # Convert Pydantic models to dict for service
@@ -119,40 +194,79 @@ async def chat_with_tutor(
                 for msg in request.conversation_history
             ]
 
-        # Enhance context with course information if provided
+        # Check cache first (only for course-aware requests without history)
+        materials_content = None
+        cache_key = None
+        if effective_course_id and not history:
+            cache_key = _generate_cache_key(
+                effective_course_id, request.context, request.message, week_number
+            )
+            cached_response = _get_cached_response(cache_key)
+            if cached_response:
+                return ChatResponse(
+                    content=cached_response,
+                    status="success",
+                    course_id=effective_course_id
+                )
+
+        # Load course materials if course_id provided
         enhanced_context = request.context
-        if course_id:
+        if effective_course_id:
             try:
                 from app.services.files_api_service import get_files_api_service
                 service = get_files_api_service()
 
-                # Get course topics to enhance context
-                topics = service.get_course_topics(course_id)
-                topic_names = [t["name"] for t in topics]
+                # Get materials with text content
+                materials_with_text = await service.get_course_materials_with_text(
+                    course_id=effective_course_id,
+                    week_number=week_number,
+                    limit=3  # Limit to 3 materials to manage context size
+                )
 
-                enhanced_context = f"{request.context} (Course: {course_id}, Topics: {', '.join(topic_names[:3])})"
-                logger.info("Enhanced context with course info: %s", course_id)
+                if materials_with_text:
+                    materials_content = [
+                        {"title": mat.title or mat.filename, "text": text}
+                        for mat, text in materials_with_text
+                    ]
+                    logger.info(
+                        "Loaded %d materials for tutor context (course=%s, week=%s)",
+                        len(materials_content), effective_course_id, week_number
+                    )
+
+                # Enhance context string
+                enhanced_context = f"{request.context} (Course: {effective_course_id})"
+                if week_number:
+                    enhanced_context += f", Week {week_number}"
+
             except Exception as e:
-                logger.warning("Could not enhance context for course %s: %s", course_id, str(e))
-                # Continue with original context
+                logger.warning(
+                    "Could not load materials for course %s: %s",
+                    effective_course_id, str(e)
+                )
+                # Continue without materials
 
         # Get AI response
         response_content = await get_ai_tutor_response(
             message=request.message,
             context=enhanced_context,
-            conversation_history=history
+            conversation_history=history,
+            materials_content=materials_content
         )
 
         logger.info("AI Tutor response generated - Length: %d", len(response_content))
+
+        # Cache the response for future use
+        if cache_key and effective_course_id:
+            _cache_response(cache_key, response_content, effective_course_id, request.context)
 
         response_data = {
             "content": response_content,
             "status": "success"
         }
 
-        # Include course_id in response if provided (even if enhancement failed)
-        if course_id:
-            response_data["course_id"] = course_id
+        # Include course_id in response if provided
+        if effective_course_id:
+            response_data["course_id"] = effective_course_id
 
         return ChatResponse(**response_data)
 

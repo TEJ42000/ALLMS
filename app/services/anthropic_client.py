@@ -92,7 +92,8 @@ Be constructive, specific, visual, and educational!"""
 async def get_ai_tutor_response(
     message: str,
     context: str = "Law & Legal Skills",
-    conversation_history: Optional[List[Dict[str, str]]] = None
+    conversation_history: Optional[List[Dict[str, str]]] = None,
+    materials_content: Optional[List[Dict[str, str]]] = None
 ) -> str:
     """
     Get AI tutor response for a user message.
@@ -101,6 +102,8 @@ async def get_ai_tutor_response(
         message: User's question or prompt
         context: Subject area context
         conversation_history: Previous conversation messages
+        materials_content: Optional list of dicts with 'title' and 'text' keys
+                          containing course material content to include
 
     Returns:
         AI-generated response text
@@ -113,14 +116,34 @@ async def get_ai_tutor_response(
             # Add previous messages (limit to last 10)
             messages.extend(conversation_history[-10:])
 
+        # Build user message content
+        user_content = ""
+
+        # If materials provided, include them as context
+        if materials_content:
+            user_content += "Use the following course materials to inform your response:\n\n"
+            for mat in materials_content[:5]:  # Limit to 5 materials
+                user_content += f"=== DOCUMENT: {mat['title']} ===\n"
+                # Truncate text to avoid token limits
+                text = mat['text'][:8000] if len(mat['text']) > 8000 else mat['text']
+                user_content += f"{text}\n"
+                user_content += f"=== END OF {mat['title']} ===\n\n"
+            user_content += "---\n\n"
+            user_content += f"Student Question: {message}"
+        else:
+            user_content = message
+
         # Add current message
         messages.append({
             "role": "user",
-            "content": message
+            "content": user_content
         })
 
         # Add context to system prompt
         system_prompt = TUTOR_SYSTEM_PROMPT + "\n\nCurrent topic context: " + context
+        if materials_content:
+            system_prompt += "\n\nIMPORTANT: Use the provided course materials to answer. "
+            system_prompt += "Cite specific documents when relevant."
 
         # Call Anthropic API
         response = await client.messages.create(
@@ -133,7 +156,11 @@ async def get_ai_tutor_response(
         # Extract text from response
         response_text = response.content[0].text
 
-        logger.info("AI Tutor response generated for context: %s", context)
+        materials_count = len(materials_content) if materials_content else 0
+        logger.info(
+            "AI Tutor response generated for context: %s (with %d materials)",
+            context, materials_count
+        )
 
         return response_text
 
