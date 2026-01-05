@@ -153,10 +153,11 @@ Return ONLY valid JSON:
             "text": prompt_text
         })
 
-        # Call API
-        response = await self.client.messages.create(
+        # Call API with Files API beta
+        response = await self.client.beta.messages.create(
             model="claude-sonnet-4-20250514",
             max_tokens=4000,
+            betas=[self.beta_header],
             messages=[{
                 "role": "user",
                 "content": content_blocks
@@ -250,9 +251,10 @@ Use visual formatting:
             "text": prompt_text
         })
 
-        response = await self.client.messages.create(
+        response = await self.client.beta.messages.create(
             model="claude-sonnet-4-20250514",
             max_tokens=3000,
+            betas=[self.beta_header],
             messages=[{"role": "user", "content": content_blocks}]
         )
 
@@ -311,9 +313,10 @@ Cite page numbers if available.""" % (article, code)
             "text": prompt_text
         })
 
-        response = await self.client.messages.create(
+        response = await self.client.beta.messages.create(
             model="claude-sonnet-4-20250514",
             max_tokens=2500,
+            betas=[self.beta_header],
             messages=[{"role": "user", "content": content_blocks}]
         )
 
@@ -388,9 +391,10 @@ Use proper legal analysis method and cite articles.""" % (topic, case_facts)
             "text": prompt_text
         })
 
-        response = await self.client.messages.create(
+        response = await self.client.beta.messages.create(
             model="claude-sonnet-4-20250514",
             max_tokens=2500,
+            betas=[self.beta_header],
             messages=[{"role": "user", "content": content_blocks}]
         )
 
@@ -459,9 +463,10 @@ Include:
             "text": prompt_text
         })
 
-        response = await self.client.messages.create(
+        response = await self.client.beta.messages.create(
             model="claude-sonnet-4-20250514",
             max_tokens=3000,
+            betas=[self.beta_header],
             messages=[{"role": "user", "content": content_blocks}]
         )
 
