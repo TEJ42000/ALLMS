@@ -367,21 +367,12 @@ async function generateQuiz() {
 
         const data = await response.json();
 
-        // Parse quiz data
-        let questions = [];
-        if (data.quiz && data.quiz.questions) {
-            questions = data.quiz.questions;
-        } else if (Array.isArray(data.quiz)) {
-            questions = data.quiz;
-        } else if (typeof data.quiz === 'string') {
-            // Try to parse JSON string
-            try {
-                const parsed = JSON.parse(data.quiz);
-                questions = parsed.questions || [];
-            } catch (e) {
-                throw new Error('Invalid quiz format');
-            }
+        // Parse quiz data - expect standardized format: { quiz: { questions: [...] } }
+        if (!data.quiz || !data.quiz.questions || !Array.isArray(data.quiz.questions)) {
+            throw new Error('Invalid quiz format: expected { quiz: { questions: [...] } }');
         }
+
+        const questions = data.quiz.questions;
 
         if (questions.length === 0) {
             throw new Error('No questions generated');
@@ -493,22 +484,35 @@ function displayCurrentQuestion(container) {
 
     container.innerHTML = html;
 
-    // Attach event listeners using event delegation (avoiding inline onclick for security)
-    container.querySelectorAll('.quiz-option').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const index = parseInt(btn.dataset.answerIndex, 10);
-            selectAnswer(index);
-        });
-    });
+    // Use event delegation on the container to avoid memory leaks from per-element listeners
+    container.addEventListener('click', handleQuizContainerClick);
+}
 
-    const prevBtn = container.querySelector('.nav-prev-btn');
-    if (prevBtn) {
-        prevBtn.addEventListener('click', previousQuestion);
+/**
+ * Event delegation handler for quiz container clicks.
+ * Handles all button clicks within the quiz question container.
+ */
+function handleQuizContainerClick(event) {
+    const target = event.target;
+
+    // Handle quiz option selection
+    const optionBtn = target.closest('.quiz-option');
+    if (optionBtn && !optionBtn.disabled) {
+        const index = parseInt(optionBtn.dataset.answerIndex, 10);
+        selectAnswer(index);
+        return;
     }
 
-    const nextBtn = container.querySelector('.nav-next-btn');
-    if (nextBtn) {
-        nextBtn.addEventListener('click', nextQuestion);
+    // Handle previous button
+    if (target.closest('.nav-prev-btn') && !target.closest('.nav-prev-btn').disabled) {
+        previousQuestion();
+        return;
+    }
+
+    // Handle next button
+    if (target.closest('.nav-next-btn') && !target.closest('.nav-next-btn').disabled) {
+        nextQuestion();
+        return;
     }
 }
 
@@ -530,8 +534,10 @@ function selectAnswer(answerIndex) {
     // Update score if correct
     if (answerIndex === question.correct_index) {
         quizState.score++;
-        updateQuizProgress();
     }
+
+    // Always update progress display after answering
+    updateQuizProgress();
 
     // Re-render to show feedback
     const container = document.getElementById('quiz-question-container');
@@ -640,15 +646,22 @@ function displayQuizResults(container) {
 
     container.innerHTML = html;
 
-    // Attach event listeners (avoiding inline onclick for security)
-    const restartBtn = container.querySelector('.restart-quiz-btn');
-    if (restartBtn) {
-        restartBtn.addEventListener('click', restartQuiz);
+    // Use event delegation for results buttons
+    container.addEventListener('click', handleResultsContainerClick);
+}
+
+/**
+ * Event delegation handler for quiz results container clicks.
+ */
+function handleResultsContainerClick(event) {
+    if (event.target.closest('.restart-quiz-btn')) {
+        restartQuiz();
+        return;
     }
 
-    const reviewBtn = container.querySelector('.review-quiz-btn');
-    if (reviewBtn) {
-        reviewBtn.addEventListener('click', reviewQuiz);
+    if (event.target.closest('.review-quiz-btn')) {
+        reviewQuiz();
+        return;
     }
 }
 
