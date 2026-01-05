@@ -50,6 +50,57 @@ class QuizPersistenceService:
         content = "|".join(question_texts)
         return hashlib.sha256(content.encode()).hexdigest()[:CONTENT_HASH_LENGTH]
 
+    async def _count_similar_quizzes(
+        self,
+        course_id: str,
+        topic: str,
+        difficulty: str
+    ) -> int:
+        """Count existing quizzes with the same topic and difficulty.
+
+        Args:
+            course_id: Course ID
+            topic: Quiz topic
+            difficulty: Difficulty level
+
+        Returns:
+            Number of existing quizzes with same topic/difficulty
+        """
+        if not self._firestore:
+            return 0
+
+        quizzes_ref = self._firestore.collection("courses").document(course_id) \
+            .collection("quizzes")
+        query = quizzes_ref.where("topic", "==", topic).where("difficulty", "==", difficulty)
+        docs = list(query.stream())
+        return len(docs)
+
+    def _generate_quiz_title(
+        self,
+        topic: str,
+        difficulty: str,
+        sequence_number: int,
+        created_at: datetime
+    ) -> str:
+        """Generate a unique quiz title with sequence number and date.
+
+        Args:
+            topic: Quiz topic
+            difficulty: Difficulty level
+            sequence_number: Which number quiz this is (1-based)
+            created_at: Creation timestamp
+
+        Returns:
+            Formatted title like "Contract Law Quiz - Medium #2 (Jan 5)"
+        """
+        date_str = created_at.strftime("%b %d")
+        base_title = f"{topic} Quiz - {difficulty.capitalize()}"
+
+        if sequence_number <= 1:
+            return f"{base_title} ({date_str})"
+        else:
+            return f"{base_title} #{sequence_number} ({date_str})"
+
     async def save_quiz(
         self,
         course_id: str,
@@ -67,7 +118,7 @@ class QuizPersistenceService:
             difficulty: Difficulty level
             questions: List of question dictionaries
             week_number: Optional week filter used
-            title: Optional quiz title
+            title: Optional quiz title (auto-generated if not provided)
 
         Returns:
             Dictionary with saved quiz data including ID
@@ -89,6 +140,11 @@ class QuizPersistenceService:
         content_hash = self._generate_content_hash(questions)
         now = datetime.now(timezone.utc)
 
+        # Generate title with sequence number and date if not provided
+        if not title:
+            existing_count = await self._count_similar_quizzes(course_id, topic, difficulty)
+            title = self._generate_quiz_title(topic, difficulty, existing_count + 1, now)
+
         quiz_data = {
             "id": quiz_id,
             "courseId": course_id,
@@ -99,7 +155,7 @@ class QuizPersistenceService:
             "questions": questions,
             "contentHash": content_hash,
             "createdAt": now,
-            "title": title or f"{topic} Quiz - {difficulty.capitalize()}"
+            "title": title
         }
 
         # Save to Firestore
