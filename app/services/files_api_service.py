@@ -650,12 +650,39 @@ OUTPUT QUALITY:
             messages=[{"role": "user", "content": content_blocks}]
         )
 
+        # Log cache statistics from the response
+        usage = response.usage
+        cache_created = getattr(usage, 'cache_creation_input_tokens', 0) or 0
+        cache_read = getattr(usage, 'cache_read_input_tokens', 0) or 0
+        input_tokens = getattr(usage, 'input_tokens', 0) or 0
+        output_tokens = getattr(usage, 'output_tokens', 0) or 0
+
+        if cache_read > 0:
+            cache_hit_pct = (cache_read / (input_tokens + cache_read)) * 100 if input_tokens else 0
+            logger.info(
+                "📦 CACHE HIT: %d tokens read from cache (%.1f%% cached), %d new input tokens",
+                cache_read, cache_hit_pct, input_tokens
+            )
+        elif cache_created > 0:
+            logger.info(
+                "📝 CACHE MISS: %d tokens written to cache for future requests",
+                cache_created
+            )
+        else:
+            logger.info("⚠️ No cache activity detected")
+
+        logger.info(
+            "💰 Token usage - Input: %d, Output: %d, Cache read: %d, Cache created: %d",
+            input_tokens, output_tokens, cache_read, cache_created
+        )
+
         # With extended thinking, response has thinking blocks and text blocks
         # Extract just the text content (not the thinking)
         guide = ""
         for block in response.content:
             if block.type == "text":
                 guide += block.text
+
         logger.info(
             "Generated study guide: %d characters from %d materials",
             len(guide), len(materials_with_text)
