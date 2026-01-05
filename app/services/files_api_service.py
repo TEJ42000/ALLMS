@@ -550,7 +550,7 @@ Return ONLY valid JSON:
 
         prompt_text = f"""Based on the documents provided above, create a comprehensive study guide for {topic}.
         Wherever possible include links to the source material to all of easy cross referencing. When echr cases
-        are mentioned try to include a link to the case in the HUDOC database. When duch law is mentioned include a link to the article on the wetten.nl website.
+        are mentioned try to include a link to the case in the HUDOC database. When Dutch law is mentioned include a link to the article on the wetten.nl website.
 
 REQUIRED SECTIONS:
 
