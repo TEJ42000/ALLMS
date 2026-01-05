@@ -716,7 +716,8 @@ class TestCourseAwareFlashcardsEndpoint:
         """Test flashcards generation with course_id parameter."""
         mock_service = MagicMock()
         mock_service.get_files_for_course.return_value = ["reader_admin_law"]
-        mock_service.generate_flashcards = AsyncMock(return_value=[
+        # Fix: Mock the correct method name that's actually called
+        mock_service.generate_flashcards_from_course = AsyncMock(return_value=[
             {"front": "Q1", "back": "A1"},
             {"front": "Q2", "back": "A2"}
         ])
