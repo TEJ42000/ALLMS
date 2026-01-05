@@ -1500,7 +1500,7 @@ async function loadCourseWeeks() {
         const response = await fetch(`/api/admin/courses/${COURSE_ID}?include_weeks=true`);
 
         if (!response.ok) {
-            throw new Error(`Failed to fetch course: ${response.status}`);
+            throw new Error(`Failed to fetch course: ${response.status} ${response.statusText}`);
         }
 
         const course = await response.json();
@@ -1517,13 +1517,14 @@ async function loadCourseWeeks() {
         // Render week cards
         weeksGrid.innerHTML = weeks.map(week => renderWeekCard(week)).join('');
 
-        // Add click handlers for week cards
-        setupWeekCardHandlers();
+        // Setup event delegation for week card clicks (only once)
+        setupWeekCardEventDelegation(weeksGrid);
 
         // Update topics stat to show total weeks
+        // TODO: Progress tracking will show completed/total when implemented
         const statTopics = document.getElementById('stat-topics');
         if (statTopics) {
-            statTopics.textContent = `0/${weeks.length}`;
+            statTopics.textContent = `${weeks.length} weeks`;
         }
 
     } catch (error) {
@@ -1577,44 +1578,51 @@ function getWeekIcon(week) {
     if (title.includes('tort') || title.includes('liability')) return '⚠️';
     if (title.includes('review') || title.includes('exam')) return '📝';
 
-    // Default icon based on week number
+    // Default icon based on week number (with validation)
     const icons = ['📖', '📗', '📘', '📙', '📕', '📓'];
-    return icons[(week.weekNumber - 1) % icons.length];
+    const weekNum = typeof week.weekNumber === 'number' && week.weekNumber > 0 ? week.weekNumber : 1;
+    return icons[(weekNum - 1) % icons.length];
 }
 
 /**
- * Setup click handlers for week cards
+ * Setup event delegation for week card clicks (prevents memory leaks)
+ * Uses a flag to ensure the listener is only attached once
  */
-function setupWeekCardHandlers() {
-    document.querySelectorAll('.week-card').forEach(card => {
-        card.addEventListener('click', () => {
-            const weekNumber = card.dataset.week;
-            const title = card.dataset.title;
+let weekCardDelegationSetup = false;
+function setupWeekCardEventDelegation(weeksGrid) {
+    if (weekCardDelegationSetup || !weeksGrid) return;
+    weekCardDelegationSetup = true;
 
-            // Navigate to AI Tutor with week context
-            const tutorTab = document.querySelector('.nav-tab[data-tab="tutor"]');
-            if (tutorTab) tutorTab.click();
+    weeksGrid.addEventListener('click', (e) => {
+        const card = e.target.closest('.week-card');
+        if (!card) return;
 
-            // Set context to the week topic
-            const contextSelect = document.getElementById('context-select');
-            if (contextSelect && title) {
-                // Try to find matching option or use the title
-                const options = Array.from(contextSelect.options);
-                const match = options.find(opt =>
-                    opt.value.toLowerCase().includes(title.toLowerCase()) ||
-                    title.toLowerCase().includes(opt.value.toLowerCase())
-                );
-                if (match) {
-                    contextSelect.value = match.value;
-                }
+        const weekNumber = card.dataset.week;
+        const title = card.dataset.title;
+
+        // Navigate to AI Tutor with week context
+        const tutorTab = document.querySelector('.nav-tab[data-tab="tutor"]');
+        if (tutorTab) tutorTab.click();
+
+        // Set context to the week topic
+        const contextSelect = document.getElementById('context-select');
+        if (contextSelect && title) {
+            // Try to find matching option or use the title
+            const options = Array.from(contextSelect.options);
+            const match = options.find(opt =>
+                opt.value.toLowerCase().includes(title.toLowerCase()) ||
+                title.toLowerCase().includes(opt.value.toLowerCase())
+            );
+            if (match) {
+                contextSelect.value = match.value;
             }
+        }
 
-            // Pre-fill chat with week context
-            const chatInput = document.getElementById('chat-input');
-            if (chatInput) {
-                chatInput.placeholder = `Ask about Week ${weekNumber}: ${title}...`;
-            }
-        });
+        // Pre-fill chat with week context
+        const chatInput = document.getElementById('chat-input');
+        if (chatInput) {
+            chatInput.placeholder = `Ask about Week ${weekNumber}: ${title}...`;
+        }
     });
 }
 
