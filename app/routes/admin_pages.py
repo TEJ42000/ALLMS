@@ -12,6 +12,7 @@ from fastapi.templating import Jinja2Templates
 
 from app.dependencies.auth import require_mgms_domain
 from app.models.auth_models import User
+from app.services.auth_service import get_auth_config
 
 logger = logging.getLogger(__name__)
 
@@ -31,13 +32,15 @@ async def admin_dashboard(
 
     Requires @mgms.eu domain authentication.
     """
+    auth_config = get_auth_config()
     return templates.TemplateResponse(
         "admin/courses.html",
         {
             "request": request,
             "title": "Course Management",
             "version": "2.0.0",
-            "user": user
+            "user": user,
+            "auth_enabled": auth_config.auth_enabled
         }
     )
 
@@ -57,13 +60,15 @@ async def admin_courses(
     - Edit course metadata
     - Manage weeks and materials
     """
+    auth_config = get_auth_config()
     return templates.TemplateResponse(
         "admin/courses.html",
         {
             "request": request,
             "title": "Course Management",
             "version": "2.0.0",
-            "user": user
+            "user": user,
+            "auth_enabled": auth_config.auth_enabled
         }
     )
 
@@ -84,6 +89,7 @@ async def admin_course_detail(
     - Manage weeks
     - Link materials
     """
+    auth_config = get_auth_config()
     return templates.TemplateResponse(
         "admin/courses.html",
         {
@@ -91,7 +97,8 @@ async def admin_course_detail(
             "title": f"Edit Course: {course_id}",
             "course_id": course_id,
             "version": "2.0.0",
-            "user": user
+            "user": user,
+            "auth_enabled": auth_config.auth_enabled
         }
     )
 
@@ -111,12 +118,14 @@ async def admin_users(
     - Add new users to the allow list
     - Edit or remove existing users
     """
+    auth_config = get_auth_config()
     return templates.TemplateResponse(
         "admin/users.html",
         {
             "request": request,
             "title": "User Management",
             "version": "2.0.0",
-            "user": user
+            "user": user,
+            "auth_enabled": auth_config.auth_enabled
         }
     )
