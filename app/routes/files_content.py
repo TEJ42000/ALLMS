@@ -320,18 +320,18 @@ async def generate_study_guide(request: FilesStudyGuideRequest):
     providing a complete overview of key concepts, important articles, common
     mistakes, exam tips, and practice scenarios.
 
-    **Modes:**
-    - **Course-aware mode**: Provide `course_id` to use all materials from that course
-    - **Legacy mode**: No parameters needed - uses all default materials
+    **Usage:**
+    - Provide `course_id` to generate a study guide from course materials
+    - Optionally provide `weeks` to filter to specific weeks
 
-    **Example (course-aware - all materials):**
+    **Example (all course materials):**
     ```json
     {
         "course_id": "LLS-2025-2026"
     }
     ```
 
-    **Example (course-aware - specific weeks):**
+    **Example (specific weeks):**
     ```json
     {
         "course_id": "LLS-2025-2026",
@@ -339,116 +339,62 @@ async def generate_study_guide(request: FilesStudyGuideRequest):
     }
     ```
 
-    **Example (legacy - all default materials):**
-    ```json
-    {}
-    ```
-
-    **Note:** The `topic` parameter is deprecated. Study guides now automatically
-    include all available materials instead of filtering by topic.
+    **Note:** The `topic` parameter is deprecated. Study guides now use
+    course materials via text extraction.
     """
     try:
         service = get_files_api_service()
 
-        # Note: weeks are validated by Pydantic @validator
+        # course_id is required for the new architecture
+        if not request.course_id:
+            raise HTTPException(
+                400,
+                detail="course_id is required. Please provide a valid course ID."
+            )
 
-        # Get files - comprehensive approach using ALL available materials
-        if request.course_id:
-            # Course-aware mode: fetch ALL course materials (or specific weeks)
-            try:
-                if request.weeks:
-                    # Use batch method for multiple weeks - single Firestore read
-                    file_keys = service.get_files_for_course_weeks(
-                        request.course_id,
-                        week_numbers=request.weeks
-                    )
-                    topic_description = f"Course '{request.course_id}' - Weeks {request.weeks}"
-                else:
-                    # Get ALL materials for the course
-                    file_keys = service.get_files_for_course(request.course_id)
-                    topic_description = f"Course '{request.course_id}' - All Materials"
-            except ValueError as e:
-                logger.warning("Course not found: %s", request.course_id)
-                raise HTTPException(404, detail=str(e)) from e
+        # Build topic description
+        if request.weeks:
+            topic_description = f"Course '{request.course_id}' - Weeks {request.weeks}"
         else:
-            # Legacy mode: Use ALL default materials across all topics
-            # This provides a comprehensive study guide covering all subjects
-            all_topics = ["constitutional", "administrative", "criminal", "private", "international"]
-            file_keys = []
-            failed_topics = []
+            topic_description = f"Course '{request.course_id}' - All Materials"
 
-            for topic in all_topics:
-                try:
-                    topic_files = service.get_topic_files(topic)
-                    file_keys.extend(topic_files)
-                except Exception as e:
-                    logger.warning("Could not get files for topic %s: %s", topic, str(e))
-                    failed_topics.append(topic)
-
-            # Log summary of topic loading
-            if failed_topics:
-                logger.warning("Failed to load topics: %s", failed_topics)
-                if len(failed_topics) == len(all_topics):
-                    logger.error("All topics failed to load - no materials available")
-
-            # Remove duplicates while preserving order
-            seen = set()
-            file_keys = [x for x in file_keys if not (x in seen or seen.add(x))]
-
-            topic_description = "Comprehensive Study Guide - All Topics"
-
-        # Check if we have any files to work with
-        if not file_keys:
-            error_msg = "No course materials available. "
-            if request.course_id:
-                error_msg += f"Course '{request.course_id}' has no materials"
-                if request.weeks:
-                    error_msg += f" for weeks {request.weeks}"
-                error_msg += ". Please contact your instructor to add materials."
-            else:
-                error_msg += "No default materials found. Please contact your administrator."
-            raise HTTPException(400, detail=error_msg)
-
-        # Generate comprehensive study guide
-        guide = await service.generate_study_guide(
+        # Generate study guide using the new text extraction approach
+        # Pass week_numbers list (or None for all materials)
+        guide = await service.generate_study_guide_from_course(
+            course_id=request.course_id,
             topic=topic_description,
-            file_keys=file_keys
+            week_numbers=request.weeks  # Pass full list of weeks
         )
 
         response = {
             "guide": guide,
-            "topic": topic_description,
-            "files_used": file_keys,
-            "files_count": len(file_keys)
+            "topic": topic_description
         }
 
         # Add deprecation warning if topic parameter was provided
         if request.topic:
             response["_warning"] = (
                 "The 'topic' parameter is deprecated and was ignored. "
-                "Study guides now include all materials."
+                "Study guides now use course materials."
             )
-            logger.info("Deprecated 'topic' parameter used: %s", request.topic)
+            logger.warning("Deprecated 'topic' parameter used: %s", request.topic)
 
         # Add course context to response
         _add_course_context(response, course_id=request.course_id, weeks=request.weeks)
 
-        # Log successful generation
-        if request.course_id:
-            logger.info(
-                "Generated comprehensive study guide for course %s, weeks %s, files: %d",
-                request.course_id, request.weeks, len(file_keys)
-            )
-        else:
-            logger.info(
-                "Generated comprehensive study guide using %d files from all topics",
-                len(file_keys)
-            )
+        logger.info(
+            "Generated study guide for course %s, weeks %s",
+            request.course_id, request.weeks
+        )
 
         return response
 
     except HTTPException:
         raise
+    except ValueError as e:
+        # No materials found
+        logger.warning("No materials for study guide: %s", e)
+        raise HTTPException(400, detail=str(e)) from e
     except Exception as e:
         logger.error("Error generating study guide: %s", e)
         raise HTTPException(500, detail=str(e)) from e

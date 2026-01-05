@@ -57,25 +57,22 @@ class FilesAPIService:
         self._course_service = None
         self._firestore = None
 
-        # Load file IDs from file_ids.json
-        self.file_ids = {}
-        file_ids_path = Path("file_ids.json")
-        if file_ids_path.exists():
-            try:
-                with open(file_ids_path, "r", encoding="utf-8") as f:
-                    self.file_ids = json.load(f)
-                logger.info("Loaded %d file IDs from file_ids.json", len(self.file_ids))
-            except Exception as e:
-                logger.warning("Failed to load file_ids.json: %s", e)
-                self.file_ids = {}
-        else:
-            logger.warning("file_ids.json not found - file-based features will be limited")
+        # Legacy file_ids dict - kept for backwards compatibility with methods
+        # that haven't been migrated to text extraction yet (explain_article,
+        # analyze_case, get_topic_files, etc). These methods will return empty
+        # results until they are refactored.
+        # TODO: Remove once all methods are migrated to text extraction
+        self.file_ids: Dict[str, Dict[str, Any]] = {}
 
-        # Beta header for Files API
+        # Beta header for Files API (used by legacy methods)
         self.beta_header = "pdfs-2024-09-25"
 
     def get_file_id(self, key: str) -> str:
-        """Get file_id for a course material.
+        """Get file_id for a course material (legacy method).
+
+        Note: This is kept for backwards compatibility with legacy methods
+        that haven't been migrated to text extraction yet. Returns empty
+        results since file_ids is no longer loaded from file_ids.json.
 
         Args:
             key: File key from file_ids.json
@@ -502,53 +499,78 @@ Return ONLY valid JSON:
         )
         return quiz_data
 
-    async def generate_study_guide(
+    async def generate_study_guide_from_course(
         self,
+        course_id: str,
         topic: str,
-        file_keys: List[str]
+        week_numbers: Optional[List[int]] = None
     ) -> str:
-        """
-        Generate comprehensive study guide from files.
+        """Generate comprehensive study guide using Firestore materials with text extraction.
+
+        This method uses the materials subcollection in Firestore and
+        extracts text from local files to send as content blocks.
 
         Args:
-            topic: Topic name
-            file_keys: Files to use
+            course_id: Course ID
+            topic: Topic description for the study guide
+            week_numbers: Optional list of week numbers to filter by (e.g., [1, 2, 3])
 
         Returns:
-            Formatted study guide
+            Formatted study guide in Markdown
 
         Raises:
-            ValueError: If file_keys is empty
-            TypeError: If file_keys contains non-string values
+            ValueError: If no materials found
         """
-        # Input validation
-        if not file_keys:
-            raise ValueError("file_keys cannot be empty")
-        if not all(isinstance(k, str) for k in file_keys):
-            raise TypeError("All file_keys must be strings")
+        logger.info(
+            "Generating study guide from course %s, weeks=%s",
+            course_id, week_numbers
+        )
 
-        logger.info("Generating study guide for %s using %d files", topic, len(file_keys))
+        # Get materials with their extracted text content
+        # For multiple weeks, fetch each week separately and combine
+        materials_with_text = []
 
-        # Build content
+        if week_numbers and len(week_numbers) > 0:
+            # Fetch materials for each specified week
+            for week_num in week_numbers:
+                week_materials = await self.get_course_materials_with_text(
+                    course_id=course_id,
+                    week_number=week_num,
+                    limit=10  # Limit per week to avoid overwhelming context
+                )
+                materials_with_text.extend(week_materials)
+        else:
+            # No week filter - get all materials
+            materials_with_text = await self.get_course_materials_with_text(
+                course_id=course_id,
+                week_number=None,
+                limit=15  # Allow more materials for comprehensive study guide
+            )
+
+        if not materials_with_text:
+            raise ValueError(f"No materials found for course {course_id}")
+
+        # Build content blocks using extracted text
         content_blocks = []
 
-        for key in file_keys:
-            try:
-                file_id = self.get_file_id(key)
-                content_blocks.append({
-                    "type": "document",
-                    "source": {"type": "file", "file_id": file_id},
-                    "citations": {"enabled": True}
-                })
-            except ValueError as e:
-                logger.warning("Skipping file '%s': %s", key, e)
-                continue
+        # Add each document's content as a text block with clear labeling
+        for material, text in materials_with_text:
+            title = material.title or material.filename
+            document_block = f"""
+=== DOCUMENT: {title} ===
+{text}
+=== END OF {title} ===
+"""
+            content_blocks.append({
+                "type": "text",
+                "text": document_block
+            })
 
-        prompt_text = """Create a comprehensive study guide for %s.
+        prompt_text = f"""Based on the documents provided above, create a comprehensive study guide for {topic}.
 
 Include:
 ## Key Concepts
-- All core concepts mentioned in Materials
+- All core concepts mentioned in the materials
 - Important definitions
 - Detailed, well illustrated and visualised decision models
 - Prioritize making the study guide visual and easy to understand, while presenting all course information in great detail
@@ -570,27 +592,31 @@ Include:
 - Example situations to analyze
 
 Use visual formatting:
-- Use valid Markdown formatting 
+- Use valid Markdown formatting
 - ✅ for correct info
 - ❌ for mistakes
 - ⚠️ for warnings
 - Bold **key terms**
-- Cite articles properly""" % topic
+- Cite articles properly"""
 
         content_blocks.append({
             "type": "text",
             "text": prompt_text
         })
 
-        response = await self.client.beta.messages.create(
+        # Use 8000 tokens for study guides (longer than quizzes which use 4000)
+        # Study guides include multiple sections: concepts, articles, mistakes, tips, scenarios
+        response = await self.client.messages.create(
             model="claude-sonnet-4-20250514",
-            max_tokens=3000,
-            betas=[self.beta_header],
+            max_tokens=8000,
             messages=[{"role": "user", "content": content_blocks}]
         )
 
         guide = response.content[0].text
-        logger.info("Generated study guide: %d characters", len(guide))
+        logger.info(
+            "Generated study guide: %d characters from %d materials",
+            len(guide), len(materials_with_text)
+        )
         return guide
 
     async def explain_article(
