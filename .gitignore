@@ -190,3 +190,6 @@ Temporary Items
 file_ids.json
 .gcloud/
 
+node_modules/
+playwright-report/
+test-results/

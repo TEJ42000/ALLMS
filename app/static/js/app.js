@@ -312,63 +312,396 @@ async function assessAnswer() {
 }
 
 // ========== Quiz Generator ==========
+// Quiz state management
+let quizState = {
+    questions: [],
+    currentQuestionIndex: 0,
+    userAnswers: [],
+    score: 0,
+    isComplete: false
+};
+
+// Race condition protection - prevent multiple simultaneous quiz generations
+let isGeneratingQuiz = false;
+
 function initQuizListeners() {
     const startBtn = document.getElementById('start-quiz-btn');
     if (startBtn) startBtn.addEventListener('click', generateQuiz);
 }
 
 async function generateQuiz() {
+    // Prevent multiple simultaneous quiz generation requests
+    if (isGeneratingQuiz) {
+        console.log('Quiz generation already in progress');
+        return;
+    }
+
     const topicSelect = document.getElementById('quiz-topic-select');
+    const difficultySelect = document.getElementById('quiz-difficulty-select');
     const topic = topicSelect ? topicSelect.value : 'all';
-    const num_questions = 5; // Default to 5 questions
+    const difficulty = difficultySelect ? difficultySelect.value : 'medium';
+    const num_questions = 10; // Generate 10 questions
     const quizContent = document.getElementById('quiz-content');
     const questionContainer = document.getElementById('quiz-question-container');
-    
+
+    // Reset quiz state
+    quizState = {
+        questions: [],
+        currentQuestionIndex: 0,
+        userAnswers: [],
+        score: 0,
+        isComplete: false
+    };
+
+    isGeneratingQuiz = true;
     showLoading();
-    
+
     try {
         const response = await fetch(`${API_BASE}/api/files-content/quiz`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(addCourseContext({topic, num_questions, difficulty: 'medium'}))
+            body: JSON.stringify(addCourseContext({topic, num_questions, difficulty}))
         });
 
         if (!response.ok) throw new Error(`API error: ${response.status}`);
 
         const data = await response.json();
-        displayQuiz(data.quiz, quizContent, questionContainer);
+
+        // Parse quiz data - expect standardized format: { quiz: { questions: [...] } }
+        if (!data.quiz || !data.quiz.questions || !Array.isArray(data.quiz.questions)) {
+            throw new Error('Invalid quiz format: expected { quiz: { questions: [...] } }');
+        }
+
+        const questions = data.quiz.questions;
+
+        if (questions.length === 0) {
+            throw new Error('No questions generated');
+        }
+
+        quizState.questions = questions;
+        quizState.userAnswers = new Array(questions.length).fill(null);
+
+        displayQuiz(quizContent, questionContainer);
 
     } catch (error) {
         console.error('Error:', error);
         if (questionContainer) {
-            questionContainer.innerHTML = '<p class="error">Error generating quiz. Please try again.</p>';
+            questionContainer.innerHTML = `<p class="error">Error generating quiz: ${error.message}. Please try again.</p>`;
         }
         if (quizContent) quizContent.classList.remove('hidden');
     } finally {
+        isGeneratingQuiz = false;
         hideLoading();
     }
 }
 
-function displayQuiz(quiz, quizContent, questionContainer) {
+function displayQuiz(quizContent, questionContainer) {
     if (!quizContent || !questionContainer) return;
 
     quizContent.classList.remove('hidden');
 
-    // Update totals
-    const totalSpan = document.getElementById('quiz-total');
-    if (totalSpan) totalSpan.textContent = quiz.length || 5;
+    // Update progress
+    updateQuizProgress();
 
-    // Display the quiz content
-    if (typeof quiz === 'string') {
-        questionContainer.innerHTML = `<div class="quiz-generated">${formatMarkdown(quiz)}</div>`;
-    } else if (Array.isArray(quiz)) {
-        let quizHtml = '';
-        quiz.forEach((q, i) => {
-            quizHtml += `<div class="quiz-question"><h4>Question ${i + 1}</h4><p>${escapeHtml(q.question || q)}</p></div>`;
-        });
-        questionContainer.innerHTML = quizHtml;
+    // Display current question
+    displayCurrentQuestion(questionContainer);
+}
+
+function updateQuizProgress() {
+    const currentSpan = document.getElementById('quiz-current');
+    const totalSpan = document.getElementById('quiz-total');
+    const scoreSpan = document.getElementById('quiz-score');
+
+    if (currentSpan) currentSpan.textContent = quizState.currentQuestionIndex + 1;
+    if (totalSpan) totalSpan.textContent = quizState.questions.length;
+    if (scoreSpan) scoreSpan.textContent = quizState.score;
+}
+
+function displayCurrentQuestion(container) {
+    if (quizState.isComplete) {
+        displayQuizResults(container);
+        return;
+    }
+
+    const question = quizState.questions[quizState.currentQuestionIndex];
+
+    // Validate question structure before rendering
+    if (!question || !Array.isArray(question.options) || typeof question.correct_index !== 'number') {
+        container.innerHTML = '<p class="error">Invalid question data. Please try generating a new quiz.</p>';
+        return;
+    }
+
+    const questionNum = quizState.currentQuestionIndex + 1;
+    const userAnswer = quizState.userAnswers[quizState.currentQuestionIndex];
+
+    let html = `
+        <div class="quiz-question-card">
+            <div class="question-header">
+                <h3>Question ${questionNum}</h3>
+                ${question.difficulty ? `<span class="difficulty-badge difficulty-${question.difficulty}">${question.difficulty}</span>` : ''}
+            </div>
+            <p class="question-text">${escapeHtml(question.question)}</p>
+            ${question.articles && question.articles.length > 0 ? `
+                <div class="question-articles">
+                    <strong>Related Articles:</strong> ${question.articles.map(a => escapeHtml(a)).join(', ')}
+                </div>
+            ` : ''}
+            <div class="quiz-options">
+                ${question.options.map((option, index) => `
+                    <button
+                        class="quiz-option ${userAnswer === index ? 'selected' : ''}"
+                        data-answer-index="${index}"
+                        ${userAnswer !== null ? 'disabled' : ''}
+                    >
+                        <span class="option-letter">${String.fromCharCode(65 + index)}</span>
+                        <span class="option-text">${escapeHtml(option)}</span>
+                    </button>
+                `).join('')}
+            </div>
+            ${userAnswer !== null ? `
+                <div class="answer-feedback ${userAnswer === question.correct_index ? 'correct' : 'incorrect'}">
+                    <strong>${userAnswer === question.correct_index ? '✓ Correct!' : '✗ Incorrect'}</strong>
+                    ${question.explanation ? `<p>${escapeHtml(question.explanation)}</p>` : ''}
+                    ${userAnswer !== question.correct_index ? `<p><strong>Correct answer:</strong> ${String.fromCharCode(65 + question.correct_index)}) ${escapeHtml(question.options[question.correct_index])}</p>` : ''}
+                </div>
+            ` : ''}
+            <div class="quiz-navigation">
+                <button
+                    class="btn btn-secondary nav-prev-btn"
+                    ${quizState.currentQuestionIndex === 0 ? 'disabled' : ''}
+                >
+                    ← Previous
+                </button>
+                <button
+                    class="btn btn-primary nav-next-btn"
+                    ${userAnswer === null ? 'disabled' : ''}
+                >
+                    ${quizState.currentQuestionIndex === quizState.questions.length - 1 ? 'Finish Quiz' : 'Next →'}
+                </button>
+            </div>
+        </div>
+    `;
+
+    container.innerHTML = html;
+
+    // Use event delegation on the container to avoid memory leaks from per-element listeners
+    container.addEventListener('click', handleQuizContainerClick);
+}
+
+/**
+ * Event delegation handler for quiz container clicks.
+ * Handles all button clicks within the quiz question container.
+ */
+function handleQuizContainerClick(event) {
+    const target = event.target;
+
+    // Handle quiz option selection
+    const optionBtn = target.closest('.quiz-option');
+    if (optionBtn && !optionBtn.disabled) {
+        const index = parseInt(optionBtn.dataset.answerIndex, 10);
+        selectAnswer(index);
+        return;
+    }
+
+    // Handle previous button
+    if (target.closest('.nav-prev-btn') && !target.closest('.nav-prev-btn').disabled) {
+        previousQuestion();
+        return;
+    }
+
+    // Handle next button
+    if (target.closest('.nav-next-btn') && !target.closest('.nav-next-btn').disabled) {
+        nextQuestion();
+        return;
+    }
+}
+
+function selectAnswer(answerIndex) {
+    if (quizState.userAnswers[quizState.currentQuestionIndex] !== null) {
+        return; // Already answered
+    }
+
+    const question = quizState.questions[quizState.currentQuestionIndex];
+
+    // Validate answerIndex is within bounds
+    if (typeof answerIndex !== 'number' || answerIndex < 0 || answerIndex >= question.options.length) {
+        console.error('Invalid answer index:', answerIndex);
+        return;
+    }
+
+    quizState.userAnswers[quizState.currentQuestionIndex] = answerIndex;
+
+    // Update score if correct
+    if (answerIndex === question.correct_index) {
+        quizState.score++;
+    }
+
+    // Always update progress display after answering
+    updateQuizProgress();
+
+    // Re-render to show feedback
+    const container = document.getElementById('quiz-question-container');
+    if (container) {
+        displayCurrentQuestion(container);
+    }
+}
+
+function previousQuestion() {
+    if (quizState.currentQuestionIndex > 0) {
+        quizState.currentQuestionIndex--;
+        updateQuizProgress();
+        const container = document.getElementById('quiz-question-container');
+        if (container) {
+            displayCurrentQuestion(container);
+        }
+    }
+}
+
+function nextQuestion() {
+    if (quizState.currentQuestionIndex < quizState.questions.length - 1) {
+        quizState.currentQuestionIndex++;
+        updateQuizProgress();
+        const container = document.getElementById('quiz-question-container');
+        if (container) {
+            displayCurrentQuestion(container);
+        }
     } else {
-        questionContainer.innerHTML = formatMarkdown(JSON.stringify(quiz, null, 2));
+        // Quiz complete
+        quizState.isComplete = true;
+        const container = document.getElementById('quiz-question-container');
+        if (container) {
+            displayQuizResults(container);
+        }
+    }
+}
+
+function displayQuizResults(container) {
+    const totalQuestions = quizState.questions.length;
+    const correctAnswers = quizState.score;
+    const percentage = Math.round((correctAnswers / totalQuestions) * 100);
+
+    let performanceMessage = '';
+    let performanceClass = '';
+
+    if (percentage >= 90) {
+        performanceMessage = 'Excellent! You have mastered this material!';
+        performanceClass = 'excellent';
+    } else if (percentage >= 70) {
+        performanceMessage = 'Good job! You have a solid understanding.';
+        performanceClass = 'good';
+    } else if (percentage >= 50) {
+        performanceMessage = 'Not bad, but there\'s room for improvement.';
+        performanceClass = 'average';
+    } else {
+        performanceMessage = 'Keep studying! Review the material and try again.';
+        performanceClass = 'needs-improvement';
+    }
+
+    let html = `
+        <div class="quiz-results ${performanceClass}">
+            <div class="results-header">
+                <h2>Quiz Complete!</h2>
+                <div class="results-score">
+                    <div class="score-circle">
+                        <span class="score-percentage">${percentage}%</span>
+                        <span class="score-fraction">${correctAnswers}/${totalQuestions}</span>
+                    </div>
+                </div>
+                <p class="performance-message">${performanceMessage}</p>
+            </div>
+
+            <div class="results-breakdown">
+                <h3>Question Review</h3>
+                <div class="question-list">
+                    ${quizState.questions.map((q, index) => {
+                        const userAnswer = quizState.userAnswers[index];
+                        const isCorrect = userAnswer === q.correct_index;
+                        const isValidAnswer = userAnswer !== null && userAnswer >= 0 && userAnswer < q.options.length;
+                        const userAnswerText = isValidAnswer
+                            ? `${String.fromCharCode(65 + userAnswer)}) ${escapeHtml(q.options[userAnswer])}`
+                            : 'No answer';
+                        return `
+                            <div class="question-summary ${isCorrect ? 'correct' : 'incorrect'}">
+                                <div class="question-summary-header">
+                                    <span class="question-number">Q${index + 1}</span>
+                                    <span class="question-result">${isCorrect ? '✓' : '✗'}</span>
+                                </div>
+                                <p class="question-summary-text">${escapeHtml(q.question)}</p>
+                                <div class="question-summary-answers">
+                                    <p><strong>Your answer:</strong> ${userAnswerText}</p>
+                                    ${!isCorrect ? `<p><strong>Correct answer:</strong> ${String.fromCharCode(65 + q.correct_index)}) ${escapeHtml(q.options[q.correct_index])}</p>` : ''}
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            </div>
+
+            <div class="results-actions">
+                <button class="btn btn-primary restart-quiz-btn">Take Another Quiz</button>
+                <button class="btn btn-secondary review-quiz-btn">Review Answers</button>
+            </div>
+        </div>
+    `;
+
+    container.innerHTML = html;
+
+    // Use event delegation for results buttons
+    container.addEventListener('click', handleResultsContainerClick);
+}
+
+/**
+ * Event delegation handler for quiz results container clicks.
+ */
+function handleResultsContainerClick(event) {
+    if (event.target.closest('.restart-quiz-btn')) {
+        restartQuiz();
+        return;
+    }
+
+    if (event.target.closest('.review-quiz-btn')) {
+        reviewQuiz();
+        return;
+    }
+}
+
+function restartQuiz() {
+    // Hide quiz content and reset
+    const quizContent = document.getElementById('quiz-content');
+    if (quizContent) {
+        quizContent.classList.add('hidden');
+    }
+
+    // Reset state
+    quizState = {
+        questions: [],
+        currentQuestionIndex: 0,
+        userAnswers: [],
+        score: 0,
+        isComplete: false
+    };
+
+    // Scroll to quiz section
+    const quizSection = document.getElementById('quiz-section');
+    if (quizSection) {
+        quizSection.scrollIntoView({ behavior: 'smooth' });
+    }
+}
+
+/**
+ * Review quiz answers after completion.
+ * This shows questions in read-only mode with the user's previous answers preserved.
+ * Users can navigate through questions to see their answers and the correct ones.
+ * Note: userAnswers are intentionally NOT reset - this is review mode, not retake mode.
+ * To retake the quiz with new questions, use restartQuiz() instead.
+ */
+function reviewQuiz() {
+    quizState.currentQuestionIndex = 0;
+    quizState.isComplete = false;
+
+    const container = document.getElementById('quiz-question-container');
+    if (container) {
+        displayCurrentQuestion(container);
     }
 }
 
