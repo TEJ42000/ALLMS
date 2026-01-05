@@ -294,7 +294,12 @@ class QuizPersistenceService:
             limit: Maximum results to return
 
         Returns:
-            List of quiz result dictionaries with quiz metadata
+            List of quiz result dictionaries with quiz metadata, sorted by
+            completedAt descending (most recent first)
+
+        Note:
+            Requires Firestore composite index on quizResults:
+            (userId ASC, completedAt DESC)
         """
         if not self._firestore:
             return []
@@ -318,6 +323,7 @@ class QuizPersistenceService:
                 "quizId": data.get("quizId"),
                 "courseId": data.get("courseId"),
                 "topic": quiz.get("topic") if quiz else "Unknown",
+                "quizTitle": quiz.get("title") if quiz else None,
                 "difficulty": quiz.get("difficulty") if quiz else "Unknown",
                 "score": data.get("score"),
                 "totalQuestions": data.get("totalQuestions"),
