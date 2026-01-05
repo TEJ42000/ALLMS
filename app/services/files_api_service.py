@@ -16,13 +16,14 @@ This approach is more robust than the Files API because it:
 3. Simpler architecture with no external file state
 """
 
+import asyncio
 import json
 import logging
 import re
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-from anthropic import AsyncAnthropic
+from anthropic import AsyncAnthropic, RateLimitError
 
 from app.models.course_models import CourseMaterial
 from app.services.gcp_service import get_anthropic_api_key, get_firestore_client
@@ -500,19 +501,21 @@ Return ONLY valid JSON:
 
         if week_numbers and len(week_numbers) > 0:
             # Fetch materials for each specified week
+            # Limit to 3 materials per week to stay under rate limits (10k tokens/min)
             for week_num in week_numbers:
                 week_materials = await self.get_course_materials_with_text(
                     course_id=course_id,
                     week_number=week_num,
-                    limit=10  # Limit per week to avoid overwhelming context
+                    limit=3  # Reduced from 10 to manage rate limits
                 )
                 materials_with_text.extend(week_materials)
         else:
             # No week filter - get all materials
+            # Limit to 5 materials total for general study guides
             materials_with_text = await self.get_course_materials_with_text(
                 course_id=course_id,
                 week_number=None,
-                limit=15  # Allow more materials for comprehensive study guide
+                limit=5  # Reduced from 15 to manage rate limits
             )
 
         if not materials_with_text:
@@ -639,16 +642,36 @@ OUTPUT QUALITY:
         # - Document content: cached (same documents reused across requests)
         # - Cache TTL: 5 minutes, refreshed on each use
         # - Cost reduction: ~90% cheaper for cached tokens on cache hits
-        response = await self.client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=16000,  # Increased to accommodate thinking + output
-            thinking={
-                "type": "enabled",
-                "budget_tokens": 5000  # Allow up to 5000 tokens for reasoning
-            },
-            system=system_blocks,
-            messages=[{"role": "user", "content": content_blocks}]
-        )
+        #
+        # Retry logic for rate limits with exponential backoff
+        max_retries = 5
+        base_delay = 60  # Start with 60 seconds (rate limit is per minute)
+
+        for attempt in range(max_retries):
+            try:
+                response = await self.client.messages.create(
+                    model="claude-sonnet-4-20250514",
+                    max_tokens=16000,  # Increased to accommodate thinking + output
+                    thinking={
+                        "type": "enabled",
+                        "budget_tokens": 5000  # Allow up to 5000 tokens for reasoning
+                    },
+                    system=system_blocks,
+                    messages=[{"role": "user", "content": content_blocks}]
+                )
+                break  # Success, exit retry loop
+            except RateLimitError as e:
+                if attempt < max_retries - 1:
+                    # Exponential backoff: 60s, 120s, 240s, 480s
+                    delay = base_delay * (2 ** attempt)
+                    logger.warning(
+                        "⏳ Rate limit hit (attempt %d/%d). Waiting %d seconds before retry...",
+                        attempt + 1, max_retries, delay
+                    )
+                    await asyncio.sleep(delay)
+                else:
+                    logger.error("❌ Rate limit exceeded after %d attempts", max_retries)
+                    raise
 
         # Log cache statistics from the response
         usage = response.usage
