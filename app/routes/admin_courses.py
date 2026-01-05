@@ -31,7 +31,7 @@ from app.models.course_models import (
     UploadedMaterial,
     CourseMaterial,
 )
-from app.services.course_service import get_course_service
+from app.services.course_service import get_course_service, CourseNotFoundError, CourseAlreadyExistsError, ServiceValidationError, FirestoreOperationError
 from app.services.materials_scanner import (
     scan_materials_folder,
     enhance_titles_with_ai,
@@ -256,7 +256,7 @@ async def get_course(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(e)
         )
-    except ServiceValidationError as e:
+    except (ServiceValidationError, ValueError) as e:
         logger.warning("Invalid course ID: %s - %s", course_id, e)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -310,7 +310,7 @@ async def create_course(course_data: CourseCreate):
             status_code=status.HTTP_409_CONFLICT,
             detail=str(e)
         )
-    except ServiceValidationError as e:
+    except (ServiceValidationError, ValueError) as e:
         logger.warning("Invalid course data: %s", e)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

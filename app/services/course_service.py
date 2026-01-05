@@ -28,6 +28,36 @@ from app.models.course_models import (
 )
 from app.services.gcp_service import get_firestore_client
 
+# ============================================================================
+# Custom Exceptions
+# ============================================================================
+
+
+class CourseServiceError(Exception):
+    """Base exception for CourseService errors."""
+    pass
+
+
+class CourseNotFoundError(CourseServiceError):
+    """Raised when a course is not found."""
+    pass
+
+
+class CourseAlreadyExistsError(CourseServiceError):
+    """Raised when attempting to create a course that already exists."""
+    pass
+
+
+class ServiceValidationError(CourseServiceError):
+    """Raised when a validation error occurs in the service."""
+    pass
+
+
+class FirestoreOperationError(CourseServiceError):
+    """Raised when a Firestore operation fails."""
+    pass
+
+
 logger = logging.getLogger(__name__)
 
 # Collection names
