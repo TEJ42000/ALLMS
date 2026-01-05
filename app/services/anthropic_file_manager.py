@@ -41,8 +41,16 @@ def _get_validated_refresh_days(retention_days: int) -> int:
 FILE_RETENTION_DAYS = _get_validated_retention_days()
 REFRESH_BEFORE_EXPIRY_DAYS = _get_validated_refresh_days(FILE_RETENTION_DAYS)
 
-# File upload limits
-MAX_FILE_SIZE_MB = int(os.getenv("ANTHROPIC_MAX_FILE_SIZE_MB", "100"))
+# File upload limits with validation
+def _get_validated_max_file_size() -> int:
+    """Get MAX_FILE_SIZE_MB from env, ensuring positive and reasonable value."""
+    try:
+        value = int(os.getenv("ANTHROPIC_MAX_FILE_SIZE_MB", "100"))
+        return max(1, min(1000, value))  # Cap between 1MB and 1GB
+    except ValueError:
+        return 100  # Default if env var is not a valid integer
+
+MAX_FILE_SIZE_MB = _get_validated_max_file_size()
 MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
 
 # Supported file extensions for upload

@@ -135,6 +135,10 @@ class FilesAPIService:
         This method ensures all returned materials have valid Anthropic file IDs,
         uploading files on-demand if necessary.
 
+        Note: This method is async for consistency with other endpoint methods,
+        though the underlying Firestore and file operations are synchronous.
+        The Firestore Python SDK doesn't support async natively.
+
         Args:
             course_id: Course ID
             week_number: Optional week filter

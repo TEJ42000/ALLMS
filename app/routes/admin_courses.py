@@ -9,6 +9,7 @@ See Issue #29 for the implementation plan.
 
 import logging
 import pathlib
+import re
 from typing import Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, Path, Query, status, UploadFile, File, Form
@@ -2248,7 +2249,6 @@ def _validate_course_id(course_id: str) -> str:
             detail="Invalid course_id: too long (max 100 characters)"
         )
     # Basic character validation (alphanumeric, hyphens, underscores)
-    import re
     if not re.match(r'^[a-zA-Z0-9_-]+$', course_id):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
