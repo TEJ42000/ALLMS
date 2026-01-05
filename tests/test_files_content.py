@@ -713,7 +713,12 @@ class TestStudyGuideErrorHandling:
             assert "weeks [1, 2]" in detail
 
     def test_study_guide_no_materials_legacy_mode(self, client):
-        """Test study guide returns 400 in legacy mode with no materials."""
+        """Test study guide returns 400 in legacy mode with no materials.
+
+        Note: With comprehensive study guide (PR #67), the topic parameter is deprecated
+        and ignored. The system tries to load ALL topics, and if none have materials,
+        it returns an error message about no default materials.
+        """
         mock_service = MagicMock()
         mock_service.get_topic_files.return_value = []
 
@@ -722,13 +727,15 @@ class TestStudyGuideErrorHandling:
             return_value=mock_service
         ):
             response = client.post("/api/files-content/study-guide", json={
-                "topic": "Nonexistent Topic"
+                "topic": "Nonexistent Topic"  # Deprecated parameter, will be ignored
             })
 
             assert response.status_code == 400
             detail = response.json()["detail"]
             assert "No course materials available" in detail
-            assert "select a topic" in detail
+            # After PR #67, the error message is about no default materials
+            assert "No default materials found" in detail
+            assert "contact your administrator" in detail
 
 
 class TestCourseAwareFlashcardsEndpoint:
