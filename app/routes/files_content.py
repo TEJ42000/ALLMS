@@ -33,12 +33,16 @@ class FilesQuizRequest(BaseModel):
 
     Uses Firestore-based file management with automatic upload to Anthropic.
     A course_id is required to identify which course materials to use.
+
+    BREAKING CHANGE (v2.0): course_id is now required. The legacy topic-only
+    mode has been removed in favor of Firestore-based material management.
     """
 
-    course_id: str = Field(
-        ...,
+    course_id: Optional[str] = Field(
+        None,
         description="Course ID (e.g., 'LLS-2025-2026'). "
-                    "Materials are retrieved from Firestore.",
+                    "Materials are retrieved from Firestore. "
+                    "**REQUIRED** - this field is mandatory.",
         min_length=1,
         max_length=100
     )
@@ -55,6 +59,16 @@ class FilesQuizRequest(BaseModel):
     )
     num_questions: int = Field(10, ge=1, le=50)
     difficulty: str = Field("medium", description="easy, medium, hard")
+
+    @validator('course_id', always=True)
+    def course_id_required(cls, v):
+        """Validate that course_id is provided."""
+        if not v:
+            raise ValueError(
+                "course_id is required. The legacy topic-only mode has been removed. "
+                "Please provide a valid course_id (e.g., 'LLS-2025-2026')."
+            )
+        return v
 
 
 class FilesStudyGuideRequest(BaseModel):

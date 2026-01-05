@@ -2362,19 +2362,26 @@ async def get_anthropic_files_status(
             .collection("materials")
         )
 
-        # Use pagination to handle large collections
+        # Use pagination to handle large collections with a total limit
         batch_size = 100
+        max_materials_limit = 1000  # Prevent loading unlimited materials into memory
         materials_status = []
         now = datetime.now(timezone.utc)
         query = materials_ref.limit(batch_size)
+        truncated = False
 
-        while True:
+        while len(materials_status) < max_materials_limit:
             docs = list(query.stream())
             if not docs:
                 break
 
             for doc in docs:
+                if len(materials_status) >= max_materials_limit:
+                    truncated = True
+                    break
                 data = doc.to_dict()
+                if not data:
+                    continue  # Skip materials with no data
                 file_id = data.get("anthropicFileId")
                 expiry = data.get("anthropicFileExpiry")
 
@@ -2392,7 +2399,7 @@ async def get_anthropic_files_status(
                 materials_status.append(status_info)
 
             # Get next batch
-            if len(docs) < batch_size:
+            if len(docs) < batch_size or truncated:
                 break
             query = materials_ref.start_after(docs[-1]).limit(batch_size)
 
@@ -2409,7 +2416,9 @@ async def get_anthropic_files_status(
                 "uploaded_to_anthropic": uploaded,
                 "expired": expired,
                 "needing_upload": len(needing_upload),
-                "with_errors": with_errors
+                "with_errors": with_errors,
+                "truncated": truncated,
+                "max_limit": max_materials_limit if truncated else None
             },
             "materials": materials_status
         }

@@ -20,9 +20,26 @@ from app.services.gcp_service import get_anthropic_api_key, get_firestore_client
 
 logger = logging.getLogger(__name__)
 
-# Configuration from environment with sensible defaults
-FILE_RETENTION_DAYS = int(os.getenv("ANTHROPIC_FILE_RETENTION_DAYS", "30"))
-REFRESH_BEFORE_EXPIRY_DAYS = int(os.getenv("ANTHROPIC_REFRESH_BEFORE_EXPIRY_DAYS", "7"))
+# Configuration from environment with sensible defaults and validation
+def _get_validated_retention_days() -> int:
+    """Get FILE_RETENTION_DAYS from env, ensuring positive value."""
+    try:
+        value = int(os.getenv("ANTHROPIC_FILE_RETENTION_DAYS", "30"))
+        return max(1, value)  # Ensure at least 1 day
+    except ValueError:
+        return 30  # Default if env var is not a valid integer
+
+def _get_validated_refresh_days(retention_days: int) -> int:
+    """Get REFRESH_BEFORE_EXPIRY_DAYS from env, ensuring positive and less than retention."""
+    try:
+        value = int(os.getenv("ANTHROPIC_REFRESH_BEFORE_EXPIRY_DAYS", "7"))
+        # Ensure positive and at most retention_days - 1
+        return max(1, min(retention_days - 1, value))
+    except ValueError:
+        return min(7, retention_days - 1)  # Default if env var is not valid
+
+FILE_RETENTION_DAYS = _get_validated_retention_days()
+REFRESH_BEFORE_EXPIRY_DAYS = _get_validated_refresh_days(FILE_RETENTION_DAYS)
 
 # File upload limits
 MAX_FILE_SIZE_MB = int(os.getenv("ANTHROPIC_MAX_FILE_SIZE_MB", "100"))
@@ -342,6 +359,11 @@ class AnthropicFileManager:
                 material_id,
                 str(e)
             )
+            # Re-raise to notify caller that Firestore update failed
+            # This prevents silent failures where file ID is lost
+            raise AnthropicFileManagerError(
+                f"Failed to update Firestore for material {material_id}: {e}"
+            ) from e
 
     def get_materials_needing_upload(
         self,
@@ -378,6 +400,9 @@ class AnthropicFileManager:
         needing_upload = []
         for doc in docs:
             data = doc.to_dict()
+            if not data:
+                logger.warning("Material %s has no data, skipping", doc.id)
+                continue
             data["id"] = doc.id
 
             # Check if needs upload
@@ -430,6 +455,10 @@ class AnthropicFileManager:
 
         for doc in docs:
             data = doc.to_dict()
+            if not data:
+                logger.warning("Material %s has no data, skipping", doc.id)
+                results["skipped"] += 1
+                continue
             material = CourseMaterial(**data, id=doc.id)
 
             # Check if needs upload
