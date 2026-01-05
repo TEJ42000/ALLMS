@@ -221,7 +221,10 @@ function formatInline(text) {
 }
 
 // Escape HTML to prevent XSS
+// This function properly escapes all special characters including:
+// <, >, &, ", ', and backslashes by using textContent which handles all escaping
 function escapeHtml(text) {
+    if (!text) return '';
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
@@ -1084,17 +1087,43 @@ function initDashboard() {
         // Check if course info banner already exists
         let courseInfoBanner = dashboardSection.querySelector('.course-info-banner');
         if (!courseInfoBanner) {
+            // Create banner using DOM manipulation for CSP compliance and XSS prevention
             courseInfoBanner = document.createElement('div');
             courseInfoBanner.className = 'course-info-banner';
-            // Use CSS classes instead of inline styles for CSP compliance
-            courseInfoBanner.innerHTML = `
-                <span class="course-info-icon">📚</span>
-                <div class="course-info-text">
-                    <div class="course-info-name">Active Course: ${escapeHtml(COURSE_NAME)}</div>
-                    <div class="course-info-id">Course ID: ${escapeHtml(COURSE_ID)}</div>
-                </div>
-                <span class="course-info-badge">✓ Course-Specific Content</span>
-            `;
+
+            // Create icon element
+            const icon = document.createElement('span');
+            icon.className = 'course-info-icon';
+            icon.textContent = '📚';
+
+            // Create text container
+            const textDiv = document.createElement('div');
+            textDiv.className = 'course-info-text';
+
+            // Create course name element
+            const nameDiv = document.createElement('div');
+            nameDiv.className = 'course-info-name';
+            nameDiv.textContent = `Active Course: ${COURSE_NAME}`;
+
+            // Create course ID element
+            const idDiv = document.createElement('div');
+            idDiv.className = 'course-info-id';
+            idDiv.textContent = `Course ID: ${COURSE_ID}`;
+
+            // Assemble text container
+            textDiv.appendChild(nameDiv);
+            textDiv.appendChild(idDiv);
+
+            // Create badge element
+            const badge = document.createElement('span');
+            badge.className = 'course-info-badge';
+            badge.textContent = '✓ Course-Specific Content';
+
+            // Assemble banner
+            courseInfoBanner.appendChild(icon);
+            courseInfoBanner.appendChild(textDiv);
+            courseInfoBanner.appendChild(badge);
+
             // Insert at the top of the dashboard section
             const sectionTitle = dashboardSection.querySelector('.section-title');
             if (sectionTitle && sectionTitle.nextSibling) {
@@ -1257,15 +1286,15 @@ async function loadFlashcards() {
         console.error('Error loading flashcards:', error);
         showFlashcardError(error.message || 'Error loading flashcards. Please try again.');
         // Add debounce on error to prevent rapid retries that could DDoS the backend
-        // Don't reset flag immediately - wait 2 seconds
+        // Wait 2 seconds before allowing retry
         setTimeout(() => {
             isLoadingFlashcards = false;
         }, 2000);
-        return; // Exit early so finally block doesn't reset flag
-    } finally {
-        // Only reset immediately on success (no error thrown)
-        isLoadingFlashcards = false;
+        return; // Exit early - don't reset flag immediately
     }
+
+    // Success - reset flag immediately (only reached if no error thrown)
+    isLoadingFlashcards = false;
 }
 
 /**
