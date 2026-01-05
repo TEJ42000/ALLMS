@@ -50,6 +50,53 @@ class DecisionModel(BaseModel):
     steps: List[DecisionModelStep] = []
 
 
+# ============================================================================
+# Course Topics (Issue #68)
+# ============================================================================
+
+
+class CourseTopic(BaseModel):
+    """Topic extracted from course syllabus.
+
+    Stored in Firestore: courses/{course_id}/topics/{topic_id}
+
+    Topics are extracted from syllabi - either explicitly listed per week
+    or inferred from content. They support:
+    - Name and description for study guides, quizzes, etc.
+    - Association with zero, one, or multiple weeks
+    - Manual editing after extraction
+    """
+
+    id: str  # Unique topic ID (e.g., "criminal-law-mens-rea")
+    name: str  # Topic name (e.g., "Mens Rea in Criminal Law")
+    description: str  # 2-3 sentence summary of the topic
+    weekNumbers: List[int] = []  # Associated weeks (empty = course-wide topic)
+
+    # Source tracking
+    extractedFromSyllabus: bool = True  # False if manually added
+    extractionConfidence: Optional[str] = None  # "high", "medium", "low"
+
+    # Timestamps
+    createdAt: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updatedAt: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class TopicCreate(BaseModel):
+    """Request model for creating a topic."""
+
+    name: str = Field(..., min_length=1, max_length=200)
+    description: str = Field(..., min_length=10, max_length=1000)
+    weekNumbers: List[int] = []
+
+
+class TopicUpdate(BaseModel):
+    """Request model for updating a topic."""
+
+    name: Optional[str] = Field(None, min_length=1, max_length=200)
+    description: Optional[str] = Field(None, min_length=10, max_length=1000)
+    weekNumbers: Optional[List[int]] = None
+
+
 class WeekMaterial(BaseModel):
     """Material reference for a specific week."""
 

@@ -28,6 +28,9 @@ from app.models.course_models import (
     Week,
     WeekCreate,
     LegalSkill,
+    CourseTopic,
+    TopicCreate,
+    TopicUpdate,
 )
 from app.services.gcp_service import get_firestore_client
 
@@ -67,6 +70,7 @@ logger = logging.getLogger(__name__)
 COURSES_COLLECTION = "courses"
 WEEKS_SUBCOLLECTION = "weeks"
 LEGAL_SKILLS_SUBCOLLECTION = "legalSkills"
+TOPICS_SUBCOLLECTION = "topics"
 
 # Validation patterns
 # Course IDs: alphanumeric, hyphens, underscores, 1-100 chars
@@ -794,6 +798,387 @@ class CourseService:
         except google_exceptions.GoogleAPIError as e:
             logger.error("Firestore error upserting legal skill '%s' for course %s: %s", skill_id, course_id, str(e))
             raise FirestoreOperationError(f"Failed to upsert legal skill '{skill_id}' for course {course_id}: {str(e)}") from e
+
+    # ========================================================================
+    # Topic Operations (Issue #68)
+    # ========================================================================
+
+    @with_retry()
+    def get_topics(
+        self, course_id: str, week_number: Optional[int] = None
+    ) -> List[CourseTopic]:
+        """
+        Get all topics for a course, optionally filtered by week.
+
+        Args:
+            course_id: The course ID
+            week_number: Optional week number to filter topics
+
+        Returns:
+            List of CourseTopic objects
+
+        Raises:
+            ServiceValidationError: If course_id is invalid
+            CourseNotFoundError: If course not found
+            FirestoreOperationError: If Firestore operation fails
+        """
+        try:
+            course_id = validate_course_id(course_id)
+        except ValueError as e:
+            raise ServiceValidationError(str(e)) from e
+
+        try:
+            # Verify course exists
+            course_ref = self.db.collection(COURSES_COLLECTION).document(course_id)
+            if not course_ref.get().exists:
+                raise CourseNotFoundError(f"Course not found: {course_id}")
+
+            topics_ref = course_ref.collection(TOPICS_SUBCOLLECTION)
+
+            topics = []
+            for doc in topics_ref.stream():
+                data = doc.to_dict()
+                topic = CourseTopic(**data)
+                # Filter by week if specified
+                if week_number is None or week_number in topic.weekNumbers:
+                    topics.append(topic)
+
+            logger.debug("Retrieved %d topics for course %s", len(topics), course_id)
+            return topics
+
+        except CourseNotFoundError:
+            raise
+        except google_exceptions.GoogleAPIError as e:
+            logger.error("Firestore error getting topics for %s: %s", course_id, str(e))
+            raise FirestoreOperationError(f"Failed to get topics for course {course_id}") from e
+
+    @with_retry()
+    def get_topic(self, course_id: str, topic_id: str) -> Optional[CourseTopic]:
+        """
+        Get a specific topic by ID.
+
+        Args:
+            course_id: The course ID
+            topic_id: The topic ID
+
+        Returns:
+            CourseTopic or None if not found
+
+        Raises:
+            ServiceValidationError: If course_id is invalid
+            FirestoreOperationError: If Firestore operation fails
+        """
+        try:
+            course_id = validate_course_id(course_id)
+        except ValueError as e:
+            raise ServiceValidationError(str(e)) from e
+
+        try:
+            doc_ref = (
+                self.db.collection(COURSES_COLLECTION)
+                .document(course_id)
+                .collection(TOPICS_SUBCOLLECTION)
+                .document(topic_id)
+            )
+
+            doc = doc_ref.get()
+            if not doc.exists:
+                return None
+
+            return CourseTopic(**doc.to_dict())
+
+        except google_exceptions.GoogleAPIError as e:
+            logger.error("Firestore error getting topic %s: %s", topic_id, str(e))
+            raise FirestoreOperationError(f"Failed to get topic {topic_id}") from e
+
+    @with_retry()
+    def create_topic(
+        self, course_id: str, topic_data: TopicCreate, topic_id: Optional[str] = None
+    ) -> CourseTopic:
+        """
+        Create a new topic for a course.
+
+        Args:
+            course_id: The course ID
+            topic_data: Topic creation data
+            topic_id: Optional custom topic ID (generated if not provided)
+
+        Returns:
+            Created CourseTopic
+
+        Raises:
+            ServiceValidationError: If course_id is invalid
+            CourseNotFoundError: If course not found
+            FirestoreOperationError: If Firestore operation fails
+        """
+        import uuid
+        import re
+
+        try:
+            course_id = validate_course_id(course_id)
+        except ValueError as e:
+            raise ServiceValidationError(str(e)) from e
+
+        try:
+            # Verify course exists
+            course_ref = self.db.collection(COURSES_COLLECTION).document(course_id)
+            if not course_ref.get().exists:
+                raise CourseNotFoundError(f"Course not found: {course_id}")
+
+            # Generate topic ID if not provided
+            if not topic_id:
+                name_slug = re.sub(r'[^a-z0-9]+', '-', topic_data.name.lower()).strip('-')
+                short_uuid = str(uuid.uuid4())[:8]
+                topic_id = f"{name_slug[:50]}-{short_uuid}"
+
+            now = datetime.now(timezone.utc)
+            topic = CourseTopic(
+                id=topic_id,
+                name=topic_data.name,
+                description=topic_data.description,
+                weekNumbers=topic_data.weekNumbers,
+                extractedFromSyllabus=False,
+                createdAt=now,
+                updatedAt=now,
+            )
+
+            # Use batch for atomic update
+            batch = self.db.batch()
+            topic_ref = course_ref.collection(TOPICS_SUBCOLLECTION).document(topic_id)
+            batch.set(topic_ref, topic.model_dump())
+            batch.update(course_ref, {"updatedAt": now})
+            batch.commit()
+
+            logger.info("Created topic '%s' for course %s", topic_id, course_id)
+            return topic
+
+        except CourseNotFoundError:
+            raise
+        except google_exceptions.GoogleAPIError as e:
+            logger.error("Firestore error creating topic for %s: %s", course_id, str(e))
+            raise FirestoreOperationError(f"Failed to create topic for course {course_id}") from e
+
+    @with_retry()
+    def update_topic(
+        self, course_id: str, topic_id: str, updates: TopicUpdate
+    ) -> Optional[CourseTopic]:
+        """
+        Update an existing topic.
+
+        Args:
+            course_id: The course ID
+            topic_id: The topic ID
+            updates: Fields to update
+
+        Returns:
+            Updated CourseTopic or None if not found
+
+        Raises:
+            ServiceValidationError: If course_id is invalid
+            FirestoreOperationError: If Firestore operation fails
+        """
+        try:
+            course_id = validate_course_id(course_id)
+        except ValueError as e:
+            raise ServiceValidationError(str(e)) from e
+
+        try:
+            course_ref = self.db.collection(COURSES_COLLECTION).document(course_id)
+            topic_ref = course_ref.collection(TOPICS_SUBCOLLECTION).document(topic_id)
+
+            if not topic_ref.get().exists:
+                return None
+
+            # Build update dict
+            update_data = {}
+            if updates.name is not None:
+                update_data["name"] = updates.name
+            if updates.description is not None:
+                update_data["description"] = updates.description
+            if updates.weekNumbers is not None:
+                update_data["weekNumbers"] = updates.weekNumbers
+
+            if not update_data:
+                # No updates to apply
+                return self.get_topic(course_id, topic_id)
+
+            now = datetime.now(timezone.utc)
+            update_data["updatedAt"] = now
+
+            # Use batch for atomic update
+            batch = self.db.batch()
+            batch.update(topic_ref, update_data)
+            batch.update(course_ref, {"updatedAt": now})
+            batch.commit()
+
+            logger.info("Updated topic '%s' for course %s", topic_id, course_id)
+            return self.get_topic(course_id, topic_id)
+
+        except google_exceptions.GoogleAPIError as e:
+            logger.error("Firestore error updating topic %s: %s", topic_id, str(e))
+            raise FirestoreOperationError(f"Failed to update topic {topic_id}") from e
+
+    @with_retry()
+    def delete_topic(self, course_id: str, topic_id: str) -> bool:
+        """
+        Delete a topic from a course.
+
+        Args:
+            course_id: The course ID
+            topic_id: The topic ID to delete
+
+        Returns:
+            True if deleted, False if not found
+
+        Raises:
+            ServiceValidationError: If course_id is invalid
+            FirestoreOperationError: If Firestore operation fails
+        """
+        try:
+            course_id = validate_course_id(course_id)
+        except ValueError as e:
+            raise ServiceValidationError(str(e)) from e
+
+        try:
+            course_ref = self.db.collection(COURSES_COLLECTION).document(course_id)
+            topic_ref = course_ref.collection(TOPICS_SUBCOLLECTION).document(topic_id)
+
+            if not topic_ref.get().exists:
+                return False
+
+            # Use batch for atomic delete + course timestamp update
+            batch = self.db.batch()
+            batch.delete(topic_ref)
+            batch.update(course_ref, {"updatedAt": datetime.now(timezone.utc)})
+            batch.commit()
+
+            logger.info("Deleted topic '%s' from course %s", topic_id, course_id)
+            return True
+
+        except google_exceptions.GoogleAPIError as e:
+            logger.error("Firestore error deleting topic %s: %s", topic_id, str(e))
+            raise FirestoreOperationError(f"Failed to delete topic {topic_id}") from e
+
+    @with_retry()
+    def bulk_create_topics(
+        self, course_id: str, topics: List[Dict]
+    ) -> List[CourseTopic]:
+        """
+        Create multiple topics at once (used during syllabus import).
+
+        Args:
+            course_id: The course ID
+            topics: List of topic dicts with id, name, description, weekNumbers, etc.
+
+        Returns:
+            List of created CourseTopic objects
+
+        Raises:
+            ServiceValidationError: If course_id is invalid
+            CourseNotFoundError: If course not found
+            FirestoreOperationError: If Firestore operation fails
+        """
+        try:
+            course_id = validate_course_id(course_id)
+        except ValueError as e:
+            raise ServiceValidationError(str(e)) from e
+
+        if not topics:
+            return []
+
+        try:
+            # Verify course exists
+            course_ref = self.db.collection(COURSES_COLLECTION).document(course_id)
+            if not course_ref.get().exists:
+                raise CourseNotFoundError(f"Course not found: {course_id}")
+
+            now = datetime.now(timezone.utc)
+            created_topics = []
+            batch = self.db.batch()
+
+            for topic_dict in topics:
+                topic = CourseTopic(
+                    id=topic_dict.get("id"),
+                    name=topic_dict.get("name", ""),
+                    description=topic_dict.get("description", ""),
+                    weekNumbers=topic_dict.get("weekNumbers", []),
+                    extractedFromSyllabus=topic_dict.get("extractedFromSyllabus", True),
+                    extractionConfidence=topic_dict.get("extractionConfidence"),
+                    createdAt=now,
+                    updatedAt=now,
+                )
+                topic_ref = course_ref.collection(TOPICS_SUBCOLLECTION).document(topic.id)
+                batch.set(topic_ref, topic.model_dump())
+                created_topics.append(topic)
+
+            # Update course timestamp
+            batch.update(course_ref, {"updatedAt": now})
+            batch.commit()
+
+            logger.info("Bulk created %d topics for course %s", len(created_topics), course_id)
+            return created_topics
+
+        except CourseNotFoundError:
+            raise
+        except google_exceptions.GoogleAPIError as e:
+            logger.error("Firestore error bulk creating topics for %s: %s", course_id, str(e))
+            raise FirestoreOperationError(f"Failed to bulk create topics for course {course_id}") from e
+
+    @with_retry()
+    def delete_all_topics(self, course_id: str) -> int:
+        """
+        Delete all topics from a course (used before regenerating).
+
+        Args:
+            course_id: The course ID
+
+        Returns:
+            Number of topics deleted
+
+        Raises:
+            ServiceValidationError: If course_id is invalid
+            FirestoreOperationError: If Firestore operation fails
+        """
+        try:
+            course_id = validate_course_id(course_id)
+        except ValueError as e:
+            raise ServiceValidationError(str(e)) from e
+
+        try:
+            course_ref = self.db.collection(COURSES_COLLECTION).document(course_id)
+            topics_ref = course_ref.collection(TOPICS_SUBCOLLECTION)
+
+            # Get all topics
+            docs = list(topics_ref.stream())
+            if not docs:
+                return 0
+
+            # Delete in batches of 500 (Firestore limit)
+            deleted_count = 0
+            batch = self.db.batch()
+            batch_count = 0
+
+            for doc in docs:
+                batch.delete(doc.reference)
+                batch_count += 1
+                deleted_count += 1
+
+                if batch_count >= 500:
+                    batch.commit()
+                    batch = self.db.batch()
+                    batch_count = 0
+
+            # Commit remaining
+            if batch_count > 0:
+                batch.update(course_ref, {"updatedAt": datetime.now(timezone.utc)})
+                batch.commit()
+
+            logger.info("Deleted %d topics from course %s", deleted_count, course_id)
+            return deleted_count
+
+        except google_exceptions.GoogleAPIError as e:
+            logger.error("Firestore error deleting topics for %s: %s", course_id, str(e))
+            raise FirestoreOperationError(f"Failed to delete topics for course {course_id}") from e
 
 
 # ============================================================================
