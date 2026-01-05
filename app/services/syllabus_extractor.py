@@ -47,8 +47,9 @@ Extract the following information from the syllabus text and return it as valid 
   "weeks": [
     {
       "weekNumber": 1,
-      "title": "Week title/topic",
-      "topics": ["Topic 1", "Topic 2"],
+      "title": "Short topic title (3-10 words)",
+      "topicDescription": "3-5 sentence description of what this week's topic covers, including key concepts, legal principles, and learning objectives.",
+      "topics": ["Sub-topic 1", "Sub-topic 2"],
       "readings": [
         {"author": "Author", "title": "Book/Article Title", "chapters": "Chapter X, par. Y-Z"}
       ]
@@ -63,13 +64,18 @@ Extract the following information from the syllabus text and return it as valid 
 }
 
 Rules:
-1. Extract ALL weeks mentioned in the syllabus
-2. For each week, extract the topic and all required readings
-3. Include lecturer names for each week if mentioned
-4. Extract course components (parts) with their point values
-5. Return ONLY valid JSON, no markdown or explanations
-6. Use null for missing values, not empty strings
-7. Preserve exact names and titles as written"""
+1. Extract ALL weeks mentioned in the syllabus (typically 6 weeks per course)
+2. For each week, extract:
+   - title: A short, descriptive topic title (3-10 words)
+   - topicDescription: A detailed 3-5 sentence description explaining what the topic covers
+   - topics: List of sub-topics or key points (optional, for backward compatibility)
+   - readings: All required readings with author, title, and chapters
+3. If topics are not explicitly listed, INFER them from readings, lecture content, and learning objectives
+4. Include lecturer names for each week if mentioned
+5. Extract course components (parts) with their point values
+6. Return ONLY valid JSON, no markdown or explanations
+7. Use null for missing values, not empty strings
+8. Preserve exact names and titles as written"""
 
 
 TOPIC_EXTRACTION_SYSTEM_PROMPT = """You are an expert at extracting course topics from academic syllabi.
@@ -257,31 +263,72 @@ async def extract_topics_from_syllabus(
 
 
 async def extract_course_data_with_topics(
-    syllabus_text: str
+    syllabus_text: str,
+    expected_weeks: int = 6
 ) -> Dict[str, Any]:
     """
-    Extract both course data and detailed topics from syllabus.
+    Extract course data with week-based topics from syllabus.
 
-    This combines the standard course extraction with enhanced topic extraction,
-    returning a complete course data structure with full topic details.
+    Topics are now extracted as part of each week's data, not as a separate collection.
+    Each week has:
+    - title: Short topic title (3-10 words)
+    - topicDescription: 3-5 sentence description of the topic
 
     Args:
         syllabus_text: Raw text extracted from syllabus PDF
+        expected_weeks: Expected number of weeks in the course (default: 6)
 
     Returns:
-        Dictionary with course data including detailed topics
+        Dictionary with course data including weeks with topic descriptions
     """
-    # Extract standard course data
+    # Extract course data - the prompt now extracts topicDescription for each week
     course_data = await extract_course_data(syllabus_text)
 
-    # Extract detailed topics
-    topics_result = await extract_topics_from_syllabus(
-        syllabus_text,
-        course_name=course_data.get("courseName")
+    # Validate and ensure we have the expected number of weeks with topics
+    weeks = course_data.get("weeks", [])
+
+    # Log extraction summary
+    weeks_with_topics = sum(1 for w in weeks if w.get("topicDescription"))
+    logger.info(
+        "Extracted %d weeks (%d with topic descriptions) for course: %s",
+        len(weeks),
+        weeks_with_topics,
+        course_data.get("courseName", "Unknown")
     )
 
-    # Add topics to course data
-    course_data["extractedTopics"] = topics_result["topics"]
-    course_data["topicExtractionNotes"] = topics_result.get("extractionNotes", "")
+    # If we have fewer weeks than expected, note it but don't fail
+    if len(weeks) < expected_weeks:
+        logger.warning(
+            "Extracted %d weeks but expected %d for course: %s",
+            len(weeks),
+            expected_weeks,
+            course_data.get("courseName", "Unknown")
+        )
+
+    # Add metadata about extraction
+    course_data["expectedWeeks"] = expected_weeks
+    course_data["extractedWeekCount"] = len(weeks)
+    course_data["weeksWithTopicDescriptions"] = weeks_with_topics
 
     return course_data
+
+
+# Deprecated: Keep for backward compatibility but log deprecation warning
+async def extract_topics_from_syllabus_deprecated(
+    syllabus_text: str,
+    course_name: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    DEPRECATED: Use extract_course_data_with_topics() instead.
+
+    Topics are now extracted as part of week data, not as a separate collection.
+    This function is kept for backward compatibility only.
+    """
+    import warnings
+    warnings.warn(
+        "extract_topics_from_syllabus is deprecated. "
+        "Topics are now part of week data. Use extract_course_data_with_topics() instead.",
+        DeprecationWarning,
+        stacklevel=2
+    )
+    return await extract_topics_from_syllabus(syllabus_text, course_name)

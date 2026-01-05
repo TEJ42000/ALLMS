@@ -1002,7 +1002,11 @@ class ScanSyllabiResponse(BaseModel):
 
 
 class ExtractedTopicData(BaseModel):
-    """Extracted topic from syllabus."""
+    """DEPRECATED: Topics are now part of week data.
+
+    Kept for backward compatibility with existing code.
+    Use week.title and week.topicDescription instead.
+    """
     id: str
     name: str
     description: str
@@ -1012,6 +1016,21 @@ class ExtractedTopicData(BaseModel):
         description="Confidence level: 'high' (explicit), 'medium' (implied), 'low' (inferred)"
     )
     extractedFromSyllabus: bool = True
+
+
+class ExtractedWeekData(BaseModel):
+    """Extracted week data from syllabus with topic information."""
+    weekNumber: int
+    title: str = Field(..., description="Short topic title (3-10 words)")
+    topicDescription: Optional[str] = Field(
+        None,
+        description="3-5 sentence description of the week's topic"
+    )
+    topics: List[str] = Field(
+        default=[],
+        description="DEPRECATED: Sub-topics list, use title/topicDescription instead"
+    )
+    readings: Optional[List[Dict]] = None
 
 
 class ExtractedCourseData(BaseModel):
@@ -1027,7 +1046,7 @@ class ExtractedCourseData(BaseModel):
     components: Optional[List[Dict]] = None
     coordinators: Optional[List[Dict]] = None
     lecturers: Optional[List[Dict]] = None
-    weeks: Optional[List[Dict]] = None
+    weeks: Optional[List[Dict]] = None  # Contains title and topicDescription per week
     examInfo: Optional[Dict] = None
     participationRequirements: Optional[str] = None
     materialSubjects: Optional[List[str]] = None  # Derived from syllabus folder
@@ -1044,7 +1063,15 @@ class ExtractedCourseData(BaseModel):
     sections: Optional[List[Dict]] = None
     additionalNotes: Optional[str] = None
 
-    # Extracted topics (Issue #68)
+    # Week-based topic extraction metadata (Issue #71)
+    expectedWeeks: Optional[int] = Field(None, description="Expected number of weeks (default 6)")
+    extractedWeekCount: Optional[int] = Field(None, description="Number of weeks extracted")
+    weeksWithTopicDescriptions: Optional[int] = Field(
+        None,
+        description="Number of weeks that have topic descriptions"
+    )
+
+    # DEPRECATED: Separate topic extraction (Issue #68) - use weeks instead
     extractedTopics: Optional[List[ExtractedTopicData]] = None
     topicExtractionNotes: Optional[str] = None
 
@@ -1128,9 +1155,10 @@ async def extract_syllabus_data(request: ImportSyllabusRequest):
         source_files = extraction_result["files"]
         source_folder = extraction_result["folder_path"]
 
-        # Use AI to extract structured data WITH enhanced topic extraction
-        logger.info("Extracting course data and topics with AI...")
-        extracted = await extract_course_data_with_topics(raw_text)
+        # Use AI to extract structured data with week-based topics
+        logger.info("Extracting course data with week-based topics...")
+        from app.models.course_models import DEFAULT_WEEKS_PER_COURSE
+        extracted = await extract_course_data_with_topics(raw_text, expected_weeks=DEFAULT_WEEKS_PER_COURSE)
 
         # Add materialSubjects derived from syllabus folder
         if subject:
@@ -1141,11 +1169,13 @@ async def extract_syllabus_data(request: ImportSyllabusRequest):
         extracted["sourceFolder"] = source_folder
         extracted["sourceFiles"] = source_files
 
-        topic_count = len(extracted.get("extractedTopics", []))
+        # Build response message with week-based topic info
+        week_count = extracted.get("extractedWeekCount", 0)
+        topics_count = extracted.get("weeksWithTopicDescriptions", 0)
         return ImportSyllabusResponse(
             success=True,
             extracted_data=ExtractedCourseData(**extracted),
-            message=f"Successfully extracted course data and {topic_count} topics from {len(source_files)} file(s)"
+            message=f"Successfully extracted {week_count} weeks ({topics_count} with topic descriptions) from {len(source_files)} file(s)"
         )
     except FileNotFoundError as e:
         raise HTTPException(
@@ -1161,40 +1191,42 @@ async def extract_syllabus_data(request: ImportSyllabusRequest):
 
 
 # ============================================================================
-# Topic Endpoints (Issue #68)
+# Topic Endpoints (Issue #68) - DEPRECATED
+# These endpoints are deprecated as of Issue #71.
+# Topics are now part of week data (week.title and week.topicDescription).
+# Use GET /{course_id}/weeks to access week topics.
 # ============================================================================
 
 
 class TopicListResponse(BaseModel):
-    """Response for listing topics."""
+    """Response for listing topics. DEPRECATED: Use week endpoints instead."""
     topics: List[CourseTopic]
     count: int
 
 
 class TopicRegenerateRequest(BaseModel):
-    """Request to regenerate topics from stored syllabus."""
+    """Request to regenerate topics. DEPRECATED: Topics are now part of weeks."""
     delete_existing: bool = True  # Whether to delete existing topics first
 
 
 class TopicRegenerateResponse(BaseModel):
-    """Response from topic regeneration."""
+    """Response from topic regeneration. DEPRECATED."""
     success: bool
     topics_created: int
     extraction_notes: Optional[str] = None
     message: str
 
 
-@router.get("/{course_id}/topics", response_model=TopicListResponse)
+@router.get("/{course_id}/topics", response_model=TopicListResponse, deprecated=True)
 async def list_topics(
     course_id: str = Path(..., description="Course ID"),
     week: Optional[int] = Query(None, description="Filter by week number"),
 ):
     """
-    Get all topics for a course.
+    DEPRECATED: Topics are now part of week data.
 
-    Topics are extracted from syllabi and can be:
-    - Associated with specific weeks
-    - Course-wide (no week association)
+    Use GET /{course_id}/weeks to access week topics.
+    Each week has a 'title' (topic name) and 'topicDescription' (detailed description).
 
     **Example:**
     ```
