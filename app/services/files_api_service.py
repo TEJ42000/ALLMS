@@ -536,36 +536,59 @@ Return ONLY valid JSON:
 
         prompt_text = f"""Based on the documents provided above, create a comprehensive study guide for {topic}.
 
-Include:
-## Key Concepts
-- All core concepts mentioned in the materials
-- Important definitions
-- Detailed, well illustrated and visualised decision models
-- Prioritize making the study guide visual and easy to understand, while presenting all course information in great detail
+REQUIRED SECTIONS:
 
-## Important Articles
-- List with brief explanations
-- Include article numbers
-- Explain the articles purpose and context
+## 📚 Key Concepts
+- All core concepts mentioned in the materials with clear definitions
+- Use **bold** for key terms being defined
+- Group related concepts together under ### subheadings
 
-## Common Mistakes
-- What students often get wrong (use ❌)
-- Correct approaches (use ✅)
+## 🔄 Decision Models & Frameworks
+- Create visual decision trees using Mermaid flowchart syntax
+- Use this format for flowcharts:
+```mermaid
+graph TD
+    A[Start] --> B{{Decision?}}
+    B -->|Yes| C[Action 1]
+    B -->|No| D[Action 2]
+```
+- Include step-by-step analysis frameworks
+- Show how concepts connect to each other
 
-## Exam Tips
-- How to approach questions
-- What to remember
+## 📖 Important Articles
+Present articles in a Markdown table:
+| Article | Name | Purpose | Key Elements |
+|---------|------|---------|--------------|
+| Art. X:XX | ... | ... | ... |
 
-## Practice Scenarios
-- Example situations to analyze
+- Explain each article's purpose and when it applies
+- Group by topic or code section
 
-Use visual formatting:
-- Use valid Markdown formatting
-- ✅ for correct info
-- ❌ for mistakes
-- ⚠️ for warnings
-- Bold **key terms**
-- Cite articles properly"""
+## ⚠️ Common Mistakes
+| ❌ Mistake | ✅ Correct Approach |
+|-----------|---------------------|
+| What students do wrong | What they should do instead |
+
+## 🎯 Exam Tips
+- Numbered list of practical tips
+- How to structure answers
+- Time management advice
+- Key phrases to use
+
+## 📝 Practice Scenarios
+Provide 2-3 example scenarios with:
+1. **Facts**: Brief situation
+2. **Issue**: What legal question arises
+3. **Analysis**: How to approach it
+4. **Conclusion**: Expected outcome
+
+FORMATTING REQUIREMENTS:
+- Use valid Markdown (headers, bold, tables, lists)
+- Use Mermaid syntax for ALL flowcharts and diagrams (not ASCII art)
+- Use Markdown tables (not ASCII tables)
+- Use emojis for visual appeal: ✅ ❌ ⚠️ 💡 📌
+- Cite articles properly: **Art. 6:74 DCC**
+- Keep content detailed but well-organized"""
 
         content_blocks.append({
             "type": "text",
