@@ -1478,29 +1478,173 @@ function initDashboard() {
     if (statTopics) statTopics.textContent = stats.topics;
     if (statQuizzes) statQuizzes.textContent = stats.quizzes;
 
-    // Add topic card click handlers with context passing
-    document.querySelectorAll('.topic-card').forEach(card => {
-        card.addEventListener('click', () => {
-            const topic = card.dataset.topic;
-            const tutorTab = document.querySelector('.nav-tab[data-tab="tutor"]');
-            if (tutorTab) tutorTab.click();
+    // Load course weeks dynamically
+    loadCourseWeeks();
+}
 
-            // Set the context select to match the clicked topic
-            const contextSelect = document.getElementById('context-select');
-            if (contextSelect && topic) {
-                const topicMap = {
-                    'criminal': 'Criminal Law',
-                    'private': 'Private Law',
-                    'constitutional': 'Constitutional Law',
-                    'administrative': 'Administrative Law',
-                    'international': 'International Law'
-                };
-                if (topicMap[topic]) {
-                    contextSelect.value = topicMap[topic];
-                }
-            }
+/**
+ * Fetch course weeks from API and render them in the dashboard
+ */
+async function loadCourseWeeks() {
+    const weeksGrid = document.getElementById('weeks-grid');
+    if (!weeksGrid) return;
+
+    // Need course context to fetch weeks
+    if (!COURSE_ID) {
+        weeksGrid.innerHTML = '<p class="no-weeks-message">No course selected</p>';
+        return;
+    }
+
+    try {
+        // Fetch course with weeks from admin API
+        const response = await fetch(`/api/admin/courses/${COURSE_ID}?include_weeks=true`);
+
+        if (!response.ok) {
+            throw new Error(`Failed to fetch course: ${response.status} ${response.statusText}`);
+        }
+
+        const course = await response.json();
+        const weeks = course.weeks || [];
+
+        if (weeks.length === 0) {
+            weeksGrid.innerHTML = '<p class="no-weeks-message">No weeks defined for this course yet.</p>';
+            return;
+        }
+
+        // Sort weeks by week number (with defensive validation)
+        weeks.sort((a, b) => {
+            const aNum = typeof a.weekNumber === 'number' ? a.weekNumber : 0;
+            const bNum = typeof b.weekNumber === 'number' ? b.weekNumber : 0;
+            return aNum - bNum;
         });
+
+        // Render week cards
+        weeksGrid.innerHTML = weeks.map(week => renderWeekCard(week)).join('');
+
+        // Setup event delegation for week card clicks (only once)
+        setupWeekCardEventDelegation(weeksGrid);
+
+        // Update topics stat to show total weeks
+        // TODO: Progress tracking will show completed/total when implemented
+        const statTopics = document.getElementById('stat-topics');
+        if (statTopics) {
+            statTopics.textContent = `${weeks.length} weeks`;
+        }
+
+    } catch (error) {
+        console.error('Error loading course weeks:', error);
+        weeksGrid.innerHTML = '<p class="error-message">Failed to load course weeks. Please try refreshing.</p>';
+    }
+}
+
+/**
+ * Render a single week card
+ * @param {Object} week - Week object from API
+ * @param {number} week.weekNumber - Week number (1-based)
+ * @param {string} [week.title] - Week title
+ * @param {string} [week.topicDescription] - Description of the week's content
+ * @param {string[]} [week.topics] - Array of topic strings
+ * @returns {string} HTML string for the week card
+ */
+function renderWeekCard(week) {
+    const weekNumber = week.weekNumber;
+    const safeWeekNumber = escapeHtml(String(weekNumber || 0));
+    const title = week.title || `Week ${weekNumber}`;
+    const description = week.topicDescription || '';
+    const topics = week.topics || [];
+
+    // Get icon based on week number or title (icons are safe literals)
+    const icon = getWeekIcon(week);
+
+    // Build topics list (show first 3 topics, ensure each is a string)
+    const topicsList = topics.slice(0, 3).map(t => `<li>${escapeHtml(String(t || ''))}</li>`).join('');
+    const moreTopics = topics.length > 3 ? `<li class="more-topics">+${topics.length - 3} more...</li>` : '';
+
+    return `
+        <div class="topic-card week-card" data-week="${safeWeekNumber}" data-title="${escapeHtml(title)}">
+            <h4>${icon} Week ${safeWeekNumber}: ${escapeHtml(title)}</h4>
+            <p>${escapeHtml(description) || (topics.length > 0 ? '' : 'No description available')}</p>
+            ${topics.length > 0 ? `<ul class="week-topics-list">${topicsList}${moreTopics}</ul>` : ''}
+            <div class="topic-progress" data-placeholder="true">
+                <div class="progress-bar"><div class="progress-fill" style="width: 0%"></div></div>
+                <span class="progress-text">0% Complete</span>
+            </div>
+        </div>
+    `;
+}
+
+/**
+ * Get an appropriate icon for the week based on title keywords
+ */
+function getWeekIcon(week) {
+    const title = (week.title || '').toLowerCase();
+
+    if (title.includes('criminal')) return '⚖️';
+    if (title.includes('constitution')) return '🏛️';
+    if (title.includes('administrative') || title.includes('gala')) return '🏢';
+    if (title.includes('private') || title.includes('contract') || title.includes('civil')) return '📜';
+    if (title.includes('international') || title.includes('european')) return '🌍';
+    if (title.includes('introduction') || title.includes('intro')) return '📚';
+    if (title.includes('property')) return '🏠';
+    if (title.includes('tort') || title.includes('liability')) return '⚠️';
+    if (title.includes('review') || title.includes('exam')) return '📝';
+
+    // Default icon based on week number (with validation)
+    const icons = ['📖', '📗', '📘', '📙', '📕', '📓'];
+    const weekNum = typeof week.weekNumber === 'number' && week.weekNumber > 0 ? week.weekNumber : 1;
+    return icons[(weekNum - 1) % icons.length];
+}
+
+/**
+ * Setup event delegation for week card clicks (prevents memory leaks)
+ * Uses a data attribute on the element to ensure the listener is only attached once,
+ * which is more robust than a global flag when dealing with DOM element lifecycle.
+ */
+function setupWeekCardEventDelegation(weeksGrid) {
+    if (!weeksGrid || weeksGrid.dataset.delegationSetup) return;
+    weeksGrid.dataset.delegationSetup = 'true';
+
+    weeksGrid.addEventListener('click', (e) => {
+        const card = e.target.closest('.week-card');
+        if (!card) return;
+
+        const weekNumber = card.dataset.week;
+        const title = card.dataset.title;
+
+        // Navigate to AI Tutor with week context
+        const tutorTab = document.querySelector('.nav-tab[data-tab="tutor"]');
+        if (tutorTab) tutorTab.click();
+
+        // Set context to the week topic
+        const contextSelect = document.getElementById('context-select');
+        if (contextSelect && title) {
+            // Try to find matching option or use the title
+            const options = Array.from(contextSelect.options);
+            const match = options.find(opt =>
+                opt.value.toLowerCase().includes(title.toLowerCase()) ||
+                title.toLowerCase().includes(opt.value.toLowerCase())
+            );
+            if (match) {
+                contextSelect.value = match.value;
+            }
+        }
+
+        // Pre-fill chat with week context
+        const chatInput = document.getElementById('chat-input');
+        if (chatInput) {
+            chatInput.placeholder = `Ask about Week ${weekNumber}: ${title}...`;
+        }
     });
+}
+
+/**
+ * Escape HTML to prevent XSS
+ */
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
 }
 
 // ========== Flashcards ==========
