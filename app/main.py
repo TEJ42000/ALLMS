@@ -1,5 +1,6 @@
 """FastAPI Application Entry Point for LLS Study Portal."""
 
+import logging
 import os
 
 from dotenv import load_dotenv
@@ -11,8 +12,15 @@ from fastapi.templating import Jinja2Templates
 # Import routers
 from app.routes import ai_tutor, assessment, pages, files_content, admin_courses, admin_pages, echr, text_cache, quiz_management, study_guide_routes
 
+# Import authentication middleware
+from app.middleware import AuthMiddleware
+from app.services.auth_service import get_auth_config
+
 # Load environment variables
 load_dotenv()
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -22,6 +30,10 @@ app = FastAPI(
     docs_url="/api/docs",
     redoc_url="/api/redoc"
 )
+
+# Add Authentication middleware (runs first, before CORS)
+# This validates IAP headers and attaches user to request.state
+app.add_middleware(AuthMiddleware)
 
 # CORS middleware (adjust origins as needed)
 app.add_middleware(
@@ -56,6 +68,28 @@ app.include_router(study_guide_routes.router)
 async def startup_event():
     """Run on application startup."""
     print("🚀 LLS Study Portal starting up...")
+
+    # Log authentication status
+    auth_config = get_auth_config()
+    env = os.getenv("ENV", "development").lower()
+
+    if auth_config.auth_enabled:
+        print(f"🔐 Authentication: ENABLED (domain: @{auth_config.auth_domain})")
+        if not auth_config.google_client_id:
+            if env == "production":
+                print("🚨 CRITICAL: GOOGLE_CLIENT_ID not set in production!")
+                print("🚨 Without JWT verification, IAP headers can be spoofed!")
+                print("🚨 Set GOOGLE_CLIENT_ID or set AUTH_ENABLED=false for testing only.")
+                # Don't fail startup, but log prominently
+            else:
+                print("⚠️  WARNING: GOOGLE_CLIENT_ID not set - JWT verification unavailable")
+    else:
+        print("⚠️  Authentication: DISABLED (development mode)")
+        if env == "production":
+            print("🚨 CRITICAL: AUTH_ENABLED=false in production environment!")
+            print("🚨 This is a security risk - all users get mock admin access!")
+        else:
+            print("⚠️  WARNING: Do NOT use AUTH_ENABLED=false in production!")
 
     # Verify Anthropic API key is set
     api_key = os.getenv("ANTHROPIC_API_KEY")

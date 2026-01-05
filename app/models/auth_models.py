@@ -36,7 +36,7 @@ class AuthConfig(BaseSettings):
         description="IAP audience for JWT validation"
     )
     auth_mock_user_email: str = Field(
-        default="dev@local.test",
+        default="dev@mgms.eu",
         description="Mock user email when auth is disabled"
     )
     auth_mock_user_is_admin: bool = Field(
