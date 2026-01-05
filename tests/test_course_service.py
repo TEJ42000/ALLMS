@@ -21,6 +21,7 @@ from app.services.course_service import (
     validate_course_id,
     validate_week_number,
     COURSE_ID_PATTERN,
+    ServiceValidationError,
 )
 
 
@@ -149,12 +150,12 @@ class TestGetCourse:
         assert result is None
 
     def test_get_course_invalid_id(self, course_service):
-        """Should raise ValueError for invalid course ID."""
-        with pytest.raises(ValueError, match="Invalid course ID"):
+        """Should raise ServiceValidationError for invalid course ID."""
+        with pytest.raises(ServiceValidationError, match="Invalid course ID"):
             course_service.get_course("../malicious")
 
     def test_get_course_empty_id(self, course_service):
-        """Should raise ValueError for empty course ID."""
-        with pytest.raises(ValueError, match="cannot be empty"):
+        """Should raise ServiceValidationError for empty course ID."""
+        with pytest.raises(ServiceValidationError, match="cannot be empty"):
             course_service.get_course("")
 

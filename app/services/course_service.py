@@ -31,6 +31,36 @@ from app.models.course_models import (
 )
 from app.services.gcp_service import get_firestore_client
 
+# ============================================================================
+# Custom Exceptions
+# ============================================================================
+
+
+class CourseServiceError(Exception):
+    """Base exception for CourseService errors."""
+    pass
+
+
+class CourseNotFoundError(CourseServiceError):
+    """Raised when a course is not found."""
+    pass
+
+
+class CourseAlreadyExistsError(CourseServiceError):
+    """Raised when attempting to create a course that already exists."""
+    pass
+
+
+class ServiceValidationError(CourseServiceError):
+    """Raised when a validation error occurs in the service."""
+    pass
+
+
+class FirestoreOperationError(CourseServiceError):
+    """Raised when a Firestore operation fails."""
+    pass
+
+
 logger = logging.getLogger(__name__)
 
 # Collection names
@@ -53,35 +83,6 @@ RETRY_MULTIPLIER = 2.0
 
 # Firestore batch limit
 FIRESTORE_BATCH_LIMIT = 500
-
-
-# ============================================================================
-# Custom Exceptions
-# ============================================================================
-
-class CourseServiceError(Exception):
-    """Base exception for CourseService errors."""
-    pass
-
-
-class CourseNotFoundError(CourseServiceError):
-    """Raised when a course is not found."""
-    pass
-
-
-class CourseAlreadyExistsError(CourseServiceError):
-    """Raised when attempting to create a course that already exists."""
-    pass
-
-
-class FirestoreOperationError(CourseServiceError):
-    """Raised when a Firestore operation fails."""
-    pass
-
-
-class ValidationError(CourseServiceError):
-    """Raised when validation fails."""
-    pass
 
 
 # ============================================================================
@@ -230,14 +231,14 @@ class CourseService:
             Tuple of (list of course summaries, total count)
 
         Raises:
-            ValidationError: If limit or offset is invalid
+            ServiceValidationError: If limit or offset is invalid
             FirestoreOperationError: If Firestore operation fails
         """
         # Validate pagination parameters
         if limit < 1 or limit > 100:
-            raise ValidationError(f"Limit must be between 1 and 100, got {limit}")
+            raise ServiceValidationError(f"Limit must be between 1 and 100, got {limit}")
         if offset < 0:
-            raise ValidationError(f"Offset must be non-negative, got {offset}")
+            raise ServiceValidationError(f"Offset must be non-negative, got {offset}")
 
         try:
             courses_ref = self.db.collection(COURSES_COLLECTION)
@@ -288,13 +289,13 @@ class CourseService:
             Course object or None if not found
 
         Raises:
-            ValidationError: If course_id is invalid
+            ServiceValidationError: If course_id is invalid
             FirestoreOperationError: If Firestore operation fails
         """
         try:
             course_id = validate_course_id(course_id)
         except ValueError as e:
-            raise ValidationError(str(e)) from e
+            raise ServiceValidationError(str(e)) from e
 
         try:
             doc_ref = self.db.collection(COURSES_COLLECTION).document(course_id)
@@ -356,14 +357,14 @@ class CourseService:
             Created course object
 
         Raises:
-            ValidationError: If course_id is invalid
+            ServiceValidationError: If course_id is invalid
             CourseAlreadyExistsError: If course already exists
             FirestoreOperationError: If Firestore operation fails
         """
         try:
             course_id = validate_course_id(course_data.id)
         except ValueError as e:
-            raise ValidationError(str(e)) from e
+            raise ServiceValidationError(str(e)) from e
 
         try:
             doc_ref = self.db.collection(COURSES_COLLECTION).document(course_id)
@@ -425,14 +426,14 @@ class CourseService:
             Updated course or None if not found
 
         Raises:
-            ValidationError: If course_id is invalid
+            ServiceValidationError: If course_id is invalid
             CourseNotFoundError: If course not found
             FirestoreOperationError: If Firestore operation fails
         """
         try:
             course_id = validate_course_id(course_id)
         except ValueError as e:
-            raise ValidationError(str(e)) from e
+            raise ServiceValidationError(str(e)) from e
 
         try:
             doc_ref = self.db.collection(COURSES_COLLECTION).document(course_id)
@@ -466,13 +467,13 @@ class CourseService:
             True if deactivated, False if not found
 
         Raises:
-            ValidationError: If course_id is invalid
+            ServiceValidationError: If course_id is invalid
             FirestoreOperationError: If Firestore operation fails
         """
         try:
             course_id = validate_course_id(course_id)
         except ValueError as e:
-            raise ValidationError(str(e)) from e
+            raise ServiceValidationError(str(e)) from e
 
         try:
             doc_ref = self.db.collection(COURSES_COLLECTION).document(course_id)
@@ -543,14 +544,14 @@ class CourseService:
             Week object or None if not found
 
         Raises:
-            ValidationError: If course_id or week_number is invalid
+            ServiceValidationError: If course_id or week_number is invalid
             FirestoreOperationError: If Firestore operation fails
         """
         try:
             course_id = validate_course_id(course_id)
             week_number = validate_week_number(week_number)
         except ValueError as e:
-            raise ValidationError(str(e)) from e
+            raise ServiceValidationError(str(e)) from e
 
         try:
             doc_ref = (
@@ -583,14 +584,14 @@ class CourseService:
             Created/updated week
 
         Raises:
-            ValidationError: If course_id or week_number is invalid
+            ServiceValidationError: If course_id or week_number is invalid
             FirestoreOperationError: If Firestore operation fails
         """
         try:
             course_id = validate_course_id(course_id)
             validate_week_number(week_data.weekNumber)
         except ValueError as e:
-            raise ValidationError(str(e)) from e
+            raise ServiceValidationError(str(e)) from e
 
         try:
             # Use batch for atomic update of week + course timestamp
@@ -630,14 +631,14 @@ class CourseService:
             True if deleted, False if not found
 
         Raises:
-            ValidationError: If course_id or week_number is invalid
+            ServiceValidationError: If course_id or week_number is invalid
             FirestoreOperationError: If Firestore operation fails
         """
         try:
             course_id = validate_course_id(course_id)
             week_number = validate_week_number(week_number)
         except ValueError as e:
-            raise ValidationError(str(e)) from e
+            raise ServiceValidationError(str(e)) from e
 
         try:
             doc_ref = (
@@ -719,19 +720,19 @@ class CourseService:
             Created/updated legal skill
 
         Raises:
-            ValidationError: If course_id or skill_id is invalid
+            ServiceValidationError: If course_id or skill_id is invalid
             FirestoreOperationError: If Firestore operation fails
         """
         try:
             course_id = validate_course_id(course_id)
             # Validate skill_id using same pattern as course_id
             if not COURSE_ID_PATTERN.match(skill_id):
-                raise ValidationError(
+                raise ServiceValidationError(
                     f"Invalid skill ID '{skill_id}'. "
                     "Must be 1-100 characters, alphanumeric with hyphens and underscores only."
                 )
         except ValueError as e:
-            raise ValidationError(str(e)) from e
+            raise ServiceValidationError(str(e)) from e
 
         try:
             # Use batch for atomic update of skill + course timestamp
