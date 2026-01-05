@@ -8,6 +8,7 @@ All content generation uses Firestore-based file management with automatic uploa
 to Anthropic Files API on-demand.
 """
 
+import json
 import logging
 import re
 from typing import Dict, List, Optional, Tuple

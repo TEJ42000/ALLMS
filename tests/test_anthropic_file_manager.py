@@ -311,3 +311,215 @@ class TestAdminEndpointValidation:
 
         result = _validate_course_id("course_123_test")
         assert result == "course_123_test"
+
+
+class TestEnsureFileAvailable:
+    """Tests for ensure_file_available method."""
+
+    def test_ensure_file_available_returns_existing_valid_file(self):
+        """Test that valid non-expired files are reused."""
+        from datetime import datetime, timezone, timedelta
+        from app.services.anthropic_file_manager import AnthropicFileManager
+
+        with patch.object(AnthropicFileManager, '__init__', lambda x: None):
+            manager = AnthropicFileManager()
+            manager.client = MagicMock()
+            manager._firestore = MagicMock()
+
+            # Mock check_file_exists to return True
+            manager.check_file_exists = MagicMock(return_value=True)
+
+            # Create material with valid, non-expired file ID
+            material = MagicMock()
+            material.anthropicFileId = "file_existing123"
+            material.anthropicFileExpiry = datetime.now(timezone.utc) + timedelta(days=10)
+            material.filename = "test.pdf"
+
+            result = manager.ensure_file_available(material, "test-course")
+
+            assert result == "file_existing123"
+            manager.check_file_exists.assert_called_once_with("file_existing123")
+
+    def test_ensure_file_available_uploads_when_expired(self, tmp_path):
+        """Test that expired files trigger re-upload."""
+        from datetime import datetime, timezone, timedelta
+        from app.services.anthropic_file_manager import AnthropicFileManager
+
+        with patch.object(AnthropicFileManager, '__init__', lambda x: None):
+            manager = AnthropicFileManager()
+            manager._firestore = MagicMock()
+
+            # Mock upload_file to return new ID
+            manager.upload_file = MagicMock(return_value="file_new456")
+            manager._update_material_anthropic_fields = MagicMock()
+
+            # Create material with expired file ID
+            material = MagicMock()
+            material.anthropicFileId = "file_old123"
+            material.anthropicFileExpiry = datetime.now(timezone.utc) - timedelta(days=1)
+            material.filename = "test.pdf"
+            material.id = "material_1"
+
+            result = manager.ensure_file_available(material, "test-course")
+
+            assert result == "file_new456"
+            manager.upload_file.assert_called_once_with(material)
+            manager._update_material_anthropic_fields.assert_called_once()
+
+    def test_ensure_file_available_uploads_when_missing(self, tmp_path):
+        """Test that missing file IDs trigger upload."""
+        from app.services.anthropic_file_manager import AnthropicFileManager
+
+        with patch.object(AnthropicFileManager, '__init__', lambda x: None):
+            manager = AnthropicFileManager()
+            manager._firestore = MagicMock()
+
+            # Mock upload_file
+            manager.upload_file = MagicMock(return_value="file_new789")
+            manager._update_material_anthropic_fields = MagicMock()
+
+            # Create material without file ID
+            material = MagicMock()
+            material.anthropicFileId = None
+            material.anthropicFileExpiry = None
+            material.filename = "test.pdf"
+            material.id = "material_2"
+
+            result = manager.ensure_file_available(material, "test-course")
+
+            assert result == "file_new789"
+            manager.upload_file.assert_called_once_with(material)
+
+
+class TestFirestoreUpdateFailures:
+    """Tests for Firestore update failure scenarios."""
+
+    def test_update_material_fields_raises_on_failure(self):
+        """Test that Firestore update failures are propagated."""
+        from app.services.anthropic_file_manager import (
+            AnthropicFileManager,
+            AnthropicFileManagerError
+        )
+        from datetime import datetime, timezone
+
+        with patch.object(AnthropicFileManager, '__init__', lambda x: None):
+            manager = AnthropicFileManager()
+
+            # Mock Firestore to raise exception
+            mock_firestore = MagicMock()
+            mock_doc_ref = MagicMock()
+            mock_doc_ref.update.side_effect = Exception("Firestore connection failed")
+            mock_firestore.collection.return_value.document.return_value.collection.return_value.document.return_value = mock_doc_ref
+            manager._firestore = mock_firestore
+
+            with pytest.raises(AnthropicFileManagerError) as exc_info:
+                manager._update_material_anthropic_fields(
+                    course_id="test-course",
+                    material_id="material_1",
+                    file_id="file_123",
+                    uploaded_at=datetime.now(timezone.utc),
+                    expiry=datetime.now(timezone.utc),
+                    error=None
+                )
+
+            # Check the error message contains relevant info
+            assert "Firestore" in str(exc_info.value)
+            assert "material_1" in str(exc_info.value)
+
+
+class TestGenerateQuizFromCourse:
+    """Tests for generate_quiz_from_course method."""
+
+    @pytest.mark.asyncio
+    async def test_generate_quiz_from_course_success(self):
+        """Test successful quiz generation from course materials."""
+        from unittest.mock import AsyncMock
+        from app.services.files_api_service import FilesAPIService
+
+        with patch.object(FilesAPIService, '__init__', lambda x: None):
+            service = FilesAPIService()
+            service._firestore = MagicMock()
+            service._file_manager = MagicMock()
+            service.beta_header = "files-api-2025-04-14"  # Required attribute
+
+            # Mock material
+            mock_material = MagicMock()
+            mock_material.title = "Contract Law Basics"
+            mock_material.filename = "contracts.pdf"
+
+            # Mock get_course_materials_with_file_ids
+            service.get_course_materials_with_file_ids = AsyncMock(
+                return_value=[(mock_material, "file_abc123")]
+            )
+
+            # Mock Anthropic API response (must be async)
+            mock_response = MagicMock()
+            mock_response.content = [MagicMock(text='{"questions": [{"question": "What is a contract?"}]}')]
+
+            # Create a mock client with async beta.messages.create
+            mock_client = MagicMock()
+            mock_client.beta.messages.create = AsyncMock(return_value=mock_response)
+            service.client = mock_client
+
+            result = await service.generate_quiz_from_course(
+                course_id="LLS-2025",
+                topic="Contracts",
+                num_questions=5,
+                difficulty="medium"
+            )
+
+            assert "questions" in result
+            service.get_course_materials_with_file_ids.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_generate_quiz_from_course_no_materials(self):
+        """Test quiz generation fails gracefully with no materials."""
+        from unittest.mock import AsyncMock
+        from app.services.files_api_service import FilesAPIService
+
+        with patch.object(FilesAPIService, '__init__', lambda x: None):
+            service = FilesAPIService()
+            service.client = MagicMock()
+            service._firestore = MagicMock()
+
+            # Mock empty materials
+            service.get_course_materials_with_file_ids = AsyncMock(return_value=[])
+
+            with pytest.raises(ValueError) as exc_info:
+                await service.generate_quiz_from_course(
+                    course_id="nonexistent-course",
+                    topic="Contracts",
+                    num_questions=5
+                )
+
+            assert "No materials found" in str(exc_info.value)
+
+
+class TestRefreshEndpointIntegration:
+    """Integration tests for admin refresh endpoint."""
+
+    def test_refresh_endpoint_validates_course_id(self):
+        """Test refresh endpoint validates course_id."""
+        from fastapi.testclient import TestClient
+        from app.main import app
+
+        client = TestClient(app)
+
+        # Invalid course_id with special chars
+        response = client.post("/admin/courses/test;DROP/anthropic-files/refresh")
+
+        # Should fail validation (course_id has invalid chars)
+        assert response.status_code in [400, 404, 422]
+
+    def test_refresh_endpoint_handles_nonexistent_course(self):
+        """Test refresh endpoint handles nonexistent course gracefully."""
+        from fastapi.testclient import TestClient
+        from app.main import app
+
+        client = TestClient(app)
+
+        # Valid format but non-existent course
+        response = client.post("/admin/courses/nonexistent-course-12345/anthropic-files/refresh")
+
+        # Should return error (course not found or no materials)
+        assert response.status_code in [200, 404]  # 200 with 0 uploaded is valid

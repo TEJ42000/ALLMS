@@ -262,6 +262,14 @@ class AnthropicFileManager:
         3. Re-uploads if expired or missing
         4. Updates Firestore with new file ID
 
+        Note on concurrency:
+            This method does not use distributed locking. Concurrent calls for
+            the same material are safe (won't corrupt data), but may trigger
+            redundant uploads. This is acceptable given the infrequent nature
+            of uploads and the automatic expiry refresh mechanism. If high
+            concurrency becomes an issue, consider using Firestore transactions
+            or distributed locks.
+
         Args:
             material: The course material
             course_id: The course ID (for Firestore update)
@@ -270,7 +278,7 @@ class AnthropicFileManager:
             The Anthropic file ID (existing or newly uploaded)
 
         Raises:
-            FileNotFoundError: If local file doesn't exist
+            LocalFileNotFoundError: If local file doesn't exist
             UploadError: If upload fails
         """
         now = datetime.now(timezone.utc)
