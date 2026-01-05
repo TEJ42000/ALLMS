@@ -236,6 +236,46 @@ class CreateQuizRequest(BaseModel):
 
 
 # ============================================================================
+# Study Guide Persistence Models
+# ============================================================================
+
+class StoredStudyGuide(BaseModel):
+    """Model for a study guide stored in Firestore."""
+
+    id: str = Field(..., description="Unique study guide ID")
+    course_id: str = Field(..., description="Course ID this guide belongs to")
+    title: str = Field(..., description="Study guide title")
+    content: str = Field(..., description="Markdown content of the study guide")
+    week_numbers: Optional[List[int]] = Field(None, description="Week numbers covered")
+    content_hash: str = Field(..., description="Hash for duplicate detection")
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        description="Creation timestamp (UTC)"
+    )
+    word_count: int = Field(0, description="Approximate word count")
+
+
+class StoredStudyGuideSummary(BaseModel):
+    """Summary of a stored study guide for listing."""
+
+    id: str = Field(..., description="Study guide ID")
+    course_id: str = Field(..., description="Course ID")
+    title: str = Field(..., description="Study guide title")
+    week_numbers: Optional[List[int]] = Field(None, description="Week numbers covered")
+    created_at: datetime = Field(..., description="Creation timestamp")
+    word_count: int = Field(0, description="Approximate word count")
+
+
+class CreateStudyGuideRequest(BaseModel):
+    """Request model for creating/generating a new study guide."""
+
+    course_id: str = Field(..., min_length=1, max_length=100, description="Course ID")
+    weeks: Optional[List[int]] = Field(None, description="Week numbers to cover")
+    title: Optional[str] = Field(None, max_length=200, description="Optional study guide title")
+    allow_duplicate: bool = Field(False, description="Allow duplicate if one exists")
+
+
+# ============================================================================
 # User Progress Models (Optional - for database integration)
 # ============================================================================
 

@@ -73,10 +73,84 @@ function hideLoading() {
 }
 
 // ========== Markdown Formatting ==========
+// Configure marked.js for rendering
+if (typeof marked !== 'undefined') {
+    marked.setOptions({
+        breaks: true,
+        gfm: true,
+        headerIds: false,
+        mangle: false
+    });
+}
+
+// Initialize Mermaid for diagram rendering
+if (typeof mermaid !== 'undefined') {
+    mermaid.initialize({
+        startOnLoad: false,
+        theme: 'default',
+        securityLevel: 'loose'
+    });
+}
+
+/**
+ * Format markdown text using marked.js library
+ * Falls back to simple formatting if marked is not available
+ */
 function formatMarkdown(text) {
     if (!text) return '';
 
-    // Split into lines for processing
+    // Use marked.js if available
+    if (typeof marked !== 'undefined') {
+        try {
+            return marked.parse(text);
+        } catch (e) {
+            console.error('Marked.js error:', e);
+            return formatMarkdownFallback(text);
+        }
+    }
+
+    return formatMarkdownFallback(text);
+}
+
+/**
+ * Render Mermaid diagrams in a container
+ * Call this after inserting HTML with mermaid code blocks
+ */
+async function renderMermaidDiagrams(container) {
+    if (typeof mermaid === 'undefined') return;
+
+    // Find all code blocks that might be mermaid
+    const codeBlocks = container.querySelectorAll('pre code');
+    for (const block of codeBlocks) {
+        const text = block.textContent.trim();
+        // Check if it looks like a mermaid diagram
+        if (text.startsWith('graph ') || text.startsWith('flowchart ') ||
+            text.startsWith('sequenceDiagram') || text.startsWith('classDiagram') ||
+            text.startsWith('stateDiagram') || text.startsWith('erDiagram') ||
+            text.startsWith('gantt') || text.startsWith('pie')) {
+
+            try {
+                const pre = block.parentElement;
+                const id = 'mermaid-' + Math.random().toString(36).substr(2, 9);
+                const { svg } = await mermaid.render(id, text);
+
+                const div = document.createElement('div');
+                div.className = 'mermaid';
+                div.innerHTML = svg;
+                pre.replaceWith(div);
+            } catch (e) {
+                console.warn('Mermaid rendering failed:', e);
+            }
+        }
+    }
+}
+
+/**
+ * Fallback simple markdown formatting when marked.js is not available
+ */
+function formatMarkdownFallback(text) {
+    if (!text) return '';
+
     const lines = text.split('\n');
     let html = '';
     let inList = false;
@@ -85,81 +159,37 @@ function formatMarkdown(text) {
     for (let i = 0; i < lines.length; i++) {
         let line = lines[i];
 
-        // Skip empty lines but add spacing
         if (line.trim() === '') {
-            if (inList) {
-                html += '</ul>';
-                inList = false;
-            }
-            if (inNumberedList) {
-                html += '</ol>';
-                inNumberedList = false;
-            }
+            if (inList) { html += '</ul>'; inList = false; }
+            if (inNumberedList) { html += '</ol>'; inNumberedList = false; }
             html += '<br>';
             continue;
         }
 
         // Headers
+        if (line.startsWith('# ')) {
+            if (inList) { html += '</ul>'; inList = false; }
+            if (inNumberedList) { html += '</ol>'; inNumberedList = false; }
+            html += `<h1>${escapeHtml(line.substring(2))}</h1>`;
+            continue;
+        }
         if (line.startsWith('## ')) {
             if (inList) { html += '</ul>'; inList = false; }
             if (inNumberedList) { html += '</ol>'; inNumberedList = false; }
-            html += `<h2 class="md-h2">${escapeHtml(line.substring(3))}</h2>`;
+            html += `<h2>${escapeHtml(line.substring(3))}</h2>`;
             continue;
         }
         if (line.startsWith('### ')) {
             if (inList) { html += '</ul>'; inList = false; }
             if (inNumberedList) { html += '</ol>'; inNumberedList = false; }
-            html += `<h3 class="md-h3">${escapeHtml(line.substring(4))}</h3>`;
+            html += `<h3>${escapeHtml(line.substring(4))}</h3>`;
             continue;
         }
 
-        // Special callout boxes
-        if (line.startsWith('💡 ')) {
-            if (inList) { html += '</ul>'; inList = false; }
+        // Bullet lists
+        if (line.match(/^[•\-\*] /)) {
             if (inNumberedList) { html += '</ol>'; inNumberedList = false; }
-            html += `<div class="callout callout-tip">💡 ${formatInline(line.substring(3))}</div>`;
-            continue;
-        }
-        if (line.startsWith('✅ ')) {
-            if (inList) { html += '</ul>'; inList = false; }
-            if (inNumberedList) { html += '</ol>'; inNumberedList = false; }
-            html += `<div class="callout callout-success">✅ ${formatInline(line.substring(3))}</div>`;
-            continue;
-        }
-        if (line.startsWith('❌ ')) {
-            if (inList) { html += '</ul>'; inList = false; }
-            if (inNumberedList) { html += '</ol>'; inNumberedList = false; }
-            html += `<div class="callout callout-error">❌ ${formatInline(line.substring(3))}</div>`;
-            continue;
-        }
-        if (line.startsWith('⚠️ ')) {
-            if (inList) { html += '</ul>'; inList = false; }
-            if (inNumberedList) { html += '</ol>'; inNumberedList = false; }
-            html += `<div class="callout callout-warning">⚠️ ${formatInline(line.substring(3))}</div>`;
-            continue;
-        }
-        if (line.startsWith('❓ ')) {
-            if (inList) { html += '</ul>'; inList = false; }
-            if (inNumberedList) { html += '</ol>'; inNumberedList = false; }
-            html += `<div class="callout callout-question">❓ ${formatInline(line.substring(3))}</div>`;
-            continue;
-        }
-
-        // STEP markers
-        if (line.match(/^STEP \d+:/)) {
-            if (inList) { html += '</ul>'; inList = false; }
-            if (inNumberedList) { html += '</ol>'; inNumberedList = false; }
-            html += `<div class="step-marker">${formatInline(line)}</div>`;
-            continue;
-        }
-
-        // Bullet lists (• or -)
-        if (line.match(/^[•\-] /)) {
-            if (inNumberedList) { html += '</ol>'; inNumberedList = false; }
-            if (!inList) {
-                html += '<ul class="md-list">';
-                inList = true;
-            }
+            if (!inList) { html += '<ul>'; inList = true; }
             html += `<li>${formatInline(line.substring(2))}</li>`;
             continue;
         }
@@ -167,10 +197,7 @@ function formatMarkdown(text) {
         // Numbered lists
         if (line.match(/^\d+\. /)) {
             if (inList) { html += '</ul>'; inList = false; }
-            if (!inNumberedList) {
-                html += '<ol class="md-list-numbered">';
-                inNumberedList = true;
-            }
+            if (!inNumberedList) { html += '<ol>'; inNumberedList = true; }
             const content = line.replace(/^\d+\. /, '');
             html += `<li>${formatInline(content)}</li>`;
             continue;
@@ -179,10 +206,9 @@ function formatMarkdown(text) {
         // Regular paragraph
         if (inList) { html += '</ul>'; inList = false; }
         if (inNumberedList) { html += '</ol>'; inNumberedList = false; }
-        html += `<p class="md-p">${formatInline(line)}</p>`;
+        html += `<p>${formatInline(line)}</p>`;
     }
 
-    // Close any open lists
     if (inList) html += '</ul>';
     if (inNumberedList) html += '</ol>';
 
@@ -191,18 +217,10 @@ function formatMarkdown(text) {
 
 // Format inline markdown (bold, italic, code, etc.)
 function formatInline(text) {
-    // First escape HTML to prevent XSS
     text = escapeHtml(text);
-
-    // Bold
-    text = text.replace(/\*\*(.*?)\*\*/g, '<strong class="md-bold">$1</strong>');
-    // Italic
-    text = text.replace(/\*(.*?)\*/g, '<em class="md-italic">$1</em>');
-    // Code/Articles
-    text = text.replace(/`(.*?)`/g, '<code class="md-code">$1</code>');
-    // Article references (Art. X:XX format)
-    text = text.replace(/Art\. ([\d:]+\s+[A-Z]+)/g, '<span class="article-ref">Art. $1</span>');
-
+    text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    text = text.replace(/\*(.*?)\*/g, '<em>$1</em>');
+    text = text.replace(/`(.*?)`/g, '<code>$1</code>');
     return text;
 }
 
@@ -1011,21 +1029,135 @@ function reviewQuiz() {
     }
 }
 
-// ========== Study Guide Generator ==========
+// ========== Study Guide Management ==========
 function initStudyListeners() {
-    document.getElementById('generate-study-btn').addEventListener('click', generateStudyGuide);
+    // Generate button
+    const generateBtn = document.getElementById('generate-study-btn');
+    if (generateBtn) {
+        generateBtn.addEventListener('click', generateStudyGuide);
+    }
+
+    // Sub-tab navigation
+    const subTabs = document.querySelectorAll('[data-study-tab]');
+    subTabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            const tabName = tab.dataset.studyTab;
+
+            // Update active tab
+            subTabs.forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+
+            // Show corresponding content
+            document.getElementById('saved-guides-tab').style.display =
+                tabName === 'saved-guides' ? 'block' : 'none';
+            document.getElementById('new-guide-tab').style.display =
+                tabName === 'new-guide' ? 'block' : 'none';
+
+            // Clear result when switching tabs
+            document.getElementById('study-result').style.display = 'none';
+        });
+    });
+
+    // Load saved guides on init
+    loadSavedStudyGuides();
 }
 
+/**
+ * Load and display saved study guides for the current course
+ */
+async function loadSavedStudyGuides() {
+    const listDiv = document.getElementById('study-guides-list');
+    if (!listDiv || !COURSE_ID) {
+        if (listDiv) {
+            listDiv.innerHTML = '<p class="no-guides-message">Select a course to view saved study guides.</p>';
+        }
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE}/api/study-guides/courses/${COURSE_ID}`);
+        if (!response.ok) throw new Error('Failed to load study guides');
+
+        const data = await response.json();
+
+        if (data.guides && data.guides.length > 0) {
+            listDiv.innerHTML = data.guides.map(guide => `
+                <div class="study-guide-card" onclick="loadStudyGuide('${guide.id}')">
+                    <h4>${escapeHtml(guide.title)}</h4>
+                    <div class="guide-meta">
+                        <span>📅 ${formatDate(guide.created_at)}</span>
+                        <span>📝 ${guide.word_count || 0} words</span>
+                        ${guide.week_numbers ? `<span>📚 Weeks: ${guide.week_numbers.join(', ')}</span>` : ''}
+                    </div>
+                </div>
+            `).join('');
+        } else {
+            listDiv.innerHTML = `
+                <div class="no-guides-message">
+                    <p>No saved study guides yet.</p>
+                    <p>Click "Generate New" to create your first study guide!</p>
+                </div>
+            `;
+        }
+    } catch (error) {
+        console.error('Error loading study guides:', error);
+        listDiv.innerHTML = '<p class="error">Failed to load study guides.</p>';
+    }
+}
+
+/**
+ * Load and display a specific study guide
+ */
+async function loadStudyGuide(guideId) {
+    const resultDiv = document.getElementById('study-result');
+    showLoading();
+
+    try {
+        const response = await fetch(`${API_BASE}/api/study-guides/courses/${COURSE_ID}/${guideId}`);
+        if (!response.ok) throw new Error('Failed to load study guide');
+
+        const guide = await response.json();
+
+        resultDiv.innerHTML = formatMarkdown(guide.content);
+        resultDiv.style.display = 'block';
+
+        // Render any Mermaid diagrams
+        await renderMermaidDiagrams(resultDiv);
+
+        // Scroll to result
+        resultDiv.scrollIntoView({ behavior: 'smooth' });
+
+    } catch (error) {
+        console.error('Error loading study guide:', error);
+        resultDiv.innerHTML = `<p class="error">Failed to load study guide: ${escapeHtml(error.message)}</p>`;
+        resultDiv.style.display = 'block';
+    } finally {
+        hideLoading();
+    }
+}
+
+/**
+ * Generate a new study guide using the persistence API
+ */
 async function generateStudyGuide() {
     const resultDiv = document.getElementById('study-result');
+    const weekSelect = document.getElementById('study-week-select');
 
     showLoading();
 
     try {
-        // Build request with course context (course_id will be added if available)
-        const requestBody = addCourseContext({});
+        // Build request
+        const requestBody = {
+            course_id: COURSE_ID
+        };
 
-        const response = await fetch(`${API_BASE}/api/files-content/study-guide`, {
+        // Add week filter if selected
+        if (weekSelect && weekSelect.value) {
+            requestBody.weeks = [parseInt(weekSelect.value, 10)];
+        }
+
+        // Use new persistence API
+        const response = await fetch(`${API_BASE}/api/study-guides/courses/${COURSE_ID}`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(requestBody)
@@ -1033,22 +1165,50 @@ async function generateStudyGuide() {
 
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
-            const errorMessage = errorData.detail || `API error: ${response.status}`;
-            throw new Error(errorMessage);
+            throw new Error(errorData.detail || `API error: ${response.status}`);
         }
 
         const data = await response.json();
-        resultDiv.innerHTML = `<div class="study-guide">${formatMarkdown(data.guide)}</div>`;
+        const guide = data.guide;
+
+        // Display the generated content
+        resultDiv.innerHTML = formatMarkdown(guide.content);
         resultDiv.style.display = 'block';
+
+        // Render any Mermaid diagrams
+        await renderMermaidDiagrams(resultDiv);
+
+        // Refresh saved guides list
+        await loadSavedStudyGuides();
+
+        // Show success message if it was a new guide
+        if (!data.is_duplicate) {
+            console.log('Study guide saved:', guide.title);
+        }
 
     } catch (error) {
         console.error('Error:', error);
-        // Backend now provides user-friendly error messages directly
-        const errorMessage = error.message || 'Error generating study guide. Please try again.';
-        resultDiv.innerHTML = `<p class="error">${escapeHtml(errorMessage)}</p>`;
+        resultDiv.innerHTML = `<p class="error">${escapeHtml(error.message || 'Error generating study guide. Please try again.')}</p>`;
         resultDiv.style.display = 'block';
     } finally {
         hideLoading();
+    }
+}
+
+/**
+ * Format a date string for display
+ */
+function formatDate(dateStr) {
+    if (!dateStr) return 'Unknown';
+    try {
+        const date = new Date(dateStr);
+        return date.toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric'
+        });
+    } catch (e) {
+        return dateStr;
     }
 }
 

@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 # Import routers
-from app.routes import ai_tutor, assessment, pages, files_content, admin_courses, admin_pages, echr, text_cache, quiz_management
+from app.routes import ai_tutor, assessment, pages, files_content, admin_courses, admin_pages, echr, text_cache, quiz_management, study_guide_routes
 
 # Load environment variables
 load_dotenv()
@@ -48,6 +48,7 @@ app.include_router(admin_pages.router)
 app.include_router(echr.router)
 app.include_router(text_cache.router)
 app.include_router(quiz_management.router)
+app.include_router(study_guide_routes.router)
 
 
 # Startup event
