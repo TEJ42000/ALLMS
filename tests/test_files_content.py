@@ -12,20 +12,22 @@ class TestFilesContentQuizEndpoint:
     def test_quiz_generation_success(self, client):
         """Test successful quiz generation."""
         mock_service = MagicMock()
-        mock_service.get_topic_files.return_value = ["reader_private_law"]
-        mock_service.generate_quiz_from_files = AsyncMock(return_value=[
-            {
-                "question": "What is Art. 6:74?",
-                "options": ["A", "B", "C", "D"],
-                "correct": 0
-            }
-        ])
+        mock_service.generate_quiz_from_course = AsyncMock(return_value={
+            "questions": [
+                {
+                    "question": "What is Art. 6:74?",
+                    "options": ["A", "B", "C", "D"],
+                    "correct_index": 0
+                }
+            ]
+        })
 
         with patch(
             'app.routes.files_content.get_files_api_service',
             return_value=mock_service
         ):
             response = client.post("/api/files-content/quiz", json={
+                "course_id": "LLS-2025-2026",
                 "topic": "Private Law",
                 "num_questions": 5,
                 "difficulty": "medium"
@@ -34,19 +36,21 @@ class TestFilesContentQuizEndpoint:
             assert response.status_code == 200
             data = response.json()
             assert "quiz" in data
-            assert "files_used" in data
+            assert "course_id" in data
 
     def test_quiz_with_week_parameter(self, client):
         """Test quiz generation with week parameter."""
         mock_service = MagicMock()
-        mock_service.get_topic_files.return_value = ["reader_admin_law"]
-        mock_service.generate_quiz_from_files = AsyncMock(return_value=[])
+        mock_service.generate_quiz_from_course = AsyncMock(return_value={
+            "questions": []
+        })
 
         with patch(
             'app.routes.files_content.get_files_api_service',
             return_value=mock_service
         ):
             response = client.post("/api/files-content/quiz", json={
+                "course_id": "LLS-2025-2026",
                 "topic": "Administrative Law",
                 "week": 3,
                 "num_questions": 10,
@@ -447,10 +451,11 @@ class TestCourseAwareQuizEndpoint:
     def test_quiz_with_course_id(self, client):
         """Test quiz generation with course_id parameter."""
         mock_service = MagicMock()
-        mock_service.get_files_for_course.return_value = ["reader_private_law"]
-        mock_service.generate_quiz_from_files = AsyncMock(return_value=[
-            {"question": "Test question", "options": ["A", "B"], "correct": 0}
-        ])
+        mock_service.generate_quiz_from_course = AsyncMock(return_value={
+            "questions": [
+                {"question": "Test question", "options": ["A", "B"], "correct_index": 0}
+            ]
+        })
 
         with patch(
             'app.routes.files_content.get_files_api_service',
@@ -466,13 +471,14 @@ class TestCourseAwareQuizEndpoint:
             data = response.json()
             assert "quiz" in data
             assert data.get("course_id") == "LLS-2025-2026"
-            mock_service.get_files_for_course.assert_called_once()
+            mock_service.generate_quiz_from_course.assert_called_once()
 
     def test_quiz_with_course_id_and_week(self, client):
         """Test quiz generation with course_id and week parameters."""
         mock_service = MagicMock()
-        mock_service.get_files_for_course.return_value = ["lecture_week_3"]
-        mock_service.generate_quiz_from_files = AsyncMock(return_value=[])
+        mock_service.generate_quiz_from_course = AsyncMock(return_value={
+            "questions": []
+        })
 
         with patch(
             'app.routes.files_content.get_files_api_service',
@@ -489,15 +495,19 @@ class TestCourseAwareQuizEndpoint:
             data = response.json()
             assert data.get("course_id") == "LLS-2025-2026"
             assert data.get("week") == 3
-            mock_service.get_files_for_course.assert_called_with(
-                "LLS-2025-2026", week_number=3
+            mock_service.generate_quiz_from_course.assert_called_with(
+                course_id="LLS-2025-2026",
+                topic="Course Materials",
+                num_questions=10,
+                difficulty="hard",
+                week_number=3
             )
 
     def test_quiz_course_not_found(self, client):
-        """Test quiz returns 404 when course not found."""
+        """Test quiz returns 400 when course not found."""
         mock_service = MagicMock()
-        mock_service.get_files_for_course.side_effect = ValueError(
-            "Course not found: INVALID"
+        mock_service.generate_quiz_from_course = AsyncMock(
+            side_effect=ValueError("Course not found: INVALID")
         )
 
         with patch(
@@ -510,11 +520,11 @@ class TestCourseAwareQuizEndpoint:
                 "difficulty": "medium"
             })
 
-            assert response.status_code == 404
+            assert response.status_code == 400
             assert "Course not found" in response.json()["detail"]
 
-    def test_quiz_requires_topic_or_course_id(self, client):
-        """Test quiz returns 400 when neither topic nor course_id provided."""
+    def test_quiz_requires_course_id(self, client):
+        """Test quiz returns 422 when course_id not provided (required field)."""
         mock_service = MagicMock()
 
         with patch(
@@ -526,8 +536,8 @@ class TestCourseAwareQuizEndpoint:
                 "difficulty": "medium"
             })
 
-            assert response.status_code == 400
-            assert "Either 'topic' or 'course_id'" in response.json()["detail"]
+            # 422 Unprocessable Entity - missing required field
+            assert response.status_code == 422
 
 
 class TestCourseAwareStudyGuideEndpoint:

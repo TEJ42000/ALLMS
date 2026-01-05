@@ -278,6 +278,12 @@ class CourseMaterial(BaseModel):
     summary: Optional[str] = None  # LLM-generated summary
     summaryGenerated: bool = False
 
+    # Anthropic Files API integration
+    anthropicFileId: Optional[str] = None  # Anthropic file ID (e.g., "file_abc123...")
+    anthropicFileExpiry: Optional[datetime] = None  # When the file expires in Anthropic
+    anthropicUploadedAt: Optional[datetime] = None  # When last uploaded to Anthropic
+    anthropicUploadError: Optional[str] = None  # Last upload error message
+
     # Timestamps
     createdAt: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updatedAt: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

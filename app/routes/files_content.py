@@ -31,19 +31,25 @@ router = APIRouter(
 class FilesQuizRequest(BaseModel):
     """Generate quiz using uploaded files.
 
-    Supports both legacy mode (topic) and course-aware mode (course_id).
-    If course_id is provided, materials are retrieved from Firestore.
+    Uses Firestore-based file management with automatic upload to Anthropic.
+    A course_id is required to identify which course materials to use.
+
+    BREAKING CHANGE (v2.0): course_id is now required. The legacy topic-only
+    mode has been removed in favor of Firestore-based material management.
     """
 
-    topic: Optional[str] = Field(
-        None,
-        description="Topic name (e.g., 'Constitutional Law'). "
-                    "Required if course_id is not provided."
-    )
     course_id: Optional[str] = Field(
         None,
         description="Course ID (e.g., 'LLS-2025-2026'). "
-                    "If provided, materials are retrieved from Firestore."
+                    "Materials are retrieved from Firestore. "
+                    "**REQUIRED** - this field is mandatory.",
+        min_length=1,
+        max_length=100
+    )
+    topic: Optional[str] = Field(
+        None,
+        description="Optional topic name for context (e.g., 'Constitutional Law'). "
+                    "If not provided, defaults to 'Course Materials'."
     )
     week: Optional[int] = Field(
         None,
@@ -53,6 +59,16 @@ class FilesQuizRequest(BaseModel):
     )
     num_questions: int = Field(10, ge=1, le=50)
     difficulty: str = Field("medium", description="easy, medium, hard")
+
+    @validator('course_id', always=True)
+    def course_id_required(cls, v):
+        """Validate that course_id is provided."""
+        if not v:
+            raise ValueError(
+                "course_id is required. The legacy topic-only mode has been removed. "
+                "Please provide a valid course_id (e.g., 'LLS-2025-2026')."
+            )
+        return v
 
 
 class FilesStudyGuideRequest(BaseModel):
@@ -231,28 +247,16 @@ async def generate_quiz_from_files(request: FilesQuizRequest):
     """
     Generate quiz questions from uploaded course materials.
 
-    Uses Anthropic Files API - automatically references your uploaded PDFs!
+    Uses Anthropic Files API with Firestore-based file management.
+    Files are automatically uploaded to Anthropic on-demand.
 
     **Benefits:**
     - 90% cost savings with automatic caching
-    - No file re-upload needed
+    - No manual file management needed
+    - Automatic file expiry handling
     - Claude can cite page numbers
 
-    **Modes:**
-    - **Legacy mode**: Provide `topic` parameter
-    - **Course-aware mode**: Provide `course_id` parameter
-
-    **Example (legacy):**
-    ```json
-    {
-        "topic": "Administrative Law",
-        "week": 3,
-        "num_questions": 10,
-        "difficulty": "medium"
-    }
-    ```
-
-    **Example (course-aware):**
+    **Example:**
     ```json
     {
         "course_id": "LLS-2025-2026",
@@ -265,44 +269,42 @@ async def generate_quiz_from_files(request: FilesQuizRequest):
     try:
         service = get_files_api_service()
 
-        # Get file keys (supports both legacy and course-aware modes)
-        file_keys = _get_file_keys(
-            service,
-            topic=request.topic,
-            course_id=request.course_id,
-            week=request.week
-        )
-
         # Determine topic for quiz generation
         topic = request.topic or "Course Materials"
 
-        quiz = await service.generate_quiz_from_files(
-            file_keys=file_keys,
+        logger.info(
+            "Generating quiz: course=%s, week=%s, questions=%d",
+            request.course_id, request.week, request.num_questions
+        )
+
+        quiz = await service.generate_quiz_from_course(
+            course_id=request.course_id,
             topic=topic,
             num_questions=request.num_questions,
-            difficulty=request.difficulty
+            difficulty=request.difficulty,
+            week_number=request.week
         )
 
         response = {
             "quiz": quiz,
-            "files_used": file_keys,
-            "cached": True  # Files API auto-caches
+            "course_id": request.course_id,
+            "week": request.week,
+            "cached": True
         }
 
-        # Add course context to response
-        _add_course_context(response, course_id=request.course_id, week=request.week)
-
-        # Log successful generation
-        if request.course_id:
-            logger.info(
-                "Generated quiz for course %s, week %s, %d questions",
-                request.course_id, request.week, request.num_questions
-            )
+        logger.info(
+            "Generated quiz for course %s, week %s, %d questions",
+            request.course_id, request.week, request.num_questions
+        )
 
         return response
 
     except HTTPException:
         raise
+    except ValueError as e:
+        # Course not found or other value errors
+        logger.warning("Invalid request for quiz: %s", e)
+        raise HTTPException(400, detail=str(e)) from e
     except Exception as e:
         logger.error("Error generating quiz: %s", e)
         raise HTTPException(500, detail=str(e)) from e

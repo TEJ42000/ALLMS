@@ -1,18 +1,22 @@
 """Content Generation using Anthropic Files API for the LLS Study Portal.
 
 This service provides AI-powered content generation (quizzes, study guides, flashcards)
-using uploaded course materials. It can optionally integrate with CourseService to
-get course-specific materials from Firestore.
+using uploaded course materials. It integrates with CourseService to get course-specific
+materials from Firestore and uses AnthropicFileManager for automatic file uploads.
+
+All content generation uses Firestore-based file management with automatic upload
+to Anthropic Files API on-demand.
 """
 
 import json
 import logging
 import re
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from anthropic import AsyncAnthropic
 
-from app.services.gcp_service import get_anthropic_api_key
+from app.models.course_models import CourseMaterial
+from app.services.gcp_service import get_anthropic_api_key, get_firestore_client
 
 logger = logging.getLogger(__name__)
 
@@ -23,37 +27,26 @@ DEFAULT_FALLBACK_COUNT = 5  # Number of files to return when no specific files f
 class FilesAPIService:
     """Service for generating content using uploaded files via Anthropic Files API.
 
-    This service can operate in two modes:
-    1. **Legacy mode**: Uses hardcoded topic mappings (backward compatible)
-    2. **Course-aware mode**: Uses CourseService to get course-specific materials
+    This service uses Firestore-based file management with AnthropicFileManager
+    for automatic upload to Anthropic on-demand.
 
-    The course-aware mode is activated by passing a course_id to methods like
-    get_topic_files_for_course().
+    Key methods:
+    - get_course_materials(): Fetch materials from Firestore
+    - get_course_materials_with_file_ids(): Get materials with Anthropic file IDs
+    - generate_quiz_from_course(): Generate quizzes using course materials
     """
 
-    def __init__(self, file_ids_path: str = "file_ids.json"):
-        """
-        Initialize the Files API service.
-
-        Args:
-            file_ids_path: Path to the JSON file containing uploaded file IDs.
-        """
+    def __init__(self):
+        """Initialize the Files API service."""
         self.client = AsyncAnthropic(api_key=get_anthropic_api_key())
-
-        # Load uploaded file IDs
-        try:
-            with open(file_ids_path, "r", encoding="utf-8") as f:
-                self.file_ids = json.load(f)
-            logger.info("Loaded %d file IDs", len(self.file_ids))
-        except FileNotFoundError:
-            logger.warning("file_ids.json not found! Run upload_files_script.py first")
-            self.file_ids = {}
 
         # Beta header for Files API
         self.beta_header = "files-api-2025-04-14"
 
-        # Lazy-loaded CourseService reference
+        # Lazy-loaded service references
         self._course_service = None
+        self._file_manager = None
+        self._firestore = None
 
     def _get_course_service(self):
         """Get CourseService instance (lazy loading to avoid circular imports)."""
@@ -62,12 +55,136 @@ class FilesAPIService:
             self._course_service = get_course_service()
         return self._course_service
 
-    def get_file_id(self, key: str) -> str:
-        """Get file_id for a course material."""
-        file_info = self.file_ids.get(key)
-        if not file_info:
-            raise ValueError("File '%s' not found in file_ids.json" % key)
-        return file_info["file_id"]
+    def _get_file_manager(self):
+        """Get AnthropicFileManager instance (lazy loading)."""
+        if self._file_manager is None:
+            from app.services.anthropic_file_manager import get_anthropic_file_manager
+            self._file_manager = get_anthropic_file_manager()
+        return self._file_manager
+
+    @property
+    def firestore(self):
+        """Lazy-load Firestore client."""
+        if self._firestore is None:
+            self._firestore = get_firestore_client()
+        return self._firestore
+
+    # ========== Firestore-Based Methods ==========
+
+    def get_course_materials(
+        self,
+        course_id: str,
+        week_number: Optional[int] = None,
+        tier: Optional[str] = None,
+        category: Optional[str] = None,
+        limit: int = 50
+    ) -> List[CourseMaterial]:
+        """Get course materials from Firestore.
+
+        Args:
+            course_id: Course ID
+            week_number: Optional week filter
+            tier: Optional tier filter ('syllabus', 'course_materials', 'supplementary')
+            category: Optional category filter
+            limit: Maximum materials to return
+
+        Returns:
+            List of CourseMaterial objects
+        """
+        if not self.firestore:
+            logger.warning("Firestore not available")
+            return []
+
+        query = (
+            self.firestore
+            .collection("courses")
+            .document(course_id)
+            .collection("materials")
+        )
+
+        # Apply filters
+        if week_number is not None:
+            query = query.where("weekNumber", "==", week_number)
+        if tier:
+            query = query.where("tier", "==", tier)
+        if category:
+            query = query.where("category", "==", category)
+
+        # Execute query
+        docs = query.limit(limit).stream()
+
+        materials = []
+        for doc in docs:
+            data = doc.to_dict()
+            data["id"] = doc.id
+            try:
+                materials.append(CourseMaterial(**data))
+            except Exception as e:
+                logger.warning("Failed to parse material %s: %s", doc.id, str(e))
+
+        return materials
+
+    async def get_course_materials_with_file_ids(
+        self,
+        course_id: str,
+        week_number: Optional[int] = None,
+        tier: Optional[str] = None,
+        limit: int = 20
+    ) -> List[Tuple[CourseMaterial, str]]:
+        """Get course materials with their Anthropic file IDs.
+
+        This method ensures all returned materials have valid Anthropic file IDs,
+        uploading files on-demand if necessary.
+
+        Note: This method is async for consistency with other endpoint methods,
+        though the underlying Firestore and file operations are synchronous.
+        The Firestore Python SDK doesn't support async natively.
+
+        Args:
+            course_id: Course ID
+            week_number: Optional week filter
+            tier: Optional tier filter
+            limit: Maximum materials to return
+
+        Returns:
+            List of (CourseMaterial, anthropic_file_id) tuples
+        """
+        materials = self.get_course_materials(
+            course_id=course_id,
+            week_number=week_number,
+            tier=tier,
+            limit=limit
+        )
+
+        if not materials:
+            logger.warning("No materials found for course %s", course_id)
+            return []
+
+        file_manager = self._get_file_manager()
+        results = []
+
+        for material in materials:
+            try:
+                # Ensure file is available in Anthropic
+                file_id = file_manager.ensure_file_available(
+                    material=material,
+                    course_id=course_id
+                )
+                results.append((material, file_id))
+            except Exception as e:
+                logger.error(
+                    "Failed to get file ID for %s: %s",
+                    material.filename,
+                    str(e)
+                )
+                # Continue with other materials
+
+        logger.info(
+            "Got %d materials with file IDs for course %s",
+            len(results),
+            course_id
+        )
+        return results
 
     async def generate_quiz_from_files(
         self,
@@ -169,6 +286,114 @@ Return ONLY valid JSON:
         quiz_data = self._parse_json(text)
 
         logger.info("Generated %d questions", len(quiz_data.get('questions', [])))
+        return quiz_data
+
+    async def generate_quiz_from_course(
+        self,
+        course_id: str,
+        topic: str,
+        num_questions: int = 10,
+        difficulty: str = "medium",
+        week_number: Optional[int] = None
+    ) -> Dict:
+        """Generate quiz using Firestore materials (new Firestore-based method).
+
+        This method uses the materials subcollection in Firestore and
+        automatically ensures files are uploaded to Anthropic.
+
+        Args:
+            course_id: Course ID
+            topic: Topic name for the quiz
+            num_questions: Number of questions to generate
+            difficulty: 'easy', 'medium', or 'hard'
+            week_number: Optional week filter
+
+        Returns:
+            Dictionary with quiz questions
+
+        Raises:
+            ValueError: If no materials found
+        """
+        logger.info(
+            "Generating quiz from course %s: %d questions, week=%s",
+            course_id, num_questions, week_number
+        )
+
+        # Get materials with their Anthropic file IDs
+        materials_with_ids = await self.get_course_materials_with_file_ids(
+            course_id=course_id,
+            week_number=week_number,
+            limit=10  # Limit to avoid context overflow
+        )
+
+        if not materials_with_ids:
+            raise ValueError(f"No materials found for course {course_id}")
+
+        # Build content blocks using the file IDs
+        content_blocks = []
+        for material, file_id in materials_with_ids:
+            content_blocks.append({
+                "type": "document",
+                "source": {
+                    "type": "file",
+                    "file_id": file_id
+                },
+                "title": material.title or material.filename,
+                "citations": {"enabled": True}
+            })
+
+        # Add text prompt
+        prompt_text = """Generate %d multiple choice quiz questions about %s from these documents.
+
+Difficulty: %s
+Requirements:
+- Use only information from the provided documents
+- Each question tests understanding of legal concepts
+- Include article citations where applicable
+- Provide 4 multiple choice answer options
+- Mark correct answer
+- Include detailed explanation
+
+Return ONLY valid JSON:
+{
+  "questions": [
+    {
+      "question": "...",
+      "options": ["A", "B", "C", "D"],
+      "correct_index": 0,
+      "explanation": "...",
+      "difficulty": "%s",
+      "articles": [],
+      "topic": "%s"
+    }
+  ]
+}""" % (num_questions, topic, difficulty, difficulty, topic)
+
+        content_blocks.append({
+            "type": "text",
+            "text": prompt_text
+        })
+
+        # Call API with Files API beta
+        response = await self.client.beta.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=4000,
+            betas=[self.beta_header],
+            messages=[{
+                "role": "user",
+                "content": content_blocks
+            }]
+        )
+
+        # Parse response
+        text = response.content[0].text
+        quiz_data = self._parse_json(text)
+
+        logger.info(
+            "Generated %d questions from %d materials",
+            len(quiz_data.get('questions', [])),
+            len(materials_with_ids)
+        )
         return quiz_data
 
     async def generate_study_guide(
