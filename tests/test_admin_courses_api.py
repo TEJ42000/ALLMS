@@ -276,3 +276,165 @@ class TestIncludeWeeksParameter:
             "LLS-2025-2026",
             include_weeks=True
         )
+
+
+# ============================================================================
+# Tests for Path Resolution Functions (PR #55)
+# ============================================================================
+
+
+class TestResolveIncompletePath:
+    """Tests for resolve_incomplete_path function."""
+
+    @patch("app.routes.admin_courses.MATERIALS_BASE")
+    def test_resolve_incomplete_path_success(self, mock_base, tmp_path):
+        """Should resolve incomplete path to full path when file exists."""
+        from app.routes.admin_courses import resolve_incomplete_path
+
+        # Setup mock directory structure
+        course_materials = tmp_path / "Course_Materials"
+        lls_dir = course_materials / "LLS"
+        readings_dir = lls_dir / "Readings"
+        readings_dir.mkdir(parents=True)
+        test_file = readings_dir / "test.pdf"
+        test_file.touch()
+
+        mock_base.__truediv__ = lambda self, other: tmp_path / other
+        mock_base.return_value = tmp_path
+        
+        # Patch MATERIALS_BASE in the actual module
+        with patch("app.routes.admin_courses.MATERIALS_BASE", tmp_path):
+            result = resolve_incomplete_path("Readings/test.pdf")
+
+        assert result == "Course_Materials/LLS/Readings/test.pdf"
+
+    @patch("app.routes.admin_courses.MATERIALS_BASE")
+    def test_resolve_incomplete_path_already_complete(self, mock_base, tmp_path):
+        """Should return None for paths that already start with known prefixes."""
+        from app.routes.admin_courses import resolve_incomplete_path
+
+        mock_base.__truediv__ = lambda self, other: tmp_path / other
+        
+        with patch("app.routes.admin_courses.MATERIALS_BASE", tmp_path):
+            # Already complete paths should return None
+            assert resolve_incomplete_path("Course_Materials/LLS/Readings/file.pdf") is None
+            assert resolve_incomplete_path("Syllabus/file.pdf") is None
+            assert resolve_incomplete_path("Supplementary_Sources/file.pdf") is None
+
+    @patch("app.routes.admin_courses.MATERIALS_BASE")
+    def test_resolve_incomplete_path_not_found(self, mock_base, tmp_path):
+        """Should return None when file is not found in any subject directory."""
+        from app.routes.admin_courses import resolve_incomplete_path
+
+        # Setup mock directory structure without the target file
+        course_materials = tmp_path / "Course_Materials"
+        lls_dir = course_materials / "LLS"
+        readings_dir = lls_dir / "Readings"
+        readings_dir.mkdir(parents=True)
+
+        mock_base.__truediv__ = lambda self, other: tmp_path / other
+        
+        with patch("app.routes.admin_courses.MATERIALS_BASE", tmp_path):
+            result = resolve_incomplete_path("Readings/nonexistent.pdf")
+
+        assert result is None
+
+    @patch("app.routes.admin_courses.MATERIALS_BASE")
+    def test_resolve_incomplete_path_no_course_materials_dir(self, mock_base, tmp_path):
+        """Should return None when Course_Materials directory doesn't exist."""
+        from app.routes.admin_courses import resolve_incomplete_path
+
+        mock_base.__truediv__ = lambda self, other: tmp_path / other
+        
+        with patch("app.routes.admin_courses.MATERIALS_BASE", tmp_path):
+            result = resolve_incomplete_path("Readings/file.pdf")
+
+        assert result is None
+
+
+class TestValidateMaterialsPathWithResolution:
+    """Tests for validate_materials_path with try_resolve parameter."""
+
+    @patch("app.routes.admin_courses.MATERIALS_BASE")
+    def test_validate_path_with_resolution_finds_file(self, mock_base, tmp_path):
+        """Should resolve and return corrected path when file exists."""
+        from app.routes.admin_courses import validate_materials_path
+
+        # Setup mock directory structure
+        course_materials = tmp_path / "Course_Materials"
+        lls_dir = course_materials / "LLS"
+        readings_dir = lls_dir / "Readings"
+        readings_dir.mkdir(parents=True)
+        test_file = readings_dir / "test.pdf"
+        test_file.touch()
+
+        with patch("app.routes.admin_courses.MATERIALS_BASE", tmp_path):
+            result = validate_materials_path("Readings/test.pdf", try_resolve=True)
+
+        assert result == test_file
+        assert result.exists()
+
+    @patch("app.routes.admin_courses.MATERIALS_BASE")
+    def test_validate_path_without_resolution(self, mock_base, tmp_path):
+        """Should not attempt resolution when try_resolve=False."""
+        from app.routes.admin_courses import validate_materials_path
+
+        # Setup mock directory structure
+        course_materials = tmp_path / "Course_Materials"
+        lls_dir = course_materials / "LLS"
+        readings_dir = lls_dir / "Readings"
+        readings_dir.mkdir(parents=True)
+        test_file = readings_dir / "test.pdf"
+        test_file.touch()
+
+        with patch("app.routes.admin_courses.MATERIALS_BASE", tmp_path):
+            # With try_resolve=False, should return the incomplete path (not resolved)
+            result = validate_materials_path("Readings/test.pdf", try_resolve=False)
+
+        # Result should be the non-existent incomplete path
+        assert not result.exists()
+
+    @patch("app.routes.admin_courses.MATERIALS_BASE")
+    def test_validate_path_rejects_null_bytes(self, mock_base, tmp_path):
+        """Should reject paths with null bytes."""
+        from app.routes.admin_courses import validate_materials_path
+        from fastapi import HTTPException
+
+        with patch("app.routes.admin_courses.MATERIALS_BASE", tmp_path):
+            with pytest.raises(HTTPException) as exc_info:
+                validate_materials_path("test\x00.pdf")
+        
+        assert exc_info.value.status_code == 400
+        assert "null bytes" in exc_info.value.detail
+
+    @patch("app.routes.admin_courses.MATERIALS_BASE")
+    def test_validate_path_blocks_traversal(self, mock_base, tmp_path):
+        """Should block path traversal attempts."""
+        from app.routes.admin_courses import validate_materials_path
+        from fastapi import HTTPException
+
+        with patch("app.routes.admin_courses.MATERIALS_BASE", tmp_path):
+            with pytest.raises(HTTPException) as exc_info:
+                validate_materials_path("../../../etc/passwd")
+        
+        assert exc_info.value.status_code == 403
+        assert "outside materials directory" in exc_info.value.detail
+
+    @patch("app.routes.admin_courses.MATERIALS_BASE")
+    def test_validate_path_corrected_path_must_exist(self, mock_base, tmp_path):
+        """Should not return corrected path if it doesn't exist on disk."""
+        from app.routes.admin_courses import validate_materials_path, resolve_incomplete_path
+
+        # Setup mock directory structure WITHOUT the target file
+        course_materials = tmp_path / "Course_Materials"
+        lls_dir = course_materials / "LLS"
+        readings_dir = lls_dir / "Readings"
+        readings_dir.mkdir(parents=True)
+
+        with patch("app.routes.admin_courses.MATERIALS_BASE", tmp_path):
+            # File doesn't exist, so even with resolution attempt, should return original path
+            result = validate_materials_path("Readings/nonexistent.pdf", try_resolve=True)
+
+        # Result should be the non-existent path (not corrected)
+        assert not result.exists()
+        assert "nonexistent.pdf" in str(result)

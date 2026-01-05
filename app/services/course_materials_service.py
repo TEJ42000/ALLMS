@@ -158,6 +158,38 @@ class CourseMaterialsService:
 
         return self.get_material(course_id, material_id)
 
+    def update_storage_path(
+        self,
+        course_id: str,
+        material_id: str,
+        new_storage_path: str
+    ) -> Optional[CourseMaterial]:
+        """Update the storagePath for a material.
+
+        This is used to fix incomplete storage paths that were saved incorrectly.
+
+        Args:
+            course_id: Course ID
+            material_id: Material document ID
+            new_storage_path: The corrected storage path
+
+        Returns:
+            Updated material or None if not found
+        """
+        doc_ref = self._get_collection(course_id).document(material_id)
+        doc = doc_ref.get()
+        if not doc.exists:
+            return None
+
+        update_data = {
+            "storagePath": new_storage_path,
+            "updatedAt": datetime.now(timezone.utc).isoformat()
+        }
+        doc_ref.update(update_data)
+        logger.info("Updated storagePath for material %s: %s", material_id, new_storage_path)
+
+        return self.get_material(course_id, material_id)
+
     def get_materials_stats(self, course_id: str) -> Dict[str, Any]:
         """Get statistics about materials for a course."""
         materials = self.list_materials(course_id)
