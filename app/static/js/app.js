@@ -1511,8 +1511,12 @@ async function loadCourseWeeks() {
             return;
         }
 
-        // Sort weeks by week number
-        weeks.sort((a, b) => a.weekNumber - b.weekNumber);
+        // Sort weeks by week number (with defensive validation)
+        weeks.sort((a, b) => {
+            const aNum = typeof a.weekNumber === 'number' ? a.weekNumber : 0;
+            const bNum = typeof b.weekNumber === 'number' ? b.weekNumber : 0;
+            return aNum - bNum;
+        });
 
         // Render week cards
         weeksGrid.innerHTML = weeks.map(week => renderWeekCard(week)).join('');
@@ -1535,26 +1539,33 @@ async function loadCourseWeeks() {
 
 /**
  * Render a single week card
+ * @param {Object} week - Week object from API
+ * @param {number} week.weekNumber - Week number (1-based)
+ * @param {string} [week.title] - Week title
+ * @param {string} [week.topicDescription] - Description of the week's content
+ * @param {string[]} [week.topics] - Array of topic strings
+ * @returns {string} HTML string for the week card
  */
 function renderWeekCard(week) {
     const weekNumber = week.weekNumber;
+    const safeWeekNumber = escapeHtml(String(weekNumber || 0));
     const title = week.title || `Week ${weekNumber}`;
     const description = week.topicDescription || '';
     const topics = week.topics || [];
 
-    // Get icon based on week number or title
+    // Get icon based on week number or title (icons are safe literals)
     const icon = getWeekIcon(week);
 
-    // Build topics list (show first 3 topics)
-    const topicsList = topics.slice(0, 3).map(t => `<li>${escapeHtml(t)}</li>`).join('');
+    // Build topics list (show first 3 topics, ensure each is a string)
+    const topicsList = topics.slice(0, 3).map(t => `<li>${escapeHtml(String(t || ''))}</li>`).join('');
     const moreTopics = topics.length > 3 ? `<li class="more-topics">+${topics.length - 3} more...</li>` : '';
 
     return `
-        <div class="topic-card week-card" data-week="${weekNumber}" data-title="${escapeHtml(title)}">
-            <h4>${icon} Week ${weekNumber}: ${escapeHtml(title)}</h4>
+        <div class="topic-card week-card" data-week="${safeWeekNumber}" data-title="${escapeHtml(title)}">
+            <h4>${icon} Week ${safeWeekNumber}: ${escapeHtml(title)}</h4>
             <p>${escapeHtml(description) || (topics.length > 0 ? '' : 'No description available')}</p>
             ${topics.length > 0 ? `<ul class="week-topics-list">${topicsList}${moreTopics}</ul>` : ''}
-            <div class="topic-progress">
+            <div class="topic-progress" data-placeholder="true">
                 <div class="progress-bar"><div class="progress-fill" style="width: 0%"></div></div>
                 <span class="progress-text">0% Complete</span>
             </div>
@@ -1586,12 +1597,12 @@ function getWeekIcon(week) {
 
 /**
  * Setup event delegation for week card clicks (prevents memory leaks)
- * Uses a flag to ensure the listener is only attached once
+ * Uses a data attribute on the element to ensure the listener is only attached once,
+ * which is more robust than a global flag when dealing with DOM element lifecycle.
  */
-let weekCardDelegationSetup = false;
 function setupWeekCardEventDelegation(weeksGrid) {
-    if (weekCardDelegationSetup || !weeksGrid) return;
-    weekCardDelegationSetup = true;
+    if (!weeksGrid || weeksGrid.dataset.delegationSetup) return;
+    weeksGrid.dataset.delegationSetup = 'true';
 
     weeksGrid.addEventListener('click', (e) => {
         const card = e.target.closest('.week-card');
