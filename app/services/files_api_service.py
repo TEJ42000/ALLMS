@@ -1,18 +1,13 @@
 """Content Generation using Anthropic Files API for the LLS Study Portal.
 
 This service provides AI-powered content generation (quizzes, study guides, flashcards)
-using uploaded course materials. It can optionally integrate with CourseService to
-get course-specific materials from Firestore.
+using uploaded course materials. It integrates with CourseService to get course-specific
+materials from Firestore and uses AnthropicFileManager for automatic file uploads.
 
-The service supports two modes:
-1. **Legacy mode**: Uses file_ids.json for backward compatibility
-2. **Firestore mode**: Uses CourseMaterial documents with anthropicFileId
-
-Firestore mode is preferred and will automatically upload files to Anthropic
-on-demand using the AnthropicFileManager.
+All content generation uses Firestore-based file management with automatic upload
+to Anthropic Files API on-demand.
 """
 
-import json
 import logging
 import re
 from typing import Dict, List, Optional, Tuple
@@ -31,32 +26,18 @@ DEFAULT_FALLBACK_COUNT = 5  # Number of files to return when no specific files f
 class FilesAPIService:
     """Service for generating content using uploaded files via Anthropic Files API.
 
-    This service can operate in two modes:
-    1. **Legacy mode**: Uses file_ids.json (backward compatible)
-    2. **Firestore mode**: Uses CourseService + AnthropicFileManager
+    This service uses Firestore-based file management with AnthropicFileManager
+    for automatic upload to Anthropic on-demand.
 
-    The Firestore mode is activated by using methods like:
-    - get_course_materials_with_file_ids()
-    - generate_quiz_from_course()
+    Key methods:
+    - get_course_materials(): Fetch materials from Firestore
+    - get_course_materials_with_file_ids(): Get materials with Anthropic file IDs
+    - generate_quiz_from_course(): Generate quizzes using course materials
     """
 
-    def __init__(self, file_ids_path: str = "file_ids.json"):
-        """
-        Initialize the Files API service.
-
-        Args:
-            file_ids_path: Path to the JSON file containing uploaded file IDs.
-        """
+    def __init__(self):
+        """Initialize the Files API service."""
         self.client = AsyncAnthropic(api_key=get_anthropic_api_key())
-
-        # Load uploaded file IDs (legacy mode)
-        try:
-            with open(file_ids_path, "r", encoding="utf-8") as f:
-                self.file_ids = json.load(f)
-            logger.info("Loaded %d file IDs from %s", len(self.file_ids), file_ids_path)
-        except FileNotFoundError:
-            logger.info("file_ids.json not found - using Firestore mode only")
-            self.file_ids = {}
 
         # Beta header for Files API
         self.beta_header = "files-api-2025-04-14"
@@ -87,17 +68,7 @@ class FilesAPIService:
             self._firestore = get_firestore_client()
         return self._firestore
 
-    def get_file_id(self, key: str) -> str:
-        """Get file_id for a course material (legacy mode).
-
-        DEPRECATED: Use get_course_materials_with_file_ids() instead.
-        """
-        file_info = self.file_ids.get(key)
-        if not file_info:
-            raise ValueError("File '%s' not found in file_ids.json" % key)
-        return file_info["file_id"]
-
-    # ========== Firestore-Based Methods (New) ==========
+    # ========== Firestore-Based Methods ==========
 
     def get_course_materials(
         self,

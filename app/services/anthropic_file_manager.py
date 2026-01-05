@@ -8,26 +8,31 @@ Manages the lifecycle of files in Anthropic's Files API:
 """
 
 import logging
+import os
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 
-from anthropic import Anthropic
+from anthropic import Anthropic, NotFoundError as AnthropicNotFoundError, APIError
 
 from app.models.course_models import CourseMaterial
 from app.services.gcp_service import get_anthropic_api_key, get_firestore_client
 
 logger = logging.getLogger(__name__)
 
-# Anthropic Files API retention period (files expire after this)
-# Based on Anthropic docs, files have limited retention
-FILE_RETENTION_DAYS = 30  # Conservative estimate - adjust based on actual API behavior
+# Configuration from environment with sensible defaults
+FILE_RETENTION_DAYS = int(os.getenv("ANTHROPIC_FILE_RETENTION_DAYS", "30"))
+REFRESH_BEFORE_EXPIRY_DAYS = int(os.getenv("ANTHROPIC_REFRESH_BEFORE_EXPIRY_DAYS", "7"))
 
-# Refresh files this many days before expiry
-REFRESH_BEFORE_EXPIRY_DAYS = 7
+# File upload limits
+MAX_FILE_SIZE_MB = int(os.getenv("ANTHROPIC_MAX_FILE_SIZE_MB", "100"))
+MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
+
+# Supported file extensions for upload
+SUPPORTED_EXTENSIONS = {'.pdf', '.txt', '.md', '.docx', '.pptx', '.html', '.htm'}
 
 # Local materials root directory
-MATERIALS_ROOT = Path("Materials")
+MATERIALS_ROOT = Path("Materials").resolve()
 
 
 class AnthropicFileManagerError(Exception):
@@ -35,13 +40,23 @@ class AnthropicFileManagerError(Exception):
     pass
 
 
-class FileNotFoundError(AnthropicFileManagerError):
+class LocalFileNotFoundError(AnthropicFileManagerError):
     """Local file not found."""
     pass
 
 
 class UploadError(AnthropicFileManagerError):
     """Failed to upload file to Anthropic."""
+    pass
+
+
+class PathTraversalError(AnthropicFileManagerError):
+    """Attempted path traversal attack detected."""
+    pass
+
+
+class FileValidationError(AnthropicFileManagerError):
+    """File validation failed (size, type, etc.)."""
     pass
 
 
@@ -65,66 +80,127 @@ class AnthropicFileManager:
         return self._firestore
     
     def get_local_file_path(self, material: CourseMaterial) -> Path:
-        """Get the local file path for a material.
-        
+        """Get the local file path for a material with path traversal protection.
+
         Args:
             material: The course material
-            
+
         Returns:
-            Path to the local file
+            Path to the local file (validated to be within MATERIALS_ROOT)
+
+        Raises:
+            PathTraversalError: If the path attempts to escape MATERIALS_ROOT
         """
-        return MATERIALS_ROOT / material.storagePath
-    
+        # Resolve the path to prevent path traversal attacks
+        file_path = (MATERIALS_ROOT / material.storagePath).resolve()
+
+        # Ensure the resolved path is within MATERIALS_ROOT
+        try:
+            file_path.relative_to(MATERIALS_ROOT)
+        except ValueError:
+            raise PathTraversalError(
+                f"Invalid storage path (path traversal detected): {material.storagePath}"
+            )
+
+        return file_path
+
+    def _validate_file_for_upload(self, file_path: Path) -> None:
+        """Validate a file before uploading to Anthropic.
+
+        Args:
+            file_path: Path to the file to validate
+
+        Raises:
+            LocalFileNotFoundError: If file doesn't exist
+            FileValidationError: If file fails validation
+        """
+        if not file_path.exists():
+            raise LocalFileNotFoundError(f"Local file not found: {file_path}")
+
+        # Check file size
+        file_size = file_path.stat().st_size
+        if file_size > MAX_FILE_SIZE_BYTES:
+            raise FileValidationError(
+                f"File too large: {file_size / (1024*1024):.1f}MB "
+                f"(max: {MAX_FILE_SIZE_MB}MB)"
+            )
+
+        if file_size == 0:
+            raise FileValidationError("File is empty")
+
+        # Check file extension
+        suffix = file_path.suffix.lower()
+        if suffix not in SUPPORTED_EXTENSIONS:
+            raise FileValidationError(
+                f"Unsupported file type: {suffix}. "
+                f"Supported: {', '.join(sorted(SUPPORTED_EXTENSIONS))}"
+            )
+
     def upload_file(self, material: CourseMaterial) -> str:
         """Upload a file to Anthropic's Files API.
-        
+
         Args:
             material: The course material to upload
-            
+
         Returns:
             The Anthropic file ID
-            
+
         Raises:
-            FileNotFoundError: If local file doesn't exist
+            LocalFileNotFoundError: If local file doesn't exist
+            FileValidationError: If file fails validation
+            PathTraversalError: If path traversal detected
             UploadError: If upload fails
         """
         file_path = self.get_local_file_path(material)
-        
-        if not file_path.exists():
-            raise FileNotFoundError(f"Local file not found: {file_path}")
-        
+
+        # Validate file before upload
+        self._validate_file_for_upload(file_path)
+
         try:
             logger.info("Uploading file to Anthropic: %s", material.filename)
-            
+
             uploaded_file = self.client.beta.files.upload(file=file_path)
-            
+
             logger.info(
                 "Successfully uploaded %s -> %s",
                 material.filename,
                 uploaded_file.id
             )
-            
+
             return uploaded_file.id
-            
+
+        except (LocalFileNotFoundError, FileValidationError, PathTraversalError):
+            # Re-raise our custom exceptions
+            raise
+        except APIError as e:
+            logger.error("Anthropic API error uploading %s: %s", material.filename, str(e))
+            raise UploadError(f"Anthropic API error: {str(e)}") from e
         except Exception as e:
-            logger.error("Failed to upload %s: %s", material.filename, str(e))
+            logger.error("Unexpected error uploading %s: %s", material.filename, str(e))
             raise UploadError(f"Failed to upload {material.filename}: {str(e)}") from e
     
     def check_file_exists(self, file_id: str) -> bool:
         """Check if a file still exists in Anthropic's storage.
-        
+
         Args:
             file_id: The Anthropic file ID
-            
+
         Returns:
             True if file exists, False otherwise
         """
         try:
             self.client.beta.files.retrieve(file_id)
             return True
-        except Exception:
+        except AnthropicNotFoundError:
+            logger.debug("File not found in Anthropic: %s", file_id)
             return False
-    
+        except APIError as e:
+            logger.warning("API error checking file %s: %s", file_id, str(e))
+            return False
+        except Exception as e:
+            logger.error("Unexpected error checking file %s: %s", file_id, str(e))
+            return False
+
     def delete_file(self, file_id: str) -> bool:
         """Delete a file from Anthropic's storage.
 
@@ -138,8 +214,14 @@ class AnthropicFileManager:
             self.client.beta.files.delete(file_id)
             logger.info("Deleted file from Anthropic: %s", file_id)
             return True
+        except AnthropicNotFoundError:
+            logger.debug("File already deleted or not found: %s", file_id)
+            return False
+        except APIError as e:
+            logger.warning("API error deleting file %s: %s", file_id, str(e))
+            return False
         except Exception as e:
-            logger.warning("Failed to delete file %s: %s", file_id, str(e))
+            logger.error("Unexpected error deleting file %s: %s", file_id, str(e))
             return False
 
     def ensure_file_available(

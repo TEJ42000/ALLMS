@@ -21,8 +21,7 @@ class TestQuizGeneration:
     def test_quiz_generation_with_valid_topic(self, client):
         """Test quiz generation with a valid topic."""
         mock_service = Mock()
-        mock_service.get_topic_files.return_value = ["reader_private_law"]
-        mock_service.generate_quiz_from_files = AsyncMock(return_value={
+        mock_service.generate_quiz_from_course = AsyncMock(return_value={
             "questions": [
                 {
                     "question": "What is Art. 6:74 DCC?",
@@ -43,6 +42,7 @@ class TestQuizGeneration:
 
         with patch('app.routes.files_content.get_files_api_service', return_value=mock_service):
             response = client.post("/api/files-content/quiz", json={
+                "course_id": "LLS-2025-2026",
                 "topic": "Private Law",
                 "num_questions": 1,
                 "difficulty": "medium"
@@ -56,10 +56,9 @@ class TestQuizGeneration:
             assert data["quiz"]["questions"][0]["question"] == "What is Art. 6:74 DCC?"
 
     def test_quiz_generation_with_course_id(self, client):
-        """Test quiz generation using course_id instead of topic."""
+        """Test quiz generation using course_id."""
         mock_service = Mock()
-        mock_service.get_files_for_course.return_value = ["reader_private_law"]
-        mock_service.generate_quiz_from_files = AsyncMock(return_value={
+        mock_service.generate_quiz_from_course = AsyncMock(return_value={
             "questions": [
                 {
                     "question": "What is Art. 6:74 DCC?",
@@ -87,7 +86,7 @@ class TestQuizGeneration:
             data = response.json()
             assert "quiz" in data
             assert data.get("course_id") == "LLS-2025-2026"
-            mock_service.get_files_for_course.assert_called_once()
+            mock_service.generate_quiz_from_course.assert_called_once()
 
     def test_quiz_generation_with_multiple_questions(self, client):
         """Test quiz generation with multiple questions."""
@@ -103,11 +102,11 @@ class TestQuizGeneration:
         ]
 
         mock_service = Mock()
-        mock_service.get_topic_files.return_value = ["reader"]
-        mock_service.generate_quiz_from_files = AsyncMock(return_value={"questions": questions})
+        mock_service.generate_quiz_from_course = AsyncMock(return_value={"questions": questions})
 
         with patch('app.routes.files_content.get_files_api_service', return_value=mock_service):
             response = client.post("/api/files-content/quiz", json={
+                "course_id": "LLS-2025-2026",
                 "topic": "Criminal Law",
                 "num_questions": 10,
                 "difficulty": "medium"
@@ -121,8 +120,7 @@ class TestQuizGeneration:
         """Test quiz generation with different difficulty levels."""
         for difficulty in ["easy", "medium", "hard"]:
             mock_service = Mock()
-            mock_service.get_topic_files.return_value = ["reader"]
-            mock_service.generate_quiz_from_files = AsyncMock(return_value={
+            mock_service.generate_quiz_from_course = AsyncMock(return_value={
                 "questions": [{
                     "question": "Test",
                     "options": ["A", "B", "C", "D"],
@@ -133,7 +131,7 @@ class TestQuizGeneration:
 
             with patch('app.routes.files_content.get_files_api_service', return_value=mock_service):
                 response = client.post("/api/files-content/quiz", json={
-                    "topic": "Law",
+                    "course_id": "LLS-2025-2026",
                     "num_questions": 1,
                     "difficulty": difficulty
                 })
@@ -149,8 +147,7 @@ class TestQuizStructure:
     def test_quiz_question_has_required_fields(self, client):
         """Test that quiz questions have all required fields."""
         mock_service = Mock()
-        mock_service.get_topic_files.return_value = ["reader"]
-        mock_service.generate_quiz_from_files = AsyncMock(return_value={
+        mock_service.generate_quiz_from_course = AsyncMock(return_value={
             "questions": [{
                 "question": "What is the capital of France?",
                 "options": ["Paris", "London", "Berlin", "Madrid"],
@@ -164,6 +161,7 @@ class TestQuizStructure:
 
         with patch('app.routes.files_content.get_files_api_service', return_value=mock_service):
             response = client.post("/api/files-content/quiz", json={
+                "course_id": "LLS-2025-2026",
                 "topic": "Geography",
                 "num_questions": 1,
                 "difficulty": "easy"
@@ -172,7 +170,7 @@ class TestQuizStructure:
             assert response.status_code == 200
             data = response.json()
             question = data["quiz"]["questions"][0]
-            
+
             # Check required fields
             assert "question" in question
             assert "options" in question
@@ -185,8 +183,7 @@ class TestQuizStructure:
     def test_quiz_options_are_strings(self, client):
         """Test that all quiz options are strings."""
         mock_service = Mock()
-        mock_service.get_topic_files.return_value = ["reader"]
-        mock_service.generate_quiz_from_files = AsyncMock(return_value={
+        mock_service.generate_quiz_from_course = AsyncMock(return_value={
             "questions": [{
                 "question": "Test",
                 "options": ["Option A", "Option B", "Option C", "Option D"],
@@ -196,7 +193,7 @@ class TestQuizStructure:
 
         with patch('app.routes.files_content.get_files_api_service', return_value=mock_service):
             response = client.post("/api/files-content/quiz", json={
-                "topic": "Test",
+                "course_id": "LLS-2025-2026",
                 "num_questions": 1,
                 "difficulty": "medium"
             })
@@ -261,17 +258,19 @@ class TestQuizErrorHandling:
     def test_quiz_generation_with_no_files(self, client):
         """Test quiz generation when no files are available."""
         mock_service = Mock()
-        mock_service.get_topic_files.return_value = []
-        
+        mock_service.generate_quiz_from_course = AsyncMock(
+            side_effect=ValueError("No materials found for course")
+        )
+
         with patch('app.routes.files_content.get_files_api_service', return_value=mock_service):
             response = client.post("/api/files-content/quiz", json={
-                "topic": "Nonexistent Topic",
+                "course_id": "EMPTY-COURSE",
                 "num_questions": 5,
                 "difficulty": "medium"
             })
 
-            # Should return error or empty quiz
-            assert response.status_code in [200, 404, 500]
+            # Should return error
+            assert response.status_code in [400, 404, 500]
 
     def test_quiz_generation_with_invalid_difficulty(self, client):
         """Test quiz generation with invalid difficulty level.
@@ -282,8 +281,7 @@ class TestQuizErrorHandling:
         doesn't crash with unusual difficulty values.
         """
         mock_service = Mock()
-        mock_service.get_topic_files.return_value = ["reader"]
-        mock_service.generate_quiz_from_files = AsyncMock(return_value={
+        mock_service.generate_quiz_from_course = AsyncMock(return_value={
             "questions": [{
                 "question": "Test question",
                 "options": ["A", "B", "C", "D"],
@@ -294,7 +292,7 @@ class TestQuizErrorHandling:
 
         with patch('app.routes.files_content.get_files_api_service', return_value=mock_service):
             response = client.post("/api/files-content/quiz", json={
-                "topic": "Law",
+                "course_id": "LLS-2025-2026",
                 "num_questions": 1,
                 "difficulty": "invalid_difficulty"
             })
@@ -305,7 +303,7 @@ class TestQuizErrorHandling:
     def test_quiz_generation_with_invalid_num_questions(self, client):
         """Test quiz generation with invalid number of questions."""
         response = client.post("/api/files-content/quiz", json={
-            "topic": "Law",
+            "course_id": "LLS-2025-2026",
             "num_questions": 0,  # Invalid: must be >= 1
             "difficulty": "medium"
         })
@@ -320,8 +318,7 @@ class TestQuizIntegration:
         """Test the complete quiz workflow from generation to completion."""
         # Step 1: Generate quiz
         mock_service = Mock()
-        mock_service.get_topic_files.return_value = ["reader"]
-        mock_service.generate_quiz_from_files = AsyncMock(return_value={
+        mock_service.generate_quiz_from_course = AsyncMock(return_value={
             "questions": [
                 {
                     "question": "Q1",
@@ -340,25 +337,25 @@ class TestQuizIntegration:
 
         with patch('app.routes.files_content.get_files_api_service', return_value=mock_service):
             response = client.post("/api/files-content/quiz", json={
-                "topic": "Law",
+                "course_id": "LLS-2025-2026",
                 "num_questions": 2,
                 "difficulty": "medium"
             })
 
             assert response.status_code == 200
             data = response.json()
-            
+
             # Step 2: Verify quiz structure
             assert "quiz" in data
             assert "questions" in data["quiz"]
             questions = data["quiz"]["questions"]
             assert len(questions) == 2
-            
+
             # Step 3: Simulate answering questions
             user_answers = [0, 2]  # First correct, second incorrect
-            score = sum(1 for i, ans in enumerate(user_answers) 
+            score = sum(1 for i, ans in enumerate(user_answers)
                        if ans == questions[i]["correct_index"])
-            
+
             # Step 4: Verify score
             assert score == 1
             percentage = round((score / len(questions)) * 100)

@@ -2224,6 +2224,39 @@ async def delete_unified_material(
 # ========== Anthropic Files API Management ==========
 
 
+def _validate_course_id(course_id: str) -> str:
+    """Validate course_id parameter.
+
+    Args:
+        course_id: The course ID to validate
+
+    Returns:
+        The validated (stripped) course ID
+
+    Raises:
+        HTTPException: If validation fails
+    """
+    course_id = course_id.strip()
+    if not course_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid course_id: cannot be empty"
+        )
+    if len(course_id) > 100:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid course_id: too long (max 100 characters)"
+        )
+    # Basic character validation (alphanumeric, hyphens, underscores)
+    import re
+    if not re.match(r'^[a-zA-Z0-9_-]+$', course_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid course_id: only alphanumeric characters, hyphens, and underscores allowed"
+        )
+    return course_id
+
+
 @router.post(
     "/courses/{course_id}/anthropic-files/refresh",
     summary="Refresh Anthropic file uploads for a course",
@@ -2232,7 +2265,7 @@ async def delete_unified_material(
                 "allows proactive refresh before files expire."
 )
 async def refresh_anthropic_files(
-    course_id: str = Path(..., description="Course ID"),
+    course_id: str = Path(..., description="Course ID", min_length=1, max_length=100),
     force: bool = Query(False, description="Force re-upload all files, even if not expired")
 ):
     """Refresh Anthropic file uploads for a course.
@@ -2243,8 +2276,17 @@ async def refresh_anthropic_files(
     Files are automatically uploaded on-demand when needed, but this endpoint
     allows proactive refresh to ensure files are ready before they expire.
     """
+    # Validate course_id
+    course_id = _validate_course_id(course_id)
+
     try:
         from app.services.anthropic_file_manager import get_anthropic_file_manager
+        from app.services.anthropic_file_manager import (
+            AnthropicFileManagerError,
+            LocalFileNotFoundError,
+            PathTraversalError,
+            FileValidationError,
+        )
 
         file_manager = get_anthropic_file_manager()
         results = file_manager.refresh_course_files(course_id, force=force)
@@ -2255,8 +2297,26 @@ async def refresh_anthropic_files(
             "results": results
         }
 
+    except (LocalFileNotFoundError, FileValidationError) as e:
+        logger.warning(f"File validation error for {course_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except PathTraversalError as e:
+        logger.error(f"Path traversal attempt for {course_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid file path detected"
+        )
+    except AnthropicFileManagerError as e:
+        logger.error(f"Anthropic file manager error for {course_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"File manager error: {str(e)}"
+        )
     except Exception as e:
-        logger.error(f"Failed to refresh Anthropic files for {course_id}: {e}")
+        logger.error(f"Unexpected error refreshing Anthropic files for {course_id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to refresh files: {str(e)}"
@@ -2269,13 +2329,16 @@ async def refresh_anthropic_files(
     description="Check which materials have been uploaded to Anthropic and their expiry status."
 )
 async def get_anthropic_files_status(
-    course_id: str = Path(..., description="Course ID")
+    course_id: str = Path(..., description="Course ID", min_length=1, max_length=100)
 ):
     """Get Anthropic file upload status for a course.
 
     Returns information about which materials have been uploaded to Anthropic,
     their file IDs, and when they expire.
     """
+    # Validate course_id
+    course_id = _validate_course_id(course_id)
+
     try:
         from app.services.anthropic_file_manager import get_anthropic_file_manager
         from datetime import datetime, timezone
@@ -2299,27 +2362,39 @@ async def get_anthropic_files_status(
             .collection("materials")
         )
 
-        docs = list(materials_ref.stream())
-        now = datetime.now(timezone.utc)
-
+        # Use pagination to handle large collections
+        batch_size = 100
         materials_status = []
-        for doc in docs:
-            data = doc.to_dict()
-            file_id = data.get("anthropicFileId")
-            expiry = data.get("anthropicFileExpiry")
+        now = datetime.now(timezone.utc)
+        query = materials_ref.limit(batch_size)
 
-            status_info = {
-                "material_id": doc.id,
-                "filename": data.get("filename"),
-                "title": data.get("title"),
-                "tier": data.get("tier"),
-                "has_anthropic_file": bool(file_id),
-                "anthropic_file_id": file_id,
-                "expiry": expiry.isoformat() if expiry else None,
-                "is_expired": expiry < now if expiry else None,
-                "upload_error": data.get("anthropicUploadError")
-            }
-            materials_status.append(status_info)
+        while True:
+            docs = list(query.stream())
+            if not docs:
+                break
+
+            for doc in docs:
+                data = doc.to_dict()
+                file_id = data.get("anthropicFileId")
+                expiry = data.get("anthropicFileExpiry")
+
+                status_info = {
+                    "material_id": doc.id,
+                    "filename": data.get("filename"),
+                    "title": data.get("title"),
+                    "tier": data.get("tier"),
+                    "has_anthropic_file": bool(file_id),
+                    "anthropic_file_id": file_id,
+                    "expiry": expiry.isoformat() if expiry else None,
+                    "is_expired": expiry < now if expiry else None,
+                    "upload_error": data.get("anthropicUploadError")
+                }
+                materials_status.append(status_info)
+
+            # Get next batch
+            if len(docs) < batch_size:
+                break
+            query = materials_ref.start_after(docs[-1]).limit(batch_size)
 
         # Summary counts
         total = len(materials_status)

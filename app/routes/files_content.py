@@ -31,22 +31,21 @@ router = APIRouter(
 class FilesQuizRequest(BaseModel):
     """Generate quiz using uploaded files.
 
-    Supports both legacy mode (topic) and course-aware mode (course_id).
-    If course_id is provided, materials are retrieved from Firestore.
-
-    Set use_firestore_materials=True to use the new Firestore-based file
-    management which automatically uploads files to Anthropic on-demand.
+    Uses Firestore-based file management with automatic upload to Anthropic.
+    A course_id is required to identify which course materials to use.
     """
 
+    course_id: str = Field(
+        ...,
+        description="Course ID (e.g., 'LLS-2025-2026'). "
+                    "Materials are retrieved from Firestore.",
+        min_length=1,
+        max_length=100
+    )
     topic: Optional[str] = Field(
         None,
-        description="Topic name (e.g., 'Constitutional Law'). "
-                    "Required if course_id is not provided."
-    )
-    course_id: Optional[str] = Field(
-        None,
-        description="Course ID (e.g., 'LLS-2025-2026'). "
-                    "If provided, materials are retrieved from Firestore."
+        description="Optional topic name for context (e.g., 'Constitutional Law'). "
+                    "If not provided, defaults to 'Course Materials'."
     )
     week: Optional[int] = Field(
         None,
@@ -56,11 +55,6 @@ class FilesQuizRequest(BaseModel):
     )
     num_questions: int = Field(10, ge=1, le=50)
     difficulty: str = Field("medium", description="easy, medium, hard")
-    use_firestore_materials: bool = Field(
-        False,
-        description="Use Firestore materials with auto-upload to Anthropic. "
-                    "Requires course_id. Default: False (uses file_ids.json)"
-    )
 
 
 class FilesStudyGuideRequest(BaseModel):
@@ -239,28 +233,16 @@ async def generate_quiz_from_files(request: FilesQuizRequest):
     """
     Generate quiz questions from uploaded course materials.
 
-    Uses Anthropic Files API - automatically references your uploaded PDFs!
+    Uses Anthropic Files API with Firestore-based file management.
+    Files are automatically uploaded to Anthropic on-demand.
 
     **Benefits:**
     - 90% cost savings with automatic caching
-    - No file re-upload needed
+    - No manual file management needed
+    - Automatic file expiry handling
     - Claude can cite page numbers
 
-    **Modes:**
-    - **Legacy mode**: Provide `topic` parameter
-    - **Course-aware mode**: Provide `course_id` parameter
-
-    **Example (legacy):**
-    ```json
-    {
-        "topic": "Administrative Law",
-        "week": 3,
-        "num_questions": 10,
-        "difficulty": "medium"
-    }
-    ```
-
-    **Example (course-aware):**
+    **Example:**
     ```json
     {
         "course_id": "LLS-2025-2026",
@@ -276,64 +258,39 @@ async def generate_quiz_from_files(request: FilesQuizRequest):
         # Determine topic for quiz generation
         topic = request.topic or "Course Materials"
 
-        # Use new Firestore-based method if requested and course_id provided
-        if request.use_firestore_materials and request.course_id:
-            logger.info(
-                "Using Firestore materials for quiz: course=%s, week=%s",
-                request.course_id, request.week
-            )
-            quiz = await service.generate_quiz_from_course(
-                course_id=request.course_id,
-                topic=topic,
-                num_questions=request.num_questions,
-                difficulty=request.difficulty,
-                week_number=request.week
-            )
+        logger.info(
+            "Generating quiz: course=%s, week=%s, questions=%d",
+            request.course_id, request.week, request.num_questions
+        )
 
-            response = {
-                "quiz": quiz,
-                "course_id": request.course_id,
-                "week": request.week,
-                "mode": "firestore_materials",
-                "cached": True
-            }
-        else:
-            # Legacy mode: use file_ids.json
-            file_keys = _get_file_keys(
-                service,
-                topic=request.topic,
-                course_id=request.course_id,
-                week=request.week
-            )
+        quiz = await service.generate_quiz_from_course(
+            course_id=request.course_id,
+            topic=topic,
+            num_questions=request.num_questions,
+            difficulty=request.difficulty,
+            week_number=request.week
+        )
 
-            quiz = await service.generate_quiz_from_files(
-                file_keys=file_keys,
-                topic=topic,
-                num_questions=request.num_questions,
-                difficulty=request.difficulty
-            )
+        response = {
+            "quiz": quiz,
+            "course_id": request.course_id,
+            "week": request.week,
+            "cached": True
+        }
 
-            response = {
-                "quiz": quiz,
-                "files_used": file_keys,
-                "mode": "legacy_file_ids",
-                "cached": True
-            }
-
-            # Add course context to response
-            _add_course_context(response, course_id=request.course_id, week=request.week)
-
-        # Log successful generation
-        if request.course_id:
-            logger.info(
-                "Generated quiz for course %s, week %s, %d questions",
-                request.course_id, request.week, request.num_questions
-            )
+        logger.info(
+            "Generated quiz for course %s, week %s, %d questions",
+            request.course_id, request.week, request.num_questions
+        )
 
         return response
 
     except HTTPException:
         raise
+    except ValueError as e:
+        # Course not found or other value errors
+        logger.warning("Invalid request for quiz: %s", e)
+        raise HTTPException(400, detail=str(e)) from e
     except Exception as e:
         logger.error("Error generating quiz: %s", e)
         raise HTTPException(500, detail=str(e)) from e
