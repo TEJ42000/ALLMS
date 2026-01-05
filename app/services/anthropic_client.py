@@ -89,6 +89,71 @@ GRADING RUBRIC:
 Be constructive, specific, visual, and educational!"""
 
 
+ESSAY_QUESTION_SYSTEM_PROMPT = """You are an expert Law & Legal Skills professor \
+creating essay exam questions for the University of Groningen LLS course.
+
+YOUR TASK: Generate a thoughtful essay question that:
+1. Tests deep understanding of the topic
+2. Requires a response of 3-7 paragraphs
+3. Is similar to questions seen on actual law exams
+4. Requires analysis, not just memorization
+5. May ask students to compare, analyze, apply, or evaluate legal concepts
+
+QUESTION TYPES to consider:
+- Case analysis: "Analyze the following scenario..."
+- Comparative: "Compare and contrast X and Y..."
+- Application: "Apply the principles of X to the following situation..."
+- Critical analysis: "Critically evaluate the argument that..."
+- Problem questions: Present a legal scenario and ask for resolution
+
+FORMAT YOUR RESPONSE AS JSON:
+{
+    "question": "The full essay question text",
+    "topic": "The specific topic being tested",
+    "key_concepts": ["concept1", "concept2", "concept3"],
+    "guidance": "Optional hints about what a good answer should address"
+}
+
+Make questions challenging but fair - typical of university law examinations."""
+
+
+ESSAY_EVALUATION_SYSTEM_PROMPT = """You are an expert Law & Legal Skills professor \
+evaluating essay answers for the University of Groningen LLS course.
+
+YOUR TASK: Evaluate the student's essay answer based on:
+1. Accuracy of legal knowledge and concepts
+2. Quality of legal reasoning and analysis
+3. Use of relevant article citations (Art. X DCC format)
+4. Structure and organization of the answer
+5. Completeness - are all key points addressed?
+6. Critical thinking and original analysis
+
+GRADING SCALE (1-10):
+- **9-10**: Exceptional - Comprehensive, insightful, well-structured, excellent citations
+- **7-8**: Good - Solid understanding, good structure, minor gaps or errors
+- **5-6**: Adequate - Basic understanding, some analysis, missing key elements
+- **3-4**: Below average - Significant gaps, weak analysis, few citations
+- **1-2**: Poor - Fundamental misunderstanding or largely incomplete
+
+FORMAT YOUR RESPONSE AS JSON:
+{
+    "grade": 7,
+    "feedback": "## Overall Assessment\\n\\nDetailed markdown feedback with sections...",
+    "strengths": ["Strong point 1", "Strong point 2", "Strong point 3"],
+    "improvements": ["Area for improvement 1", "Area for improvement 2"]
+}
+
+The feedback should be comprehensive markdown with:
+- ## Overall Assessment
+- ### Strengths section with ✅ bullets
+- ### Areas for Improvement with ⚠️ bullets
+- ### Specific Corrections with ❌ for errors and correct citations
+- ### Key Takeaways with 💡 bullets
+
+Be constructive, specific, and educational. Help the student understand both what \
+they did well and how to improve."""
+
+
 async def get_ai_tutor_response(
     message: str,
     context: str = "Law & Legal Skills",
@@ -222,6 +287,146 @@ async def get_simple_response(
 
     except Exception as e:
         logger.error("Error getting simple response: %s", str(e))
+        raise
+
+
+async def generate_essay_question(
+    topic: str,
+    course_context: Optional[str] = None
+) -> Dict:
+    """
+    Generate an essay question for a given topic.
+
+    Args:
+        topic: The topic to generate a question about
+        course_context: Optional course material context
+
+    Returns:
+        Dictionary with question, topic, key_concepts, guidance
+    """
+    import json
+
+    try:
+        user_message = f"Generate an essay question for the topic: {topic}"
+        if course_context:
+            user_message += f"\n\nRelevant course material:\n{course_context[:5000]}"
+
+        response = await client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=1500,
+            system=ESSAY_QUESTION_SYSTEM_PROMPT,
+            messages=[{
+                "role": "user",
+                "content": user_message
+            }]
+        )
+
+        response_text = response.content[0].text
+
+        # Parse JSON from response
+        # Try to extract JSON from the response
+        try:
+            # First try direct JSON parse
+            result = json.loads(response_text)
+        except json.JSONDecodeError:
+            # Try to find JSON in the response
+            import re
+            json_match = re.search(r'\{[^{}]*\}', response_text, re.DOTALL)
+            if json_match:
+                result = json.loads(json_match.group())
+            else:
+                # Fallback: create structured response from text
+                result = {
+                    "question": response_text,
+                    "topic": topic,
+                    "key_concepts": [],
+                    "guidance": None
+                }
+
+        logger.info("Generated essay question for topic: %s", topic)
+        return result
+
+    except Exception as e:
+        logger.error("Error generating essay question: %s", str(e))
+        raise
+
+
+async def evaluate_essay_answer(
+    question: str,
+    answer: str,
+    topic: str,
+    key_concepts: Optional[List[str]] = None,
+    course_context: Optional[str] = None
+) -> Dict:
+    """
+    Evaluate a student's essay answer.
+
+    Args:
+        question: The essay question
+        answer: The student's answer
+        topic: The topic being assessed
+        key_concepts: Optional list of concepts that should be addressed
+        course_context: Optional course material for reference
+
+    Returns:
+        Dictionary with grade, feedback, strengths, improvements
+    """
+    import json
+
+    try:
+        user_message = f"""## Essay Question
+{question}
+
+## Topic
+{topic}
+"""
+        if key_concepts:
+            user_message += f"\n## Key Concepts Expected\n{', '.join(key_concepts)}\n"
+
+        if course_context:
+            user_message += f"\n## Reference Material\n{course_context[:5000]}\n"
+
+        user_message += f"\n## Student's Answer\n{answer}"
+
+        response = await client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=3000,
+            system=ESSAY_EVALUATION_SYSTEM_PROMPT,
+            messages=[{
+                "role": "user",
+                "content": user_message
+            }]
+        )
+
+        response_text = response.content[0].text
+
+        # Parse JSON from response
+        try:
+            result = json.loads(response_text)
+        except json.JSONDecodeError:
+            import re
+            json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
+            if json_match:
+                result = json.loads(json_match.group())
+            else:
+                # Fallback: extract grade and use response as feedback
+                grade_match = re.search(r'"grade"\s*:\s*(\d+)', response_text)
+                grade = int(grade_match.group(1)) if grade_match else 5
+                result = {
+                    "grade": grade,
+                    "feedback": response_text,
+                    "strengths": [],
+                    "improvements": []
+                }
+
+        # Ensure grade is in valid range
+        result["grade"] = max(1, min(10, result.get("grade", 5)))
+
+        logger.info("Evaluated essay answer for topic: %s, grade: %d", topic, result["grade"])
+        return result
+
+    except Exception as e:
+        logger.error("Error evaluating essay answer: %s", str(e))
         raise
 
 
