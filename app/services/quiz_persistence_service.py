@@ -21,6 +21,10 @@ from app.services.gcp_service import get_firestore_client
 
 logger = logging.getLogger(__name__)
 
+# Length of content hash for duplicate detection
+# 16 hex characters (64 bits) provides sufficient uniqueness for typical course sizes
+CONTENT_HASH_LENGTH = 16
+
 
 class QuizPersistenceService:
     """Service for persisting quizzes and results to Firestore."""
@@ -44,7 +48,7 @@ class QuizPersistenceService:
         # Extract and sort question texts
         question_texts = sorted([q.get("question", "") for q in questions])
         content = "|".join(question_texts)
-        return hashlib.sha256(content.encode()).hexdigest()[:16]
+        return hashlib.sha256(content.encode()).hexdigest()[:CONTENT_HASH_LENGTH]
 
     async def save_quiz(
         self,
@@ -70,6 +74,16 @@ class QuizPersistenceService:
         """
         if not self._firestore:
             raise RuntimeError("Firestore not available")
+
+        # Validate questions have valid correct_index values
+        for i, question in enumerate(questions):
+            options = question.get("options", [])
+            correct_index = question.get("correct_index", 0)
+            if correct_index < 0 or correct_index >= len(options):
+                raise ValueError(
+                    f"Question {i + 1} has invalid correct_index {correct_index} "
+                    f"for {len(options)} options"
+                )
 
         quiz_id = str(uuid.uuid4())
         content_hash = self._generate_content_hash(questions)

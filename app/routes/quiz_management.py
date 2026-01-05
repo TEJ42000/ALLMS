@@ -34,8 +34,7 @@ router = APIRouter(
     tags=["Quiz Management"]
 )
 
-# Maximum regeneration attempts for duplicate detection
-MAX_REGENERATION_ATTEMPTS = 3
+
 
 
 def get_or_create_user_id(user_id_header: Optional[str] = None) -> str:
@@ -44,16 +43,26 @@ def get_or_create_user_id(user_id_header: Optional[str] = None) -> str:
     In production, this would come from authentication.
     For now, we accept a header or generate a UUID.
 
+    Note: When no header is provided, a new user ID is generated each time.
+    The frontend should persist the user ID in localStorage and send it
+    with the X-User-ID header to maintain quiz history across sessions.
+
     Args:
         user_id_header: Optional X-User-ID header value
 
     Returns:
-        User ID string
+        User ID string (either from header or newly generated)
     """
     if user_id_header:
         return user_id_header
     # Generate a simulated user ID (frontend should persist this)
-    return f"sim-{uuid.uuid4().hex[:12]}"
+    new_user_id = f"sim-{uuid.uuid4().hex[:12]}"
+    logger.warning(
+        "No X-User-ID header provided, generating new simulated user ID: %s. "
+        "Frontend should persist this ID to maintain quiz history.",
+        new_user_id
+    )
+    return new_user_id
 
 
 @router.get("/courses/{course_id}")
@@ -147,7 +156,18 @@ async def create_quiz(
 
         questions = quiz_data.get("questions", [])
         if not questions:
-            raise ValueError("No questions generated")
+            # Log details to help debug quiz generation failures
+            logger.error(
+                "Quiz generation failed for course %s (topic=%s, difficulty=%s, week=%s): "
+                "No questions were generated. This may indicate missing course materials, "
+                "API issues, or content that could not be processed.",
+                course_id, topic, request.difficulty, request.week
+            )
+            raise HTTPException(
+                status_code=400,
+                detail=f"No questions could be generated for course '{course_id}'. "
+                       f"Please ensure course materials are available and try again."
+            )
 
         # Check for duplicates
         if not request.allow_duplicate:
@@ -200,7 +220,7 @@ async def submit_quiz(
     Calculates score, saves the result, and returns detailed feedback.
 
     Args:
-        request: Quiz submission with quiz_id and answers
+        request: Quiz submission with quiz_id, course_id, and answers
         x_user_id: Optional user ID header (simulated if not provided)
 
     Returns:
@@ -210,43 +230,22 @@ async def submit_quiz(
         service = get_quiz_persistence_service()
         user_id = request.user_id or get_or_create_user_id(x_user_id)
 
-        # Get quiz to find course_id
-        # First try to find the quiz by searching all courses
-        # This is a workaround since we don't have course_id in the request
-        quiz = None
-        course_id = None
-
-        # Check if quiz_id contains course context or search for it
-        # For now, we require the frontend to provide context
-        # Try to extract from the stored quiz
-        from app.services.gcp_service import get_firestore_client
-        firestore = get_firestore_client()
-
-        if firestore:
-            # Search for the quiz across courses
-            courses_ref = firestore.collection("courses")
-            for course_doc in courses_ref.stream():
-                quiz_ref = course_doc.reference.collection("quizzes").document(request.quiz_id)
-                quiz_doc = quiz_ref.get()
-                if quiz_doc.exists:
-                    quiz = quiz_doc.to_dict()
-                    course_id = course_doc.id
-                    break
-
+        # Verify quiz exists using the service layer
+        quiz = await service.get_quiz(request.course_id, request.quiz_id)
         if not quiz:
-            raise HTTPException(404, detail=f"Quiz {request.quiz_id} not found")
+            raise HTTPException(404, detail=f"Quiz {request.quiz_id} not found in course {request.course_id}")
 
         # Calculate score
         score, total, question_results = await service.calculate_score(
             quiz_id=request.quiz_id,
-            course_id=course_id,
+            course_id=request.course_id,
             answers=request.answers
         )
 
         # Save result
         result = await service.save_quiz_result(
             quiz_id=request.quiz_id,
-            course_id=course_id,
+            course_id=request.course_id,
             user_id=user_id,
             answers=request.answers,
             score=score,

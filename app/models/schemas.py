@@ -1,6 +1,6 @@
 """Pydantic Models for API Requests/Responses."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
 
 from pydantic import BaseModel, Field, field_validator
@@ -159,7 +159,7 @@ class StoredQuiz(BaseModel):
     num_questions: int = Field(..., description="Number of questions")
     questions: List[StoredQuizQuestion] = Field(..., description="Quiz questions")
     content_hash: str = Field(..., description="Hash for duplicate detection")
-    created_at: datetime = Field(default_factory=datetime.utcnow, description="Creation timestamp")
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), description="Creation timestamp (UTC)")
     title: Optional[str] = Field(None, description="Optional quiz title")
 
 
@@ -188,16 +188,25 @@ class QuizAttemptResult(BaseModel):
     total_questions: int = Field(..., ge=1, description="Total questions in quiz")
     percentage: float = Field(..., ge=0, le=100, description="Score percentage")
     time_taken_seconds: Optional[int] = Field(None, description="Time taken in seconds")
-    completed_at: datetime = Field(default_factory=datetime.utcnow, description="Completion timestamp")
+    completed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), description="Completion timestamp (UTC)")
 
 
 class QuizSubmitRequest(BaseModel):
     """Request model for submitting quiz answers."""
 
     quiz_id: str = Field(..., description="Quiz ID")
+    course_id: str = Field(..., description="Course ID the quiz belongs to")
     answers: List[int] = Field(..., description="User's answer indices for each question")
     user_id: Optional[str] = Field(None, description="User ID (generated if not provided)")
     time_taken_seconds: Optional[int] = Field(None, ge=0, description="Time taken in seconds")
+
+    @field_validator('answers')
+    @classmethod
+    def validate_answers(cls, v: List[int]) -> List[int]:
+        """Validate that answer indices are non-negative."""
+        if any(answer < 0 for answer in v):
+            raise ValueError('Answer indices must be non-negative')
+        return v
 
 
 class QuizHistoryItem(BaseModel):

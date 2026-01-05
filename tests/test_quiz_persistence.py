@@ -6,13 +6,60 @@ Tests cover:
 - Quiz result saving and scoring
 - User quiz history
 - API endpoints for quiz management
+- Input validation for quiz submissions
 """
 
 import pytest
 from datetime import datetime, timezone
 from unittest.mock import MagicMock, AsyncMock, patch
+from pydantic import ValidationError
 
 from app.services.quiz_persistence_service import QuizPersistenceService
+from app.models.schemas import QuizSubmitRequest
+
+
+class TestQuizSubmitRequestValidation:
+    """Tests for QuizSubmitRequest input validation."""
+
+    def test_valid_submit_request(self):
+        """Test valid submission request is accepted."""
+        request = QuizSubmitRequest(
+            quiz_id="quiz-123",
+            course_id="course-456",
+            answers=[0, 1, 2, 3],
+            user_id="user-789"
+        )
+        assert request.quiz_id == "quiz-123"
+        assert request.course_id == "course-456"
+        assert request.answers == [0, 1, 2, 3]
+
+    def test_submit_request_requires_course_id(self):
+        """Test that course_id is required."""
+        with pytest.raises(ValidationError) as exc_info:
+            QuizSubmitRequest(
+                quiz_id="quiz-123",
+                answers=[0, 1, 2]
+            )
+        assert "course_id" in str(exc_info.value)
+
+    def test_submit_request_rejects_negative_answers(self):
+        """Test that negative answer indices are rejected."""
+        with pytest.raises(ValidationError) as exc_info:
+            QuizSubmitRequest(
+                quiz_id="quiz-123",
+                course_id="course-456",
+                answers=[0, -1, 2]
+            )
+        assert "Answer indices must be non-negative" in str(exc_info.value)
+
+    def test_submit_request_accepts_zero_answers(self):
+        """Test that zero is a valid answer index."""
+        request = QuizSubmitRequest(
+            quiz_id="quiz-123",
+            course_id="course-456",
+            answers=[0, 0, 0]
+        )
+        assert request.answers == [0, 0, 0]
 
 
 class TestContentHashing:
@@ -67,13 +114,14 @@ class TestContentHashing:
         assert hash1 != hash2
 
     def test_generate_content_hash_length(self):
-        """Hash should be 16 characters (truncated SHA-256)."""
+        """Hash should be CONTENT_HASH_LENGTH characters (truncated SHA-256)."""
+        from app.services.quiz_persistence_service import CONTENT_HASH_LENGTH
         service = QuizPersistenceService()
         questions = [{"question": "Test question"}]
 
         hash_value = service._generate_content_hash(questions)
 
-        assert len(hash_value) == 16
+        assert len(hash_value) == CONTENT_HASH_LENGTH
 
 
 class TestSaveQuiz:
@@ -126,6 +174,46 @@ class TestSaveQuiz:
             )
 
         assert "Firestore not available" in str(exc_info.value)
+
+    @pytest.mark.asyncio
+    async def test_save_quiz_invalid_correct_index_too_high(self):
+        """Test save quiz fails when correct_index is out of bounds."""
+        service = QuizPersistenceService()
+        service._firestore = MagicMock()
+
+        questions = [
+            {"question": "Q1", "options": ["A", "B"], "correct_index": 5}  # Only 2 options
+        ]
+
+        with pytest.raises(ValueError) as exc_info:
+            await service.save_quiz(
+                course_id="test-course",
+                topic="Test",
+                difficulty="easy",
+                questions=questions
+            )
+
+        assert "invalid correct_index" in str(exc_info.value)
+
+    @pytest.mark.asyncio
+    async def test_save_quiz_invalid_correct_index_negative(self):
+        """Test save quiz fails when correct_index is negative."""
+        service = QuizPersistenceService()
+        service._firestore = MagicMock()
+
+        questions = [
+            {"question": "Q1", "options": ["A", "B"], "correct_index": -1}
+        ]
+
+        with pytest.raises(ValueError) as exc_info:
+            await service.save_quiz(
+                course_id="test-course",
+                topic="Test",
+                difficulty="easy",
+                questions=questions
+            )
+
+        assert "invalid correct_index" in str(exc_info.value)
 
 
 class TestGetQuiz:

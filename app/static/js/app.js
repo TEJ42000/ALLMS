@@ -830,9 +830,9 @@ function nextQuestion() {
 }
 
 async function submitQuizResults() {
-    // Only submit if we have a quiz ID (persisted quiz)
-    if (!quizState.quizId) {
-        console.log('Quiz not persisted, skipping result submission');
+    // Only submit if we have both quiz ID and course ID (persisted quiz)
+    if (!quizState.quizId || !quizState.courseId) {
+        console.log('Quiz not persisted or missing course ID, skipping result submission');
         return;
     }
 
@@ -849,6 +849,7 @@ async function submitQuizResults() {
             },
             body: JSON.stringify({
                 quiz_id: quizState.quizId,
+                course_id: quizState.courseId,
                 answers: quizState.userAnswers,
                 user_id: getUserId(),
                 time_taken_seconds: timeTaken
