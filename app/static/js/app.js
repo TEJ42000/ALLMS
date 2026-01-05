@@ -319,19 +319,245 @@ async function assessAnswer() {
 // ========== Quiz Generator ==========
 // Quiz state management
 let quizState = {
+    quizId: null,        // ID of the current quiz (for persisted quizzes)
+    courseId: null,      // Course ID
     questions: [],
     currentQuestionIndex: 0,
     userAnswers: [],
     score: 0,
-    isComplete: false
+    isComplete: false,
+    startTime: null      // Track quiz start time
 };
 
 // Race condition protection - prevent multiple simultaneous quiz generations
 let isGeneratingQuiz = false;
 
+// Simulated user ID (stored in localStorage until real auth)
+function getUserId() {
+    let userId = localStorage.getItem('allms_user_id');
+    if (!userId) {
+        userId = 'sim-' + crypto.randomUUID();
+        localStorage.setItem('allms_user_id', userId);
+    }
+    return userId;
+}
+
 function initQuizListeners() {
     const startBtn = document.getElementById('start-quiz-btn');
     if (startBtn) startBtn.addEventListener('click', generateQuiz);
+
+    // Tab navigation
+    document.querySelectorAll('.quiz-tab').forEach(tab => {
+        tab.addEventListener('click', () => switchQuizTab(tab.dataset.quizTab));
+    });
+
+    // Back button
+    const backBtn = document.getElementById('back-to-quizzes-btn');
+    if (backBtn) backBtn.addEventListener('click', backToQuizList);
+
+    // Load saved quizzes on init
+    loadSavedQuizzes();
+}
+
+function switchQuizTab(tabName) {
+    // Update tab buttons
+    document.querySelectorAll('.quiz-tab').forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.quizTab === tabName);
+    });
+
+    // Update tab content
+    document.getElementById('saved-quizzes-tab')?.classList.toggle('hidden', tabName !== 'saved');
+    document.getElementById('new-quiz-tab')?.classList.toggle('hidden', tabName !== 'new');
+    document.getElementById('history-tab')?.classList.toggle('hidden', tabName !== 'history');
+
+    // Load data for the tab
+    if (tabName === 'saved') {
+        loadSavedQuizzes();
+    } else if (tabName === 'history') {
+        loadQuizHistory();
+    }
+}
+
+async function loadSavedQuizzes() {
+    const container = document.getElementById('saved-quizzes-list');
+    if (!container || !COURSE_ID) return;
+
+    container.innerHTML = '<p class="loading-text">Loading saved quizzes...</p>';
+
+    try {
+        const response = await fetch(`${API_BASE}/api/quizzes/courses/${COURSE_ID}`);
+        if (!response.ok) throw new Error('Failed to load quizzes');
+
+        const data = await response.json();
+        const quizzes = data.quizzes || [];
+
+        if (quizzes.length === 0) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon">📚</div>
+                    <p>No saved quizzes yet. Create your first quiz!</p>
+                    <button class="btn btn-primary" onclick="switchQuizTab('new')">Create New Quiz</button>
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = quizzes.map(quiz => `
+            <div class="saved-quiz-card" data-quiz-id="${quiz.id}">
+                <div class="saved-quiz-info">
+                    <h4>${escapeHtml(quiz.title || quiz.topic)}</h4>
+                    <div class="saved-quiz-meta">
+                        <span>📝 ${quiz.numQuestions} questions</span>
+                        <span>🎯 ${quiz.difficulty}</span>
+                        ${quiz.weekNumber ? `<span>📅 Week ${quiz.weekNumber}</span>` : ''}
+                        <span>📅 ${formatDate(quiz.createdAt)}</span>
+                    </div>
+                </div>
+                <div class="saved-quiz-actions">
+                    <button class="btn btn-primary btn-small start-saved-quiz">Start Quiz</button>
+                </div>
+            </div>
+        `).join('');
+
+        // Add click handlers
+        container.querySelectorAll('.start-saved-quiz').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const quizId = btn.closest('.saved-quiz-card').dataset.quizId;
+                startSavedQuiz(quizId);
+            });
+        });
+
+    } catch (error) {
+        console.error('Error loading quizzes:', error);
+        container.innerHTML = `<p class="error">Error loading quizzes: ${error.message}</p>`;
+    }
+}
+
+async function loadQuizHistory() {
+    const container = document.getElementById('quiz-history-list');
+    if (!container) return;
+
+    container.innerHTML = '<p class="loading-text">Loading quiz history...</p>';
+
+    try {
+        const userId = getUserId();
+        const response = await fetch(`${API_BASE}/api/quizzes/history/${userId}`, {
+            headers: { 'X-User-ID': userId }
+        });
+
+        if (!response.ok) throw new Error('Failed to load history');
+
+        const data = await response.json();
+        const history = data.history || [];
+
+        if (history.length === 0) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon">📊</div>
+                    <p>No quiz history yet. Take a quiz to see your results!</p>
+                    <button class="btn btn-primary" onclick="switchQuizTab('saved')">Browse Quizzes</button>
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = history.map(item => {
+            const perfClass = getPerformanceClass(item.percentage);
+            return `
+                <div class="history-item">
+                    <div class="history-info">
+                        <h4>${escapeHtml(item.quizTitle || item.topic || 'Quiz')}</h4>
+                        <span class="history-date">${formatDateTime(item.completedAt)}</span>
+                    </div>
+                    <div class="history-score">
+                        <div class="percentage ${perfClass}">${item.percentage}%</div>
+                        <div class="fraction">${item.score}/${item.totalQuestions}</div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+    } catch (error) {
+        console.error('Error loading history:', error);
+        container.innerHTML = `<p class="error">Error loading history: ${error.message}</p>`;
+    }
+}
+
+function getPerformanceClass(percentage) {
+    if (percentage >= 90) return 'excellent';
+    if (percentage >= 70) return 'good';
+    if (percentage >= 50) return 'average';
+    return 'poor';
+}
+
+function formatDate(dateStr) {
+    if (!dateStr) return '';
+    const date = new Date(dateStr);
+    return date.toLocaleDateString();
+}
+
+function formatDateTime(dateStr) {
+    if (!dateStr) return '';
+    const date = new Date(dateStr);
+    return date.toLocaleString();
+}
+
+async function startSavedQuiz(quizId) {
+    if (!COURSE_ID) return;
+
+    showLoading();
+
+    try {
+        const response = await fetch(`${API_BASE}/api/quizzes/courses/${COURSE_ID}/${quizId}`);
+        if (!response.ok) throw new Error('Failed to load quiz');
+
+        const data = await response.json();
+        const quiz = data.quiz;
+
+        // Reset quiz state
+        quizState = {
+            quizId: quiz.id,
+            courseId: COURSE_ID,
+            questions: quiz.questions,
+            currentQuestionIndex: 0,
+            userAnswers: new Array(quiz.questions.length).fill(null),
+            score: 0,
+            isComplete: false,
+            startTime: Date.now()
+        };
+
+        // Show quiz content
+        showQuizContent();
+
+    } catch (error) {
+        console.error('Error starting quiz:', error);
+        alert('Error loading quiz: ' + error.message);
+    } finally {
+        hideLoading();
+    }
+}
+
+function showQuizContent() {
+    const selectionView = document.getElementById('quiz-selection-view');
+    const quizContent = document.getElementById('quiz-content');
+    const questionContainer = document.getElementById('quiz-question-container');
+
+    if (selectionView) selectionView.classList.add('hidden');
+    if (quizContent) quizContent.classList.remove('hidden');
+
+    displayQuiz(quizContent, questionContainer);
+}
+
+function backToQuizList() {
+    const selectionView = document.getElementById('quiz-selection-view');
+    const quizContent = document.getElementById('quiz-content');
+
+    if (quizContent) quizContent.classList.add('hidden');
+    if (selectionView) selectionView.classList.remove('hidden');
+
+    // Reload saved quizzes
+    loadSavedQuizzes();
 }
 
 async function generateQuiz() {
@@ -341,31 +567,36 @@ async function generateQuiz() {
         return;
     }
 
+    if (!COURSE_ID) {
+        alert('No course selected. Please select a course first.');
+        return;
+    }
+
     const topicSelect = document.getElementById('quiz-topic-select');
     const difficultySelect = document.getElementById('quiz-difficulty-select');
+    const numQuestionsSelect = document.getElementById('quiz-num-questions');
     const topic = topicSelect ? topicSelect.value : 'all';
     const difficulty = difficultySelect ? difficultySelect.value : 'medium';
-    const num_questions = 10; // Generate 10 questions
-    const quizContent = document.getElementById('quiz-content');
-    const questionContainer = document.getElementById('quiz-question-container');
-
-    // Reset quiz state
-    quizState = {
-        questions: [],
-        currentQuestionIndex: 0,
-        userAnswers: [],
-        score: 0,
-        isComplete: false
-    };
+    const num_questions = numQuestionsSelect ? parseInt(numQuestionsSelect.value) : 10;
 
     isGeneratingQuiz = true;
     showLoading();
 
     try {
-        const response = await fetch(`${API_BASE}/api/files-content/quiz`, {
+        // Use the new quiz persistence API
+        const response = await fetch(`${API_BASE}/api/quizzes/courses/${COURSE_ID}`, {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(addCourseContext({topic, num_questions, difficulty}))
+            headers: {
+                'Content-Type': 'application/json',
+                'X-User-ID': getUserId()
+            },
+            body: JSON.stringify({
+                course_id: COURSE_ID,
+                topic: topic,
+                num_questions: num_questions,
+                difficulty: difficulty,
+                allow_duplicate: false
+            })
         });
 
         if (!response.ok) {
@@ -375,22 +606,31 @@ async function generateQuiz() {
         }
 
         const data = await response.json();
+        const quiz = data.quiz;
 
-        // Parse quiz data - expect standardized format: { quiz: { questions: [...] } }
-        if (!data.quiz || !data.quiz.questions || !Array.isArray(data.quiz.questions)) {
-            throw new Error('Invalid quiz format: expected { quiz: { questions: [...] } }');
-        }
-
-        const questions = data.quiz.questions;
-
-        if (questions.length === 0) {
+        if (!quiz || !quiz.questions || quiz.questions.length === 0) {
             throw new Error('No questions generated');
         }
 
-        quizState.questions = questions;
-        quizState.userAnswers = new Array(questions.length).fill(null);
+        // Reset quiz state with the new quiz
+        quizState = {
+            quizId: quiz.id,
+            courseId: COURSE_ID,
+            questions: quiz.questions,
+            currentQuestionIndex: 0,
+            userAnswers: new Array(quiz.questions.length).fill(null),
+            score: 0,
+            isComplete: false,
+            startTime: Date.now()
+        };
 
-        displayQuiz(quizContent, questionContainer);
+        // Show notification if this was an existing quiz
+        if (!data.is_new) {
+            console.log('Loaded existing quiz with matching content');
+        }
+
+        // Show quiz content
+        showQuizContent();
 
     } catch (error) {
         console.error('Error:', error);
@@ -578,11 +818,66 @@ function nextQuestion() {
     } else {
         // Quiz complete
         quizState.isComplete = true;
+
+        // Submit results to backend
+        submitQuizResults();
+
         const container = document.getElementById('quiz-question-container');
         if (container) {
             displayQuizResults(container);
         }
     }
+}
+
+async function submitQuizResults() {
+    // Only submit if we have a quiz ID (persisted quiz)
+    if (!quizState.quizId) {
+        console.log('Quiz not persisted, skipping result submission');
+        return;
+    }
+
+    const timeTaken = quizState.startTime
+        ? Math.round((Date.now() - quizState.startTime) / 1000)
+        : null;
+
+    try {
+        const response = await fetch(`${API_BASE}/api/quizzes/submit`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-User-ID': getUserId()
+            },
+            body: JSON.stringify({
+                quiz_id: quizState.quizId,
+                answers: quizState.userAnswers,
+                user_id: getUserId(),
+                time_taken_seconds: timeTaken
+            })
+        });
+
+        if (!response.ok) {
+            console.error('Failed to submit quiz results:', response.status);
+            return;
+        }
+
+        const data = await response.json();
+        console.log('Quiz results submitted:', data);
+
+        // Update local stats
+        updateLocalQuizStats();
+
+    } catch (error) {
+        console.error('Error submitting quiz results:', error);
+    }
+}
+
+function updateLocalQuizStats() {
+    const currentQuizzes = parseInt(localStorage.getItem('lls_quizzes') || '0');
+    localStorage.setItem('lls_quizzes', currentQuizzes + 1);
+
+    // Update points based on score
+    const currentPoints = parseInt(localStorage.getItem('lls_points') || '0');
+    localStorage.setItem('lls_points', currentPoints + quizState.score * 10);
 }
 
 function displayQuizResults(container) {
@@ -676,20 +971,20 @@ function handleResultsContainerClick(event) {
 }
 
 function restartQuiz() {
-    // Hide quiz content and reset
-    const quizContent = document.getElementById('quiz-content');
-    if (quizContent) {
-        quizContent.classList.add('hidden');
-    }
-
     // Reset state
     quizState = {
+        quizId: null,
+        courseId: null,
         questions: [],
         currentQuestionIndex: 0,
         userAnswers: [],
         score: 0,
-        isComplete: false
+        isComplete: false,
+        startTime: null
     };
+
+    // Go back to quiz list
+    backToQuizList();
 
     // Scroll to quiz section
     const quizSection = document.getElementById('quiz-section');
