@@ -1,59 +1,60 @@
-"""Content Generation using Anthropic Files API for the LLS Study Portal.
+"""Content Generation Service for the LLS Study Portal.
 
 This service provides AI-powered content generation (quizzes, study guides, flashcards)
-using uploaded course materials. It can optionally integrate with CourseService to
-get course-specific materials from Firestore.
+using course materials. It integrates with CourseService to get course-specific
+materials from Firestore and uses text extraction to get content from files.
+
+Content is extracted locally using the text_extractor service, which handles:
+- Real PDFs (using PyMuPDF)
+- Slide archives (ZIP files with JPEG slides + text, disguised as PDFs)
+- Images (OCR)
+- DOCX, Markdown, HTML, etc.
+
+This approach is more robust than the Files API because it:
+1. Works with all file types including slide archives
+2. Doesn't require managing file IDs and expiry
+3. Simpler architecture with no external file state
 """
 
 import json
 import logging
 import re
-from typing import Dict, List, Optional
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple
 
 from anthropic import AsyncAnthropic
 
-from app.services.gcp_service import get_anthropic_api_key
+from app.models.course_models import CourseMaterial
+from app.services.gcp_service import get_anthropic_api_key, get_firestore_client
+from app.services.text_extractor import extract_text, detect_file_type, ExtractionResult
 
 logger = logging.getLogger(__name__)
 
 # Constants
 DEFAULT_FALLBACK_COUNT = 5  # Number of files to return when no specific files found
+MATERIALS_ROOT = Path("Materials")
+MAX_TEXT_LENGTH = 100000  # Maximum characters per document to avoid context overflow
 
 
 class FilesAPIService:
-    """Service for generating content using uploaded files via Anthropic Files API.
+    """Service for generating content using course materials with text extraction.
 
-    This service can operate in two modes:
-    1. **Legacy mode**: Uses hardcoded topic mappings (backward compatible)
-    2. **Course-aware mode**: Uses CourseService to get course-specific materials
+    This service uses text extraction to get content from local files,
+    supporting all file types including slide archives.
 
-    The course-aware mode is activated by passing a course_id to methods like
-    get_topic_files_for_course().
+    Key methods:
+    - get_course_materials(): Fetch materials from Firestore
+    - get_course_materials_with_text(): Get materials with extracted text content
+    - generate_quiz_from_course(): Generate quizzes using course materials
     """
 
-    def __init__(self, file_ids_path: str = "file_ids.json"):
-        """
-        Initialize the Files API service.
-
-        Args:
-            file_ids_path: Path to the JSON file containing uploaded file IDs.
-        """
+    def __init__(self):
+        """Initialize the content generation service."""
         self.client = AsyncAnthropic(api_key=get_anthropic_api_key())
 
-        # Load uploaded file IDs
-        try:
-            with open(file_ids_path, "r", encoding="utf-8") as f:
-                self.file_ids = json.load(f)
-            logger.info("Loaded %d file IDs", len(self.file_ids))
-        except FileNotFoundError:
-            logger.warning("file_ids.json not found! Run upload_files_script.py first")
-            self.file_ids = {}
-
-        # Beta header for Files API
-        self.beta_header = "files-api-2025-04-14"
-
-        # Lazy-loaded CourseService reference
+        # Lazy-loaded service references
         self._course_service = None
+        self._firestore = None
 
     def _get_course_service(self):
         """Get CourseService instance (lazy loading to avoid circular imports)."""
@@ -62,12 +63,184 @@ class FilesAPIService:
             self._course_service = get_course_service()
         return self._course_service
 
-    def get_file_id(self, key: str) -> str:
-        """Get file_id for a course material."""
-        file_info = self.file_ids.get(key)
-        if not file_info:
-            raise ValueError("File '%s' not found in file_ids.json" % key)
-        return file_info["file_id"]
+    @property
+    def firestore(self):
+        """Lazy-load Firestore client."""
+        if self._firestore is None:
+            self._firestore = get_firestore_client()
+        return self._firestore
+
+    # ========== Firestore-Based Methods ==========
+
+    def get_course_materials(
+        self,
+        course_id: str,
+        week_number: Optional[int] = None,
+        tier: Optional[str] = None,
+        category: Optional[str] = None,
+        limit: int = 50
+    ) -> List[CourseMaterial]:
+        """Get course materials from Firestore.
+
+        Args:
+            course_id: Course ID
+            week_number: Optional week filter
+            tier: Optional tier filter ('syllabus', 'course_materials', 'supplementary')
+            category: Optional category filter
+            limit: Maximum materials to return
+
+        Returns:
+            List of CourseMaterial objects
+        """
+        if not self.firestore:
+            logger.warning("Firestore not available")
+            return []
+
+        query = (
+            self.firestore
+            .collection("courses")
+            .document(course_id)
+            .collection("materials")
+        )
+
+        # Apply filters
+        if week_number is not None:
+            query = query.where("weekNumber", "==", week_number)
+        if tier:
+            query = query.where("tier", "==", tier)
+        if category:
+            query = query.where("category", "==", category)
+
+        # Execute query
+        docs = query.limit(limit).stream()
+
+        materials = []
+        for doc in docs:
+            data = doc.to_dict()
+            data["id"] = doc.id
+            try:
+                materials.append(CourseMaterial(**data))
+            except Exception as e:
+                logger.warning("Failed to parse material %s: %s", doc.id, str(e))
+
+        return materials
+
+    def _get_local_file_path(self, material: CourseMaterial) -> Path:
+        """Get the local file path for a material.
+
+        Args:
+            material: The course material
+
+        Returns:
+            Path to the local file
+        """
+        return MATERIALS_ROOT / material.storagePath
+
+    def _extract_text_from_material(self, material: CourseMaterial) -> Optional[str]:
+        """Extract text content from a material file.
+
+        Handles all file types including slide archives (ZIP files disguised as PDFs).
+
+        Args:
+            material: The course material
+
+        Returns:
+            Extracted text content, or None if extraction failed
+        """
+        file_path = self._get_local_file_path(material)
+
+        if not file_path.exists():
+            logger.warning("File not found: %s", file_path)
+            return None
+
+        # Detect file type and extract text
+        file_type = detect_file_type(file_path)
+        logger.info("Extracting text from %s (type: %s)", material.filename, file_type)
+
+        result = extract_text(file_path)
+
+        if not result.success:
+            logger.warning(
+                "Failed to extract text from %s: %s",
+                material.filename,
+                result.error
+            )
+            return None
+
+        # Truncate if too long to avoid context overflow
+        text = result.text
+        if len(text) > MAX_TEXT_LENGTH:
+            logger.info(
+                "Truncating text from %s: %d -> %d chars",
+                material.filename,
+                len(text),
+                MAX_TEXT_LENGTH
+            )
+            text = text[:MAX_TEXT_LENGTH] + "\n\n[... content truncated ...]"
+
+        logger.info(
+            "Extracted %d chars from %s (type: %s)",
+            len(text),
+            material.filename,
+            file_type
+        )
+        return text
+
+    async def get_course_materials_with_text(
+        self,
+        course_id: str,
+        week_number: Optional[int] = None,
+        tier: Optional[str] = None,
+        limit: int = 10
+    ) -> List[Tuple[CourseMaterial, str]]:
+        """Get course materials with their extracted text content.
+
+        This method extracts text from local files, supporting all file types
+        including slide archives (ZIP files with JPEG slides + text).
+
+        Args:
+            course_id: Course ID
+            week_number: Optional week filter
+            tier: Optional tier filter
+            limit: Maximum materials to return
+
+        Returns:
+            List of (CourseMaterial, extracted_text) tuples
+        """
+        materials = self.get_course_materials(
+            course_id=course_id,
+            week_number=week_number,
+            tier=tier,
+            limit=limit
+        )
+
+        if not materials:
+            logger.warning("No materials found for course %s", course_id)
+            return []
+
+        results = []
+
+        for material in materials:
+            try:
+                text = self._extract_text_from_material(material)
+                if text:
+                    results.append((material, text))
+                else:
+                    logger.warning("No text extracted from %s", material.filename)
+            except Exception as e:
+                logger.error(
+                    "Failed to extract text from %s: %s",
+                    material.filename,
+                    str(e)
+                )
+                # Continue with other materials
+
+        logger.info(
+            "Got %d materials with text for course %s",
+            len(results),
+            course_id
+        )
+        return results
 
     async def generate_quiz_from_files(
         self,
@@ -169,6 +342,122 @@ Return ONLY valid JSON:
         quiz_data = self._parse_json(text)
 
         logger.info("Generated %d questions", len(quiz_data.get('questions', [])))
+        return quiz_data
+
+    async def generate_quiz_from_course(
+        self,
+        course_id: str,
+        topic: str,
+        num_questions: int = 10,
+        difficulty: str = "medium",
+        week_number: Optional[int] = None
+    ) -> Dict:
+        """Generate quiz using Firestore materials with text extraction.
+
+        This method uses the materials subcollection in Firestore and
+        extracts text from local files to send as content blocks.
+
+        Args:
+            course_id: Course ID
+            topic: Topic name for the quiz
+            num_questions: Number of questions to generate
+            difficulty: 'easy', 'medium', or 'hard'
+            week_number: Optional week filter
+
+        Returns:
+            Dictionary with quiz questions
+
+        Raises:
+            ValueError: If no materials found
+        """
+        logger.info(
+            "Generating quiz from course %s: %d questions, week=%s",
+            course_id, num_questions, week_number
+        )
+
+        # Get materials with their extracted text content
+        materials_with_text = await self.get_course_materials_with_text(
+            course_id=course_id,
+            week_number=week_number,
+            limit=10  # Limit to avoid context overflow
+        )
+
+        if not materials_with_text:
+            raise ValueError(f"No materials found for course {course_id}")
+
+        # Build content blocks using extracted text
+        content_blocks = []
+
+        # Add each document's content as a text block with clear labeling
+        for material, text in materials_with_text:
+            title = material.title or material.filename
+            document_block = f"""
+=== DOCUMENT: {title} ===
+{text}
+=== END OF {title} ===
+"""
+            content_blocks.append({
+                "type": "text",
+                "text": document_block
+            })
+
+        # Add the quiz generation prompt
+        prompt_text = """Based on the documents provided above, generate %d multiple choice quiz questions about %s.
+
+Difficulty: %s
+Requirements:
+- Use only information from the provided documents
+- Each question tests understanding of legal concepts
+- Include article citations where applicable
+- Provide 4 multiple choice answer options
+- Mark correct answer
+- Include detailed explanation
+
+Return ONLY valid JSON:
+{
+  "questions": [
+    {
+      "question": "...",
+      "options": ["A", "B", "C", "D"],
+      "correct_index": 0,
+      "explanation": "...",
+      "difficulty": "%s",
+      "articles": [],
+      "topic": "%s"
+    }
+  ]
+}""" % (num_questions, topic, difficulty, difficulty, topic)
+
+        content_blocks.append({
+            "type": "text",
+            "text": prompt_text
+        })
+
+        logger.info(
+            "Sending %d content blocks to Anthropic (from %d materials)",
+            len(content_blocks),
+            len(materials_with_text)
+        )
+
+        # Call API (no Files API beta header needed)
+        response = await self.client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=4000,
+            messages=[{
+                "role": "user",
+                "content": content_blocks
+            }]
+        )
+
+        # Parse response
+        text = response.content[0].text
+        quiz_data = self._parse_json(text)
+
+        logger.info(
+            "Generated %d questions from %d materials",
+            len(quiz_data.get('questions', [])),
+            len(materials_with_text)
+        )
         return quiz_data
 
     async def generate_study_guide(
