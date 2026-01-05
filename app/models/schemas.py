@@ -41,6 +41,7 @@ class ChatResponse(BaseModel):
     content: str = Field(..., description="AI-generated response")
     status: str = Field(default="success", description="Response status")
     timestamp: datetime = Field(default_factory=datetime.now, description="Response timestamp")
+    course_id: Optional[str] = Field(None, description="Course ID if course-aware mode was used")
 
 
 # ============================================================================

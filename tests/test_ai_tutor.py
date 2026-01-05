@@ -1,6 +1,6 @@
 """Tests for AI Tutor endpoints."""
 
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, patch, Mock
 
 
 class TestChatEndpoint:
@@ -143,3 +143,135 @@ class TestExamplesEndpoint:
             assert "topic" in example
             assert "questions" in example
             assert len(example["questions"]) > 0
+
+
+class TestCourseAwareMode:
+    """Tests for course-aware AI tutor functionality."""
+
+    def test_chat_with_course_id(self, client, sample_chat_request, mock_tutor_response):
+        """Test chat request with course_id parameter."""
+        with patch('app.services.anthropic_client.client') as mock_client:
+            mock_client.messages.create = AsyncMock(return_value=mock_tutor_response)
+
+            with patch('app.services.files_api_service.FilesAPIService.get_course_topics') as mock_topics:
+                mock_topics.return_value = [
+                    {"id": "private_law", "name": "Private Law", "description": "Week 1"}
+                ]
+
+                response = client.post(
+                    "/api/tutor/chat?course_id=LLS-2025-2026",
+                    json=sample_chat_request
+                )
+
+                assert response.status_code == 200
+                data = response.json()
+                assert data["status"] == "success"
+                assert "course_id" in data
+                assert data["course_id"] == "LLS-2025-2026"
+
+    def test_topics_with_course_id(self, client):
+        """Test topics endpoint with course_id parameter."""
+        with patch('app.services.files_api_service.FilesAPIService.get_course_topics') as mock_topics:
+            mock_topics.return_value = [
+                {
+                    "id": "constitutional_law",
+                    "name": "Constitutional Law",
+                    "description": "Week 1: Introduction",
+                    "week": 1
+                },
+                {
+                    "id": "administrative_law",
+                    "name": "Administrative Law",
+                    "description": "Week 2: GALA",
+                    "week": 2
+                }
+            ]
+
+            response = client.get("/api/tutor/topics?course_id=LLS-2025-2026")
+
+            assert response.status_code == 200
+            data = response.json()
+            assert data["status"] == "success"
+            assert "course_id" in data
+            assert data["course_id"] == "LLS-2025-2026"
+            assert len(data["topics"]) == 2
+            assert data["topics"][0]["name"] == "Constitutional Law"
+
+    def test_topics_with_invalid_course_id(self, client):
+        """Test topics endpoint with invalid course_id."""
+        with patch('app.services.files_api_service.FilesAPIService.get_course_topics') as mock_topics:
+            mock_topics.side_effect = ValueError("Course not found: INVALID")
+
+            response = client.get("/api/tutor/topics?course_id=INVALID")
+
+            assert response.status_code == 404
+            data = response.json()
+            assert "detail" in data
+
+    def test_examples_with_course_id(self, client):
+        """Test examples endpoint with course_id parameter."""
+        with patch('app.services.files_api_service.FilesAPIService.get_course_topics') as mock_topics:
+            mock_topics.return_value = [
+                {
+                    "id": "private_law",
+                    "name": "Private Law",
+                    "description": "Week 3",
+                    "week": 3
+                }
+            ]
+
+            response = client.get("/api/tutor/examples?course_id=LLS-2025-2026")
+
+            assert response.status_code == 200
+            data = response.json()
+            assert data["status"] == "success"
+            assert "course_id" in data
+            assert len(data["examples"]) > 0
+            assert data["examples"][0]["topic"] == "Private Law"
+
+    def test_course_info_endpoint(self, client):
+        """Test course-info endpoint."""
+        with patch('app.services.files_api_service.get_files_api_service') as mock_files_service:
+            with patch('app.services.course_service.get_course_service') as mock_course_service:
+                # Mock course data
+                mock_course_obj = Mock()
+                mock_course_obj.name = "Law & Legal Skills"
+                mock_course_obj.description = "LLS Course 2025-2026"
+                mock_course_obj.active = True
+
+                # Mock weeks
+                mock_week = Mock()
+                mock_week.weekNumber = 1
+                mock_week.title = "Introduction"
+                mock_week.topics = ["Constitutional Law"]
+                mock_week.materials = [Mock(), Mock()]  # 2 materials
+
+                mock_course_obj.weeks = [mock_week]
+
+                # Setup mocks
+                mock_course_service.return_value.get_course.return_value = mock_course_obj
+                mock_files_service.return_value.get_course_topics.return_value = [
+                    {"id": "constitutional_law", "name": "Constitutional Law", "week": 1}
+                ]
+
+                response = client.get("/api/tutor/course-info?course_id=LLS-2025-2026")
+
+                assert response.status_code == 200
+                data = response.json()
+                assert data["status"] == "success"
+                assert data["course_id"] == "LLS-2025-2026"
+                assert data["name"] == "Law & Legal Skills"
+                assert len(data["topics"]) == 1
+                assert len(data["weeks"]) == 1
+                assert data["materials_count"] == 2
+
+    def test_course_info_not_found(self, client):
+        """Test course-info endpoint with non-existent course."""
+        with patch('app.services.course_service.get_course_service') as mock_course_service:
+            mock_course_service.return_value.get_course.return_value = None
+
+            response = client.get("/api/tutor/course-info?course_id=INVALID")
+
+            assert response.status_code == 404
+            data = response.json()
+            assert "detail" in data
