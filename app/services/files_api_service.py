@@ -595,15 +595,43 @@ FORMATTING REQUIREMENTS:
             "text": prompt_text
         })
 
-        # Use 8000 tokens for study guides (longer than quizzes which use 4000)
-        # Study guides include multiple sections: concepts, articles, mistakes, tips, scenarios
+        # System prompt emphasizing accuracy and grounding in provided materials
+        system_prompt = """You are an expert legal education content creator for University of Groningen law students.
+
+CRITICAL REQUIREMENTS:
+- ONLY use information explicitly stated in the provided documents
+- DO NOT invent, assume, or hallucinate any legal rules, articles, or case law
+- If information is not in the documents, do not include it
+- Cite specific documents when referencing information
+- Use proper Dutch legal terminology and article citations (e.g., Art. 6:74 DCC)
+
+OUTPUT QUALITY:
+- Create clear, well-organized study materials
+- Use Mermaid diagrams for flowcharts and decision trees
+- Use Markdown tables for structured information
+- Make content visually appealing and easy to scan
+- Focus on exam-relevant material"""
+
+        # Use extended thinking for better reasoning and accuracy
+        # Note: temperature must be 1 when using extended thinking (API requirement)
+        # Extended thinking helps reduce hallucinations through careful reasoning
         response = await self.client.messages.create(
             model="claude-sonnet-4-20250514",
-            max_tokens=8000,
+            max_tokens=16000,  # Increased to accommodate thinking + output
+            thinking={
+                "type": "enabled",
+                "budget_tokens": 5000  # Allow up to 5000 tokens for reasoning
+            },
+            system=system_prompt,
             messages=[{"role": "user", "content": content_blocks}]
         )
 
-        guide = response.content[0].text
+        # With extended thinking, response has thinking blocks and text blocks
+        # Extract just the text content (not the thinking)
+        guide = ""
+        for block in response.content:
+            if block.type == "text":
+                guide += block.text
         logger.info(
             "Generated study guide: %d characters from %d materials",
             len(guide), len(materials_with_text)
