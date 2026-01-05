@@ -157,3 +157,79 @@ async def delete_study_guide(course_id: str, guide_id: str):
         logger.error("Error deleting study guide: %s", e)
         raise HTTPException(500, detail=str(e)) from e
 
+
+@router.post("/courses/{course_id}/estimate-tokens")
+async def estimate_tokens(
+    course_id: str,
+    weeks: Optional[List[int]] = Query(None, description="Week numbers to include")
+):
+    """Estimate token count for a study guide request.
+
+    Returns estimated input tokens based on the materials that would be included.
+    Helps users stay under rate limits (e.g., 10,000 tokens/minute).
+    """
+    try:
+        files_service = get_files_api_service()
+
+        # Get materials that would be included (same logic as generate)
+        materials_with_text = []
+
+        if weeks and len(weeks) > 0:
+            for week_num in weeks:
+                week_materials = await files_service.get_course_materials_with_text(
+                    course_id=course_id,
+                    week_number=week_num,
+                    limit=3  # Same limit as generate
+                )
+                materials_with_text.extend(week_materials)
+        else:
+            materials_with_text = await files_service.get_course_materials_with_text(
+                course_id=course_id,
+                week_number=None,
+                limit=5  # Same limit as generate
+            )
+
+        # Calculate character counts and estimate tokens
+        # Rough estimation: ~4 characters per token for English text
+        total_chars = 0
+        material_details = []
+
+        for material, text in materials_with_text:
+            char_count = len(text)
+            token_estimate = char_count // 4
+            total_chars += char_count
+            material_details.append({
+                "title": material.title or material.filename,
+                "week": material.week_number,
+                "characters": char_count,
+                "estimated_tokens": token_estimate
+            })
+
+        # Add system prompt (~500 tokens) and user prompt (~800 tokens)
+        system_prompt_tokens = 500
+        user_prompt_tokens = 800
+        total_estimated_tokens = (total_chars // 4) + system_prompt_tokens + user_prompt_tokens
+
+        # Rate limit info
+        rate_limit = 10000  # tokens per minute
+        will_exceed = total_estimated_tokens > rate_limit
+
+        return {
+            "course_id": course_id,
+            "weeks": weeks,
+            "material_count": len(materials_with_text),
+            "materials": material_details,
+            "total_characters": total_chars,
+            "estimated_input_tokens": total_estimated_tokens,
+            "rate_limit": rate_limit,
+            "will_exceed_rate_limit": will_exceed,
+            "recommendation": (
+                "⚠️ Request will likely exceed rate limit. Try fewer weeks or wait 60 seconds."
+                if will_exceed else
+                "✅ Request should be within rate limits."
+            )
+        }
+
+    except Exception as e:
+        logger.error("Error estimating tokens: %s", e)
+        raise HTTPException(500, detail=str(e)) from e

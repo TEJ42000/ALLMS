@@ -317,9 +317,18 @@
                                 <option value="6">Week 6</option>
                                 <option value="7">Week 7</option>
                             </select>
+                            <button type="button" id="estimate-tokens-btn" class="btn btn-small btn-secondary" style="margin-left: 10px;">📊 Estimate Tokens</button>
                         </div>
                         <button id="generate-study-btn" class="btn btn-primary">Generate Comprehensive Study Guide</button>
                     </div>
+
+                    <!-- Collapsible Debug Panel -->
+                    <details id="token-debug-panel" class="debug-panel" style="display: none;">
+                        <summary>🔧 Token Estimation Details</summary>
+                        <div id="token-debug-content" class="debug-content">
+                            <!-- Populated by JavaScript -->
+                        </div>
+                    </details>
                 </div>
 
                 <!-- Study Guide Content Display -->

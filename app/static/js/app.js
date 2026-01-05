@@ -1127,6 +1127,12 @@ function initStudyListeners() {
         generateBtn.addEventListener('click', generateStudyGuide);
     }
 
+    // Estimate tokens button
+    const estimateBtn = document.getElementById('estimate-tokens-btn');
+    if (estimateBtn) {
+        estimateBtn.addEventListener('click', estimateStudyGuideTokens);
+    }
+
     // Sub-tab navigation
     const subTabs = document.querySelectorAll('[data-study-tab]');
     subTabs.forEach(tab => {
@@ -1145,11 +1151,106 @@ function initStudyListeners() {
 
             // Clear result when switching tabs
             document.getElementById('study-result').style.display = 'none';
+            // Hide debug panel when switching tabs
+            document.getElementById('token-debug-panel').style.display = 'none';
         });
     });
 
     // Load saved guides on init
     loadSavedStudyGuides();
+}
+
+/**
+ * Estimate tokens for the selected week(s) before generating
+ */
+async function estimateStudyGuideTokens() {
+    const debugPanel = document.getElementById('token-debug-panel');
+    const debugContent = document.getElementById('token-debug-content');
+    const weekSelect = document.getElementById('study-week-select');
+    const estimateBtn = document.getElementById('estimate-tokens-btn');
+
+    // Show loading state
+    estimateBtn.disabled = true;
+    estimateBtn.textContent = '⏳ Estimating...';
+
+    try {
+        // Build query params
+        let url = `${API_BASE}/api/study-guides/courses/${COURSE_ID}/estimate-tokens`;
+        if (weekSelect && weekSelect.value) {
+            url += `?weeks=${weekSelect.value}`;
+        }
+
+        const response = await fetch(url, { method: 'POST' });
+
+        if (!response.ok) {
+            throw new Error(`API error: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        // Build debug HTML
+        const statusClass = data.will_exceed_rate_limit ? 'debug-warning' : 'debug-success';
+        const statusIcon = data.will_exceed_rate_limit ? '⚠️' : '✅';
+
+        let materialsHtml = data.materials.map(m => `
+            <tr>
+                <td>${escapeHtml(m.title)}</td>
+                <td>Week ${m.week || 'N/A'}</td>
+                <td>${m.characters.toLocaleString()}</td>
+                <td>${m.estimated_tokens.toLocaleString()}</td>
+            </tr>
+        `).join('');
+
+        debugContent.innerHTML = `
+            <div class="debug-summary ${statusClass}">
+                <strong>${statusIcon} ${data.recommendation}</strong>
+            </div>
+            <div class="debug-stats">
+                <div class="debug-stat">
+                    <span class="debug-label">Materials:</span>
+                    <span class="debug-value">${data.material_count}</span>
+                </div>
+                <div class="debug-stat">
+                    <span class="debug-label">Total Characters:</span>
+                    <span class="debug-value">${data.total_characters.toLocaleString()}</span>
+                </div>
+                <div class="debug-stat">
+                    <span class="debug-label">Estimated Input Tokens:</span>
+                    <span class="debug-value">${data.estimated_input_tokens.toLocaleString()}</span>
+                </div>
+                <div class="debug-stat">
+                    <span class="debug-label">Rate Limit:</span>
+                    <span class="debug-value">${data.rate_limit.toLocaleString()} tokens/min</span>
+                </div>
+            </div>
+            <table class="debug-table">
+                <thead>
+                    <tr>
+                        <th>Material</th>
+                        <th>Week</th>
+                        <th>Characters</th>
+                        <th>Est. Tokens</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${materialsHtml}
+                </tbody>
+            </table>
+        `;
+
+        // Show and open the panel
+        debugPanel.style.display = 'block';
+        debugPanel.open = true;
+
+    } catch (error) {
+        console.error('Error estimating tokens:', error);
+        debugContent.innerHTML = `<div class="debug-error">❌ Error: ${escapeHtml(error.message)}</div>`;
+        debugPanel.style.display = 'block';
+        debugPanel.open = true;
+    } finally {
+        estimateBtn.disabled = false;
+        estimateBtn.textContent = '📊 Estimate Tokens';
+    }
 }
 
 /**
