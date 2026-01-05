@@ -124,10 +124,11 @@ async def require_allowed_user(
     return user
 
 
-def get_optional_user(request: Request) -> Optional[User]:
+async def get_optional_user(request: Request) -> Optional[User]:
     """Get the current user if available, without requiring authentication.
 
     Useful for routes that behave differently for authenticated vs anonymous users.
+    This is async for consistency with other auth dependencies.
 
     Args:
         request: The FastAPI request object

@@ -8,7 +8,6 @@ This middleware intercepts all incoming requests and:
 """
 
 import logging
-import re
 from typing import Set
 
 from fastapi import Request
@@ -47,12 +46,14 @@ class AuthMiddleware(BaseHTTPMiddleware):
     - Bypasses auth for public paths (health, docs, static files)
     - Validates IAP headers and attaches user to request.state
     - Returns 401 for unauthenticated requests to protected paths
+
+    Note: Auth status logging is handled by main.py startup_event,
+    not by this middleware (avoids thread-safety issues).
     """
 
     def __init__(self, app: ASGIApp) -> None:
         """Initialize the authentication middleware."""
         super().__init__(app)
-        self._logged_startup = False
 
     async def dispatch(self, request: Request, call_next):
         """Process each request through authentication checks.
@@ -65,11 +66,6 @@ class AuthMiddleware(BaseHTTPMiddleware):
             The response from the next handler or an error response
         """
         config = get_auth_config()
-
-        # Log auth status once on first request
-        if not self._logged_startup:
-            self._log_auth_status(config.auth_enabled)
-            self._logged_startup = True
 
         # If auth is disabled, attach mock user and continue
         if not config.auth_enabled:
@@ -119,18 +115,4 @@ class AuthMiddleware(BaseHTTPMiddleware):
             return True
 
         return False
-
-    def _log_auth_status(self, auth_enabled: bool) -> None:
-        """Log the authentication status on startup.
-
-        Args:
-            auth_enabled: Whether authentication is enabled
-        """
-        if auth_enabled:
-            logger.info("🔐 Authentication is ENABLED")
-        else:
-            logger.warning(
-                "⚠️  Authentication is DISABLED - using mock user for all requests. "
-                "DO NOT use in production!"
-            )
 

@@ -71,13 +71,25 @@ async def startup_event():
 
     # Log authentication status
     auth_config = get_auth_config()
+    env = os.getenv("ENV", "development").lower()
+
     if auth_config.auth_enabled:
         print(f"🔐 Authentication: ENABLED (domain: @{auth_config.auth_domain})")
         if not auth_config.google_client_id:
-            print("⚠️  WARNING: GOOGLE_CLIENT_ID not set - JWT verification unavailable!")
+            if env == "production":
+                print("🚨 CRITICAL: GOOGLE_CLIENT_ID not set in production!")
+                print("🚨 Without JWT verification, IAP headers can be spoofed!")
+                print("🚨 Set GOOGLE_CLIENT_ID or set AUTH_ENABLED=false for testing only.")
+                # Don't fail startup, but log prominently
+            else:
+                print("⚠️  WARNING: GOOGLE_CLIENT_ID not set - JWT verification unavailable")
     else:
         print("⚠️  Authentication: DISABLED (development mode)")
-        print("⚠️  WARNING: Do NOT use AUTH_ENABLED=false in production!")
+        if env == "production":
+            print("🚨 CRITICAL: AUTH_ENABLED=false in production environment!")
+            print("🚨 This is a security risk - all users get mock admin access!")
+        else:
+            print("⚠️  WARNING: Do NOT use AUTH_ENABLED=false in production!")
 
     # Verify Anthropic API key is set
     api_key = os.getenv("ANTHROPIC_API_KEY")
