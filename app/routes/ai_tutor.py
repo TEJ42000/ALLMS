@@ -133,7 +133,7 @@ async def chat_with_tutor(
                 enhanced_context = f"{request.context} (Course: {course_id}, Topics: {', '.join(topic_names[:3])})"
                 logger.info("Enhanced context with course info: %s", course_id)
             except Exception as e:
-                logger.warning("Could not enhance context with course info: %s", str(e))
+                logger.warning("Could not enhance context for course %s: %s", course_id, str(e))
                 # Continue with original context
 
         # Get AI response
@@ -150,7 +150,7 @@ async def chat_with_tutor(
             "status": "success"
         }
 
-        # Include course_id in response if provided
+        # Include course_id in response if provided (even if enhancement failed)
         if course_id:
             response_data["course_id"] = course_id
 
@@ -285,7 +285,7 @@ async def get_example_questions(
                 "status": "success"
             }
         except Exception as e:
-            logger.warning("Could not get course-specific examples: %s", str(e))
+            logger.warning("Could not get course-specific examples for course %s: %s", course_id, str(e))
             # Fall through to default examples
 
     # Default examples (backward compatibility)
