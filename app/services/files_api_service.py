@@ -1,51 +1,59 @@
-"""Content Generation using Anthropic Files API for the LLS Study Portal.
+"""Content Generation Service for the LLS Study Portal.
 
 This service provides AI-powered content generation (quizzes, study guides, flashcards)
-using uploaded course materials. It integrates with CourseService to get course-specific
-materials from Firestore and uses AnthropicFileManager for automatic file uploads.
+using course materials. It integrates with CourseService to get course-specific
+materials from Firestore and uses text extraction to get content from files.
 
-All content generation uses Firestore-based file management with automatic upload
-to Anthropic Files API on-demand.
+Content is extracted locally using the text_extractor service, which handles:
+- Real PDFs (using PyMuPDF)
+- Slide archives (ZIP files with JPEG slides + text, disguised as PDFs)
+- Images (OCR)
+- DOCX, Markdown, HTML, etc.
+
+This approach is more robust than the Files API because it:
+1. Works with all file types including slide archives
+2. Doesn't require managing file IDs and expiry
+3. Simpler architecture with no external file state
 """
 
 import json
 import logging
 import re
+from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 from anthropic import AsyncAnthropic
 
 from app.models.course_models import CourseMaterial
 from app.services.gcp_service import get_anthropic_api_key, get_firestore_client
+from app.services.text_extractor import extract_text, detect_file_type, ExtractionResult
 
 logger = logging.getLogger(__name__)
 
 # Constants
 DEFAULT_FALLBACK_COUNT = 5  # Number of files to return when no specific files found
+MATERIALS_ROOT = Path("Materials")
+MAX_TEXT_LENGTH = 100000  # Maximum characters per document to avoid context overflow
 
 
 class FilesAPIService:
-    """Service for generating content using uploaded files via Anthropic Files API.
+    """Service for generating content using course materials with text extraction.
 
-    This service uses Firestore-based file management with AnthropicFileManager
-    for automatic upload to Anthropic on-demand.
+    This service uses text extraction to get content from local files,
+    supporting all file types including slide archives.
 
     Key methods:
     - get_course_materials(): Fetch materials from Firestore
-    - get_course_materials_with_file_ids(): Get materials with Anthropic file IDs
+    - get_course_materials_with_text(): Get materials with extracted text content
     - generate_quiz_from_course(): Generate quizzes using course materials
     """
 
     def __init__(self):
-        """Initialize the Files API service."""
+        """Initialize the content generation service."""
         self.client = AsyncAnthropic(api_key=get_anthropic_api_key())
-
-        # Beta header for Files API
-        self.beta_header = "files-api-2025-04-14"
 
         # Lazy-loaded service references
         self._course_service = None
-        self._file_manager = None
         self._firestore = None
 
     def _get_course_service(self):
@@ -54,13 +62,6 @@ class FilesAPIService:
             from app.services.course_service import get_course_service
             self._course_service = get_course_service()
         return self._course_service
-
-    def _get_file_manager(self):
-        """Get AnthropicFileManager instance (lazy loading)."""
-        if self._file_manager is None:
-            from app.services.anthropic_file_manager import get_anthropic_file_manager
-            self._file_manager = get_anthropic_file_manager()
-        return self._file_manager
 
     @property
     def firestore(self):
@@ -124,21 +125,78 @@ class FilesAPIService:
 
         return materials
 
-    async def get_course_materials_with_file_ids(
+    def _get_local_file_path(self, material: CourseMaterial) -> Path:
+        """Get the local file path for a material.
+
+        Args:
+            material: The course material
+
+        Returns:
+            Path to the local file
+        """
+        return MATERIALS_ROOT / material.storagePath
+
+    def _extract_text_from_material(self, material: CourseMaterial) -> Optional[str]:
+        """Extract text content from a material file.
+
+        Handles all file types including slide archives (ZIP files disguised as PDFs).
+
+        Args:
+            material: The course material
+
+        Returns:
+            Extracted text content, or None if extraction failed
+        """
+        file_path = self._get_local_file_path(material)
+
+        if not file_path.exists():
+            logger.warning("File not found: %s", file_path)
+            return None
+
+        # Detect file type and extract text
+        file_type = detect_file_type(file_path)
+        logger.info("Extracting text from %s (type: %s)", material.filename, file_type)
+
+        result = extract_text(file_path)
+
+        if not result.success:
+            logger.warning(
+                "Failed to extract text from %s: %s",
+                material.filename,
+                result.error
+            )
+            return None
+
+        # Truncate if too long to avoid context overflow
+        text = result.text
+        if len(text) > MAX_TEXT_LENGTH:
+            logger.info(
+                "Truncating text from %s: %d -> %d chars",
+                material.filename,
+                len(text),
+                MAX_TEXT_LENGTH
+            )
+            text = text[:MAX_TEXT_LENGTH] + "\n\n[... content truncated ...]"
+
+        logger.info(
+            "Extracted %d chars from %s (type: %s)",
+            len(text),
+            material.filename,
+            file_type
+        )
+        return text
+
+    async def get_course_materials_with_text(
         self,
         course_id: str,
         week_number: Optional[int] = None,
         tier: Optional[str] = None,
-        limit: int = 20
+        limit: int = 10
     ) -> List[Tuple[CourseMaterial, str]]:
-        """Get course materials with their Anthropic file IDs.
+        """Get course materials with their extracted text content.
 
-        This method ensures all returned materials have valid Anthropic file IDs,
-        uploading files on-demand if necessary.
-
-        Note: This method is async for consistency with other endpoint methods,
-        though the underlying Firestore and file operations are synchronous.
-        The Firestore Python SDK doesn't support async natively.
+        This method extracts text from local files, supporting all file types
+        including slide archives (ZIP files with JPEG slides + text).
 
         Args:
             course_id: Course ID
@@ -147,7 +205,7 @@ class FilesAPIService:
             limit: Maximum materials to return
 
         Returns:
-            List of (CourseMaterial, anthropic_file_id) tuples
+            List of (CourseMaterial, extracted_text) tuples
         """
         materials = self.get_course_materials(
             course_id=course_id,
@@ -160,27 +218,25 @@ class FilesAPIService:
             logger.warning("No materials found for course %s", course_id)
             return []
 
-        file_manager = self._get_file_manager()
         results = []
 
         for material in materials:
             try:
-                # Ensure file is available in Anthropic
-                file_id = file_manager.ensure_file_available(
-                    material=material,
-                    course_id=course_id
-                )
-                results.append((material, file_id))
+                text = self._extract_text_from_material(material)
+                if text:
+                    results.append((material, text))
+                else:
+                    logger.warning("No text extracted from %s", material.filename)
             except Exception as e:
                 logger.error(
-                    "Failed to get file ID for %s: %s",
+                    "Failed to extract text from %s: %s",
                     material.filename,
                     str(e)
                 )
                 # Continue with other materials
 
         logger.info(
-            "Got %d materials with file IDs for course %s",
+            "Got %d materials with text for course %s",
             len(results),
             course_id
         )
@@ -296,10 +352,10 @@ Return ONLY valid JSON:
         difficulty: str = "medium",
         week_number: Optional[int] = None
     ) -> Dict:
-        """Generate quiz using Firestore materials (new Firestore-based method).
+        """Generate quiz using Firestore materials with text extraction.
 
         This method uses the materials subcollection in Firestore and
-        automatically ensures files are uploaded to Anthropic.
+        extracts text from local files to send as content blocks.
 
         Args:
             course_id: Course ID
@@ -319,31 +375,34 @@ Return ONLY valid JSON:
             course_id, num_questions, week_number
         )
 
-        # Get materials with their Anthropic file IDs
-        materials_with_ids = await self.get_course_materials_with_file_ids(
+        # Get materials with their extracted text content
+        materials_with_text = await self.get_course_materials_with_text(
             course_id=course_id,
             week_number=week_number,
             limit=10  # Limit to avoid context overflow
         )
 
-        if not materials_with_ids:
+        if not materials_with_text:
             raise ValueError(f"No materials found for course {course_id}")
 
-        # Build content blocks using the file IDs
+        # Build content blocks using extracted text
         content_blocks = []
-        for material, file_id in materials_with_ids:
+
+        # Add each document's content as a text block with clear labeling
+        for material, text in materials_with_text:
+            title = material.title or material.filename
+            document_block = f"""
+=== DOCUMENT: {title} ===
+{text}
+=== END OF {title} ===
+"""
             content_blocks.append({
-                "type": "document",
-                "source": {
-                    "type": "file",
-                    "file_id": file_id
-                },
-                "title": material.title or material.filename,
-                "citations": {"enabled": True}
+                "type": "text",
+                "text": document_block
             })
 
-        # Add text prompt
-        prompt_text = """Generate %d multiple choice quiz questions about %s from these documents.
+        # Add the quiz generation prompt
+        prompt_text = """Based on the documents provided above, generate %d multiple choice quiz questions about %s.
 
 Difficulty: %s
 Requirements:
@@ -374,11 +433,16 @@ Return ONLY valid JSON:
             "text": prompt_text
         })
 
-        # Call API with Files API beta
-        response = await self.client.beta.messages.create(
+        logger.info(
+            "Sending %d content blocks to Anthropic (from %d materials)",
+            len(content_blocks),
+            len(materials_with_text)
+        )
+
+        # Call API (no Files API beta header needed)
+        response = await self.client.messages.create(
             model="claude-sonnet-4-20250514",
             max_tokens=4000,
-            betas=[self.beta_header],
             messages=[{
                 "role": "user",
                 "content": content_blocks
@@ -392,7 +456,7 @@ Return ONLY valid JSON:
         logger.info(
             "Generated %d questions from %d materials",
             len(quiz_data.get('questions', [])),
-            len(materials_with_ids)
+            len(materials_with_text)
         )
         return quiz_data
 

@@ -255,7 +255,7 @@ class TestAnthropicFileManagerCheckExists:
             manager = AnthropicFileManager()
 
             mock_client = MagicMock()
-            mock_client.beta.files.retrieve.side_effect = NotFoundError(
+            mock_client.beta.files.retrieve_metadata.side_effect = NotFoundError(
                 message="Not found",
                 response=MagicMock(),
                 body=None
@@ -439,26 +439,24 @@ class TestGenerateQuizFromCourse:
         with patch.object(FilesAPIService, '__init__', lambda x: None):
             service = FilesAPIService()
             service._firestore = MagicMock()
-            service._file_manager = MagicMock()
-            service.beta_header = "files-api-2025-04-14"  # Required attribute
 
             # Mock material
             mock_material = MagicMock()
             mock_material.title = "Contract Law Basics"
             mock_material.filename = "contracts.pdf"
 
-            # Mock get_course_materials_with_file_ids
-            service.get_course_materials_with_file_ids = AsyncMock(
-                return_value=[(mock_material, "file_abc123")]
+            # Mock get_course_materials_with_text (new text extraction approach)
+            service.get_course_materials_with_text = AsyncMock(
+                return_value=[(mock_material, "This is extracted text about contracts.")]
             )
 
             # Mock Anthropic API response (must be async)
             mock_response = MagicMock()
             mock_response.content = [MagicMock(text='{"questions": [{"question": "What is a contract?"}]}')]
 
-            # Create a mock client with async beta.messages.create
+            # Create a mock client with async messages.create (no beta header needed)
             mock_client = MagicMock()
-            mock_client.beta.messages.create = AsyncMock(return_value=mock_response)
+            mock_client.messages.create = AsyncMock(return_value=mock_response)
             service.client = mock_client
 
             result = await service.generate_quiz_from_course(
@@ -469,7 +467,7 @@ class TestGenerateQuizFromCourse:
             )
 
             assert "questions" in result
-            service.get_course_materials_with_file_ids.assert_called_once()
+            service.get_course_materials_with_text.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_generate_quiz_from_course_no_materials(self):
@@ -482,8 +480,8 @@ class TestGenerateQuizFromCourse:
             service.client = MagicMock()
             service._firestore = MagicMock()
 
-            # Mock empty materials
-            service.get_course_materials_with_file_ids = AsyncMock(return_value=[])
+            # Mock empty materials (using new text extraction method)
+            service.get_course_materials_with_text = AsyncMock(return_value=[])
 
             with pytest.raises(ValueError) as exc_info:
                 await service.generate_quiz_from_course(

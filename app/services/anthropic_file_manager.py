@@ -213,16 +213,21 @@ class AnthropicFileManager:
         Returns:
             True if file exists, False otherwise
         """
+        print(f"DEBUG check_file_exists: Checking {file_id}")
         try:
-            self.client.beta.files.retrieve(file_id)
+            result = self.client.beta.files.retrieve_metadata(file_id)
+            print(f"DEBUG check_file_exists: File exists, result={result}")
             return True
-        except AnthropicNotFoundError:
+        except AnthropicNotFoundError as e:
+            print(f"DEBUG check_file_exists: NotFoundError - {e}")
             logger.debug("File not found in Anthropic: %s", file_id)
             return False
         except APIError as e:
+            print(f"DEBUG check_file_exists: APIError - {e}")
             logger.warning("API error checking file %s: %s", file_id, str(e))
             return False
         except Exception as e:
+            print(f"DEBUG check_file_exists: Exception ({type(e).__name__}) - {e}")
             logger.error("Unexpected error checking file %s: %s", file_id, str(e))
             return False
 
@@ -285,25 +290,37 @@ class AnthropicFileManager:
 
         # Check if we have a valid, non-expired file ID
         if material.anthropicFileId:
+            print(f"DEBUG: Material {material.filename} has existing file_id={material.anthropicFileId}")
+            print(f"DEBUG:   expiry={material.anthropicFileExpiry}, now={now}")
             # Check expiry
             if material.anthropicFileExpiry and material.anthropicFileExpiry > now:
+                print(f"DEBUG:   File not expired, checking if exists...")
                 # File should still be valid, but verify it exists
-                if self.check_file_exists(material.anthropicFileId):
+                exists = self.check_file_exists(material.anthropicFileId)
+                print(f"DEBUG:   check_file_exists returned: {exists}")
+                if exists:
                     logger.debug(
                         "File %s still valid in Anthropic: %s",
                         material.filename,
                         material.anthropicFileId
                     )
                     return material.anthropicFileId
+            else:
+                print(f"DEBUG:   File expired or no expiry set")
 
             # File expired or doesn't exist - need to re-upload
+            print(f"DEBUG:   Will re-upload {material.filename}")
             logger.info(
                 "File %s expired or missing, re-uploading...",
                 material.filename
             )
+        else:
+            print(f"DEBUG: Material {material.filename} has no existing file_id")
 
         # Upload the file
+        print(f"DEBUG: Uploading file {material.filename}...")
         file_id = self.upload_file(material)
+        print(f"DEBUG: Uploaded {material.filename} -> {file_id}")
 
         # Calculate expiry
         expiry = now + timedelta(days=FILE_RETENTION_DAYS)
