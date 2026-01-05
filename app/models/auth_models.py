@@ -6,9 +6,9 @@ and configuration settings for Google Identity-Aware Proxy (IAP).
 
 import os
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Any, Optional
 
-from pydantic import BaseModel, Field, EmailStr, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from pydantic_settings import BaseSettings
 
 
@@ -58,7 +58,7 @@ class AuthConfig(BaseSettings):
 class User(BaseModel):
     """Authenticated user information extracted from IAP headers."""
 
-    email: str = Field(..., description="User's email address")
+    email: EmailStr = Field(..., description="User's email address")
     user_id: str = Field(..., description="User's unique identifier from IAP")
     domain: str = Field(..., description="Email domain (e.g., 'mgms.eu')")
     is_admin: bool = Field(
@@ -71,11 +71,6 @@ class User(BaseModel):
     def validate_email(cls, v: str) -> str:
         """Normalize email to lowercase."""
         return v.lower().strip()
-
-    @property
-    def is_domain_user(self) -> bool:
-        """Check if user is from the primary domain (mgms.eu)."""
-        return self.domain.lower() == "mgms.eu"
 
     def __str__(self) -> str:
         """String representation of user."""
@@ -108,7 +103,7 @@ class MockUser(User):
 class AllowListEntry(BaseModel):
     """Entry in the allow list for external users (stored in Firestore)."""
 
-    email: str = Field(..., description="User's email address")
+    email: EmailStr = Field(..., description="User's email address")
     added_by: str = Field(..., description="Admin who added this user")
     added_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
@@ -140,7 +135,7 @@ class AllowListEntry(BaseModel):
         """Check if the entry is valid (active and not expired)."""
         return self.active and not self.is_expired
 
-    def to_firestore_dict(self) -> dict:
+    def to_firestore_dict(self) -> dict[str, Any]:
         """Convert to dictionary for Firestore storage."""
         return {
             "email": self.email,

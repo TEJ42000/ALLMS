@@ -38,7 +38,7 @@ def get_auth_config() -> AuthConfig:
 # Google IAP header names
 IAP_USER_EMAIL_HEADER = "X-Goog-Authenticated-User-Email"
 IAP_USER_ID_HEADER = "X-Goog-Authenticated-User-Id"
-IAP_JWT_HEADER = "X-Goog-IAP-JWT-Assertion"
+IAP_JWT_HEADER = "X-Goog-IAP-JWT-Assertion"  # TODO: Use in Phase 2 for JWT verification
 
 # Pattern for IAP email header value: "accounts.google.com:user@domain.com"
 IAP_EMAIL_PATTERN = re.compile(r"^accounts\.google\.com:(.+@.+)$", re.IGNORECASE)
@@ -198,8 +198,13 @@ async def check_allow_list(email: str) -> bool:
         logger.info("User found in allow list: %s", normalized_email)
         return True
 
-    except Exception as e:
+    except (ValueError, KeyError, AttributeError) as e:
+        # Handle expected errors (validation, missing fields, etc.)
         logger.error("Error checking allow list: %s", str(e))
+        return False
+    except Exception as e:
+        # Log unexpected errors with full traceback but don't crash
+        logger.exception("Unexpected error checking allow list: %s", str(e))
         return False
 
 
@@ -240,14 +245,19 @@ async def is_user_authorized(request: Request) -> tuple[bool, Optional[User], st
 
     # Check allow list for non-domain users
     if await check_allow_list(user.email):
-        # Non-domain users on allow list are NOT admins
-        user.is_admin = False
+        # Non-domain users on allow list are NOT admins - create new User instance
+        allow_list_user = User(
+            email=user.email,
+            user_id=user.user_id,
+            domain=user.domain,
+            is_admin=False
+        )
         logger.debug("User authorized via allow list: %s", user.email)
-        return True, user, "Allow list user"
+        return True, allow_list_user, "Allow list user"
 
     # User not authorized
     logger.info("User not authorized: %s (domain: %s)", user.email, user.domain)
-    return False, user, f"User {user.email} is not authorized. Contact admin for access."
+    return False, user, "Access denied. Contact admin for access."
 
 
 def require_admin_domain(user: User) -> bool:
