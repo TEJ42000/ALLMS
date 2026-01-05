@@ -78,6 +78,9 @@ MAX_WEEK_NUMBER = 52
 # Retry configuration
 MAX_RETRIES = 3
 INITIAL_RETRY_DELAY_SECONDS = 0.5
+
+# Firestore batch limit (max operations per batch)
+FIRESTORE_BATCH_LIMIT = 500
 MAX_RETRY_DELAY_SECONDS = 8.0
 RETRY_MULTIPLIER = 2.0
 
@@ -246,18 +249,22 @@ class CourseService:
             if not include_inactive:
                 courses_ref = courses_ref.where(filter=FieldFilter("active", "==", True))
 
-            # Get all matching documents for total count
-            all_docs = list(courses_ref.stream())
-            total_count = len(all_docs)
+            # Get total count efficiently using select([]) to only fetch document IDs
+            # This reduces bandwidth by not fetching all document data
+            count_query = courses_ref.select([])
+            total_count = len(list(count_query.stream()))
 
-            # Apply pagination
-            paginated_docs = all_docs[offset:offset + limit]
+            # Use Firestore native pagination with offset() and limit()
+            # Note: For large datasets (10k+), consider cursor-based pagination
+            paginated_query = courses_ref.offset(offset).limit(limit)
+            paginated_docs = list(paginated_query.stream())
 
             courses = []
             for doc in paginated_docs:
                 data = doc.to_dict()
-                # Count weeks in subcollection
-                week_count = len(list(doc.reference.collection(WEEKS_SUBCOLLECTION).stream()))
+                # Use stored weekCount if available, otherwise default to 0
+                # This avoids N+1 queries - weekCount should be updated when weeks change
+                week_count = data.get("weekCount", 0)
 
                 courses.append(CourseSummary(
                     id=doc.id,
@@ -274,7 +281,7 @@ class CourseService:
 
         except google_exceptions.GoogleAPIError as e:
             logger.error("Firestore error getting courses: %s", str(e))
-            raise FirestoreOperationError(f"Failed to get courses: {str(e)}") from e
+            raise FirestoreOperationError("Failed to retrieve courses") from e
 
     @with_retry()
     def get_course(self, course_id: str, include_weeks: bool = True) -> Optional[Course]:
@@ -366,6 +373,17 @@ class CourseService:
         except ValueError as e:
             raise ServiceValidationError(str(e)) from e
 
+        # Calculate total batch operations and validate against Firestore limit
+        weeks_count = len(initial_weeks or [])
+        skills_count = len(initial_skills or {})
+        total_ops = 1 + weeks_count + skills_count  # 1 for course document
+
+        if total_ops > FIRESTORE_BATCH_LIMIT:
+            raise ServiceValidationError(
+                f"Total operations ({total_ops}) exceeds Firestore batch limit ({FIRESTORE_BATCH_LIMIT}). "
+                f"Reduce initial_weeks ({weeks_count}) or initial_skills ({skills_count})."
+            )
+
         try:
             doc_ref = self.db.collection(COURSES_COLLECTION).document(course_id)
 
@@ -377,6 +395,7 @@ class CourseService:
             data = {
                 **course_data.model_dump(),
                 "active": True,
+                "weekCount": weeks_count,  # Store week count for efficient pagination
                 "createdAt": now,
                 "updatedAt": now,
             }
@@ -402,7 +421,7 @@ class CourseService:
 
                 batch.commit()
                 logger.info("Created course %s with %d weeks and %d skills",
-                           course_id, len(initial_weeks or []), len(initial_skills or {}))
+                           course_id, weeks_count, skills_count)
             else:
                 doc_ref.set(data)
                 logger.info("Created course: %s", course_id)
@@ -411,7 +430,7 @@ class CourseService:
 
         except google_exceptions.GoogleAPIError as e:
             logger.error("Firestore error creating course %s: %s", course_id, str(e))
-            raise FirestoreOperationError(f"Failed to create course {course_id}: {str(e)}") from e
+            raise FirestoreOperationError("Failed to create course") from e
 
     @with_retry()
     def update_course(self, course_id: str, updates: CourseUpdate) -> Optional[Course]:
@@ -438,22 +457,23 @@ class CourseService:
         try:
             doc_ref = self.db.collection(COURSES_COLLECTION).document(course_id)
 
-            if not doc_ref.get().exists:
-                logger.warning("Course not found for update: %s", course_id)
-                raise CourseNotFoundError(f"Course not found: {course_id}")
-
             # Only include non-None fields
             update_data = {k: v for k, v in updates.model_dump().items() if v is not None}
             update_data["updatedAt"] = datetime.now(timezone.utc)
 
+            # Use update() which will raise NotFound if document doesn't exist
+            # This avoids race condition between exists check and update
             doc_ref.update(update_data)
             logger.info("Updated course: %s", course_id)
 
             return self.get_course(course_id, include_weeks=False)
 
+        except google_exceptions.NotFound:
+            logger.warning("Course not found for update: %s", course_id)
+            raise CourseNotFoundError(f"Course not found: {course_id}")
         except google_exceptions.GoogleAPIError as e:
             logger.error("Firestore error updating course %s: %s", course_id, str(e))
-            raise FirestoreOperationError(f"Failed to update course {course_id}: {str(e)}") from e
+            raise FirestoreOperationError("Failed to update course") from e
 
     @with_retry()
     def deactivate_course(self, course_id: str) -> bool:
@@ -594,21 +614,26 @@ class CourseService:
             raise ServiceValidationError(str(e)) from e
 
         try:
-            # Use batch for atomic update of week + course timestamp
-            batch = self.db.batch()
+            course_ref = self.db.collection(COURSES_COLLECTION).document(course_id)
+            week_ref = course_ref.collection(WEEKS_SUBCOLLECTION).document(f"week-{week_data.weekNumber}")
 
-            week_ref = (
-                self.db.collection(COURSES_COLLECTION)
-                .document(course_id)
-                .collection(WEEKS_SUBCOLLECTION)
-                .document(f"week-{week_data.weekNumber}")
-            )
+            # Check if this is a new week (for weekCount update)
+            is_new_week = not week_ref.get().exists
+
+            # Use batch for atomic update of week + course timestamp + weekCount
+            batch = self.db.batch()
             batch.set(week_ref, week_data.model_dump())
 
-            # Update course's updatedAt
-            course_ref = self.db.collection(COURSES_COLLECTION).document(course_id)
-            batch.update(course_ref, {"updatedAt": datetime.now(timezone.utc)})
+            # Update course's updatedAt and increment weekCount if new week
+            update_data = {"updatedAt": datetime.now(timezone.utc)}
+            if is_new_week:
+                # Get current weekCount and increment
+                course_doc = course_ref.get()
+                if course_doc.exists:
+                    current_count = course_doc.to_dict().get("weekCount", 0)
+                    update_data["weekCount"] = current_count + 1
 
+            batch.update(course_ref, update_data)
             batch.commit()
 
             logger.info("Upserted week %d for course %s", week_data.weekNumber, course_id)
@@ -616,7 +641,7 @@ class CourseService:
 
         except google_exceptions.GoogleAPIError as e:
             logger.error("Firestore error upserting week %d for course %s: %s", week_data.weekNumber, course_id, str(e))
-            raise FirestoreOperationError(f"Failed to upsert week {week_data.weekNumber} for course {course_id}: {str(e)}") from e
+            raise FirestoreOperationError("Failed to upsert week") from e
 
     @with_retry()
     def delete_week(self, course_id: str, week_number: int) -> bool:
@@ -641,22 +666,26 @@ class CourseService:
             raise ServiceValidationError(str(e)) from e
 
         try:
-            doc_ref = (
-                self.db.collection(COURSES_COLLECTION)
-                .document(course_id)
-                .collection(WEEKS_SUBCOLLECTION)
-                .document(f"week-{week_number}")
-            )
+            course_ref = self.db.collection(COURSES_COLLECTION).document(course_id)
+            doc_ref = course_ref.collection(WEEKS_SUBCOLLECTION).document(f"week-{week_number}")
 
             if not doc_ref.get().exists:
                 return False
 
-            # Use batch for atomic delete + course timestamp update
+            # Use batch for atomic delete + course timestamp + weekCount update
             batch = self.db.batch()
             batch.delete(doc_ref)
 
-            course_ref = self.db.collection(COURSES_COLLECTION).document(course_id)
-            batch.update(course_ref, {"updatedAt": datetime.now(timezone.utc)})
+            # Update course's updatedAt and decrement weekCount
+            course_doc = course_ref.get()
+            if course_doc.exists:
+                current_count = course_doc.to_dict().get("weekCount", 0)
+                batch.update(course_ref, {
+                    "updatedAt": datetime.now(timezone.utc),
+                    "weekCount": max(0, current_count - 1)  # Ensure non-negative
+                })
+            else:
+                batch.update(course_ref, {"updatedAt": datetime.now(timezone.utc)})
 
             batch.commit()
 
@@ -665,7 +694,7 @@ class CourseService:
 
         except google_exceptions.GoogleAPIError as e:
             logger.error("Firestore error deleting week %d from course %s: %s", week_number, course_id, str(e))
-            raise FirestoreOperationError(f"Failed to delete week {week_number} from course {course_id}: {str(e)}") from e
+            raise FirestoreOperationError("Failed to delete week") from e
 
     # ========================================================================
     # Legal Skills Operations

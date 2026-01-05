@@ -251,7 +251,7 @@ async def list_courses(
         logger.error("Firestore error listing courses: %s", e)
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"Database temporarily unavailable: {str(e)}"
+            detail="Database temporarily unavailable. Please try again later."
         )
     except Exception as e:
         logger.error("Error listing courses: %s", e)
@@ -314,7 +314,7 @@ async def get_course(
         logger.error("Firestore error getting course %s: %s", course_id, e)
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"Database temporarily unavailable: {str(e)}"
+            detail="Database temporarily unavailable. Please try again later."
         )
     except HTTPException:
         raise
@@ -368,7 +368,7 @@ async def create_course(course_data: CourseCreate):
         logger.error("Firestore error creating course: %s", e)
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"Database temporarily unavailable: {str(e)}"
+            detail="Database temporarily unavailable. Please try again later."
         )
     except Exception as e:
         logger.error("Error creating course: %s", e)
@@ -413,7 +413,7 @@ async def update_course(course_id: str, updates: CourseUpdate):
         logger.error("Firestore error updating course %s: %s", course_id, e)
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"Database temporarily unavailable: {str(e)}"
+            detail="Database temporarily unavailable. Please try again later."
         )
     except HTTPException:
         raise
@@ -461,7 +461,7 @@ async def deactivate_course(course_id: str):
         logger.error("Firestore error deactivating course %s: %s", course_id, e)
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"Database temporarily unavailable: {str(e)}"
+            detail="Database temporarily unavailable. Please try again later."
         )
     except HTTPException:
         raise
