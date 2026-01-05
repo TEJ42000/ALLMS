@@ -827,6 +827,13 @@ class CourseService:
         except ValueError as e:
             raise ServiceValidationError(str(e)) from e
 
+        # Validate week_number if provided
+        if week_number is not None:
+            try:
+                week_number = validate_week_number(week_number)
+            except ValueError as e:
+                raise ServiceValidationError(str(e)) from e
+
         try:
             # Verify course exists
             course_ref = self.db.collection(COURSES_COLLECTION).document(course_id)
@@ -835,6 +842,9 @@ class CourseService:
 
             topics_ref = course_ref.collection(TOPICS_SUBCOLLECTION)
 
+            # Note: Week filtering is done client-side as Firestore doesn't support
+            # efficient queries on array membership. For large topic sets, consider
+            # using a separate weekTopics collection with week_number as a field.
             topics = []
             for doc in topics_ref.stream():
                 data = doc.to_dict()
@@ -928,6 +938,9 @@ class CourseService:
             # Generate topic ID if not provided
             if not topic_id:
                 name_slug = re.sub(r'[^a-z0-9]+', '-', topic_data.name.lower()).strip('-')
+                # Fallback for names with only special characters
+                if not name_slug:
+                    name_slug = "topic"
                 short_uuid = str(uuid.uuid4())[:8]
                 topic_id = f"{name_slug[:50]}-{short_uuid}"
 
@@ -1168,10 +1181,14 @@ class CourseService:
                     batch = self.db.batch()
                     batch_count = 0
 
-            # Commit remaining
+            # Commit remaining deletes
             if batch_count > 0:
-                batch.update(course_ref, {"updatedAt": datetime.now(timezone.utc)})
                 batch.commit()
+
+            # Update course timestamp separately to avoid race conditions
+            # with batch commits and ensure it's always updated
+            if deleted_count > 0:
+                course_ref.update({"updatedAt": datetime.now(timezone.utc)})
 
             logger.info("Deleted %d topics from course %s", deleted_count, course_id)
             return deleted_count

@@ -19,6 +19,9 @@ logger = logging.getLogger(__name__)
 # Initialize Anthropic client
 client = AsyncAnthropic(api_key=get_anthropic_api_key())
 
+# Maximum syllabus text length for AI processing (Claude context limits)
+MAX_SYLLABUS_TEXT_LENGTH = 100000
+
 EXTRACTION_SYSTEM_PROMPT = """You are an expert at extracting structured course data from academic syllabi.
 
 Extract the following information from the syllabus text and return it as valid JSON:
@@ -115,10 +118,9 @@ async def extract_course_data(syllabus_text: str) -> Dict[str, Any]:
     """
     try:
         # Truncate if too long (Claude has context limits)
-        max_chars = 100000
-        if len(syllabus_text) > max_chars:
-            syllabus_text = syllabus_text[:max_chars] + "\n\n[Text truncated...]"
-        
+        if len(syllabus_text) > MAX_SYLLABUS_TEXT_LENGTH:
+            syllabus_text = syllabus_text[:MAX_SYLLABUS_TEXT_LENGTH] + "\n\n[Text truncated...]"
+
         response = await client.messages.create(
             model="claude-sonnet-4-20250514",
             max_tokens=8000,
@@ -176,6 +178,9 @@ def _generate_topic_id(name: str) -> str:
     topic_id = re.sub(r'[^a-z0-9]+', '-', name.lower())
     # Remove leading/trailing hyphens
     topic_id = topic_id.strip('-')
+    # Fallback for names with only special characters
+    if not topic_id:
+        topic_id = "topic"
     # Add short UUID suffix for uniqueness
     short_uuid = str(uuid.uuid4())[:8]
     return f"{topic_id[:50]}-{short_uuid}"
@@ -202,9 +207,8 @@ async def extract_topics_from_syllabus(
     """
     try:
         # Truncate if too long
-        max_chars = 100000
-        if len(syllabus_text) > max_chars:
-            syllabus_text = syllabus_text[:max_chars] + "\n\n[Text truncated...]"
+        if len(syllabus_text) > MAX_SYLLABUS_TEXT_LENGTH:
+            syllabus_text = syllabus_text[:MAX_SYLLABUS_TEXT_LENGTH] + "\n\n[Text truncated...]"
 
         context = f" for {course_name}" if course_name else ""
 

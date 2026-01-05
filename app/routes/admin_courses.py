@@ -13,7 +13,7 @@ from typing import Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, Path, Query, status, UploadFile, File, Form
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.models.course_models import (
     Course,
@@ -1006,7 +1006,10 @@ class ExtractedTopicData(BaseModel):
     name: str
     description: str
     weekNumbers: List[int] = []
-    extractionConfidence: Optional[str] = None  # "high", "medium", "low"
+    extractionConfidence: Optional[str] = Field(
+        None,
+        description="Confidence level: 'high' (explicit), 'medium' (implied), 'low' (inferred)"
+    )
     extractedFromSyllabus: bool = True
 
 
@@ -1235,6 +1238,8 @@ async def get_topic(
                 detail=f"Topic not found: {topic_id}"
             )
         return topic
+    except HTTPException:
+        raise  # Re-raise HTTPException without wrapping
     except ServiceValidationError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except FirestoreOperationError as e:
