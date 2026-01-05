@@ -175,30 +175,68 @@
                 <h2 class="section-title">🎯 Interactive Quiz</h2>
                 <p class="section-description">Test your knowledge with practice questions</p>
                 <div id="quiz-container">
-                    <div class="quiz-controls">
-                        <div class="form-group">
-                            <label for="quiz-topic-select">Select Topic</label>
-                            <select id="quiz-topic-select" class="form-select">
-                                <option value="all">All Topics</option>
-                                <option value="criminal">Criminal Law</option>
-                                <option value="private">Private Law</option>
-                                <option value="constitutional">Constitutional Law</option>
-                                <option value="administrative">Administrative Law</option>
-                                <option value="international">International Law</option>
-                            </select>
+                    <!-- Quiz Selection View -->
+                    <div id="quiz-selection-view">
+                        <div class="quiz-tabs">
+                            <button class="quiz-tab active" data-quiz-tab="saved">📚 Saved Quizzes</button>
+                            <button class="quiz-tab" data-quiz-tab="new">✨ New Quiz</button>
+                            <button class="quiz-tab" data-quiz-tab="history">📊 My History</button>
                         </div>
-                        <div class="form-group">
-                            <label for="quiz-difficulty-select">Difficulty</label>
-                            <select id="quiz-difficulty-select" class="form-select">
-                                <option value="easy">Easy</option>
-                                <option value="medium" selected>Medium</option>
-                                <option value="hard">Hard</option>
-                            </select>
+
+                        <!-- Saved Quizzes Tab -->
+                        <div id="saved-quizzes-tab" class="quiz-tab-content active">
+                            <div id="saved-quizzes-list" class="saved-quizzes-list">
+                                <p class="loading-text">Loading saved quizzes...</p>
+                            </div>
                         </div>
-                        <button id="start-quiz-btn" class="btn btn-primary">Start Quiz</button>
+
+                        <!-- New Quiz Tab -->
+                        <div id="new-quiz-tab" class="quiz-tab-content hidden">
+                            <div class="quiz-controls">
+                                <div class="form-group">
+                                    <label for="quiz-topic-select">Select Topic</label>
+                                    <select id="quiz-topic-select" class="form-select">
+                                        <option value="all">All Topics</option>
+                                        <option value="criminal">Criminal Law</option>
+                                        <option value="private">Private Law</option>
+                                        <option value="constitutional">Constitutional Law</option>
+                                        <option value="administrative">Administrative Law</option>
+                                        <option value="international">International Law</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="quiz-difficulty-select">Difficulty</label>
+                                    <select id="quiz-difficulty-select" class="form-select">
+                                        <option value="easy">Easy</option>
+                                        <option value="medium" selected>Medium</option>
+                                        <option value="hard">Hard</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="quiz-num-questions">Number of Questions</label>
+                                    <select id="quiz-num-questions" class="form-select">
+                                        <option value="5">5 Questions</option>
+                                        <option value="10" selected>10 Questions</option>
+                                        <option value="15">15 Questions</option>
+                                        <option value="20">20 Questions</option>
+                                    </select>
+                                </div>
+                                <button id="start-quiz-btn" class="btn btn-primary">Generate New Quiz</button>
+                            </div>
+                        </div>
+
+                        <!-- History Tab -->
+                        <div id="history-tab" class="quiz-tab-content hidden">
+                            <div id="quiz-history-list" class="quiz-history-list">
+                                <p class="loading-text">Loading quiz history...</p>
+                            </div>
+                        </div>
                     </div>
+
+                    <!-- Quiz Content (hidden until quiz starts) -->
                     <div id="quiz-content" class="quiz-content hidden">
                         <div class="quiz-header">
+                            <button id="back-to-quizzes-btn" class="btn btn-secondary btn-small">← Back to Quizzes</button>
                             <div class="quiz-progress"><span id="quiz-current">1</span> / <span id="quiz-total">10</span></div>
                             <div class="quiz-score">Score: <span id="quiz-score">0</span></div>
                         </div>

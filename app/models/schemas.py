@@ -1,6 +1,6 @@
 """Pydantic Models for API Requests/Responses."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
 
 from pydantic import BaseModel, Field, field_validator
@@ -130,6 +130,109 @@ class QuizResult(BaseModel):
     correct_answer: int = Field(..., description="Index of correct answer")
     explanation: str = Field(..., description="Explanation")
     status: str = Field(default="success", description="Result status")
+
+
+# ============================================================================
+# Stored Quiz Models (Firestore Persistence)
+# ============================================================================
+
+class StoredQuizQuestion(BaseModel):
+    """Model for a question in a stored quiz."""
+
+    question: str = Field(..., description="Question text")
+    options: List[str] = Field(..., min_items=2, max_items=6, description="Answer options")
+    correct_index: int = Field(..., ge=0, description="Index of correct answer")
+    explanation: str = Field(..., description="Explanation of correct answer")
+    difficulty: Optional[str] = Field(None, description="Question difficulty")
+    articles: Optional[List[str]] = Field(default_factory=list, description="Related articles")
+    topic: Optional[str] = Field(None, description="Question topic")
+
+
+class StoredQuiz(BaseModel):
+    """Model for a quiz stored in Firestore."""
+
+    id: str = Field(..., description="Unique quiz ID")
+    course_id: str = Field(..., description="Course ID this quiz belongs to")
+    topic: str = Field(..., description="Quiz topic")
+    difficulty: str = Field(..., description="Quiz difficulty: easy, medium, hard")
+    week_number: Optional[int] = Field(None, description="Week number if filtered")
+    num_questions: int = Field(..., description="Number of questions")
+    questions: List[StoredQuizQuestion] = Field(..., description="Quiz questions")
+    content_hash: str = Field(..., description="Hash for duplicate detection")
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), description="Creation timestamp (UTC)")
+    title: Optional[str] = Field(None, description="Optional quiz title")
+
+
+class StoredQuizSummary(BaseModel):
+    """Summary of a stored quiz for listing."""
+
+    id: str = Field(..., description="Quiz ID")
+    course_id: str = Field(..., description="Course ID")
+    topic: str = Field(..., description="Quiz topic")
+    difficulty: str = Field(..., description="Difficulty level")
+    week_number: Optional[int] = Field(None, description="Week number")
+    num_questions: int = Field(..., description="Number of questions")
+    created_at: datetime = Field(..., description="Creation timestamp")
+    title: Optional[str] = Field(None, description="Quiz title")
+
+
+class QuizAttemptResult(BaseModel):
+    """Model for storing a user's quiz attempt result."""
+
+    id: str = Field(..., description="Result ID")
+    quiz_id: str = Field(..., description="Quiz ID")
+    course_id: str = Field(..., description="Course ID")
+    user_id: str = Field(..., description="User ID (simulated)")
+    answers: List[int] = Field(..., description="User's answer indices")
+    score: int = Field(..., ge=0, description="Number of correct answers")
+    total_questions: int = Field(..., ge=1, description="Total questions in quiz")
+    percentage: float = Field(..., ge=0, le=100, description="Score percentage")
+    time_taken_seconds: Optional[int] = Field(None, description="Time taken in seconds")
+    completed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), description="Completion timestamp (UTC)")
+
+
+class QuizSubmitRequest(BaseModel):
+    """Request model for submitting quiz answers."""
+
+    quiz_id: str = Field(..., description="Quiz ID")
+    course_id: str = Field(..., description="Course ID the quiz belongs to")
+    answers: List[int] = Field(..., description="User's answer indices for each question")
+    user_id: Optional[str] = Field(None, description="User ID (generated if not provided)")
+    time_taken_seconds: Optional[int] = Field(None, ge=0, description="Time taken in seconds")
+
+    @field_validator('answers')
+    @classmethod
+    def validate_answers(cls, v: List[int]) -> List[int]:
+        """Validate that answer indices are non-negative."""
+        if any(answer < 0 for answer in v):
+            raise ValueError('Answer indices must be non-negative')
+        return v
+
+
+class QuizHistoryItem(BaseModel):
+    """Item in user's quiz history."""
+
+    result_id: str = Field(..., description="Result ID")
+    quiz_id: str = Field(..., description="Quiz ID")
+    course_id: str = Field(..., description="Course ID")
+    topic: str = Field(..., description="Quiz topic")
+    difficulty: str = Field(..., description="Difficulty level")
+    score: int = Field(..., description="Score achieved")
+    total_questions: int = Field(..., description="Total questions")
+    percentage: float = Field(..., description="Score percentage")
+    completed_at: datetime = Field(..., description="Completion timestamp")
+
+
+class CreateQuizRequest(BaseModel):
+    """Request model for creating/generating a new quiz."""
+
+    course_id: str = Field(..., min_length=1, max_length=100, description="Course ID")
+    topic: Optional[str] = Field(None, description="Topic for the quiz")
+    week: Optional[int] = Field(None, ge=1, le=52, description="Week number filter")
+    num_questions: int = Field(10, ge=1, le=50, description="Number of questions")
+    difficulty: str = Field("medium", description="Difficulty: easy, medium, hard")
+    title: Optional[str] = Field(None, max_length=200, description="Optional quiz title")
+    allow_duplicate: bool = Field(False, description="Allow duplicate quiz if one exists")
 
 
 # ============================================================================
