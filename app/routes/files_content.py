@@ -16,7 +16,7 @@ from typing import List, Optional
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field, validator
 
-from app.services.files_api_service import get_files_api_service
+from app.services.files_api_service import FilesAPIService, get_files_api_service
 
 logger = logging.getLogger(__name__)
 
@@ -177,7 +177,7 @@ def _add_course_context(
 
 
 def _get_file_keys(
-    service,
+    service: FilesAPIService,
     topic: Optional[str] = None,
     course_id: Optional[str] = None,
     week: Optional[int] = None
