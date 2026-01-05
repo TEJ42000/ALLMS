@@ -32,13 +32,17 @@ async function loadCourses() {
         hideNoCourses();
 
         const response = await fetch(API_BASE);
-        
+
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
 
-        const courses = await response.json();
-        
+        const data = await response.json();
+
+        // Handle paginated response format: {items: [...], total: N, ...}
+        // Also support legacy array format for backwards compatibility
+        const courses = Array.isArray(data) ? data : (data.items || []);
+
         hideLoading();
 
         if (courses.length === 0) {
