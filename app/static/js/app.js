@@ -292,9 +292,13 @@ async function assessAnswer() {
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(addCourseContext({topic, question: question || null, answer}))
         });
-        
-        if (!response.ok) throw new Error(`API error: ${response.status}`);
-        
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            const errorMessage = errorData.detail || `API error: ${response.status}`;
+            throw new Error(errorMessage);
+        }
+
         const data = await response.json();
         resultDiv.innerHTML = `
             <div class="assessment-feedback">
@@ -302,10 +306,11 @@ async function assessAnswer() {
             </div>
         `;
         resultDiv.style.display = 'block';
-        
+
     } catch (error) {
         console.error('Error:', error);
-        resultDiv.innerHTML = '<p class="error">Error getting assessment. Please try again.</p>';
+        const errorMessage = error.message || 'Error getting assessment. Please try again.';
+        resultDiv.innerHTML = `<p class="error">${escapeHtml(errorMessage)}</p>`;
     } finally {
         hideLoading();
     }
@@ -363,7 +368,11 @@ async function generateQuiz() {
             body: JSON.stringify(addCourseContext({topic, num_questions, difficulty}))
         });
 
-        if (!response.ok) throw new Error(`API error: ${response.status}`);
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            const errorMessage = errorData.detail || `API error: ${response.status}`;
+            throw new Error(errorMessage);
+        }
 
         const data = await response.json();
 
@@ -386,7 +395,8 @@ async function generateQuiz() {
     } catch (error) {
         console.error('Error:', error);
         if (questionContainer) {
-            questionContainer.innerHTML = `<p class="error">Error generating quiz: ${error.message}. Please try again.</p>`;
+            const errorMessage = error.message || 'Error generating quiz. Please try again.';
+            questionContainer.innerHTML = `<p class="error">${escapeHtml(errorMessage)}</p>`;
         }
         if (quizContent) quizContent.classList.remove('hidden');
     } finally {
@@ -713,25 +723,46 @@ function initStudyListeners() {
 async function generateStudyGuide() {
     const topic = document.getElementById('study-topic').value;
     const resultDiv = document.getElementById('study-result');
-    
+
+    // Validate: need either topic or course_id
+    if (!topic && !COURSE_ID) {
+        resultDiv.innerHTML = '<p class="error">Please select a topic.</p>';
+        resultDiv.style.display = 'block';
+        return;
+    }
+
     showLoading();
-    
+
     try {
+        const requestBody = addCourseContext({});
+
+        // Add topic if selected, otherwise rely on course_id
+        if (topic) {
+            requestBody.topic = topic;
+        }
+
         const response = await fetch(`${API_BASE}/api/files-content/study-guide`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(addCourseContext({topic}))
+            body: JSON.stringify(requestBody)
         });
-        
-        if (!response.ok) throw new Error(`API error: ${response.status}`);
-        
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            const errorMessage = errorData.detail || `API error: ${response.status}`;
+            throw new Error(errorMessage);
+        }
+
         const data = await response.json();
         resultDiv.innerHTML = `<div class="study-guide">${formatMarkdown(data.guide)}</div>`;
         resultDiv.style.display = 'block';
-        
+
     } catch (error) {
         console.error('Error:', error);
-        resultDiv.innerHTML = '<p class="error">Error generating study guide. Please try again.</p>';
+        // Backend now provides user-friendly error messages directly
+        const errorMessage = error.message || 'Error generating study guide. Please try again.';
+        resultDiv.innerHTML = `<p class="error">${escapeHtml(errorMessage)}</p>`;
+        resultDiv.style.display = 'block';
     } finally {
         hideLoading();
     }

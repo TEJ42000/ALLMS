@@ -602,6 +602,66 @@ class TestCourseAwareStudyGuideEndpoint:
         assert response.status_code == 422
 
 
+class TestStudyGuideErrorHandling:
+    """Tests for study guide error handling improvements (PR #65)."""
+
+    def test_study_guide_no_materials_with_course_id(self, client):
+        """Test study guide returns 400 when course has no materials."""
+        mock_service = MagicMock()
+        mock_service.get_files_for_course.return_value = []  # Empty file list
+
+        with patch(
+            'app.routes.files_content.get_files_api_service',
+            return_value=mock_service
+        ):
+            response = client.post("/api/files-content/study-guide", json={
+                "course_id": "Legal-History-2025-2026"
+            })
+
+            assert response.status_code == 400
+            detail = response.json()["detail"]
+            assert "No course materials available" in detail
+            assert "Legal-History-2025-2026" in detail
+            assert "contact your instructor" in detail
+
+    def test_study_guide_no_materials_with_weeks(self, client):
+        """Test study guide returns 400 when specific weeks have no materials."""
+        mock_service = MagicMock()
+        mock_service.get_files_for_course_weeks.return_value = []
+
+        with patch(
+            'app.routes.files_content.get_files_api_service',
+            return_value=mock_service
+        ):
+            response = client.post("/api/files-content/study-guide", json={
+                "course_id": "LLS-2025-2026",
+                "weeks": [1, 2]
+            })
+
+            assert response.status_code == 400
+            detail = response.json()["detail"]
+            assert "No course materials available" in detail
+            assert "weeks [1, 2]" in detail
+
+    def test_study_guide_no_materials_legacy_mode(self, client):
+        """Test study guide returns 400 in legacy mode with no materials."""
+        mock_service = MagicMock()
+        mock_service.get_topic_files.return_value = []
+
+        with patch(
+            'app.routes.files_content.get_files_api_service',
+            return_value=mock_service
+        ):
+            response = client.post("/api/files-content/study-guide", json={
+                "topic": "Nonexistent Topic"
+            })
+
+            assert response.status_code == 400
+            detail = response.json()["detail"]
+            assert "No course materials available" in detail
+            assert "select a topic" in detail
+
+
 class TestCourseAwareFlashcardsEndpoint:
     """Tests for course-aware flashcards generation."""
 

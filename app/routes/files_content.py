@@ -16,7 +16,7 @@ from typing import List, Optional
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field, validator
 
-from app.services.files_api_service import get_files_api_service
+from app.services.files_api_service import FilesAPIService, get_files_api_service
 
 logger = logging.getLogger(__name__)
 
@@ -193,7 +193,7 @@ def _add_course_context(
 
 
 def _get_file_keys(
-    service,
+    service: FilesAPIService,
     topic: Optional[str] = None,
     course_id: Optional[str] = None,
     week: Optional[int] = None
@@ -377,6 +377,18 @@ async def generate_study_guide(request: FilesStudyGuideRequest):
                 400,
                 detail="Either 'topic' or 'course_id' must be provided"
             )
+
+        # Check if we have any files to work with
+        if not file_keys:
+            error_msg = "No course materials available. "
+            if request.course_id:
+                error_msg += f"Course '{request.course_id}' has no materials"
+                if request.weeks:
+                    error_msg += f" for weeks {request.weeks}"
+                error_msg += ". Please contact your instructor to add materials."
+            else:
+                error_msg += "Please select a topic with available materials."
+            raise HTTPException(400, detail=error_msg)
 
         topic = request.topic or "Course Materials"
 
