@@ -522,19 +522,32 @@ Return ONLY valid JSON:
         content_blocks = []
 
         # Add each document's content as a text block with clear labeling
-        for material, text in materials_with_text:
+        # We'll mark the last document block for caching since cache applies
+        # to all content up to and including the marked block
+        for i, (material, text) in enumerate(materials_with_text):
             title = material.title or material.filename
             document_block = f"""
 === DOCUMENT: {title} ===
 {text}
 === END OF {title} ===
 """
-            content_blocks.append({
+            block = {
                 "type": "text",
                 "text": document_block
-            })
+            }
+
+            # Add cache_control to the LAST document block
+            # This caches all documents as a unit (cache breakpoint)
+            # Cache TTL is 5 minutes by default, refreshed on each use
+            if i == len(materials_with_text) - 1:
+                block["cache_control"] = {"type": "ephemeral"}
+                logger.info("Prompt caching enabled for %d documents", len(materials_with_text))
+
+            content_blocks.append(block)
 
         prompt_text = f"""Based on the documents provided above, create a comprehensive study guide for {topic}.
+        Wherever possible include links to the source material to all of easy cross referencing. When echr cases
+        are mentioned try to include a link to the case in the HUDOC database. When duch law is mentioned include a link to the article on the wetten.nl website.
 
 REQUIRED SECTIONS:
 
@@ -596,7 +609,10 @@ FORMATTING REQUIREMENTS:
         })
 
         # System prompt emphasizing accuracy and grounding in provided materials
-        system_prompt = """You are an expert legal education content creator for University of Groningen law students.
+        # Use list format with cache_control to cache the system prompt
+        system_blocks = [{
+            "type": "text",
+            "text": """You are an expert legal education content creator for University of Groningen law students.
 
 CRITICAL REQUIREMENTS:
 - ONLY use information explicitly stated in the provided documents
@@ -610,11 +626,19 @@ OUTPUT QUALITY:
 - Use Mermaid diagrams for flowcharts and decision trees
 - Use Markdown tables for structured information
 - Make content visually appealing and easy to scan
-- Focus on exam-relevant material"""
+- Focus on exam-relevant material""",
+            "cache_control": {"type": "ephemeral"}  # Cache the system prompt
+        }]
 
         # Use extended thinking for better reasoning and accuracy
         # Note: temperature must be 1 when using extended thinking (API requirement)
         # Extended thinking helps reduce hallucinations through careful reasoning
+        #
+        # Prompt Caching Benefits:
+        # - System prompt: cached (static, never changes)
+        # - Document content: cached (same documents reused across requests)
+        # - Cache TTL: 5 minutes, refreshed on each use
+        # - Cost reduction: ~90% cheaper for cached tokens on cache hits
         response = await self.client.messages.create(
             model="claude-sonnet-4-20250514",
             max_tokens=16000,  # Increased to accommodate thinking + output
@@ -622,7 +646,7 @@ OUTPUT QUALITY:
                 "type": "enabled",
                 "budget_tokens": 5000  # Allow up to 5000 tokens for reasoning
             },
-            system=system_prompt,
+            system=system_blocks,
             messages=[{"role": "user", "content": content_blocks}]
         )
 
