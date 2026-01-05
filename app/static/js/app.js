@@ -362,7 +362,8 @@ async function askTutor() {
     addMessage('user', message);
     document.getElementById('tutor-input').value = '';
 
-    showLoading();
+    // Show typing indicator (bouncing dots)
+    showTypingIndicator();
 
     try {
         // Build request with optional week_number
@@ -380,23 +381,76 @@ async function askTutor() {
         if (!response.ok) throw new Error(`API error: ${response.status}`);
 
         const data = await response.json();
+
+        // Hide typing indicator and show response
+        hideTypingIndicator();
         addMessage('assistant', data.content);
 
     } catch (error) {
         console.error('Error:', error);
+        hideTypingIndicator();
         addMessage('error', 'Sorry, there was an error processing your request.');
-    } finally {
-        hideLoading();
     }
 }
 
 function addMessage(role, content) {
     const messagesDiv = document.getElementById('chat-messages');
+
+    // Create wrapper for avatar + message bubble layout
+    const wrapperDiv = document.createElement('div');
+    wrapperDiv.className = `message-wrapper ${role}`;
+
+    // Create avatar
+    const avatarDiv = document.createElement('div');
+    avatarDiv.className = 'message-avatar';
+    if (role === 'user') {
+        avatarDiv.textContent = '👤';
+    } else if (role === 'assistant') {
+        avatarDiv.textContent = '🤖';
+    } else {
+        avatarDiv.textContent = '⚠️';
+    }
+
+    // Create message bubble
     const messageDiv = document.createElement('div');
-    messageDiv.className = `message message-${role}`;
+    messageDiv.className = 'message';
     messageDiv.innerHTML = formatMarkdown(content);
-    messagesDiv.appendChild(messageDiv);
+
+    // Assemble
+    wrapperDiv.appendChild(avatarDiv);
+    wrapperDiv.appendChild(messageDiv);
+    messagesDiv.appendChild(wrapperDiv);
     messagesDiv.scrollTop = messagesDiv.scrollHeight;
+}
+
+function showTypingIndicator() {
+    const messagesDiv = document.getElementById('chat-messages');
+
+    // Remove any existing typing indicator
+    hideTypingIndicator();
+
+    const typingDiv = document.createElement('div');
+    typingDiv.className = 'typing-indicator';
+    typingDiv.id = 'typing-indicator';
+
+    typingDiv.innerHTML = `
+        <div class="message-avatar">🤖</div>
+        <div class="typing-bubble">
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+        </div>
+    `;
+
+    messagesDiv.appendChild(typingDiv);
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+}
+
+function hideTypingIndicator() {
+    const typingIndicator = document.getElementById('typing-indicator');
+    if (typingIndicator) {
+        typingIndicator.remove();
+    }
 }
 
 // ========== Assessment ==========

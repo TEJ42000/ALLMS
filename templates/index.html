@@ -97,7 +97,16 @@
                 <h2 class="section-title">🤖 AI Tutor</h2>
                 <p class="section-description">Ask questions about any LLS topic and get detailed explanations</p>
                 <div class="chat-container">
-                    <div id="chat-messages" class="chat-messages"></div>
+                    <div id="chat-messages" class="chat-messages">
+                        <!-- Welcome message -->
+                        <div class="message-wrapper assistant">
+                            <div class="message-avatar">🤖</div>
+                            <div class="message">
+                                <p><strong>Hello!</strong> I'm your AI study assistant for this course.</p>
+                                <p>Select a topic from the dropdown below and ask me anything about the course material. I can help you understand concepts, explain cases, and prepare for assessments.</p>
+                            </div>
+                        </div>
+                    </div>
                     <div class="chat-input-area">
                         <label for="context-select" class="visually-hidden">Select Topic Context</label>
                         <select id="context-select" class="form-select" aria-label="Select topic context for your question">
@@ -109,9 +118,11 @@
                             <option value="General">General</option>
                             {% endif %}
                         </select>
-                        <label for="tutor-input" class="visually-hidden">Your question for the AI Tutor</label>
-                        <textarea id="tutor-input" placeholder="Ask about concepts, cases, frameworks..." rows="2" aria-label="Enter your question for the AI Tutor"></textarea>
-                        <button id="ask-btn" class="btn btn-primary">Ask Question</button>
+                        <div class="chat-input-row">
+                            <label for="tutor-input" class="visually-hidden">Your question for the AI Tutor</label>
+                            <textarea id="tutor-input" placeholder="Ask about concepts, cases, frameworks..." rows="1" aria-label="Enter your question for the AI Tutor"></textarea>
+                            <button id="ask-btn" class="btn btn-primary">Ask</button>
+                        </div>
                     </div>
                 </div>
             </section>
