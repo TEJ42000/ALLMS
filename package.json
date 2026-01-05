@@ -1,6 +1,6 @@
 {
   "name": "allms",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "AI-Powered Learning System for Law & Legal Skills using Anthropic Claude and Google Cloud Run.",
   "main": "index.js",
   "directories": {
