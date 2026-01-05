@@ -16,13 +16,14 @@ This approach is more robust than the Files API because it:
 3. Simpler architecture with no external file state
 """
 
+import asyncio
 import json
 import logging
 import re
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-from anthropic import AsyncAnthropic
+from anthropic import AsyncAnthropic, RateLimitError
 
 from app.models.course_models import CourseMaterial
 from app.services.gcp_service import get_anthropic_api_key, get_firestore_client
@@ -500,19 +501,21 @@ Return ONLY valid JSON:
 
         if week_numbers and len(week_numbers) > 0:
             # Fetch materials for each specified week
+            # Limit to 3 materials per week to stay under rate limits (10k tokens/min)
             for week_num in week_numbers:
                 week_materials = await self.get_course_materials_with_text(
                     course_id=course_id,
                     week_number=week_num,
-                    limit=10  # Limit per week to avoid overwhelming context
+                    limit=3  # Reduced from 10 to manage rate limits
                 )
                 materials_with_text.extend(week_materials)
         else:
             # No week filter - get all materials
+            # Limit to 5 materials total for general study guides
             materials_with_text = await self.get_course_materials_with_text(
                 course_id=course_id,
                 week_number=None,
-                limit=15  # Allow more materials for comprehensive study guide
+                limit=5  # Reduced from 15 to manage rate limits
             )
 
         if not materials_with_text:
@@ -522,65 +525,187 @@ Return ONLY valid JSON:
         content_blocks = []
 
         # Add each document's content as a text block with clear labeling
-        for material, text in materials_with_text:
+        # We'll mark the last document block for caching since cache applies
+        # to all content up to and including the marked block
+        for i, (material, text) in enumerate(materials_with_text):
             title = material.title or material.filename
             document_block = f"""
 === DOCUMENT: {title} ===
 {text}
 === END OF {title} ===
 """
-            content_blocks.append({
+            block = {
                 "type": "text",
                 "text": document_block
-            })
+            }
+
+            # Add cache_control to the LAST document block
+            # This caches all documents as a unit (cache breakpoint)
+            # Cache TTL is 5 minutes by default, refreshed on each use
+            if i == len(materials_with_text) - 1:
+                block["cache_control"] = {"type": "ephemeral"}
+                logger.info("Prompt caching enabled for %d documents", len(materials_with_text))
+
+            content_blocks.append(block)
 
         prompt_text = f"""Based on the documents provided above, create a comprehensive study guide for {topic}.
+        Wherever possible include links to the source material to all of easy cross referencing. When echr cases
+        are mentioned try to include a link to the case in the HUDOC database. When Dutch law is mentioned include a link to the article on the wetten.nl website.
 
-Include:
-## Key Concepts
-- All core concepts mentioned in the materials
-- Important definitions
-- Detailed, well illustrated and visualised decision models
-- Prioritize making the study guide visual and easy to understand, while presenting all course information in great detail
+REQUIRED SECTIONS:
 
-## Important Articles
-- List with brief explanations
-- Include article numbers
-- Explain the articles purpose and context
+## 📚 Key Concepts
+- All core concepts mentioned in the materials with clear definitions
+- Use **bold** for key terms being defined
+- Group related concepts together under ### subheadings
 
-## Common Mistakes
-- What students often get wrong (use ❌)
-- Correct approaches (use ✅)
+## 🔄 Decision Models & Frameworks
+- Create visual decision trees using Mermaid flowchart syntax
+- Use this format for flowcharts:
+```mermaid
+graph TD
+    A[Start] --> B{{Decision?}}
+    B -->|Yes| C[Action 1]
+    B -->|No| D[Action 2]
+```
+- Include step-by-step analysis frameworks
+- Show how concepts connect to each other
 
-## Exam Tips
-- How to approach questions
-- What to remember
+## 📖 Important Articles
+Present articles in a Markdown table:
+| Article | Name | Purpose | Key Elements |
+|---------|------|---------|--------------|
+| Art. X:XX | ... | ... | ... |
 
-## Practice Scenarios
-- Example situations to analyze
+- Explain each article's purpose and when it applies
+- Group by topic or code section
 
-Use visual formatting:
-- Use valid Markdown formatting
-- ✅ for correct info
-- ❌ for mistakes
-- ⚠️ for warnings
-- Bold **key terms**
-- Cite articles properly"""
+## ⚠️ Common Mistakes
+| ❌ Mistake | ✅ Correct Approach |
+|-----------|---------------------|
+| What students do wrong | What they should do instead |
+
+## 🎯 Exam Tips
+- Numbered list of practical tips
+- How to structure answers
+- Time management advice
+- Key phrases to use
+
+## 📝 Practice Scenarios
+Provide 2-3 example scenarios with:
+1. **Facts**: Brief situation
+2. **Issue**: What legal question arises
+3. **Analysis**: How to approach it
+4. **Conclusion**: Expected outcome
+
+FORMATTING REQUIREMENTS:
+- Use valid Markdown (headers, bold, tables, lists)
+- Use Mermaid syntax for ALL flowcharts and diagrams (not ASCII art)
+- Use Markdown tables (not ASCII tables)
+- Use emojis for visual appeal: ✅ ❌ ⚠️ 💡 📌
+- Cite articles properly: **Art. 6:74 DCC**
+- Keep content detailed but well-organized"""
 
         content_blocks.append({
             "type": "text",
             "text": prompt_text
         })
 
-        # Use 8000 tokens for study guides (longer than quizzes which use 4000)
-        # Study guides include multiple sections: concepts, articles, mistakes, tips, scenarios
-        response = await self.client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=8000,
-            messages=[{"role": "user", "content": content_blocks}]
+        # System prompt emphasizing accuracy and grounding in provided materials
+        # Use list format with cache_control to cache the system prompt
+        system_blocks = [{
+            "type": "text",
+            "text": """You are an expert legal education content creator for University of Groningen law students.
+
+CRITICAL REQUIREMENTS:
+- ONLY use information explicitly stated in the provided documents
+- DO NOT invent, assume, or hallucinate any legal rules, articles, or case law
+- If information is not in the documents, do not include it
+- Cite specific documents when referencing information
+- Use proper Dutch legal terminology and article citations (e.g., Art. 6:74 DCC)
+
+OUTPUT QUALITY:
+- Create clear, well-organized study materials
+- Use Mermaid diagrams for flowcharts and decision trees
+- Use Markdown tables for structured information
+- Make content visually appealing and easy to scan
+- Focus on exam-relevant material""",
+            "cache_control": {"type": "ephemeral"}  # Cache the system prompt
+        }]
+
+        # Use extended thinking for better reasoning and accuracy
+        # Note: temperature must be 1 when using extended thinking (API requirement)
+        # Extended thinking helps reduce hallucinations through careful reasoning
+        #
+        # Prompt Caching Benefits:
+        # - System prompt: cached (static, never changes)
+        # - Document content: cached (same documents reused across requests)
+        # - Cache TTL: 5 minutes, refreshed on each use
+        # - Cost reduction: ~90% cheaper for cached tokens on cache hits
+        #
+        # Retry logic for rate limits with exponential backoff
+        max_retries = 5
+        base_delay = 60  # Start with 60 seconds (rate limit is per minute)
+
+        for attempt in range(max_retries):
+            try:
+                response = await self.client.messages.create(
+                    model="claude-sonnet-4-20250514",
+                    max_tokens=16000,  # Increased to accommodate thinking + output
+                    thinking={
+                        "type": "enabled",
+                        "budget_tokens": 5000  # Allow up to 5000 tokens for reasoning
+                    },
+                    system=system_blocks,
+                    messages=[{"role": "user", "content": content_blocks}]
+                )
+                break  # Success, exit retry loop
+            except RateLimitError as e:
+                if attempt < max_retries - 1:
+                    # Exponential backoff: 60s, 120s, 240s, 480s
+                    delay = base_delay * (2 ** attempt)
+                    logger.warning(
+                        "⏳ Rate limit hit (attempt %d/%d). Waiting %d seconds before retry...",
+                        attempt + 1, max_retries, delay
+                    )
+                    await asyncio.sleep(delay)
+                else:
+                    logger.error("❌ Rate limit exceeded after %d attempts", max_retries)
+                    raise
+
+        # Log cache statistics from the response
+        usage = response.usage
+        cache_created = getattr(usage, 'cache_creation_input_tokens', 0) or 0
+        cache_read = getattr(usage, 'cache_read_input_tokens', 0) or 0
+        input_tokens = getattr(usage, 'input_tokens', 0) or 0
+        output_tokens = getattr(usage, 'output_tokens', 0) or 0
+
+        if cache_read > 0:
+            cache_hit_pct = (cache_read / (input_tokens + cache_read)) * 100 if input_tokens else 0
+            logger.info(
+                "📦 CACHE HIT: %d tokens read from cache (%.1f%% cached), %d new input tokens",
+                cache_read, cache_hit_pct, input_tokens
+            )
+        elif cache_created > 0:
+            logger.info(
+                "📝 CACHE MISS: %d tokens written to cache for future requests",
+                cache_created
+            )
+        else:
+            logger.info("⚠️ No cache activity detected")
+
+        logger.info(
+            "💰 Token usage - Input: %d, Output: %d, Cache read: %d, Cache created: %d",
+            input_tokens, output_tokens, cache_read, cache_created
         )
 
-        guide = response.content[0].text
+        # With extended thinking, response has thinking blocks and text blocks
+        # Extract just the text content (not the thinking)
+        guide = ""
+        for block in response.content:
+            if block.type == "text":
+                guide += block.text
+
         logger.info(
             "Generated study guide: %d characters from %d materials",
             len(guide), len(materials_with_text)

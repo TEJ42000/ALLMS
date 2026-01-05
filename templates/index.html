@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ title }}</title>
     <link rel="stylesheet" href="/static/css/styles.css">
+    <!-- Markdown and Mermaid rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
     <!-- Course Context -->
     <script>
         // Store course context for JavaScript access
@@ -283,12 +286,53 @@
                 </div>
             </section>
             <section id="study-section" class="section">
-                <h2 class="section-title">📚 Study Guide Generator</h2>
-                <p class="section-description">Generate a comprehensive study guide from all available course materials</p>
-                <div class="study-form">
-                    <button id="generate-study-btn" class="btn btn-primary">Generate Comprehensive Study Guide</button>
-                    <div id="study-result" class="result-box"></div>
+                <h2 class="section-title">📚 Study Guide</h2>
+                <p class="section-description">Generate and view comprehensive study guides from course materials</p>
+
+                <!-- Study Guide Sub-tabs -->
+                <div class="quiz-sub-tabs">
+                    <button class="quiz-sub-tab active" data-study-tab="saved-guides">📂 Saved Guides</button>
+                    <button class="quiz-sub-tab" data-study-tab="new-guide">✨ Generate New</button>
                 </div>
+
+                <!-- Saved Guides Tab -->
+                <div id="saved-guides-tab" class="quiz-tab-content active">
+                    <div id="study-guides-list" class="saved-quizzes-list">
+                        <p class="loading-text">Loading saved study guides...</p>
+                    </div>
+                </div>
+
+                <!-- Generate New Guide Tab -->
+                <div id="new-guide-tab" class="quiz-tab-content" style="display: none;">
+                    <div class="study-form">
+                        <div class="form-group">
+                            <label for="study-week-select">Week (optional):</label>
+                            <select id="study-week-select" class="form-control">
+                                <option value="">All Weeks</option>
+                                <option value="1">Week 1</option>
+                                <option value="2">Week 2</option>
+                                <option value="3">Week 3</option>
+                                <option value="4">Week 4</option>
+                                <option value="5">Week 5</option>
+                                <option value="6">Week 6</option>
+                                <option value="7">Week 7</option>
+                            </select>
+                            <button type="button" id="estimate-tokens-btn" class="btn btn-small btn-secondary" style="margin-left: 10px;">📊 Estimate Tokens</button>
+                        </div>
+                        <button id="generate-study-btn" class="btn btn-primary">Generate Comprehensive Study Guide</button>
+                    </div>
+
+                    <!-- Collapsible Debug Panel -->
+                    <details id="token-debug-panel" class="debug-panel" style="display: none;">
+                        <summary>🔧 Token Estimation Details</summary>
+                        <div id="token-debug-content" class="debug-content">
+                            <!-- Populated by JavaScript -->
+                        </div>
+                    </details>
+                </div>
+
+                <!-- Study Guide Content Display -->
+                <div id="study-result" class="study-guide-content result-box"></div>
             </section>
         </main>
         <div id="loading" class="loading hidden">

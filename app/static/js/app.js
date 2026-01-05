@@ -73,10 +73,174 @@ function hideLoading() {
 }
 
 // ========== Markdown Formatting ==========
+// Configure marked.js for rendering
+if (typeof marked !== 'undefined') {
+    marked.setOptions({
+        breaks: true,
+        gfm: true,
+        headerIds: false,
+        mangle: false
+    });
+}
+
+// Initialize Mermaid for diagram rendering
+if (typeof mermaid !== 'undefined') {
+    mermaid.initialize({
+        startOnLoad: false,
+        theme: 'default',
+        securityLevel: 'loose'
+    });
+}
+
+/**
+ * Pre-process text to wrap ASCII art diagrams in code fences
+ * Detects box-drawing characters and wraps them properly
+ */
+function preprocessAsciiArt(text) {
+    if (!text) return text;
+
+    // Box-drawing characters pattern
+    const boxChars = /[┌┐└┘├┤┬┴┼─│═║╔╗╚╝╠╣╦╩╬]/;
+
+    const lines = text.split('\n');
+    const result = [];
+    let inAsciiBlock = false;
+    let asciiBuffer = [];
+
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const hasBoxChars = boxChars.test(line);
+
+        if (hasBoxChars && !inAsciiBlock) {
+            // Start of ASCII art block
+            inAsciiBlock = true;
+            asciiBuffer = [line];
+        } else if (hasBoxChars && inAsciiBlock) {
+            // Continue ASCII art block
+            asciiBuffer.push(line);
+        } else if (!hasBoxChars && inAsciiBlock) {
+            // End of ASCII art block - wrap in code fence
+            result.push('```');
+            result.push(...asciiBuffer);
+            result.push('```');
+            result.push(line);
+            inAsciiBlock = false;
+            asciiBuffer = [];
+        } else {
+            result.push(line);
+        }
+    }
+
+    // Handle case where ASCII art is at the end
+    if (inAsciiBlock && asciiBuffer.length > 0) {
+        result.push('```');
+        result.push(...asciiBuffer);
+        result.push('```');
+    }
+
+    return result.join('\n');
+}
+
+/**
+ * Format markdown text using marked.js library
+ * Falls back to simple formatting if marked is not available
+ */
 function formatMarkdown(text) {
     if (!text) return '';
 
-    // Split into lines for processing
+    // Pre-process to wrap ASCII art in code fences
+    text = preprocessAsciiArt(text);
+
+    // Use marked.js if available
+    if (typeof marked !== 'undefined') {
+        try {
+            return marked.parse(text);
+        } catch (e) {
+            console.error('Marked.js error:', e);
+            return formatMarkdownFallback(text);
+        }
+    }
+
+    return formatMarkdownFallback(text);
+}
+
+/**
+ * Render Mermaid diagrams in a container
+ * Call this after inserting HTML with mermaid code blocks
+ */
+async function renderMermaidDiagrams(container) {
+    if (typeof mermaid === 'undefined') return;
+
+    // Mermaid diagram type keywords
+    const mermaidKeywords = [
+        'graph ', 'graph\n', 'flowchart ', 'flowchart\n',
+        'sequenceDiagram', 'classDiagram', 'stateDiagram',
+        'erDiagram', 'gantt', 'pie', 'journey', 'gitGraph',
+        'mindmap', 'timeline', 'quadrantChart', 'xychart'
+    ];
+
+    // Find all code blocks that might be mermaid
+    const codeBlocks = container.querySelectorAll('pre code');
+    for (const block of codeBlocks) {
+        const text = block.textContent.trim();
+
+        // Check if text contains mermaid keywords (anywhere, not just at start)
+        // This handles cases where there's a title before the diagram definition
+        const isMermaid = mermaidKeywords.some(keyword => text.includes(keyword));
+
+        if (isMermaid) {
+            try {
+                const pre = block.parentElement;
+                const id = 'mermaid-' + Math.random().toString(36).substr(2, 9);
+
+                // Extract just the mermaid code (skip title lines before graph/flowchart)
+                let mermaidCode = text;
+                const lines = text.split('\n');
+                const diagramStartIndex = lines.findIndex(line =>
+                    mermaidKeywords.some(kw => line.trim().startsWith(kw.trim()))
+                );
+                if (diagramStartIndex > 0) {
+                    // There's a title - extract just the diagram part
+                    mermaidCode = lines.slice(diagramStartIndex).join('\n');
+                }
+
+                const { svg } = await mermaid.render(id, mermaidCode);
+
+                // Create container with optional title
+                const div = document.createElement('div');
+                div.className = 'mermaid-container';
+
+                // Add title if present
+                if (diagramStartIndex > 0) {
+                    const title = lines.slice(0, diagramStartIndex).join(' ').trim();
+                    if (title) {
+                        const titleEl = document.createElement('div');
+                        titleEl.className = 'mermaid-title';
+                        titleEl.textContent = title;
+                        div.appendChild(titleEl);
+                    }
+                }
+
+                const diagramDiv = document.createElement('div');
+                diagramDiv.className = 'mermaid';
+                diagramDiv.innerHTML = svg;
+                div.appendChild(diagramDiv);
+
+                pre.replaceWith(div);
+            } catch (e) {
+                console.warn('Mermaid rendering failed:', e);
+                // Leave the code block as-is for debugging
+            }
+        }
+    }
+}
+
+/**
+ * Fallback simple markdown formatting when marked.js is not available
+ */
+function formatMarkdownFallback(text) {
+    if (!text) return '';
+
     const lines = text.split('\n');
     let html = '';
     let inList = false;
@@ -85,81 +249,37 @@ function formatMarkdown(text) {
     for (let i = 0; i < lines.length; i++) {
         let line = lines[i];
 
-        // Skip empty lines but add spacing
         if (line.trim() === '') {
-            if (inList) {
-                html += '</ul>';
-                inList = false;
-            }
-            if (inNumberedList) {
-                html += '</ol>';
-                inNumberedList = false;
-            }
+            if (inList) { html += '</ul>'; inList = false; }
+            if (inNumberedList) { html += '</ol>'; inNumberedList = false; }
             html += '<br>';
             continue;
         }
 
         // Headers
+        if (line.startsWith('# ')) {
+            if (inList) { html += '</ul>'; inList = false; }
+            if (inNumberedList) { html += '</ol>'; inNumberedList = false; }
+            html += `<h1>${escapeHtml(line.substring(2))}</h1>`;
+            continue;
+        }
         if (line.startsWith('## ')) {
             if (inList) { html += '</ul>'; inList = false; }
             if (inNumberedList) { html += '</ol>'; inNumberedList = false; }
-            html += `<h2 class="md-h2">${escapeHtml(line.substring(3))}</h2>`;
+            html += `<h2>${escapeHtml(line.substring(3))}</h2>`;
             continue;
         }
         if (line.startsWith('### ')) {
             if (inList) { html += '</ul>'; inList = false; }
             if (inNumberedList) { html += '</ol>'; inNumberedList = false; }
-            html += `<h3 class="md-h3">${escapeHtml(line.substring(4))}</h3>`;
+            html += `<h3>${escapeHtml(line.substring(4))}</h3>`;
             continue;
         }
 
-        // Special callout boxes
-        if (line.startsWith('💡 ')) {
-            if (inList) { html += '</ul>'; inList = false; }
+        // Bullet lists
+        if (line.match(/^[•\-\*] /)) {
             if (inNumberedList) { html += '</ol>'; inNumberedList = false; }
-            html += `<div class="callout callout-tip">💡 ${formatInline(line.substring(3))}</div>`;
-            continue;
-        }
-        if (line.startsWith('✅ ')) {
-            if (inList) { html += '</ul>'; inList = false; }
-            if (inNumberedList) { html += '</ol>'; inNumberedList = false; }
-            html += `<div class="callout callout-success">✅ ${formatInline(line.substring(3))}</div>`;
-            continue;
-        }
-        if (line.startsWith('❌ ')) {
-            if (inList) { html += '</ul>'; inList = false; }
-            if (inNumberedList) { html += '</ol>'; inNumberedList = false; }
-            html += `<div class="callout callout-error">❌ ${formatInline(line.substring(3))}</div>`;
-            continue;
-        }
-        if (line.startsWith('⚠️ ')) {
-            if (inList) { html += '</ul>'; inList = false; }
-            if (inNumberedList) { html += '</ol>'; inNumberedList = false; }
-            html += `<div class="callout callout-warning">⚠️ ${formatInline(line.substring(3))}</div>`;
-            continue;
-        }
-        if (line.startsWith('❓ ')) {
-            if (inList) { html += '</ul>'; inList = false; }
-            if (inNumberedList) { html += '</ol>'; inNumberedList = false; }
-            html += `<div class="callout callout-question">❓ ${formatInline(line.substring(3))}</div>`;
-            continue;
-        }
-
-        // STEP markers
-        if (line.match(/^STEP \d+:/)) {
-            if (inList) { html += '</ul>'; inList = false; }
-            if (inNumberedList) { html += '</ol>'; inNumberedList = false; }
-            html += `<div class="step-marker">${formatInline(line)}</div>`;
-            continue;
-        }
-
-        // Bullet lists (• or -)
-        if (line.match(/^[•\-] /)) {
-            if (inNumberedList) { html += '</ol>'; inNumberedList = false; }
-            if (!inList) {
-                html += '<ul class="md-list">';
-                inList = true;
-            }
+            if (!inList) { html += '<ul>'; inList = true; }
             html += `<li>${formatInline(line.substring(2))}</li>`;
             continue;
         }
@@ -167,10 +287,7 @@ function formatMarkdown(text) {
         // Numbered lists
         if (line.match(/^\d+\. /)) {
             if (inList) { html += '</ul>'; inList = false; }
-            if (!inNumberedList) {
-                html += '<ol class="md-list-numbered">';
-                inNumberedList = true;
-            }
+            if (!inNumberedList) { html += '<ol>'; inNumberedList = true; }
             const content = line.replace(/^\d+\. /, '');
             html += `<li>${formatInline(content)}</li>`;
             continue;
@@ -179,10 +296,9 @@ function formatMarkdown(text) {
         // Regular paragraph
         if (inList) { html += '</ul>'; inList = false; }
         if (inNumberedList) { html += '</ol>'; inNumberedList = false; }
-        html += `<p class="md-p">${formatInline(line)}</p>`;
+        html += `<p>${formatInline(line)}</p>`;
     }
 
-    // Close any open lists
     if (inList) html += '</ul>';
     if (inNumberedList) html += '</ol>';
 
@@ -191,18 +307,10 @@ function formatMarkdown(text) {
 
 // Format inline markdown (bold, italic, code, etc.)
 function formatInline(text) {
-    // First escape HTML to prevent XSS
     text = escapeHtml(text);
-
-    // Bold
-    text = text.replace(/\*\*(.*?)\*\*/g, '<strong class="md-bold">$1</strong>');
-    // Italic
-    text = text.replace(/\*(.*?)\*/g, '<em class="md-italic">$1</em>');
-    // Code/Articles
-    text = text.replace(/`(.*?)`/g, '<code class="md-code">$1</code>');
-    // Article references (Art. X:XX format)
-    text = text.replace(/Art\. ([\d:]+\s+[A-Z]+)/g, '<span class="article-ref">Art. $1</span>');
-
+    text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    text = text.replace(/\*(.*?)\*/g, '<em>$1</em>');
+    text = text.replace(/`(.*?)`/g, '<code>$1</code>');
     return text;
 }
 
@@ -1011,21 +1119,243 @@ function reviewQuiz() {
     }
 }
 
-// ========== Study Guide Generator ==========
+// ========== Study Guide Management ==========
 function initStudyListeners() {
-    document.getElementById('generate-study-btn').addEventListener('click', generateStudyGuide);
+    // Generate button
+    const generateBtn = document.getElementById('generate-study-btn');
+    if (generateBtn) {
+        generateBtn.addEventListener('click', generateStudyGuide);
+    }
+
+    // Estimate tokens button
+    const estimateBtn = document.getElementById('estimate-tokens-btn');
+    if (estimateBtn) {
+        estimateBtn.addEventListener('click', estimateStudyGuideTokens);
+    }
+
+    // Sub-tab navigation
+    const subTabs = document.querySelectorAll('[data-study-tab]');
+    subTabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            const tabName = tab.dataset.studyTab;
+
+            // Update active tab
+            subTabs.forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+
+            // Show corresponding content
+            document.getElementById('saved-guides-tab').style.display =
+                tabName === 'saved-guides' ? 'block' : 'none';
+            document.getElementById('new-guide-tab').style.display =
+                tabName === 'new-guide' ? 'block' : 'none';
+
+            // Clear result when switching tabs
+            document.getElementById('study-result').style.display = 'none';
+            // Hide debug panel when switching tabs
+            document.getElementById('token-debug-panel').style.display = 'none';
+        });
+    });
+
+    // Load saved guides on init
+    loadSavedStudyGuides();
 }
 
+/**
+ * Estimate tokens for the selected week(s) before generating
+ */
+async function estimateStudyGuideTokens() {
+    const debugPanel = document.getElementById('token-debug-panel');
+    const debugContent = document.getElementById('token-debug-content');
+    const weekSelect = document.getElementById('study-week-select');
+    const estimateBtn = document.getElementById('estimate-tokens-btn');
+
+    // Show loading state
+    estimateBtn.disabled = true;
+    estimateBtn.textContent = '⏳ Estimating...';
+
+    try {
+        // Build query params
+        let url = `${API_BASE}/api/study-guides/courses/${COURSE_ID}/estimate-tokens`;
+        if (weekSelect && weekSelect.value) {
+            url += `?weeks=${weekSelect.value}`;
+        }
+
+        const response = await fetch(url, { method: 'POST' });
+
+        if (!response.ok) {
+            throw new Error(`API error: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        // Build debug HTML
+        const statusClass = data.will_exceed_rate_limit ? 'debug-warning' : 'debug-success';
+        const statusIcon = data.will_exceed_rate_limit ? '⚠️' : '✅';
+
+        let materialsHtml = data.materials.map(m => `
+            <tr>
+                <td>${escapeHtml(m.title)}</td>
+                <td>Week ${m.week || 'N/A'}</td>
+                <td>${m.characters.toLocaleString()}</td>
+                <td>${m.estimated_tokens.toLocaleString()}</td>
+            </tr>
+        `).join('');
+
+        debugContent.innerHTML = `
+            <div class="debug-summary ${statusClass}">
+                <strong>${statusIcon} ${data.recommendation}</strong>
+            </div>
+            <div class="debug-stats">
+                <div class="debug-stat">
+                    <span class="debug-label">Materials:</span>
+                    <span class="debug-value">${data.material_count}</span>
+                </div>
+                <div class="debug-stat">
+                    <span class="debug-label">Total Characters:</span>
+                    <span class="debug-value">${data.total_characters.toLocaleString()}</span>
+                </div>
+                <div class="debug-stat">
+                    <span class="debug-label">Estimated Input Tokens:</span>
+                    <span class="debug-value">${data.estimated_input_tokens.toLocaleString()}</span>
+                </div>
+                <div class="debug-stat">
+                    <span class="debug-label">Rate Limit:</span>
+                    <span class="debug-value">${data.rate_limit.toLocaleString()} tokens/min</span>
+                </div>
+            </div>
+            <table class="debug-table">
+                <thead>
+                    <tr>
+                        <th>Material</th>
+                        <th>Week</th>
+                        <th>Characters</th>
+                        <th>Est. Tokens</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${materialsHtml}
+                </tbody>
+            </table>
+        `;
+
+        // Show and open the panel
+        debugPanel.style.display = 'block';
+        debugPanel.open = true;
+
+    } catch (error) {
+        console.error('Error estimating tokens:', error);
+        debugContent.innerHTML = `<div class="debug-error">❌ Error: ${escapeHtml(error.message)}</div>`;
+        debugPanel.style.display = 'block';
+        debugPanel.open = true;
+    } finally {
+        estimateBtn.disabled = false;
+        estimateBtn.textContent = '📊 Estimate Tokens';
+    }
+}
+
+/**
+ * Load and display saved study guides for the current course
+ */
+async function loadSavedStudyGuides() {
+    const listDiv = document.getElementById('study-guides-list');
+    if (!listDiv || !COURSE_ID) {
+        if (listDiv) {
+            listDiv.innerHTML = '<p class="no-guides-message">Select a course to view saved study guides.</p>';
+        }
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE}/api/study-guides/courses/${COURSE_ID}`);
+        if (!response.ok) throw new Error('Failed to load study guides');
+
+        const data = await response.json();
+
+        if (data.guides && data.guides.length > 0) {
+            listDiv.innerHTML = data.guides.map(guide => `
+                <div class="study-guide-card">
+                    <div class="guide-content" onclick="loadStudyGuide('${guide.id}')">
+                        <h4>${escapeHtml(guide.title)}</h4>
+                        <div class="guide-meta">
+                            <span>📅 ${formatDate(guide.created_at)}</span>
+                            <span>📝 ${guide.word_count || 0} words</span>
+                            ${guide.week_numbers ? `<span>📚 Weeks: ${guide.week_numbers.join(', ')}</span>` : ''}
+                        </div>
+                    </div>
+                    <div class="guide-actions">
+                        <button class="btn btn-small btn-danger" onclick="event.stopPropagation(); deleteStudyGuide('${guide.id}', '${escapeHtml(guide.title).replace(/'/g, "\\'")}')">
+                            🗑️ Delete
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        } else {
+            listDiv.innerHTML = `
+                <div class="no-guides-message">
+                    <p>No saved study guides yet.</p>
+                    <p>Click "Generate New" to create your first study guide!</p>
+                </div>
+            `;
+        }
+    } catch (error) {
+        console.error('Error loading study guides:', error);
+        listDiv.innerHTML = '<p class="error">Failed to load study guides.</p>';
+    }
+}
+
+/**
+ * Load and display a specific study guide
+ */
+async function loadStudyGuide(guideId) {
+    const resultDiv = document.getElementById('study-result');
+    showLoading();
+
+    try {
+        const response = await fetch(`${API_BASE}/api/study-guides/courses/${COURSE_ID}/${guideId}`);
+        if (!response.ok) throw new Error('Failed to load study guide');
+
+        const guide = await response.json();
+
+        resultDiv.innerHTML = formatMarkdown(guide.content);
+        resultDiv.style.display = 'block';
+
+        // Render any Mermaid diagrams
+        await renderMermaidDiagrams(resultDiv);
+
+        // Scroll to result
+        resultDiv.scrollIntoView({ behavior: 'smooth' });
+
+    } catch (error) {
+        console.error('Error loading study guide:', error);
+        resultDiv.innerHTML = `<p class="error">Failed to load study guide: ${escapeHtml(error.message)}</p>`;
+        resultDiv.style.display = 'block';
+    } finally {
+        hideLoading();
+    }
+}
+
+/**
+ * Generate a new study guide using the persistence API
+ */
 async function generateStudyGuide() {
     const resultDiv = document.getElementById('study-result');
+    const weekSelect = document.getElementById('study-week-select');
 
     showLoading();
 
     try {
-        // Build request with course context (course_id will be added if available)
-        const requestBody = addCourseContext({});
+        // Build request
+        const requestBody = {
+            course_id: COURSE_ID
+        };
 
-        const response = await fetch(`${API_BASE}/api/files-content/study-guide`, {
+        // Add week filter if selected
+        if (weekSelect && weekSelect.value) {
+            requestBody.weeks = [parseInt(weekSelect.value, 10)];
+        }
+
+        // Use new persistence API
+        const response = await fetch(`${API_BASE}/api/study-guides/courses/${COURSE_ID}`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(requestBody)
@@ -1033,20 +1363,86 @@ async function generateStudyGuide() {
 
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
-            const errorMessage = errorData.detail || `API error: ${response.status}`;
-            throw new Error(errorMessage);
+            throw new Error(errorData.detail || `API error: ${response.status}`);
         }
 
         const data = await response.json();
-        resultDiv.innerHTML = `<div class="study-guide">${formatMarkdown(data.guide)}</div>`;
+        const guide = data.guide;
+
+        // Display the generated content
+        resultDiv.innerHTML = formatMarkdown(guide.content);
         resultDiv.style.display = 'block';
+
+        // Render any Mermaid diagrams
+        await renderMermaidDiagrams(resultDiv);
+
+        // Refresh saved guides list
+        await loadSavedStudyGuides();
+
+        // Show success message if it was a new guide
+        if (!data.is_duplicate) {
+            console.log('Study guide saved:', guide.title);
+        }
 
     } catch (error) {
         console.error('Error:', error);
-        // Backend now provides user-friendly error messages directly
-        const errorMessage = error.message || 'Error generating study guide. Please try again.';
-        resultDiv.innerHTML = `<p class="error">${escapeHtml(errorMessage)}</p>`;
+        resultDiv.innerHTML = `<p class="error">${escapeHtml(error.message || 'Error generating study guide. Please try again.')}</p>`;
         resultDiv.style.display = 'block';
+    } finally {
+        hideLoading();
+    }
+}
+
+/**
+ * Format a date string for display
+ */
+function formatDate(dateStr) {
+    if (!dateStr) return 'Unknown';
+    try {
+        const date = new Date(dateStr);
+        return date.toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric'
+        });
+    } catch (e) {
+        return dateStr;
+    }
+}
+
+/**
+ * Delete a study guide with confirmation
+ */
+async function deleteStudyGuide(guideId, guideTitle) {
+    // Confirm before deleting
+    const confirmed = confirm(`Are you sure you want to delete "${guideTitle}"?\n\nThis action cannot be undone.`);
+    if (!confirmed) return;
+
+    showLoading();
+
+    try {
+        const response = await fetch(`${API_BASE}/api/study-guides/courses/${COURSE_ID}/${guideId}`, {
+            method: 'DELETE'
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.detail || 'Failed to delete study guide');
+        }
+
+        // Clear the result display if showing the deleted guide
+        const resultDiv = document.getElementById('study-result');
+        resultDiv.style.display = 'none';
+        resultDiv.innerHTML = '';
+
+        // Refresh the list
+        await loadSavedStudyGuides();
+
+        console.log('Study guide deleted:', guideTitle);
+
+    } catch (error) {
+        console.error('Error deleting study guide:', error);
+        alert(`Failed to delete study guide: ${error.message}`);
     } finally {
         hideLoading();
     }
