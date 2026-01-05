@@ -19,16 +19,14 @@ from app.models.auth_models import AuthConfig, User, MockUser, AllowListEntry
 
 logger = logging.getLogger(__name__)
 
-# Load auth configuration from environment
-_auth_config: Optional[AuthConfig] = None
+# Load auth configuration from environment (thread-safe singleton via lru_cache)
+from functools import lru_cache
 
 
+@lru_cache(maxsize=1)
 def get_auth_config() -> AuthConfig:
-    """Get the authentication configuration singleton."""
-    global _auth_config
-    if _auth_config is None:
-        _auth_config = AuthConfig()
-    return _auth_config
+    """Get the authentication configuration singleton (thread-safe)."""
+    return AuthConfig()
 
 
 # ============================================================================
@@ -39,6 +37,10 @@ def get_auth_config() -> AuthConfig:
 IAP_USER_EMAIL_HEADER = "X-Goog-Authenticated-User-Email"
 IAP_USER_ID_HEADER = "X-Goog-Authenticated-User-Id"
 IAP_JWT_HEADER = "X-Goog-IAP-JWT-Assertion"  # TODO: Use in Phase 2 for JWT verification
+
+# ⚠️ SECURITY WARNING: Phase 1 does NOT verify JWT signatures and is vulnerable
+# to header spoofing. JWT verification will be implemented in Phase 2.
+# DO NOT deploy to production with AUTH_ENABLED=true until JWT verification is added.
 
 # Pattern for IAP email header value: "accounts.google.com:user@domain.com"
 IAP_EMAIL_PATTERN = re.compile(r"^accounts\.google\.com:(.+@.+)$", re.IGNORECASE)
@@ -176,8 +178,10 @@ async def check_allow_list(email: str) -> bool:
         # Normalize email for lookup
         normalized_email = email.lower().strip()
 
-        # Use email as document ID (with dots replaced to avoid Firestore issues)
-        doc_id = normalized_email.replace(".", "_dot_")
+        # Use URL-safe encoding for document ID to avoid collisions
+        # This properly handles dots and all special characters
+        from urllib.parse import quote
+        doc_id = quote(normalized_email, safe='')
         doc_ref = db.collection("allowed_users").document(doc_id)
         doc = doc_ref.get()
 
@@ -229,7 +233,9 @@ async def is_user_authorized(request: Request) -> tuple[bool, Optional[User], st
 
     # If auth is disabled, return mock user
     if not config.auth_enabled:
-        logger.warning("⚠️  Authentication is DISABLED - using mock user")
+        # Use debug level to avoid log spam on every request
+        # Startup warning is logged elsewhere (main.py in Phase 2)
+        logger.debug("Auth disabled - using mock user")
         return True, get_mock_user(), "Auth disabled (development mode)"
 
     # Extract user from IAP headers

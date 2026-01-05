@@ -128,7 +128,13 @@ class AllowListEntry(BaseModel):
         """Check if the entry has expired."""
         if self.expires_at is None:
             return False
-        return datetime.now(timezone.utc) > self.expires_at
+        now = datetime.now(timezone.utc)
+        # Ensure expires_at is timezone-aware for comparison
+        expires = (
+            self.expires_at if self.expires_at.tzinfo
+            else self.expires_at.replace(tzinfo=timezone.utc)
+        )
+        return now > expires
 
     @property
     def is_valid(self) -> bool:
@@ -148,7 +154,7 @@ class AllowListEntry(BaseModel):
         }
 
     @classmethod
-    def from_firestore_dict(cls, data: dict) -> "AllowListEntry":
+    def from_firestore_dict(cls, data: dict[str, Any]) -> "AllowListEntry":
         """Create from Firestore document data."""
         return cls(**data)
 
