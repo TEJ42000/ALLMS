@@ -1277,15 +1277,26 @@ function showFlashcardError(message) {
 }
 
 function flipCard() {
-    document.getElementById('flashcard').classList.toggle('flipped');
+    const flashcard = document.getElementById('flashcard');
+    if (flashcard) {
+        flashcard.classList.toggle('flipped');
+    }
 }
 
 function navigateCard(direction) {
+    // Don't navigate if no flashcards available
+    if (flashcards.length === 0) {
+        return;
+    }
+
     currentCardIndex += direction;
     if (currentCardIndex < 0) currentCardIndex = flashcards.length - 1;
     if (currentCardIndex >= flashcards.length) currentCardIndex = 0;
 
-    document.getElementById('flashcard').classList.remove('flipped');
+    const flashcard = document.getElementById('flashcard');
+    if (flashcard) {
+        flashcard.classList.remove('flipped');
+    }
     updateFlashcardDisplay();
 }
 
