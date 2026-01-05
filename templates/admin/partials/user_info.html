@@ -16,11 +16,7 @@
         font-weight: 600;
         font-size: 0.875rem;
     ">
-        {% if user and user.email %}
-            {{ user.email[0]|upper }}
-        {% else %}
-            ?
-        {% endif %}
+        {{ (user.email[0] if user and user.email else '?')|upper }}
     </div>
     
     {# User email and badge #}

@@ -61,10 +61,14 @@ async def unauthorized_exception_handler(request: Request, exc: HTTPException):
     # Return JSON for API requests, HTML for browser requests
     accept = request.headers.get("accept", "")
     if "application/json" in accept or request.url.path.startswith("/api/"):
-        return exc
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            status_code=401,
+            content={"detail": exc.detail if hasattr(exc, 'detail') else "Not authenticated"}
+        )
 
     return HTMLResponse(
-        content=error_templates.get_template("errors/401.html").render(),
+        content=error_templates.get_template("errors/401.html").render({"request": request}),
         status_code=401
     )
 
@@ -75,10 +79,14 @@ async def forbidden_exception_handler(request: Request, exc: HTTPException):
     # Return JSON for API requests, HTML for browser requests
     accept = request.headers.get("accept", "")
     if "application/json" in accept or request.url.path.startswith("/api/"):
-        return exc
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            status_code=403,
+            content={"detail": exc.detail if hasattr(exc, 'detail') else "Forbidden"}
+        )
 
     return HTMLResponse(
-        content=error_templates.get_template("errors/403.html").render(),
+        content=error_templates.get_template("errors/403.html").render({"request": request}),
         status_code=403
     )
 
