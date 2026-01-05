@@ -764,7 +764,7 @@ Use proper legal analysis method and cite articles.""" % (topic, case_facts)
         num_cards: int = 20
     ) -> List[Dict]:
         """
-        Generate flashcards from files.
+        Generate flashcards from files (legacy method).
 
         Args:
             topic: Topic name
@@ -775,7 +775,7 @@ Use proper legal analysis method and cite articles.""" % (topic, case_facts)
             List of flashcard dictionaries
 
         Raises:
-            ValueError: If file_keys is empty
+            ValueError: If file_keys is empty or topic is invalid
             TypeError: If file_keys contains non-string values
         """
         # Input validation
@@ -783,6 +783,15 @@ Use proper legal analysis method and cite articles.""" % (topic, case_facts)
             raise ValueError("file_keys cannot be empty")
         if not all(isinstance(k, str) for k in file_keys):
             raise TypeError("All file_keys must be strings")
+
+        # Validate and sanitize topic to prevent prompt injection (same as course-aware method)
+        if topic:
+            if len(topic) > 200:
+                raise ValueError("topic must be less than 200 characters")
+            # Sanitize topic by escaping special characters that could manipulate AI behavior
+            topic = topic.replace('"', '\\"').replace('\n', ' ').replace('\r', ' ')
+        else:
+            topic = "Course Materials"
 
         content_blocks = []
 

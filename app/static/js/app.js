@@ -650,16 +650,15 @@ async function generateQuiz() {
         showQuizContent();
 
     } catch (error) {
-        console.error('Error:', error);
-        // Define questionContainer in error handler scope
-        const questionContainer = document.getElementById('quiz-question-container');
-        const quizContent = document.getElementById('quiz-content');
-
+        console.error('Error generating quiz:', error);
+        // Show error message in quiz container
         if (questionContainer) {
             const errorMessage = error.message || 'Error generating quiz. Please try again.';
             questionContainer.innerHTML = `<p class="error">${escapeHtml(errorMessage)}</p>`;
         }
-        if (quizContent) quizContent.classList.remove('hidden');
+        if (quizContent) {
+            quizContent.classList.remove('hidden');
+        }
     } finally {
         isGeneratingQuiz = false;
         hideLoading();
