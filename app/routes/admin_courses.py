@@ -14,7 +14,7 @@ from typing import Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, Path, Query, status, UploadFile, File, Form
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.models.course_models import (
     Course,
@@ -31,6 +31,9 @@ from app.models.course_models import (
     MockExam,
     UploadedMaterial,
     CourseMaterial,
+    CourseTopic,
+    TopicCreate,
+    TopicUpdate,
 )
 from app.services.course_service import (
     get_course_service,
@@ -998,6 +1001,19 @@ class ScanSyllabiResponse(BaseModel):
     count: int
 
 
+class ExtractedTopicData(BaseModel):
+    """Extracted topic from syllabus."""
+    id: str
+    name: str
+    description: str
+    weekNumbers: List[int] = []
+    extractionConfidence: Optional[str] = Field(
+        None,
+        description="Confidence level: 'high' (explicit), 'medium' (implied), 'low' (inferred)"
+    )
+    extractedFromSyllabus: bool = True
+
+
 class ExtractedCourseData(BaseModel):
     """Extracted course data from syllabus."""
     # Basic course info
@@ -1027,6 +1043,10 @@ class ExtractedCourseData(BaseModel):
     academicIntegrity: Optional[str] = None
     sections: Optional[List[Dict]] = None
     additionalNotes: Optional[str] = None
+
+    # Extracted topics (Issue #68)
+    extractedTopics: Optional[List[ExtractedTopicData]] = None
+    topicExtractionNotes: Optional[str] = None
 
     # Raw text for storage
     rawText: Optional[str] = None
@@ -1083,14 +1103,15 @@ async def extract_syllabus_data(request: ImportSyllabusRequest):
     Extract course data from all PDFs in a syllabus folder using AI.
 
     This endpoint reads all PDFs in the folder, extracts text, and uses AI to parse
-    structured course information including weeks, readings, and lecturers.
+    structured course information including weeks, readings, lecturers, and topics.
 
-    The extracted data can be reviewed before creating/updating a course.
+    The extracted data includes detailed topics with descriptions and week associations.
+    These can be reviewed and edited before creating/updating a course.
     Also includes raw text and source information for storage with the course.
     """
     try:
         from app.services.syllabus_parser import extract_text_from_folder
-        from app.services.syllabus_extractor import extract_course_data
+        from app.services.syllabus_extractor import extract_course_data_with_topics
 
         # Extract subject from syllabus path (e.g., "Syllabus/LLS" -> "LLS")
         path_parts = request.syllabus_path.split("/")
@@ -1107,9 +1128,9 @@ async def extract_syllabus_data(request: ImportSyllabusRequest):
         source_files = extraction_result["files"]
         source_folder = extraction_result["folder_path"]
 
-        # Use AI to extract structured data
-        logger.info("Extracting course data with AI...")
-        extracted = await extract_course_data(raw_text)
+        # Use AI to extract structured data WITH enhanced topic extraction
+        logger.info("Extracting course data and topics with AI...")
+        extracted = await extract_course_data_with_topics(raw_text)
 
         # Add materialSubjects derived from syllabus folder
         if subject:
@@ -1120,10 +1141,11 @@ async def extract_syllabus_data(request: ImportSyllabusRequest):
         extracted["sourceFolder"] = source_folder
         extracted["sourceFiles"] = source_files
 
+        topic_count = len(extracted.get("extractedTopics", []))
         return ImportSyllabusResponse(
             success=True,
             extracted_data=ExtractedCourseData(**extracted),
-            message=f"Successfully extracted course data from {len(source_files)} file(s)"
+            message=f"Successfully extracted course data and {topic_count} topics from {len(source_files)} file(s)"
         )
     except FileNotFoundError as e:
         raise HTTPException(
@@ -1135,6 +1157,282 @@ async def extract_syllabus_data(request: ImportSyllabusRequest):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to extract syllabus data: {str(e)}"
+        )
+
+
+# ============================================================================
+# Topic Endpoints (Issue #68)
+# ============================================================================
+
+
+class TopicListResponse(BaseModel):
+    """Response for listing topics."""
+    topics: List[CourseTopic]
+    count: int
+
+
+class TopicRegenerateRequest(BaseModel):
+    """Request to regenerate topics from stored syllabus."""
+    delete_existing: bool = True  # Whether to delete existing topics first
+
+
+class TopicRegenerateResponse(BaseModel):
+    """Response from topic regeneration."""
+    success: bool
+    topics_created: int
+    extraction_notes: Optional[str] = None
+    message: str
+
+
+@router.get("/{course_id}/topics", response_model=TopicListResponse)
+async def list_topics(
+    course_id: str = Path(..., description="Course ID"),
+    week: Optional[int] = Query(None, description="Filter by week number"),
+):
+    """
+    Get all topics for a course.
+
+    Topics are extracted from syllabi and can be:
+    - Associated with specific weeks
+    - Course-wide (no week association)
+
+    **Example:**
+    ```
+    GET /api/admin/courses/LLS-2025-2026/topics
+    GET /api/admin/courses/LLS-2025-2026/topics?week=3
+    ```
+    """
+    try:
+        service = get_course_service()
+        topics = service.get_topics(course_id, week_number=week)
+        return TopicListResponse(topics=topics, count=len(topics))
+    except CourseNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except ServiceValidationError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except FirestoreOperationError as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database temporarily unavailable."
+        )
+
+
+@router.get("/{course_id}/topics/{topic_id}", response_model=CourseTopic)
+async def get_topic(
+    course_id: str = Path(..., description="Course ID"),
+    topic_id: str = Path(..., description="Topic ID"),
+):
+    """
+    Get a specific topic by ID.
+
+    **Example:**
+    ```
+    GET /api/admin/courses/LLS-2025-2026/topics/criminal-law-mens-rea-abc12345
+    ```
+    """
+    try:
+        service = get_course_service()
+        topic = service.get_topic(course_id, topic_id)
+        if topic is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Topic not found: {topic_id}"
+            )
+        return topic
+    except HTTPException:
+        raise  # Re-raise HTTPException without wrapping
+    except ServiceValidationError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except FirestoreOperationError as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database temporarily unavailable."
+        )
+
+
+@router.post("/{course_id}/topics", response_model=CourseTopic, status_code=status.HTTP_201_CREATED)
+async def create_topic(
+    course_id: str = Path(..., description="Course ID"),
+    topic_data: TopicCreate = ...,
+):
+    """
+    Create a new topic for a course.
+
+    **Example Request:**
+    ```json
+    {
+        "name": "Constitutional Review",
+        "description": "Examination of constitutional review processes...",
+        "weekNumbers": [2, 3]
+    }
+    ```
+    """
+    try:
+        service = get_course_service()
+        topic = service.create_topic(course_id, topic_data)
+        logger.info("Created topic '%s' for course %s", topic.id, course_id)
+        return topic
+    except CourseNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except ServiceValidationError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except FirestoreOperationError as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database temporarily unavailable."
+        )
+
+
+@router.put("/{course_id}/topics/{topic_id}", response_model=CourseTopic)
+async def update_topic(
+    course_id: str = Path(..., description="Course ID"),
+    topic_id: str = Path(..., description="Topic ID"),
+    updates: TopicUpdate = ...,
+):
+    """
+    Update an existing topic.
+
+    All fields are optional. Only provided fields will be updated.
+
+    **Example Request:**
+    ```json
+    {
+        "name": "Updated Topic Name",
+        "weekNumbers": [1, 2, 3]
+    }
+    ```
+    """
+    try:
+        service = get_course_service()
+        topic = service.update_topic(course_id, topic_id, updates)
+        if topic is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Topic not found: {topic_id}"
+            )
+        logger.info("Updated topic '%s' for course %s", topic_id, course_id)
+        return topic
+    except ServiceValidationError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except FirestoreOperationError as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database temporarily unavailable."
+        )
+
+
+@router.delete("/{course_id}/topics/{topic_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_topic(
+    course_id: str = Path(..., description="Course ID"),
+    topic_id: str = Path(..., description="Topic ID"),
+):
+    """
+    Delete a topic from a course.
+
+    **Example:**
+    ```
+    DELETE /api/admin/courses/LLS-2025-2026/topics/criminal-law-mens-rea-abc12345
+    ```
+    """
+    try:
+        service = get_course_service()
+        deleted = service.delete_topic(course_id, topic_id)
+        if not deleted:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Topic not found: {topic_id}"
+            )
+        logger.info("Deleted topic '%s' from course %s", topic_id, course_id)
+        return None
+    except ServiceValidationError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except FirestoreOperationError as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database temporarily unavailable."
+        )
+
+
+@router.post("/{course_id}/topics/regenerate", response_model=TopicRegenerateResponse)
+async def regenerate_topics(
+    course_id: str = Path(..., description="Course ID"),
+    request: TopicRegenerateRequest = TopicRegenerateRequest(),
+):
+    """
+    Regenerate topics for a course from its stored syllabus text.
+
+    This endpoint:
+    1. Retrieves the stored raw syllabus text for the course
+    2. Uses AI to extract topics with descriptions
+    3. Optionally deletes existing topics first
+    4. Creates new topics in the database
+
+    **Example Request:**
+    ```json
+    {
+        "delete_existing": true
+    }
+    ```
+    """
+    try:
+        from app.services.syllabus_extractor import extract_topics_from_syllabus
+
+        service = get_course_service()
+
+        # Get the course to retrieve stored syllabus text
+        course = service.get_course(course_id, include_weeks=False)
+        if course is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Course not found: {course_id}"
+            )
+
+        # Check if we have stored syllabus text
+        # Look for rawText in the course data (stored during import)
+        course_doc = service.db.collection("courses").document(course_id).get()
+        course_data = course_doc.to_dict() if course_doc.exists else {}
+        syllabus_text = course_data.get("rawText")
+
+        if not syllabus_text:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No stored syllabus text found for this course. Import a syllabus first."
+            )
+
+        # Delete existing topics if requested
+        if request.delete_existing:
+            deleted_count = service.delete_all_topics(course_id)
+            logger.info("Deleted %d existing topics before regeneration", deleted_count)
+
+        # Extract topics using AI
+        logger.info("Regenerating topics for course %s", course_id)
+        result = await extract_topics_from_syllabus(syllabus_text, course_name=course.name)
+
+        # Create topics in database
+        topics = service.bulk_create_topics(course_id, result["topics"])
+
+        return TopicRegenerateResponse(
+            success=True,
+            topics_created=len(topics),
+            extraction_notes=result.get("extractionNotes"),
+            message=f"Successfully regenerated {len(topics)} topics for course {course_id}"
+        )
+
+    except CourseNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except ServiceValidationError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except FirestoreOperationError as e:
+        logger.error("Firestore error regenerating topics: %s", e)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database temporarily unavailable."
+        )
+    except Exception as e:
+        logger.error("Error regenerating topics: %s", e)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to regenerate topics: {str(e)}"
         )
 
 

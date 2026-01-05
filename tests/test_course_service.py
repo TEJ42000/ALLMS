@@ -17,6 +17,9 @@ from app.models.course_models import (
     Week,
     WeekCreate,
     LegalSkill,
+    CourseTopic,
+    TopicCreate,
+    TopicUpdate,
 )
 from app.services.course_service import (
     CourseService,
@@ -443,3 +446,243 @@ class TestWeekCountSync:
         course_data_arg = course_set_call[0][1]  # Second positional arg is the data
         assert course_data_arg.get("weekCount") == 3
 
+
+# ============================================================================
+# Topic Operations Tests (Issue #68)
+# ============================================================================
+
+
+class TestTopicOperations:
+    """Tests for topic CRUD operations."""
+
+    def test_get_topics_returns_empty_list_when_no_topics(self, course_service, mock_firestore):
+        """get_topics should return empty list when no topics exist."""
+        # Setup: course exists, no topics
+        mock_course_doc = MagicMock()
+        mock_course_doc.exists = True
+
+        mock_topics_ref = MagicMock()
+        mock_topics_ref.stream.return_value = []
+
+        mock_firestore.collection.return_value.document.return_value.get.return_value = mock_course_doc
+        mock_firestore.collection.return_value.document.return_value.collection.return_value = mock_topics_ref
+
+        topics = course_service.get_topics("test-course")
+        assert topics == []
+
+    def test_get_topics_returns_all_topics(self, course_service, mock_firestore):
+        """get_topics should return all topics for a course."""
+        mock_course_doc = MagicMock()
+        mock_course_doc.exists = True
+
+        mock_topic1 = MagicMock()
+        mock_topic1.to_dict.return_value = {
+            "id": "topic-1",
+            "name": "Criminal Law Basics",
+            "description": "Introduction to criminal law concepts.",
+            "weekNumbers": [1, 2],
+            "extractedFromSyllabus": True,
+            "createdAt": datetime.now(timezone.utc),
+            "updatedAt": datetime.now(timezone.utc),
+        }
+
+        mock_topic2 = MagicMock()
+        mock_topic2.to_dict.return_value = {
+            "id": "topic-2",
+            "name": "Mens Rea",
+            "description": "Mental state requirements in criminal law.",
+            "weekNumbers": [3],
+            "extractedFromSyllabus": True,
+            "createdAt": datetime.now(timezone.utc),
+            "updatedAt": datetime.now(timezone.utc),
+        }
+
+        mock_topics_ref = MagicMock()
+        mock_topics_ref.stream.return_value = [mock_topic1, mock_topic2]
+
+        mock_firestore.collection.return_value.document.return_value.get.return_value = mock_course_doc
+        mock_firestore.collection.return_value.document.return_value.collection.return_value = mock_topics_ref
+
+        topics = course_service.get_topics("test-course")
+
+        assert len(topics) == 2
+        assert topics[0].name == "Criminal Law Basics"
+        assert topics[1].name == "Mens Rea"
+
+    def test_get_topics_filters_by_week(self, course_service, mock_firestore):
+        """get_topics should filter topics by week number when specified."""
+        mock_course_doc = MagicMock()
+        mock_course_doc.exists = True
+
+        mock_topic1 = MagicMock()
+        mock_topic1.to_dict.return_value = {
+            "id": "topic-1",
+            "name": "Week 1 Topic",
+            "description": "Only in week 1.",
+            "weekNumbers": [1],
+            "extractedFromSyllabus": True,
+            "createdAt": datetime.now(timezone.utc),
+            "updatedAt": datetime.now(timezone.utc),
+        }
+
+        mock_topic2 = MagicMock()
+        mock_topic2.to_dict.return_value = {
+            "id": "topic-2",
+            "name": "Week 2 Topic",
+            "description": "Only in week 2.",
+            "weekNumbers": [2],
+            "extractedFromSyllabus": True,
+            "createdAt": datetime.now(timezone.utc),
+            "updatedAt": datetime.now(timezone.utc),
+        }
+
+        mock_topics_ref = MagicMock()
+        mock_topics_ref.stream.return_value = [mock_topic1, mock_topic2]
+
+        mock_firestore.collection.return_value.document.return_value.get.return_value = mock_course_doc
+        mock_firestore.collection.return_value.document.return_value.collection.return_value = mock_topics_ref
+
+        # Filter by week 1
+        topics = course_service.get_topics("test-course", week_number=1)
+
+        assert len(topics) == 1
+        assert topics[0].name == "Week 1 Topic"
+
+    def test_get_topics_raises_course_not_found(self, course_service, mock_firestore):
+        """get_topics should raise CourseNotFoundError when course doesn't exist."""
+        mock_course_doc = MagicMock()
+        mock_course_doc.exists = False
+
+        mock_firestore.collection.return_value.document.return_value.get.return_value = mock_course_doc
+
+        with pytest.raises(CourseNotFoundError):
+            course_service.get_topics("nonexistent-course")
+
+    def test_create_topic_success(self, course_service, mock_firestore):
+        """create_topic should create a topic and return it."""
+        mock_course_doc = MagicMock()
+        mock_course_doc.exists = True
+
+        mock_firestore.collection.return_value.document.return_value.get.return_value = mock_course_doc
+        mock_batch = MagicMock()
+        mock_firestore.batch.return_value = mock_batch
+
+        topic_data = TopicCreate(
+            name="New Topic",
+            description="This is a new topic with a description.",
+            weekNumbers=[1, 2, 3],
+        )
+
+        topic = course_service.create_topic("test-course", topic_data)
+
+        assert topic.name == "New Topic"
+        assert topic.description == "This is a new topic with a description."
+        assert topic.weekNumbers == [1, 2, 3]
+        assert topic.extractedFromSyllabus is False
+        assert "new-topic-" in topic.id
+
+        mock_batch.set.assert_called_once()
+        mock_batch.update.assert_called_once()
+        mock_batch.commit.assert_called_once()
+
+    def test_update_topic_success(self, course_service, mock_firestore):
+        """update_topic should update topic fields."""
+        mock_topic_doc = MagicMock()
+        mock_topic_doc.exists = True
+        mock_topic_doc.to_dict.return_value = {
+            "id": "topic-1",
+            "name": "Updated Name",
+            "description": "Updated description.",
+            "weekNumbers": [4, 5],
+            "extractedFromSyllabus": True,
+            "createdAt": datetime.now(timezone.utc),
+            "updatedAt": datetime.now(timezone.utc),
+        }
+
+        mock_firestore.collection.return_value.document.return_value.collection.return_value.document.return_value.get.return_value = mock_topic_doc
+        mock_batch = MagicMock()
+        mock_firestore.batch.return_value = mock_batch
+
+        updates = TopicUpdate(name="Updated Name", weekNumbers=[4, 5])
+
+        topic = course_service.update_topic("test-course", "topic-1", updates)
+
+        assert topic.name == "Updated Name"
+        mock_batch.update.assert_called()
+        mock_batch.commit.assert_called_once()
+
+    def test_delete_topic_success(self, course_service, mock_firestore):
+        """delete_topic should delete the topic and return True."""
+        mock_topic_doc = MagicMock()
+        mock_topic_doc.exists = True
+
+        mock_firestore.collection.return_value.document.return_value.collection.return_value.document.return_value.get.return_value = mock_topic_doc
+        mock_batch = MagicMock()
+        mock_firestore.batch.return_value = mock_batch
+
+        result = course_service.delete_topic("test-course", "topic-1")
+
+        assert result is True
+        mock_batch.delete.assert_called_once()
+        mock_batch.commit.assert_called_once()
+
+    def test_delete_topic_not_found(self, course_service, mock_firestore):
+        """delete_topic should return False when topic doesn't exist."""
+        mock_topic_doc = MagicMock()
+        mock_topic_doc.exists = False
+
+        mock_firestore.collection.return_value.document.return_value.collection.return_value.document.return_value.get.return_value = mock_topic_doc
+
+        result = course_service.delete_topic("test-course", "nonexistent")
+
+        assert result is False
+
+    def test_bulk_create_topics_success(self, course_service, mock_firestore):
+        """bulk_create_topics should create multiple topics."""
+        mock_course_doc = MagicMock()
+        mock_course_doc.exists = True
+
+        mock_firestore.collection.return_value.document.return_value.get.return_value = mock_course_doc
+        mock_batch = MagicMock()
+        mock_firestore.batch.return_value = mock_batch
+
+        topics_data = [
+            {
+                "id": "topic-1",
+                "name": "Topic 1",
+                "description": "First topic description.",
+                "weekNumbers": [1],
+            },
+            {
+                "id": "topic-2",
+                "name": "Topic 2",
+                "description": "Second topic description.",
+                "weekNumbers": [2],
+            },
+        ]
+
+        topics = course_service.bulk_create_topics("test-course", topics_data)
+
+        assert len(topics) == 2
+        assert topics[0].name == "Topic 1"
+        assert topics[1].name == "Topic 2"
+        assert mock_batch.set.call_count == 2
+        mock_batch.commit.assert_called_once()
+
+    def test_delete_all_topics_success(self, course_service, mock_firestore):
+        """delete_all_topics should delete all topics and return count."""
+        mock_topic1 = MagicMock()
+        mock_topic2 = MagicMock()
+
+        mock_topics_ref = MagicMock()
+        mock_topics_ref.stream.return_value = [mock_topic1, mock_topic2]
+
+        mock_firestore.collection.return_value.document.return_value.collection.return_value = mock_topics_ref
+        mock_batch = MagicMock()
+        mock_firestore.batch.return_value = mock_batch
+
+        count = course_service.delete_all_topics("test-course")
+
+        assert count == 2
+        assert mock_batch.delete.call_count == 2
+        mock_batch.commit.assert_called_once()
