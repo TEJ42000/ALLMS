@@ -34,13 +34,18 @@
         <header class="nav-header">
             <div class="header-top">
                 <h1 class="nav-title">⚖️ {{ course_name if course_name else 'LLS' }} Study Portal</h1>
-                {% if course_id %}
-                <div class="course-badge">
-                    <span class="course-badge-label">Course:</span>
-                    <span class="course-badge-id">{{ course_id }}</span>
-                    <a href="/" class="change-course-link" title="Change Course">🔄</a>
+                <div style="display: flex; align-items: center; gap: 1rem;">
+                    {% if course_id %}
+                    <div class="course-badge">
+                        <span class="course-badge-label">Course:</span>
+                        <span class="course-badge-id">{{ course_id }}</span>
+                        <a href="/" class="change-course-link" title="Change Course">🔄</a>
+                    </div>
+                    {% endif %}
+                    {% if user %}
+                    {% include "partials/user_header.html" %}
+                    {% endif %}
                 </div>
-                {% endif %}
             </div>
             <div class="nav-tabs">
                 <button class="nav-tab active" data-tab="dashboard">📊 Dashboard</button>

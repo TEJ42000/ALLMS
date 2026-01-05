@@ -16,15 +16,22 @@ router = APIRouter(tags=["Pages"])
 templates = Jinja2Templates(directory="templates")
 
 
+def get_user_from_request(request: Request):
+    """Extract user from request state (set by auth middleware)."""
+    return getattr(request.state, 'user', None)
+
+
 @router.get("/", response_class=HTMLResponse)
 async def landing_page(request: Request):
     """Serve the course selection landing page."""
+    user = get_user_from_request(request)
     return templates.TemplateResponse(
         "course_selection.html",
         {
             "request": request,
             "title": "Select Your Course - LLS Study Portal",
-            "version": "2.0.0"
+            "version": "2.0.0",
+            "user": user
         }
     )
 
@@ -48,6 +55,7 @@ async def course_study_portal(request: Request, course_id: str):
         if not course.active:
             logger.warning("Attempted to access inactive course: %s", course_id)
 
+        user = get_user_from_request(request)
         return templates.TemplateResponse(
             "index.html",
             {
@@ -56,7 +64,8 @@ async def course_study_portal(request: Request, course_id: str):
                 "version": "2.0.0",
                 "course_id": course_id,
                 "course_name": course.name,
-                "course": course
+                "course": course,
+                "user": user
             }
         )
     except ValueError as e:
