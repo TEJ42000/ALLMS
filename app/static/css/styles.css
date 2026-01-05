@@ -755,4 +755,48 @@ textarea { resize: vertical; font-family: inherit; }
     .history-score {
         text-align: left;
     }
+
+    .course-info-banner {
+        flex-direction: column;
+        text-align: center;
+    }
+}
+
+/* Course Info Banner */
+.course-info-banner {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 15px 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.course-info-icon {
+    font-size: 24px;
+}
+
+.course-info-text {
+    flex: 1;
+}
+
+.course-info-name {
+    font-weight: 600;
+    font-size: 16px;
+}
+
+.course-info-id {
+    font-size: 13px;
+    opacity: 0.9;
+}
+
+.course-info-badge {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
 }

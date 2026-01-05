@@ -862,9 +862,18 @@ Include:
         if week_number is not None and not 1 <= week_number <= 52:
             raise ValueError("week_number must be between 1 and 52")
 
+        # Validate and sanitize topic to prevent prompt injection
+        if topic:
+            if len(topic) > 200:
+                raise ValueError("topic must be less than 200 characters")
+            # Sanitize topic by escaping special characters that could manipulate AI behavior
+            topic = topic.replace('"', '\\"').replace('\n', ' ').replace('\r', ' ')
+        else:
+            topic = "Course Materials"
+
         logger.info(
-            "Generating flashcards from course %s: %d cards, week=%s",
-            course_id, num_cards, week_number
+            "Generating flashcards from course %s: %d cards, week=%s, topic=%s",
+            course_id, num_cards, week_number, topic
         )
 
         # Get materials with their extracted text content

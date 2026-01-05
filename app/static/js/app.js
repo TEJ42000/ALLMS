@@ -648,6 +648,10 @@ async function generateQuiz() {
 
     } catch (error) {
         console.error('Error:', error);
+        // Define questionContainer in error handler scope
+        const questionContainer = document.getElementById('quiz-question-container');
+        const quizContent = document.getElementById('quiz-content');
+
         if (questionContainer) {
             const errorMessage = error.message || 'Error generating quiz. Please try again.';
             questionContainer.innerHTML = `<p class="error">${escapeHtml(errorMessage)}</p>`;
@@ -1082,14 +1086,14 @@ function initDashboard() {
         if (!courseInfoBanner) {
             courseInfoBanner = document.createElement('div');
             courseInfoBanner.className = 'course-info-banner';
-            courseInfoBanner.style.cssText = 'background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px 20px; border-radius: 8px; margin-bottom: 20px; display: flex; align-items: center; gap: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);';
+            // Use CSS classes instead of inline styles for CSP compliance
             courseInfoBanner.innerHTML = `
-                <span style="font-size: 24px;">📚</span>
-                <div style="flex: 1;">
-                    <div style="font-weight: 600; font-size: 16px;">Active Course: ${escapeHtml(COURSE_NAME)}</div>
-                    <div style="font-size: 13px; opacity: 0.9;">Course ID: ${escapeHtml(COURSE_ID)}</div>
+                <span class="course-info-icon">📚</span>
+                <div class="course-info-text">
+                    <div class="course-info-name">Active Course: ${escapeHtml(COURSE_NAME)}</div>
+                    <div class="course-info-id">Course ID: ${escapeHtml(COURSE_ID)}</div>
                 </div>
-                <span style="background: rgba(255,255,255,0.2); padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;">✓ Course-Specific Content</span>
+                <span class="course-info-badge">✓ Course-Specific Content</span>
             `;
             // Insert at the top of the dashboard section
             const sectionTitle = dashboardSection.querySelector('.section-title');
@@ -1252,7 +1256,14 @@ async function loadFlashcards() {
     } catch (error) {
         console.error('Error loading flashcards:', error);
         showFlashcardError(error.message || 'Error loading flashcards. Please try again.');
+        // Add debounce on error to prevent rapid retries that could DDoS the backend
+        // Don't reset flag immediately - wait 2 seconds
+        setTimeout(() => {
+            isLoadingFlashcards = false;
+        }, 2000);
+        return; // Exit early so finally block doesn't reset flag
     } finally {
+        // Only reset immediately on success (no error thrown)
         isLoadingFlashcards = false;
     }
 }
