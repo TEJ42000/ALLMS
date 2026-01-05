@@ -74,7 +74,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h3>Add User to Allow List</h3>
-                <button class="modal-close" onclick="closeModal()">&times;</button>
+                <button class="modal-close" type="button">&times;</button>
             </div>
             <form id="add-user-form">
                 <div class="form-group">
@@ -95,7 +95,7 @@
                     <textarea id="notes" rows="2" placeholder="Additional notes..."></textarea>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                    <button type="button" class="btn btn-secondary" id="cancel-btn">Cancel</button>
                     <button type="submit" class="btn btn-primary">Add User</button>
                 </div>
             </form>

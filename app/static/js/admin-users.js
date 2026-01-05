@@ -20,7 +20,7 @@ const showInactiveCheckbox = document.getElementById('show-inactive');
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
     loadUsers();
-    
+
     addUserBtn.addEventListener('click', () => openModal());
     addUserForm.addEventListener('submit', handleAddUser);
     showExpiredCheckbox.addEventListener('change', (e) => {
@@ -31,6 +31,31 @@ document.addEventListener('DOMContentLoaded', () => {
         showInactive = e.target.checked;
         loadUsers();
     });
+
+    // Event delegation for action buttons (avoids inline onclick for CSP compliance)
+    usersTbody.addEventListener('click', (e) => {
+        const button = e.target.closest('button[data-action]');
+        if (!button) return;
+
+        const action = button.dataset.action;
+        const email = button.dataset.email;
+
+        if (action === 'toggle') {
+            toggleActive(email, button.dataset.active === 'true');
+        } else if (action === 'remove') {
+            removeUser(email);
+        }
+    });
+
+    // Modal close buttons
+    const modalClose = document.querySelector('.modal-close');
+    if (modalClose) {
+        modalClose.addEventListener('click', closeModal);
+    }
+    const cancelBtn = document.getElementById('cancel-btn');
+    if (cancelBtn) {
+        cancelBtn.addEventListener('click', closeModal);
+    }
 });
 
 async function loadUsers() {
@@ -65,17 +90,17 @@ function renderUsers(users) {
     }
     
     usersTbody.innerHTML = users.map(user => `
-        <tr data-email="${user.email}">
+        <tr data-email="${escapeHtml(user.email)}">
             <td>${escapeHtml(user.email)}</td>
             <td>${getStatusBadge(user)}</td>
             <td>${escapeHtml(user.reason)}</td>
             <td>${escapeHtml(user.added_by)}</td>
             <td>${user.expires_at ? formatDate(user.expires_at) : 'Never'}</td>
             <td>
-                <button class="btn btn-sm btn-secondary" onclick="toggleActive('${user.email}', ${!user.active})">
+                <button class="btn btn-sm btn-secondary" data-action="toggle" data-email="${escapeHtml(user.email)}" data-active="${!user.active}">
                     ${user.active ? 'Deactivate' : 'Activate'}
                 </button>
-                <button class="btn btn-sm btn-danger" onclick="removeUser('${user.email}')">
+                <button class="btn btn-sm btn-danger" data-action="remove" data-email="${escapeHtml(user.email)}">
                     Remove
                 </button>
             </td>

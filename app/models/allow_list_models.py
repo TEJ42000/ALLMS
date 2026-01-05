@@ -63,7 +63,7 @@ class AllowListCreateRequest(BaseModel):
     @classmethod
     def validate_not_mgms_domain(cls, v: str) -> str:
         """Prevent adding @mgms.eu users (they already have access)."""
-        email_lower = v.lower()
+        email_lower = v.lower().strip()
         if email_lower.endswith("@mgms.eu"):
             raise ValueError("Cannot add @mgms.eu users to allow list - they already have access")
         return email_lower

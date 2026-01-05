@@ -55,13 +55,19 @@ async def list_allowed_users(
             detail="Allow list service is not available"
         )
 
-    entries = service.get_all_users(
-        include_expired=include_expired,
-        include_inactive=include_inactive
-    )
-
-    # Calculate counts
+    # Get all entries once to avoid race conditions between queries
     all_entries = service.get_all_users(include_expired=True, include_inactive=True)
+
+    # Filter for display based on parameters
+    if include_expired and include_inactive:
+        entries = all_entries
+    else:
+        entries = [
+            e for e in all_entries
+            if (include_inactive or e.active) and (include_expired or not e.is_expired)
+        ]
+
+    # Calculate counts from the same dataset
     active_count = sum(1 for e in all_entries if e.is_effective)
     expired_count = sum(1 for e in all_entries if e.active and e.is_expired)
     inactive_count = sum(1 for e in all_entries if not e.active)
