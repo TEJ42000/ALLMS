@@ -24,6 +24,10 @@ gunicorn>=22.0.0
 google-cloud-secret-manager==2.18.0
 google-cloud-firestore==2.14.0  # Optional: if using Firestore
 
+# Google Authentication (for IAP)
+google-auth>=2.27.0
+google-auth-httplib2>=0.2.0
+
 # Logging
 python-json-logger==2.0.7
 
