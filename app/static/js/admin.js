@@ -135,8 +135,9 @@ async function fetchCourses() {
         const response = await fetch(API_BASE);
         if (!response.ok) throw new Error('Failed to fetch courses');
         const data = await response.json();
-        // API returns a list directly, not an object with courses property
-        courses = Array.isArray(data) ? data : (data.courses || []);
+        // Handle paginated response format: {items: [...], total: N, ...}
+        // Also support legacy array format for backwards compatibility
+        courses = Array.isArray(data) ? data : (data.items || data.courses || []);
         renderCoursesList();
     } catch (error) {
         showToast('Error loading courses: ' + error.message, 'error');
