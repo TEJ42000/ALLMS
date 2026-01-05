@@ -2219,3 +2219,131 @@ async def delete_unified_material(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to delete material: {str(e)}"
         )
+
+
+# ========== Anthropic Files API Management ==========
+
+
+@router.post(
+    "/courses/{course_id}/anthropic-files/refresh",
+    summary="Refresh Anthropic file uploads for a course",
+    description="Upload or re-upload course materials to Anthropic Files API. "
+                "Files are automatically uploaded on-demand, but this endpoint "
+                "allows proactive refresh before files expire."
+)
+async def refresh_anthropic_files(
+    course_id: str = Path(..., description="Course ID"),
+    force: bool = Query(False, description="Force re-upload all files, even if not expired")
+):
+    """Refresh Anthropic file uploads for a course.
+
+    This endpoint uploads course materials to Anthropic's Files API so they
+    can be used for AI-powered content generation (quizzes, study guides, etc.).
+
+    Files are automatically uploaded on-demand when needed, but this endpoint
+    allows proactive refresh to ensure files are ready before they expire.
+    """
+    try:
+        from app.services.anthropic_file_manager import get_anthropic_file_manager
+
+        file_manager = get_anthropic_file_manager()
+        results = file_manager.refresh_course_files(course_id, force=force)
+
+        return {
+            "course_id": course_id,
+            "force": force,
+            "results": results
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to refresh Anthropic files for {course_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to refresh files: {str(e)}"
+        )
+
+
+@router.get(
+    "/courses/{course_id}/anthropic-files/status",
+    summary="Get Anthropic file status for a course",
+    description="Check which materials have been uploaded to Anthropic and their expiry status."
+)
+async def get_anthropic_files_status(
+    course_id: str = Path(..., description="Course ID")
+):
+    """Get Anthropic file upload status for a course.
+
+    Returns information about which materials have been uploaded to Anthropic,
+    their file IDs, and when they expire.
+    """
+    try:
+        from app.services.anthropic_file_manager import get_anthropic_file_manager
+        from datetime import datetime, timezone
+
+        file_manager = get_anthropic_file_manager()
+
+        # Get materials needing upload
+        needing_upload = file_manager.get_materials_needing_upload(course_id)
+
+        # Get all materials to show full status
+        if not file_manager.firestore:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Firestore not available"
+            )
+
+        materials_ref = (
+            file_manager.firestore
+            .collection("courses")
+            .document(course_id)
+            .collection("materials")
+        )
+
+        docs = list(materials_ref.stream())
+        now = datetime.now(timezone.utc)
+
+        materials_status = []
+        for doc in docs:
+            data = doc.to_dict()
+            file_id = data.get("anthropicFileId")
+            expiry = data.get("anthropicFileExpiry")
+
+            status_info = {
+                "material_id": doc.id,
+                "filename": data.get("filename"),
+                "title": data.get("title"),
+                "tier": data.get("tier"),
+                "has_anthropic_file": bool(file_id),
+                "anthropic_file_id": file_id,
+                "expiry": expiry.isoformat() if expiry else None,
+                "is_expired": expiry < now if expiry else None,
+                "upload_error": data.get("anthropicUploadError")
+            }
+            materials_status.append(status_info)
+
+        # Summary counts
+        total = len(materials_status)
+        uploaded = sum(1 for m in materials_status if m["has_anthropic_file"])
+        expired = sum(1 for m in materials_status if m["is_expired"])
+        with_errors = sum(1 for m in materials_status if m["upload_error"])
+
+        return {
+            "course_id": course_id,
+            "summary": {
+                "total_materials": total,
+                "uploaded_to_anthropic": uploaded,
+                "expired": expired,
+                "needing_upload": len(needing_upload),
+                "with_errors": with_errors
+            },
+            "materials": materials_status
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get Anthropic files status for {course_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get status: {str(e)}"
+        )

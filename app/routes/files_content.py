@@ -33,6 +33,9 @@ class FilesQuizRequest(BaseModel):
 
     Supports both legacy mode (topic) and course-aware mode (course_id).
     If course_id is provided, materials are retrieved from Firestore.
+
+    Set use_firestore_materials=True to use the new Firestore-based file
+    management which automatically uploads files to Anthropic on-demand.
     """
 
     topic: Optional[str] = Field(
@@ -53,6 +56,11 @@ class FilesQuizRequest(BaseModel):
     )
     num_questions: int = Field(10, ge=1, le=50)
     difficulty: str = Field("medium", description="easy, medium, hard")
+    use_firestore_materials: bool = Field(
+        False,
+        description="Use Firestore materials with auto-upload to Anthropic. "
+                    "Requires course_id. Default: False (uses file_ids.json)"
+    )
 
 
 class FilesStudyGuideRequest(BaseModel):
@@ -265,32 +273,55 @@ async def generate_quiz_from_files(request: FilesQuizRequest):
     try:
         service = get_files_api_service()
 
-        # Get file keys (supports both legacy and course-aware modes)
-        file_keys = _get_file_keys(
-            service,
-            topic=request.topic,
-            course_id=request.course_id,
-            week=request.week
-        )
-
         # Determine topic for quiz generation
         topic = request.topic or "Course Materials"
 
-        quiz = await service.generate_quiz_from_files(
-            file_keys=file_keys,
-            topic=topic,
-            num_questions=request.num_questions,
-            difficulty=request.difficulty
-        )
+        # Use new Firestore-based method if requested and course_id provided
+        if request.use_firestore_materials and request.course_id:
+            logger.info(
+                "Using Firestore materials for quiz: course=%s, week=%s",
+                request.course_id, request.week
+            )
+            quiz = await service.generate_quiz_from_course(
+                course_id=request.course_id,
+                topic=topic,
+                num_questions=request.num_questions,
+                difficulty=request.difficulty,
+                week_number=request.week
+            )
 
-        response = {
-            "quiz": quiz,
-            "files_used": file_keys,
-            "cached": True  # Files API auto-caches
-        }
+            response = {
+                "quiz": quiz,
+                "course_id": request.course_id,
+                "week": request.week,
+                "mode": "firestore_materials",
+                "cached": True
+            }
+        else:
+            # Legacy mode: use file_ids.json
+            file_keys = _get_file_keys(
+                service,
+                topic=request.topic,
+                course_id=request.course_id,
+                week=request.week
+            )
 
-        # Add course context to response
-        _add_course_context(response, course_id=request.course_id, week=request.week)
+            quiz = await service.generate_quiz_from_files(
+                file_keys=file_keys,
+                topic=topic,
+                num_questions=request.num_questions,
+                difficulty=request.difficulty
+            )
+
+            response = {
+                "quiz": quiz,
+                "files_used": file_keys,
+                "mode": "legacy_file_ids",
+                "cached": True
+            }
+
+            # Add course context to response
+            _add_course_context(response, course_id=request.course_id, week=request.week)
 
         # Log successful generation
         if request.course_id:
