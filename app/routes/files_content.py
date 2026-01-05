@@ -570,21 +570,43 @@ async def generate_flashcards(request: FlashcardsRequest):
     try:
         service = get_files_api_service()
 
-        # Get file keys (supports both legacy and course-aware modes)
-        file_keys = _get_file_keys(
-            service,
-            topic=request.topic,
-            course_id=request.course_id,
-            week=request.week
-        )
-
         topic = request.topic or "Course Materials"
 
-        flashcards = await service.generate_flashcards(
-            topic=topic,
-            file_keys=file_keys,
-            num_cards=request.num_cards
-        )
+        # Use course-aware method if course_id is provided
+        if request.course_id:
+            logger.info(
+                "Generating flashcards: course=%s, week=%s, cards=%d",
+                request.course_id, request.week, request.num_cards
+            )
+
+            flashcards = await service.generate_flashcards_from_course(
+                course_id=request.course_id,
+                topic=topic,
+                num_cards=request.num_cards,
+                week_number=request.week
+            )
+        else:
+            # Legacy mode: use file_keys approach
+            file_keys = _get_file_keys(
+                service,
+                topic=request.topic,
+                course_id=None,
+                week=request.week
+            )
+
+            # Validate we have materials to work with
+            if not file_keys:
+                context_msg = f" for topic '{request.topic}'" if request.topic else ""
+                raise HTTPException(
+                    400,
+                    detail=f"No course materials available{context_msg}. Please contact your instructor to add materials."
+                )
+
+            flashcards = await service.generate_flashcards(
+                topic=topic,
+                file_keys=file_keys,
+                num_cards=request.num_cards
+            )
 
         response = {
             "flashcards": flashcards,

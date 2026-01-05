@@ -1108,12 +1108,12 @@ function initDashboard() {
 }
 
 // ========== Flashcards ==========
-// NOTE: Flashcard data is currently static for the MVP.
-// TODO: Issue #XX - Implement /api/files-content/flashcards endpoint to load flashcards dynamically
-// TODO: Persist flashcard progress (known/unknown) to localStorage
+// Course-aware flashcard system - loads flashcards dynamically from backend API
+// Flashcards are generated from actual course materials using FilesAPIService
 
 let flashcards = [];
 let currentCardIndex = 0;
+let isLoadingFlashcards = false;
 
 /**
  * Initialize event listeners for flashcard navigation and interaction
@@ -1125,33 +1125,144 @@ function initFlashcardListeners() {
     const knowBtn = document.getElementById('know-btn');
     const studyBtn = document.getElementById('study-btn');
     const categorySelect = document.getElementById('flashcard-category');
+    const loadBtn = document.getElementById('load-flashcards-btn');
 
     if (flipBtn) flipBtn.addEventListener('click', flipCard);
     if (prevBtn) prevBtn.addEventListener('click', () => navigateCard(-1));
     if (nextBtn) nextBtn.addEventListener('click', () => navigateCard(1));
     if (knowBtn) knowBtn.addEventListener('click', () => markCard('known'));
     if (studyBtn) studyBtn.addEventListener('click', () => markCard('study'));
-    if (categorySelect) categorySelect.addEventListener('change', loadFlashcards);
+    if (categorySelect) categorySelect.addEventListener('change', filterFlashcards);
+    if (loadBtn) loadBtn.addEventListener('click', loadFlashcards);
 
-    loadFlashcards();
+    // Load flashcards on init if course is selected
+    if (COURSE_ID) {
+        loadFlashcards();
+    }
 }
 
-function loadFlashcards() {
-    flashcards = [
-        {question: "What is the principle of legality in criminal law?", answer: "No punishment without law (nullum crimen sine lege). A person can only be punished if their act was criminally punishable at the time it was committed.", category: "criminal", known: false},
-        {question: "What are the three elements of a crime?", answer: "1) Actus reus (criminal act), 2) Mens rea (criminal intent), 3) No justification or excuse", category: "criminal", known: false},
-        {question: "What is breach of contract?", answer: "Failure to perform a contractual obligation without lawful excuse. It gives rise to remedies including damages, specific performance, or termination.", category: "private", known: false},
-        {question: "What is the Trias Politica?", answer: "The separation of powers into three branches: Legislative (makes laws), Executive (enforces laws), and Judicial (interprets laws).", category: "constitutional", known: false},
-        {question: "What is an administrative order (beschikking)?", answer: "A written decision by an administrative authority concerning a public law matter, directed at a specific person or situation.", category: "administrative", known: false}
-    ];
-
-    const category = document.getElementById('flashcard-category').value;
-    if (category !== 'all') {
-        flashcards = flashcards.filter(card => card.category === category);
+/**
+ * Load flashcards from backend API using course context
+ */
+async function loadFlashcards() {
+    // Prevent multiple simultaneous requests
+    if (isLoadingFlashcards) {
+        console.log('Flashcards already loading');
+        return;
     }
 
-    currentCardIndex = 0;
+    if (!COURSE_ID) {
+        showFlashcardError('No course selected. Please select a course first.');
+        return;
+    }
+
+    isLoadingFlashcards = true;
+    showFlashcardLoading();
+
+    try {
+        // Build request with course context
+        const requestBody = addCourseContext({
+            num_cards: 20  // Default number of flashcards
+        });
+
+        const response = await fetch(`${API_BASE}/api/files-content/flashcards`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(requestBody)
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            const errorMessage = errorData.detail || `API error: ${response.status}`;
+            throw new Error(errorMessage);
+        }
+
+        const data = await response.json();
+
+        if (!data.flashcards || data.flashcards.length === 0) {
+            throw new Error('No flashcards generated. Please try again.');
+        }
+
+        // Transform backend format (front/back) to frontend format (question/answer)
+        flashcards = data.flashcards.map(card => ({
+            question: card.front || card.question || 'No question',
+            answer: card.back || card.answer || 'No answer',
+            category: 'course',  // All course-specific flashcards
+            known: false
+        }));
+
+        currentCardIndex = 0;
+        hideFlashcardLoading();
+        updateFlashcardDisplay();
+        updateFlashcardStats();
+
+        console.log(`Loaded ${flashcards.length} flashcards for course ${COURSE_ID}`);
+
+    } catch (error) {
+        console.error('Error loading flashcards:', error);
+        showFlashcardError(error.message || 'Error loading flashcards. Please try again.');
+    } finally {
+        isLoadingFlashcards = false;
+    }
+}
+
+/**
+ * Filter flashcards by category (for future use if categories are added)
+ */
+function filterFlashcards() {
+    const category = document.getElementById('flashcard-category')?.value;
+    if (!category || category === 'all') {
+        updateFlashcardDisplay();
+        updateFlashcardStats();
+        return;
+    }
+
+    // Filter logic can be added here if categories are implemented
     updateFlashcardDisplay();
+    updateFlashcardStats();
+}
+
+/**
+ * Show loading state for flashcards
+ */
+function showFlashcardLoading() {
+    const questionEl = document.getElementById('flashcard-question');
+    const answerEl = document.getElementById('flashcard-answer');
+
+    if (questionEl) questionEl.textContent = 'Loading flashcards from course materials...';
+    if (answerEl) answerEl.textContent = 'Please wait...';
+
+    // Disable navigation buttons
+    const buttons = ['flip-card-btn', 'prev-card-btn', 'next-card-btn', 'know-btn', 'study-btn'];
+    buttons.forEach(id => {
+        const btn = document.getElementById(id);
+        if (btn) btn.disabled = true;
+    });
+}
+
+/**
+ * Hide loading state for flashcards
+ */
+function hideFlashcardLoading() {
+    // Enable navigation buttons
+    const buttons = ['flip-card-btn', 'prev-card-btn', 'next-card-btn', 'know-btn', 'study-btn'];
+    buttons.forEach(id => {
+        const btn = document.getElementById(id);
+        if (btn) btn.disabled = false;
+    });
+}
+
+/**
+ * Show error message for flashcards
+ */
+function showFlashcardError(message) {
+    const questionEl = document.getElementById('flashcard-question');
+    const answerEl = document.getElementById('flashcard-answer');
+
+    if (questionEl) questionEl.textContent = 'Error';
+    if (answerEl) answerEl.innerHTML = `<span class="error">${escapeHtml(message)}</span>`;
+
+    flashcards = [];
     updateFlashcardStats();
 }
 
