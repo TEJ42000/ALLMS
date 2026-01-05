@@ -210,8 +210,8 @@ class FilesAPIService:
             )
             # Try to truncate at last period within limit to avoid breaking mid-sentence
             truncate_at = text.rfind('.', 0, MAX_TEXT_LENGTH)
-            # Only use sentence boundary if it's within 10% of the limit
-            if truncate_at > MAX_TEXT_LENGTH * 0.9:
+            # Only use sentence boundary if it's within 10% of the limit AND within the limit
+            if truncate_at > MAX_TEXT_LENGTH * 0.9 and truncate_at < MAX_TEXT_LENGTH:
                 text = text[:truncate_at + 1] + "\n\n[... content truncated ...]"
             else:
                 # Fall back to hard truncation if no good sentence boundary found
