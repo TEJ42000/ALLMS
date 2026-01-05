@@ -732,25 +732,37 @@ textarea { resize: vertical; font-family: inherit; }
 
 /* Saved Study Guides List */
 .study-guide-card {
-    background: var(--card-bg);
-    border: 1px solid var(--border);
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
     border-radius: 12px;
     padding: 20px;
     margin-bottom: 15px;
-    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 15px;
     transition: all 0.2s ease;
 }
 
 .study-guide-card:hover {
-    border-color: var(--primary);
-    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.15);
-    transform: translateY(-2px);
+    border-color: var(--gold);
+    box-shadow: 0 4px 12px rgba(212, 175, 55, 0.15);
+}
+
+.study-guide-card .guide-content {
+    flex: 1;
+    cursor: pointer;
+}
+
+.study-guide-card .guide-content:hover h4 {
+    color: var(--gold);
 }
 
 .study-guide-card h4 {
     margin: 0 0 10px 0;
-    color: var(--primary);
+    color: var(--text-primary);
     font-size: 1.1em;
+    transition: color 0.2s;
 }
 
 .study-guide-card .guide-meta {
@@ -758,13 +770,30 @@ textarea { resize: vertical; font-family: inherit; }
     gap: 15px;
     flex-wrap: wrap;
     font-size: 0.9em;
-    color: var(--text-muted);
+    color: var(--text-secondary);
 }
 
 .study-guide-card .guide-meta span {
     display: flex;
     align-items: center;
     gap: 5px;
+}
+
+.study-guide-card .guide-actions {
+    flex-shrink: 0;
+}
+
+/* Danger Button */
+.btn-danger {
+    background: #dc2626;
+    color: white;
+    border: none;
+}
+
+.btn-danger:hover {
+    background: #b91c1c;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(220, 38, 38, 0.3);
 }
 
 /* Empty State for Study Guides */

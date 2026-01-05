@@ -1172,12 +1172,19 @@ async function loadSavedStudyGuides() {
 
         if (data.guides && data.guides.length > 0) {
             listDiv.innerHTML = data.guides.map(guide => `
-                <div class="study-guide-card" onclick="loadStudyGuide('${guide.id}')">
-                    <h4>${escapeHtml(guide.title)}</h4>
-                    <div class="guide-meta">
-                        <span>📅 ${formatDate(guide.created_at)}</span>
-                        <span>📝 ${guide.word_count || 0} words</span>
-                        ${guide.week_numbers ? `<span>📚 Weeks: ${guide.week_numbers.join(', ')}</span>` : ''}
+                <div class="study-guide-card">
+                    <div class="guide-content" onclick="loadStudyGuide('${guide.id}')">
+                        <h4>${escapeHtml(guide.title)}</h4>
+                        <div class="guide-meta">
+                            <span>📅 ${formatDate(guide.created_at)}</span>
+                            <span>📝 ${guide.word_count || 0} words</span>
+                            ${guide.week_numbers ? `<span>📚 Weeks: ${guide.week_numbers.join(', ')}</span>` : ''}
+                        </div>
+                    </div>
+                    <div class="guide-actions">
+                        <button class="btn btn-small btn-danger" onclick="event.stopPropagation(); deleteStudyGuide('${guide.id}', '${escapeHtml(guide.title).replace(/'/g, "\\'")}')">
+                            🗑️ Delete
+                        </button>
                     </div>
                 </div>
             `).join('');
@@ -1299,6 +1306,44 @@ function formatDate(dateStr) {
         });
     } catch (e) {
         return dateStr;
+    }
+}
+
+/**
+ * Delete a study guide with confirmation
+ */
+async function deleteStudyGuide(guideId, guideTitle) {
+    // Confirm before deleting
+    const confirmed = confirm(`Are you sure you want to delete "${guideTitle}"?\n\nThis action cannot be undone.`);
+    if (!confirmed) return;
+
+    showLoading();
+
+    try {
+        const response = await fetch(`${API_BASE}/api/study-guides/courses/${COURSE_ID}/${guideId}`, {
+            method: 'DELETE'
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.detail || 'Failed to delete study guide');
+        }
+
+        // Clear the result display if showing the deleted guide
+        const resultDiv = document.getElementById('study-result');
+        resultDiv.style.display = 'none';
+        resultDiv.innerHTML = '';
+
+        // Refresh the list
+        await loadSavedStudyGuides();
+
+        console.log('Study guide deleted:', guideTitle);
+
+    } catch (error) {
+        console.error('Error deleting study guide:', error);
+        alert(`Failed to delete study guide: ${error.message}`);
+    } finally {
+        hideLoading();
     }
 }
 
