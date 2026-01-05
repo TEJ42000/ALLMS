@@ -459,7 +459,7 @@ function displayCurrentQuestion(container) {
                 ${question.options.map((option, index) => `
                     <button
                         class="quiz-option ${userAnswer === index ? 'selected' : ''}"
-                        onclick="selectAnswer(${index})"
+                        data-answer-index="${index}"
                         ${userAnswer !== null ? 'disabled' : ''}
                     >
                         <span class="option-letter">${String.fromCharCode(65 + index)}</span>
@@ -476,15 +476,13 @@ function displayCurrentQuestion(container) {
             ` : ''}
             <div class="quiz-navigation">
                 <button
-                    class="btn btn-secondary"
-                    onclick="previousQuestion()"
+                    class="btn btn-secondary nav-prev-btn"
                     ${quizState.currentQuestionIndex === 0 ? 'disabled' : ''}
                 >
                     ← Previous
                 </button>
                 <button
-                    class="btn btn-primary"
-                    onclick="nextQuestion()"
+                    class="btn btn-primary nav-next-btn"
                     ${userAnswer === null ? 'disabled' : ''}
                 >
                     ${quizState.currentQuestionIndex === quizState.questions.length - 1 ? 'Finish Quiz' : 'Next →'}
@@ -494,6 +492,24 @@ function displayCurrentQuestion(container) {
     `;
 
     container.innerHTML = html;
+
+    // Attach event listeners using event delegation (avoiding inline onclick for security)
+    container.querySelectorAll('.quiz-option').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const index = parseInt(btn.dataset.answerIndex, 10);
+            selectAnswer(index);
+        });
+    });
+
+    const prevBtn = container.querySelector('.nav-prev-btn');
+    if (prevBtn) {
+        prevBtn.addEventListener('click', previousQuestion);
+    }
+
+    const nextBtn = container.querySelector('.nav-next-btn');
+    if (nextBtn) {
+        nextBtn.addEventListener('click', nextQuestion);
+    }
 }
 
 function selectAnswer(answerIndex) {
@@ -502,6 +518,13 @@ function selectAnswer(answerIndex) {
     }
 
     const question = quizState.questions[quizState.currentQuestionIndex];
+
+    // Validate answerIndex is within bounds
+    if (typeof answerIndex !== 'number' || answerIndex < 0 || answerIndex >= question.options.length) {
+        console.error('Invalid answer index:', answerIndex);
+        return;
+    }
+
     quizState.userAnswers[quizState.currentQuestionIndex] = answerIndex;
 
     // Update score if correct
@@ -609,13 +632,24 @@ function displayQuizResults(container) {
             </div>
 
             <div class="results-actions">
-                <button class="btn btn-primary" onclick="restartQuiz()">Take Another Quiz</button>
-                <button class="btn btn-secondary" onclick="reviewQuiz()">Review Answers</button>
+                <button class="btn btn-primary restart-quiz-btn">Take Another Quiz</button>
+                <button class="btn btn-secondary review-quiz-btn">Review Answers</button>
             </div>
         </div>
     `;
 
     container.innerHTML = html;
+
+    // Attach event listeners (avoiding inline onclick for security)
+    const restartBtn = container.querySelector('.restart-quiz-btn');
+    if (restartBtn) {
+        restartBtn.addEventListener('click', restartQuiz);
+    }
+
+    const reviewBtn = container.querySelector('.review-quiz-btn');
+    if (reviewBtn) {
+        reviewBtn.addEventListener('click', reviewQuiz);
+    }
 }
 
 function restartQuiz() {
@@ -641,6 +675,13 @@ function restartQuiz() {
     }
 }
 
+/**
+ * Review quiz answers after completion.
+ * This shows questions in read-only mode with the user's previous answers preserved.
+ * Users can navigate through questions to see their answers and the correct ones.
+ * Note: userAnswers are intentionally NOT reset - this is review mode, not retake mode.
+ * To retake the quiz with new questions, use restartQuiz() instead.
+ */
 function reviewQuiz() {
     quizState.currentQuestionIndex = 0;
     quizState.isComplete = false;
