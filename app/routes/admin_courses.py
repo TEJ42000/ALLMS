@@ -241,6 +241,12 @@ async def list_courses(
             offset=offset,
             has_more=(offset + len(courses)) < total
         )
+    except ServiceValidationError as e:
+        logger.warning("Invalid pagination parameters: %s", e)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
     except FirestoreOperationError as e:
         logger.error("Firestore error listing courses: %s", e)
         raise HTTPException(
@@ -392,11 +398,22 @@ async def update_course(course_id: str, updates: CourseUpdate):
 
         logger.info("Updated course: %s", course_id)
         return course
-    except ValueError as e:
+    except (ServiceValidationError, ValueError) as e:
         logger.warning("Invalid update for course %s: %s", course_id, e)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
+        )
+    except CourseNotFoundError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+    except FirestoreOperationError as e:
+        logger.error("Firestore error updating course %s: %s", course_id, e)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Database temporarily unavailable: {str(e)}"
         )
     except HTTPException:
         raise
@@ -429,11 +446,22 @@ async def deactivate_course(course_id: str):
 
         logger.info("Deactivated course: %s", course_id)
         return None
-    except ValueError as e:
-        logger.warning("Invalid course ID for deactivation: %s", course_id)
+    except (ServiceValidationError, ValueError) as e:
+        logger.warning("Invalid course ID for deactivation: %s - %s", course_id, e)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
+        )
+    except CourseNotFoundError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+    except FirestoreOperationError as e:
+        logger.error("Firestore error deactivating course %s: %s", course_id, e)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Database temporarily unavailable: {str(e)}"
         )
     except HTTPException:
         raise
