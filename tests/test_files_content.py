@@ -558,7 +558,7 @@ class TestCourseAwareStudyGuideEndpoint:
             mock_service.generate_study_guide_from_course.assert_called_once_with(
                 course_id="LLS-2025-2026",
                 topic="Course 'LLS-2025-2026' - All Materials",
-                week_number=None
+                week_numbers=None
             )
 
     def test_study_guide_with_course_id_and_single_week(self, client):
@@ -583,11 +583,11 @@ class TestCourseAwareStudyGuideEndpoint:
             mock_service.generate_study_guide_from_course.assert_called_once_with(
                 course_id="LLS-2025-2026",
                 topic="Course 'LLS-2025-2026' - Weeks [2]",
-                week_number=2
+                week_numbers=[2]
             )
 
     def test_study_guide_with_multiple_weeks(self, client):
-        """Test study guide with multiple weeks."""
+        """Test study guide with multiple weeks fetches materials for all weeks."""
         mock_service = MagicMock()
         mock_service.generate_study_guide_from_course = AsyncMock(
             return_value="# Multi-week Guide\n\nContent..."
@@ -605,8 +605,12 @@ class TestCourseAwareStudyGuideEndpoint:
             assert response.status_code == 200
             data = response.json()
             assert data.get("weeks") == [2, 3]
-            # Multiple weeks means week_number is None (service will handle internally)
-            mock_service.generate_study_guide_from_course.assert_called_once()
+            # Multiple weeks are now passed to the service
+            mock_service.generate_study_guide_from_course.assert_called_once_with(
+                course_id="LLS-2025-2026",
+                topic="Course 'LLS-2025-2026' - Weeks [2, 3]",
+                week_numbers=[2, 3]
+            )
 
     def test_study_guide_weeks_validation(self, client):
         """Test study guide rejects invalid week numbers via Pydantic."""

@@ -355,18 +355,15 @@ async def generate_study_guide(request: FilesStudyGuideRequest):
         # Build topic description
         if request.weeks:
             topic_description = f"Course '{request.course_id}' - Weeks {request.weeks}"
-            # For specific weeks, we need to call once per week
-            # The service will handle filtering
-            week_number = request.weeks[0] if len(request.weeks) == 1 else None
         else:
             topic_description = f"Course '{request.course_id}' - All Materials"
-            week_number = None
 
         # Generate study guide using the new text extraction approach
+        # Pass week_numbers list (or None for all materials)
         guide = await service.generate_study_guide_from_course(
             course_id=request.course_id,
             topic=topic_description,
-            week_number=week_number
+            week_numbers=request.weeks  # Pass full list of weeks
         )
 
         response = {
@@ -380,7 +377,7 @@ async def generate_study_guide(request: FilesStudyGuideRequest):
                 "The 'topic' parameter is deprecated and was ignored. "
                 "Study guides now use course materials."
             )
-            logger.info("Deprecated 'topic' parameter used: %s", request.topic)
+            logger.warning("Deprecated 'topic' parameter used: %s", request.topic)
 
         # Add course context to response
         _add_course_context(response, course_id=request.course_id, weeks=request.weeks)

@@ -56,6 +56,13 @@ class FilesAPIService:
         self._course_service = None
         self._firestore = None
 
+        # Legacy file_ids dict - kept for backwards compatibility with methods
+        # that haven't been migrated to text extraction yet (explain_article,
+        # analyze_case, get_topic_files, etc). These methods will return empty
+        # results until they are refactored.
+        # TODO: Remove once all methods are migrated to text extraction
+        self.file_ids: Dict[str, Dict[str, Any]] = {}
+
     def _get_course_service(self):
         """Get CourseService instance (lazy loading to avoid circular imports)."""
         if self._course_service is None:
@@ -464,7 +471,7 @@ Return ONLY valid JSON:
         self,
         course_id: str,
         topic: str,
-        week_number: Optional[int] = None
+        week_numbers: Optional[List[int]] = None
     ) -> str:
         """Generate comprehensive study guide using Firestore materials with text extraction.
 
@@ -474,7 +481,7 @@ Return ONLY valid JSON:
         Args:
             course_id: Course ID
             topic: Topic description for the study guide
-            week_number: Optional week filter
+            week_numbers: Optional list of week numbers to filter by (e.g., [1, 2, 3])
 
         Returns:
             Formatted study guide in Markdown
@@ -483,16 +490,30 @@ Return ONLY valid JSON:
             ValueError: If no materials found
         """
         logger.info(
-            "Generating study guide from course %s, week=%s",
-            course_id, week_number
+            "Generating study guide from course %s, weeks=%s",
+            course_id, week_numbers
         )
 
         # Get materials with their extracted text content
-        materials_with_text = await self.get_course_materials_with_text(
-            course_id=course_id,
-            week_number=week_number,
-            limit=15  # Allow more materials for comprehensive study guide
-        )
+        # For multiple weeks, fetch each week separately and combine
+        materials_with_text = []
+
+        if week_numbers and len(week_numbers) > 0:
+            # Fetch materials for each specified week
+            for week_num in week_numbers:
+                week_materials = await self.get_course_materials_with_text(
+                    course_id=course_id,
+                    week_number=week_num,
+                    limit=10  # Limit per week to avoid overwhelming context
+                )
+                materials_with_text.extend(week_materials)
+        else:
+            # No week filter - get all materials
+            materials_with_text = await self.get_course_materials_with_text(
+                course_id=course_id,
+                week_number=None,
+                limit=15  # Allow more materials for comprehensive study guide
+            )
 
         if not materials_with_text:
             raise ValueError(f"No materials found for course {course_id}")
@@ -551,9 +572,11 @@ Use visual formatting:
             "text": prompt_text
         })
 
+        # Use 8000 tokens for study guides (longer than quizzes which use 4000)
+        # Study guides include multiple sections: concepts, articles, mistakes, tips, scenarios
         response = await self.client.messages.create(
             model="claude-sonnet-4-20250514",
-            max_tokens=4000,
+            max_tokens=8000,
             messages=[{"role": "user", "content": content_blocks}]
         )
 
