@@ -413,9 +413,14 @@ async function loadSavedQuizzes() {
                 <div class="empty-state">
                     <div class="empty-state-icon">📚</div>
                     <p>No saved quizzes yet. Create your first quiz!</p>
-                    <button class="btn btn-primary" onclick="switchQuizTab('new')">Create New Quiz</button>
+                    <button class="btn btn-primary create-new-quiz-btn">Create New Quiz</button>
                 </div>
             `;
+            // Add event listener for CSP compliance (no inline onclick)
+            const createBtn = container.querySelector('.create-new-quiz-btn');
+            if (createBtn) {
+                createBtn.addEventListener('click', () => switchQuizTab('new'));
+            }
             return;
         }
 
@@ -473,9 +478,14 @@ async function loadQuizHistory() {
                 <div class="empty-state">
                     <div class="empty-state-icon">📊</div>
                     <p>No quiz history yet. Take a quiz to see your results!</p>
-                    <button class="btn btn-primary" onclick="switchQuizTab('saved')">Browse Quizzes</button>
+                    <button class="btn btn-primary browse-quizzes-btn">Browse Quizzes</button>
                 </div>
             `;
+            // Add event listener for CSP compliance (no inline onclick)
+            const browseBtn = container.querySelector('.browse-quizzes-btn');
+            if (browseBtn) {
+                browseBtn.addEventListener('click', () => switchQuizTab('saved'));
+            }
             return;
         }
 
