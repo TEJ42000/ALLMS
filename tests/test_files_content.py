@@ -591,6 +591,75 @@ class TestCourseAwareStudyGuideEndpoint:
         # Should return 422 Unprocessable Entity for validation error
         assert response.status_code == 422
 
+    def test_study_guide_legacy_comprehensive_mode(self, client):
+        """Test that empty request uses all topics in legacy comprehensive mode."""
+        mock_service = MagicMock()
+        # Mock get_topic_files to return files for each topic
+        mock_service.get_topic_files.side_effect = lambda topic: [f"{topic}_file1", f"{topic}_file2"]
+        mock_service.generate_study_guide = AsyncMock(
+            return_value="# Comprehensive Study Guide\n\nAll topics covered..."
+        )
+
+        with patch(
+            'app.routes.files_content.get_files_api_service',
+            return_value=mock_service
+        ):
+            response = client.post("/api/files-content/study-guide", json={})
+
+            assert response.status_code == 200
+            data = response.json()
+            assert "guide" in data
+            assert "Comprehensive Study Guide - All Topics" in data["topic"]
+            assert data["files_count"] > 0
+            # Verify all topics were attempted
+            assert mock_service.get_topic_files.call_count == 5  # 5 topics
+
+    def test_study_guide_deprecated_topic_parameter_warning(self, client):
+        """Test that using deprecated topic parameter returns a warning."""
+        mock_service = MagicMock()
+        mock_service.get_topic_files.return_value = ["file1", "file2"]
+        mock_service.generate_study_guide = AsyncMock(return_value="# Guide")
+
+        with patch(
+            'app.routes.files_content.get_files_api_service',
+            return_value=mock_service
+        ):
+            response = client.post("/api/files-content/study-guide", json={
+                "topic": "Private Law"
+            })
+
+            assert response.status_code == 200
+            data = response.json()
+            assert "_warning" in data
+            assert "deprecated" in data["_warning"].lower()
+            assert "ignored" in data["_warning"].lower()
+
+    def test_study_guide_partial_topic_failure(self, client):
+        """Test that study guide works even if some topics fail to load."""
+        mock_service = MagicMock()
+        # Mock some topics to succeed, others to fail
+        def mock_get_topic_files(topic):
+            if topic in ["constitutional", "criminal"]:
+                return [f"{topic}_file1"]
+            else:
+                raise Exception(f"Topic {topic} not available")
+
+        mock_service.get_topic_files.side_effect = mock_get_topic_files
+        mock_service.generate_study_guide = AsyncMock(return_value="# Partial Guide")
+
+        with patch(
+            'app.routes.files_content.get_files_api_service',
+            return_value=mock_service
+        ):
+            response = client.post("/api/files-content/study-guide", json={})
+
+            # Should succeed with available materials
+            assert response.status_code == 200
+            data = response.json()
+            assert data["files_count"] == 2  # Only 2 topics succeeded
+            assert "constitutional_file1" in data["files_used"]
+            assert "criminal_file1" in data["files_used"]
+
 
 class TestCourseAwareFlashcardsEndpoint:
     """Tests for course-aware flashcards generation."""

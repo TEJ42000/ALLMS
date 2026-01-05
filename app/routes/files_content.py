@@ -373,12 +373,21 @@ async def generate_study_guide(request: FilesStudyGuideRequest):
             # This provides a comprehensive study guide covering all subjects
             all_topics = ["constitutional", "administrative", "criminal", "private", "international"]
             file_keys = []
+            failed_topics = []
+
             for topic in all_topics:
                 try:
                     topic_files = service.get_topic_files(topic)
                     file_keys.extend(topic_files)
                 except Exception as e:
                     logger.warning("Could not get files for topic %s: %s", topic, str(e))
+                    failed_topics.append(topic)
+
+            # Log summary of topic loading
+            if failed_topics:
+                logger.warning("Failed to load topics: %s", failed_topics)
+                if len(failed_topics) == len(all_topics):
+                    logger.error("All topics failed to load - no materials available")
 
             # Remove duplicates while preserving order
             seen = set()
@@ -410,6 +419,14 @@ async def generate_study_guide(request: FilesStudyGuideRequest):
             "files_used": file_keys,
             "files_count": len(file_keys)
         }
+
+        # Add deprecation warning if topic parameter was provided
+        if request.topic:
+            response["_warning"] = (
+                "The 'topic' parameter is deprecated and was ignored. "
+                "Study guides now include all materials."
+            )
+            logger.info("Deprecated 'topic' parameter used: %s", request.topic)
 
         # Add course context to response
         _add_course_context(response, course_id=request.course_id, weeks=request.weeks)
