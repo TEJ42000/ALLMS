@@ -47,11 +47,11 @@ class ChatResponse(BaseModel):
 
 
 # ============================================================================
-# Assessment Models
+# Assessment Models (Legacy)
 # ============================================================================
 
 class AssessmentRequest(BaseModel):
-    """Request model for answer assessment."""
+    """Request model for answer assessment (legacy endpoint)."""
 
     topic: str = Field(
         ..., description="Subject area (e.g., 'Private Law', 'Criminal Law')"
@@ -92,7 +92,7 @@ class AssessmentRequest(BaseModel):
 
 
 class AssessmentResponse(BaseModel):
-    """Response model for answer assessment."""
+    """Response model for answer assessment (legacy endpoint)."""
 
     feedback: str = Field(..., description="AI-generated detailed feedback")
     grade: Optional[int] = Field(default=None, ge=0, le=10, description="Grade out of 10")
@@ -100,6 +100,173 @@ class AssessmentResponse(BaseModel):
     timestamp: datetime = Field(
         default_factory=datetime.now, description="Response timestamp"
     )
+
+
+# ============================================================================
+# Essay Assessment Models (New)
+# ============================================================================
+
+class GenerateEssayQuestionRequest(BaseModel):
+    """Request model for generating an essay question."""
+
+    course_id: str = Field(
+        ...,
+        min_length=1,
+        max_length=100,
+        pattern=r'^[a-zA-Z0-9_-]+$',
+        description="Course ID (alphanumeric, underscore, hyphen only)"
+    )
+    topic: Optional[str] = Field(
+        None,
+        max_length=200,
+        description="Specific topic for the question"
+    )
+    week_number: Optional[int] = Field(None, ge=1, le=52, description="Week number filter")
+
+
+class EssayQuestion(BaseModel):
+    """Model for a generated essay question."""
+
+    question: str = Field(..., description="The essay question text")
+    topic: str = Field(..., description="Topic the question is about")
+    expected_paragraphs: str = Field(
+        default="3-7",
+        description="Expected number of paragraphs in answer"
+    )
+    guidance: Optional[str] = Field(
+        None,
+        description="Optional guidance or hints for answering"
+    )
+    key_concepts: List[str] = Field(
+        default_factory=list,
+        description="Key concepts that should be addressed"
+    )
+
+
+class StoredEssayAssessment(BaseModel):
+    """Model for a stored essay assessment in Firestore."""
+
+    id: str = Field(..., description="Unique assessment ID")
+    course_id: str = Field(..., description="Course ID this assessment belongs to")
+    user_id: str = Field(..., description="User ID who took the assessment")
+
+    # Question details
+    question: str = Field(..., description="The essay question text")
+    topic: str = Field(..., description="Topic of the question")
+    week_number: Optional[int] = Field(None, description="Week number if specified")
+    expected_paragraphs: str = Field(default="3-7", description="Expected paragraphs")
+    key_concepts: List[str] = Field(default_factory=list, description="Key concepts")
+
+    # Timestamps
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        description="When the assessment was created"
+    )
+
+    # Title for display
+    title: Optional[str] = Field(None, description="Generated title for the assessment")
+
+
+class EssayAttempt(BaseModel):
+    """Model for a single attempt at answering an essay question."""
+
+    id: str = Field(..., description="Unique attempt ID")
+    assessment_id: str = Field(..., description="Assessment ID this attempt belongs to")
+    user_id: str = Field(..., description="User ID")
+
+    # Answer
+    answer: str = Field(..., description="User's essay answer")
+
+    # Evaluation
+    grade: int = Field(..., ge=1, le=10, description="Grade out of 10")
+    feedback: str = Field(..., description="AI-generated detailed feedback")
+    strengths: List[str] = Field(default_factory=list, description="Strong points")
+    improvements: List[str] = Field(default_factory=list, description="Areas for improvement")
+
+    # Timestamps
+    submitted_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        description="When the answer was submitted"
+    )
+
+
+class SubmitEssayAnswerRequest(BaseModel):
+    """Request model for submitting an essay answer."""
+
+    assessment_id: str = Field(
+        ...,
+        pattern=r'^[a-f0-9-]{36}$',
+        description="Assessment ID (UUID format)"
+    )
+    course_id: str = Field(
+        ...,
+        min_length=1,
+        max_length=100,
+        pattern=r'^[a-zA-Z0-9_-]+$',
+        description="Course ID (alphanumeric, underscore, hyphen only)"
+    )
+    answer: str = Field(
+        ...,
+        min_length=100,
+        max_length=20000,
+        description="Essay answer (should be 3-7 paragraphs)"
+    )
+
+    @field_validator('answer')
+    @classmethod
+    def validate_answer(cls, v: str) -> str:
+        """Validate that answer has reasonable length for an essay."""
+        stripped = v.strip()
+        if len(stripped) < 100:
+            raise ValueError('Essay answer must be at least 100 characters')
+        # Count paragraphs (double newlines or single newlines with content)
+        paragraphs = [p.strip() for p in stripped.split('\n\n') if p.strip()]
+        if len(paragraphs) < 1:
+            # Try single newlines
+            paragraphs = [p.strip() for p in stripped.split('\n') if p.strip()]
+        return stripped
+
+
+class EssayEvaluationResponse(BaseModel):
+    """Response model for essay evaluation."""
+
+    attempt_id: str = Field(..., description="Attempt ID")
+    assessment_id: str = Field(..., description="Assessment ID")
+    grade: int = Field(..., ge=1, le=10, description="Grade out of 10")
+    feedback: str = Field(..., description="Detailed feedback in markdown")
+    strengths: List[str] = Field(..., description="Strong points of the answer")
+    improvements: List[str] = Field(..., description="Areas for improvement")
+    status: str = Field(default="success", description="Response status")
+    submitted_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        description="Submission timestamp"
+    )
+
+
+class EssayAssessmentSummary(BaseModel):
+    """Summary of an essay assessment for listing."""
+
+    id: str = Field(..., description="Assessment ID")
+    course_id: str = Field(..., description="Course ID")
+    topic: str = Field(..., description="Topic")
+    question: str = Field(..., description="Question text (may be truncated)")
+    title: Optional[str] = Field(None, description="Assessment title")
+    created_at: datetime = Field(..., description="Creation timestamp")
+    attempt_count: int = Field(default=0, description="Number of attempts")
+    best_grade: Optional[int] = Field(None, description="Best grade achieved")
+    latest_grade: Optional[int] = Field(None, description="Most recent grade")
+
+
+class EssayAssessmentHistoryItem(BaseModel):
+    """Item in user's essay assessment history."""
+
+    assessment_id: str = Field(..., description="Assessment ID")
+    attempt_id: str = Field(..., description="Attempt ID")
+    course_id: str = Field(..., description="Course ID")
+    topic: str = Field(..., description="Topic")
+    question: str = Field(..., description="Question text")
+    grade: int = Field(..., description="Grade achieved")
+    submitted_at: datetime = Field(..., description="Submission timestamp")
 
 
 # ============================================================================
