@@ -200,7 +200,7 @@ async def estimate_tokens(
             total_chars += char_count
             material_details.append({
                 "title": material.title or material.filename,
-                "week": material.week_number,
+                "week": material.weekNumber,  # camelCase to match Pydantic model
                 "characters": char_count,
                 "estimated_tokens": token_estimate
             })
