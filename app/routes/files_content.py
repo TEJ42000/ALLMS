@@ -56,22 +56,23 @@ class FilesQuizRequest(BaseModel):
 
 
 class FilesStudyGuideRequest(BaseModel):
-    """Generate study guide from files.
+    """Generate comprehensive study guide from all available course materials.
 
-    Supports both legacy mode (topic) and course-aware mode (course_id).
+    Supports course-aware mode (course_id) and legacy mode (all default materials).
+    Topic parameter is deprecated - study guides now use all available materials.
     """
 
     topic: Optional[str] = Field(
         None,
-        description="Topic name. Required if course_id is not provided."
+        description="[DEPRECATED] Topic name. No longer used - study guides include all materials."
     )
     course_id: Optional[str] = Field(
         None,
-        description="Course ID for Firestore lookup."
+        description="Course ID for Firestore lookup. If provided, uses all course materials."
     )
     weeks: Optional[List[int]] = Field(
         None,
-        description="Specific weeks to include (each must be 1-52)"
+        description="Specific weeks to include (each must be 1-52). If not provided, uses all weeks."
     )
 
     @validator('weeks', each_item=True)
@@ -311,43 +312,47 @@ async def generate_quiz_from_files(request: FilesQuizRequest):
 @router.post("/study-guide")
 async def generate_study_guide(request: FilesStudyGuideRequest):
     """
-    Generate comprehensive study guide from uploaded files.
+    Generate comprehensive study guide from ALL available course materials.
 
-    Includes:
-    - Key concepts
-    - Important articles
-    - Common mistakes
-    - Exam tips
-    - Practice scenarios
+    The study guide automatically includes all relevant materials for the course,
+    providing a complete overview of key concepts, important articles, common
+    mistakes, exam tips, and practice scenarios.
 
     **Modes:**
-    - **Legacy mode**: Provide `topic` parameter
-    - **Course-aware mode**: Provide `course_id` parameter
+    - **Course-aware mode**: Provide `course_id` to use all materials from that course
+    - **Legacy mode**: No parameters needed - uses all default materials
 
-    **Example (legacy):**
+    **Example (course-aware - all materials):**
     ```json
     {
-        "topic": "Private Law",
-        "weeks": [2]
+        "course_id": "LLS-2025-2026"
     }
     ```
 
-    **Example (course-aware):**
+    **Example (course-aware - specific weeks):**
     ```json
     {
         "course_id": "LLS-2025-2026",
         "weeks": [2, 3]
     }
     ```
+
+    **Example (legacy - all default materials):**
+    ```json
+    {}
+    ```
+
+    **Note:** The `topic` parameter is deprecated. Study guides now automatically
+    include all available materials instead of filtering by topic.
     """
     try:
         service = get_files_api_service()
 
         # Note: weeks are validated by Pydantic @validator
 
-        # Get files (supports both legacy and course-aware modes)
+        # Get files - comprehensive approach using ALL available materials
         if request.course_id:
-            # Course-aware mode: fetch course data once to avoid N+1 queries
+            # Course-aware mode: fetch ALL course materials (or specific weeks)
             try:
                 if request.weeks:
                     # Use batch method for multiple weeks - single Firestore read
@@ -355,26 +360,31 @@ async def generate_study_guide(request: FilesStudyGuideRequest):
                         request.course_id,
                         week_numbers=request.weeks
                     )
+                    topic_description = f"Course '{request.course_id}' - Weeks {request.weeks}"
                 else:
+                    # Get ALL materials for the course
                     file_keys = service.get_files_for_course(request.course_id)
+                    topic_description = f"Course '{request.course_id}' - All Materials"
             except ValueError as e:
                 logger.warning("Course not found: %s", request.course_id)
                 raise HTTPException(404, detail=str(e)) from e
-        elif request.topic:
-            # Legacy mode
-            file_keys = service.get_topic_files(request.topic)
-            # Add week-specific content
-            if request.weeks:
-                for week in request.weeks:
-                    if week in [3, 4, 6]:
-                        file_keys.append(f"lecture_week_{week}")
-                    if week in [1, 2]:
-                        file_keys.append(f"readings_week_{week}")
         else:
-            raise HTTPException(
-                400,
-                detail="Either 'topic' or 'course_id' must be provided"
-            )
+            # Legacy mode: Use ALL default materials across all topics
+            # This provides a comprehensive study guide covering all subjects
+            all_topics = ["constitutional", "administrative", "criminal", "private", "international"]
+            file_keys = []
+            for topic in all_topics:
+                try:
+                    topic_files = service.get_topic_files(topic)
+                    file_keys.extend(topic_files)
+                except Exception as e:
+                    logger.warning("Could not get files for topic %s: %s", topic, str(e))
+
+            # Remove duplicates while preserving order
+            seen = set()
+            file_keys = [x for x in file_keys if not (x in seen or seen.add(x))]
+
+            topic_description = "Comprehensive Study Guide - All Topics"
 
         # Check if we have any files to work with
         if not file_keys:
@@ -385,20 +395,20 @@ async def generate_study_guide(request: FilesStudyGuideRequest):
                     error_msg += f" for weeks {request.weeks}"
                 error_msg += ". Please contact your instructor to add materials."
             else:
-                error_msg += "Please select a topic with available materials."
+                error_msg += "No default materials found. Please contact your administrator."
             raise HTTPException(400, detail=error_msg)
 
-        topic = request.topic or "Course Materials"
-
+        # Generate comprehensive study guide
         guide = await service.generate_study_guide(
-            topic=topic,
+            topic=topic_description,
             file_keys=file_keys
         )
 
         response = {
             "guide": guide,
-            "topic": topic,
-            "files_used": file_keys
+            "topic": topic_description,
+            "files_used": file_keys,
+            "files_count": len(file_keys)
         }
 
         # Add course context to response
@@ -407,8 +417,13 @@ async def generate_study_guide(request: FilesStudyGuideRequest):
         # Log successful generation
         if request.course_id:
             logger.info(
-                "Generated study guide for course %s, weeks %s",
-                request.course_id, request.weeks
+                "Generated comprehensive study guide for course %s, weeks %s, files: %d",
+                request.course_id, request.weeks, len(file_keys)
+            )
+        else:
+            logger.info(
+                "Generated comprehensive study guide using %d files from all topics",
+                len(file_keys)
             )
 
         return response

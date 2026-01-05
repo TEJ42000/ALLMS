@@ -711,25 +711,13 @@ function initStudyListeners() {
 }
 
 async function generateStudyGuide() {
-    const topic = document.getElementById('study-topic').value;
     const resultDiv = document.getElementById('study-result');
-
-    // Validate: need either topic or course_id
-    if (!topic && !COURSE_ID) {
-        resultDiv.innerHTML = '<p class="error">Please select a topic.</p>';
-        resultDiv.style.display = 'block';
-        return;
-    }
 
     showLoading();
 
     try {
+        // Build request with course context (course_id will be added if available)
         const requestBody = addCourseContext({});
-
-        // Add topic if selected, otherwise rely on course_id
-        if (topic) {
-            requestBody.topic = topic;
-        }
 
         const response = await fetch(`${API_BASE}/api/files-content/study-guide`, {
             method: 'POST',
@@ -749,8 +737,8 @@ async function generateStudyGuide() {
 
     } catch (error) {
         console.error('Error:', error);
-        const errorMessage = error.message.includes('file_keys cannot be empty')
-            ? 'No course materials available. Please select a topic or contact your instructor to add materials to this course.'
+        const errorMessage = error.message.includes('No course materials available')
+            ? error.message
             : `Error generating study guide: ${error.message}`;
         resultDiv.innerHTML = `<p class="error">${escapeHtml(errorMessage)}</p>`;
         resultDiv.style.display = 'block';
