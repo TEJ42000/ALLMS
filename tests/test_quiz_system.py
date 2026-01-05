@@ -57,8 +57,37 @@ class TestQuizGeneration:
 
     def test_quiz_generation_with_course_id(self, client):
         """Test quiz generation using course_id instead of topic."""
-        # Skip this test due to mock recursion issues in test environment
-        pytest.skip("Skipping due to mock recursion issues with course_id")
+        mock_service = Mock()
+        mock_service.get_files_for_course.return_value = ["reader_private_law"]
+        mock_service.generate_quiz_from_files = AsyncMock(return_value={
+            "questions": [
+                {
+                    "question": "What is Art. 6:74 DCC?",
+                    "options": [
+                        "Liability for defective products",
+                        "Contract formation",
+                        "Tort law",
+                        "Property rights"
+                    ],
+                    "correct_index": 0,
+                    "explanation": "Art. 6:74 DCC deals with product liability.",
+                    "difficulty": "medium"
+                }
+            ]
+        })
+
+        with patch('app.routes.files_content.get_files_api_service', return_value=mock_service):
+            response = client.post("/api/files-content/quiz", json={
+                "course_id": "LLS-2025-2026",
+                "num_questions": 1,
+                "difficulty": "medium"
+            })
+
+            assert response.status_code == 200
+            data = response.json()
+            assert "quiz" in data
+            assert data.get("course_id") == "LLS-2025-2026"
+            mock_service.get_files_for_course.assert_called_once()
 
     def test_quiz_generation_with_multiple_questions(self, client):
         """Test quiz generation with multiple questions."""
@@ -245,9 +274,33 @@ class TestQuizErrorHandling:
             assert response.status_code in [200, 404, 500]
 
     def test_quiz_generation_with_invalid_difficulty(self, client):
-        """Test quiz generation with invalid difficulty level."""
-        # Skip this test as it requires API authentication
-        pytest.skip("Skipping due to API authentication requirements")
+        """Test quiz generation with invalid difficulty level.
+
+        Note: The API accepts any difficulty string and passes it to the AI.
+        Invalid difficulties are not rejected at the API level, but the AI
+        may not handle them gracefully. This test verifies the endpoint
+        doesn't crash with unusual difficulty values.
+        """
+        mock_service = Mock()
+        mock_service.get_topic_files.return_value = ["reader"]
+        mock_service.generate_quiz_from_files = AsyncMock(return_value={
+            "questions": [{
+                "question": "Test question",
+                "options": ["A", "B", "C", "D"],
+                "correct_index": 0,
+                "difficulty": "invalid_difficulty"
+            }]
+        })
+
+        with patch('app.routes.files_content.get_files_api_service', return_value=mock_service):
+            response = client.post("/api/files-content/quiz", json={
+                "topic": "Law",
+                "num_questions": 1,
+                "difficulty": "invalid_difficulty"
+            })
+
+            # API accepts any difficulty string - validation happens at AI level
+            assert response.status_code == 200
 
     def test_quiz_generation_with_invalid_num_questions(self, client):
         """Test quiz generation with invalid number of questions."""

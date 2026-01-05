@@ -321,14 +321,25 @@ let quizState = {
     isComplete: false
 };
 
+// Race condition protection - prevent multiple simultaneous quiz generations
+let isGeneratingQuiz = false;
+
 function initQuizListeners() {
     const startBtn = document.getElementById('start-quiz-btn');
     if (startBtn) startBtn.addEventListener('click', generateQuiz);
 }
 
 async function generateQuiz() {
+    // Prevent multiple simultaneous quiz generation requests
+    if (isGeneratingQuiz) {
+        console.log('Quiz generation already in progress');
+        return;
+    }
+
     const topicSelect = document.getElementById('quiz-topic-select');
+    const difficultySelect = document.getElementById('quiz-difficulty-select');
     const topic = topicSelect ? topicSelect.value : 'all';
+    const difficulty = difficultySelect ? difficultySelect.value : 'medium';
     const num_questions = 10; // Generate 10 questions
     const quizContent = document.getElementById('quiz-content');
     const questionContainer = document.getElementById('quiz-question-container');
@@ -342,13 +353,14 @@ async function generateQuiz() {
         isComplete: false
     };
 
+    isGeneratingQuiz = true;
     showLoading();
 
     try {
         const response = await fetch(`${API_BASE}/api/files-content/quiz`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(addCourseContext({topic, num_questions, difficulty: 'medium'}))
+            body: JSON.stringify(addCourseContext({topic, num_questions, difficulty}))
         });
 
         if (!response.ok) throw new Error(`API error: ${response.status}`);
@@ -387,6 +399,7 @@ async function generateQuiz() {
         }
         if (quizContent) quizContent.classList.remove('hidden');
     } finally {
+        isGeneratingQuiz = false;
         hideLoading();
     }
 }
@@ -420,6 +433,13 @@ function displayCurrentQuestion(container) {
     }
 
     const question = quizState.questions[quizState.currentQuestionIndex];
+
+    // Validate question structure before rendering
+    if (!question || !Array.isArray(question.options) || typeof question.correct_index !== 'number') {
+        container.innerHTML = '<p class="error">Invalid question data. Please try generating a new quiz.</p>';
+        return;
+    }
+
     const questionNum = quizState.currentQuestionIndex + 1;
     const userAnswer = quizState.userAnswers[quizState.currentQuestionIndex];
 
@@ -432,7 +452,7 @@ function displayCurrentQuestion(container) {
             <p class="question-text">${escapeHtml(question.question)}</p>
             ${question.articles && question.articles.length > 0 ? `
                 <div class="question-articles">
-                    <strong>Related Articles:</strong> ${question.articles.join(', ')}
+                    <strong>Related Articles:</strong> ${question.articles.map(a => escapeHtml(a)).join(', ')}
                 </div>
             ` : ''}
             <div class="quiz-options">
@@ -567,6 +587,10 @@ function displayQuizResults(container) {
                     ${quizState.questions.map((q, index) => {
                         const userAnswer = quizState.userAnswers[index];
                         const isCorrect = userAnswer === q.correct_index;
+                        const isValidAnswer = userAnswer !== null && userAnswer >= 0 && userAnswer < q.options.length;
+                        const userAnswerText = isValidAnswer
+                            ? `${String.fromCharCode(65 + userAnswer)}) ${escapeHtml(q.options[userAnswer])}`
+                            : 'No answer';
                         return `
                             <div class="question-summary ${isCorrect ? 'correct' : 'incorrect'}">
                                 <div class="question-summary-header">
@@ -575,7 +599,7 @@ function displayQuizResults(container) {
                                 </div>
                                 <p class="question-summary-text">${escapeHtml(q.question)}</p>
                                 <div class="question-summary-answers">
-                                    <p><strong>Your answer:</strong> ${String.fromCharCode(65 + userAnswer)}) ${escapeHtml(q.options[userAnswer])}</p>
+                                    <p><strong>Your answer:</strong> ${userAnswerText}</p>
                                     ${!isCorrect ? `<p><strong>Correct answer:</strong> ${String.fromCharCode(65 + q.correct_index)}) ${escapeHtml(q.options[q.correct_index])}</p>` : ''}
                                 </div>
                             </div>
