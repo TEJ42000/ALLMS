@@ -713,25 +713,47 @@ function initStudyListeners() {
 async function generateStudyGuide() {
     const topic = document.getElementById('study-topic').value;
     const resultDiv = document.getElementById('study-result');
-    
+
+    // Validate: need either topic or course_id
+    if (!topic && !COURSE_ID) {
+        resultDiv.innerHTML = '<p class="error">Please select a topic.</p>';
+        resultDiv.style.display = 'block';
+        return;
+    }
+
     showLoading();
-    
+
     try {
+        const requestBody = addCourseContext({});
+
+        // Add topic if selected, otherwise rely on course_id
+        if (topic) {
+            requestBody.topic = topic;
+        }
+
         const response = await fetch(`${API_BASE}/api/files-content/study-guide`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(addCourseContext({topic}))
+            body: JSON.stringify(requestBody)
         });
-        
-        if (!response.ok) throw new Error(`API error: ${response.status}`);
-        
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            const errorMessage = errorData.detail || `API error: ${response.status}`;
+            throw new Error(errorMessage);
+        }
+
         const data = await response.json();
         resultDiv.innerHTML = `<div class="study-guide">${formatMarkdown(data.guide)}</div>`;
         resultDiv.style.display = 'block';
-        
+
     } catch (error) {
         console.error('Error:', error);
-        resultDiv.innerHTML = '<p class="error">Error generating study guide. Please try again.</p>';
+        const errorMessage = error.message.includes('file_keys cannot be empty')
+            ? 'No course materials available. Please select a topic or contact your instructor to add materials to this course.'
+            : `Error generating study guide: ${error.message}`;
+        resultDiv.innerHTML = `<p class="error">${escapeHtml(errorMessage)}</p>`;
+        resultDiv.style.display = 'block';
     } finally {
         hideLoading();
     }
