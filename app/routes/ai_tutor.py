@@ -15,10 +15,12 @@ import logging
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
+from app.dependencies.auth import get_optional_user
+from app.models.auth_models import User
 from app.models.schemas import ChatRequest, ChatResponse, ErrorResponse
-from app.services.anthropic_client import get_ai_tutor_response
+from app.services.anthropic_client import get_ai_tutor_response, UserContext
 from app.services.gcp_service import get_firestore_client
 
 logger = logging.getLogger(__name__)
@@ -143,7 +145,8 @@ async def chat_with_tutor(
     course_id: Optional[str] = Query(
         None,
         description="Course ID for course-specific context (e.g., 'LLS-2025-2026')"
-    )
+    ),
+    user: Optional[User] = Depends(get_optional_user),
 ):
     """
     Send a message to the AI tutor and get a formatted response.
@@ -259,12 +262,22 @@ async def chat_with_tutor(
                 )
                 # Continue without materials
 
+        # Build user context for usage tracking
+        user_context = None
+        if user:
+            user_context = UserContext(
+                email=user.email,
+                user_id=user.user_id,
+                course_id=effective_course_id,
+            )
+
         # Get AI response
         response_content = await get_ai_tutor_response(
             message=request.message,
             context=enhanced_context,
             conversation_history=history,
-            materials_content=materials_content
+            materials_content=materials_content,
+            user_context=user_context,
         )
 
         logger.info("AI Tutor response generated - Length: %d", len(response_content))
