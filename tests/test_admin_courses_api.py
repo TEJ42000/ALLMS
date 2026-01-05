@@ -35,31 +35,39 @@ class TestListCourses:
 
     def test_list_courses_success(self, client, mock_course_service):
         """Should return list of courses."""
-        mock_course_service.get_all_courses.return_value = [
-            CourseSummary(
-                id="LLS-2025-2026",
-                name="Law and Legal Skills",
-                academicYear="2025-2026",
-                weekCount=6,
-                active=True
-            )
-        ]
+        # Mock returns tuple (items, total) for pagination
+        mock_course_service.get_all_courses.return_value = (
+            [
+                CourseSummary(
+                    id="LLS-2025-2026",
+                    name="Law and Legal Skills",
+                    academicYear="2025-2026",
+                    weekCount=6,
+                    active=True
+                )
+            ],
+            1  # total count
+        )
 
         response = client.get("/api/admin/courses")
 
         assert response.status_code == 200
         data = response.json()
-        assert len(data) == 1
-        assert data[0]["id"] == "LLS-2025-2026"
-        assert data[0]["name"] == "Law and Legal Skills"
+        assert data["total"] == 1
+        assert len(data["items"]) == 1
+        assert data["items"][0]["id"] == "LLS-2025-2026"
+        assert data["items"][0]["name"] == "Law and Legal Skills"
 
     def test_list_courses_include_inactive(self, client, mock_course_service):
         """Should pass include_inactive parameter."""
-        mock_course_service.get_all_courses.return_value = []
+        # Mock returns tuple (items, total) for pagination
+        mock_course_service.get_all_courses.return_value = ([], 0)
 
         client.get("/api/admin/courses?include_inactive=true")
 
-        mock_course_service.get_all_courses.assert_called_with(include_inactive=True)
+        mock_course_service.get_all_courses.assert_called_with(
+            include_inactive=True, limit=50, offset=0
+        )
 
 
 class TestGetCourse:

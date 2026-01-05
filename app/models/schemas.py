@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import List, Optional
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 
 
 # ============================================================================
@@ -26,8 +26,9 @@ class ChatRequest(BaseModel):
         default=None, description="Previous conversation"
     )
 
-    @validator('message')
-    def validate_message(cls, v):  # noqa: N805
+    @field_validator('message')
+    @classmethod
+    def validate_message(cls, v: str) -> str:
         """Validate that message is not empty."""
         if len(v.strip()) == 0:
             raise ValueError('Message cannot be empty')
@@ -57,15 +58,17 @@ class AssessmentRequest(BaseModel):
         ..., min_length=10, max_length=10000, description="Student's answer"
     )
 
-    @validator('answer')
-    def validate_answer(cls, v):  # noqa: N805
+    @field_validator('answer')
+    @classmethod
+    def validate_answer(cls, v: str) -> str:
         """Validate that answer has minimum length."""
         if len(v.strip()) < 10:
             raise ValueError('Answer must be at least 10 characters')
         return v.strip()
 
-    @validator('topic')
-    def validate_topic(cls, v):  # noqa: N805
+    @field_validator('topic')
+    @classmethod
+    def validate_topic(cls, v: str) -> str:
         """Validate that topic is one of the allowed values.
 
         Note: These are the default topics for backward compatibility.
