@@ -54,7 +54,13 @@ DEFAULT_TOPICS = [
 
 
 @router.post("/chat", response_model=ChatResponse)
-async def chat_with_tutor(request: ChatRequest):
+async def chat_with_tutor(
+    request: ChatRequest,
+    course_id: Optional[str] = Query(
+        None,
+        description="Course ID for course-specific context (e.g., 'LLS-2025-2026')"
+    )
+):
     """
     Send a message to the AI tutor and get a formatted response.
 
@@ -64,7 +70,11 @@ async def chat_with_tutor(request: ChatRequest):
     - Step-by-step explanations
     - Structured headers and lists
 
-    **Example Request:**
+    **Supports two modes:**
+    1. **Legacy mode**: Uses default topics (backward compatible)
+    2. **Course-aware mode**: Uses course-specific materials when `course_id` is provided
+
+    **Example Request (legacy mode):**
     ```json
     {
         "message": "Explain Art. 6:74 DCC",
@@ -76,19 +86,29 @@ async def chat_with_tutor(request: ChatRequest):
     }
     ```
 
+    **Example Request (course-aware mode):**
+    ```
+    POST /api/tutor/chat?course_id=LLS-2025-2026
+    {
+        "message": "Explain Art. 6:74 DCC",
+        "context": "Private Law"
+    }
+    ```
+
     **Example Response:**
     ```json
     {
         "content": "## Article 6:74 DCC - Damages\\n\\n...",
         "status": "success",
-        "timestamp": "2026-01-02T19:30:00"
+        "timestamp": "2026-01-02T19:30:00",
+        "course_id": "LLS-2025-2026"
     }
     ```
     """
     try:
         logger.info(
-            "AI Tutor request - Context: %s, Message length: %d",
-            request.context, len(request.message)
+            "AI Tutor request - Context: %s, Course: %s, Message length: %d",
+            request.context, course_id or "default", len(request.message)
         )
 
         # Convert Pydantic models to dict for service
@@ -99,19 +119,42 @@ async def chat_with_tutor(request: ChatRequest):
                 for msg in request.conversation_history
             ]
 
+        # Enhance context with course information if provided
+        enhanced_context = request.context
+        if course_id:
+            try:
+                from app.services.files_api_service import get_files_api_service
+                service = get_files_api_service()
+
+                # Get course topics to enhance context
+                topics = service.get_course_topics(course_id)
+                topic_names = [t["name"] for t in topics]
+
+                enhanced_context = f"{request.context} (Course: {course_id}, Topics: {', '.join(topic_names[:3])})"
+                logger.info("Enhanced context with course info: %s", course_id)
+            except Exception as e:
+                logger.warning("Could not enhance context for course %s: %s", course_id, str(e))
+                # Continue with original context
+
         # Get AI response
         response_content = await get_ai_tutor_response(
             message=request.message,
-            context=request.context,
+            context=enhanced_context,
             conversation_history=history
         )
 
         logger.info("AI Tutor response generated - Length: %d", len(response_content))
 
-        return ChatResponse(
-            content=response_content,
-            status="success"
-        )
+        response_data = {
+            "content": response_content,
+            "status": "success"
+        }
+
+        # Include course_id in response if provided (even if enhancement failed)
+        if course_id:
+            response_data["course_id"] = course_id
+
+        return ChatResponse(**response_data)
 
     except ValueError as e:
         logger.error("Validation error in AI Tutor: %s", str(e))
@@ -193,12 +236,59 @@ async def get_topics(
 
 
 @router.get("/examples")
-async def get_example_questions():
+async def get_example_questions(
+    course_id: Optional[str] = Query(
+        None,
+        description="Course ID to get course-specific examples"
+    )
+):
     """
     Get example questions to ask the AI tutor.
-    
-    Provides sample questions for each topic area.
+
+    Provides sample questions for each topic area. If course_id is provided,
+    generates examples based on course topics.
+
+    **Example Request (default):**
+    ```
+    GET /api/tutor/examples
+    ```
+
+    **Example Request (course-specific):**
+    ```
+    GET /api/tutor/examples?course_id=LLS-2025-2026
+    ```
     """
+    # If course_id provided, try to get course-specific examples
+    if course_id:
+        try:
+            from app.services.files_api_service import get_files_api_service
+            service = get_files_api_service()
+
+            topics = service.get_course_topics(course_id)
+
+            # Generate examples based on course topics
+            examples = []
+            for topic in topics[:5]:  # Limit to first 5 topics
+                examples.append({
+                    "topic": topic["name"],
+                    "week": topic.get("week"),
+                    "questions": [
+                        f"Explain the key concepts from {topic['name']}",
+                        f"What are the main legal principles in {topic['name']}?",
+                        f"Can you provide an example case for {topic['name']}?"
+                    ]
+                })
+
+            return {
+                "examples": examples,
+                "course_id": course_id,
+                "status": "success"
+            }
+        except Exception as e:
+            logger.warning("Could not get course-specific examples for course %s: %s", course_id, str(e))
+            # Fall through to default examples
+
+    # Default examples (backward compatibility)
     return {
         "examples": [
             {
@@ -246,6 +336,92 @@ async def get_example_questions():
     }
 
 
+@router.get("/course-info")
+async def get_course_info(
+    course_id: str = Query(..., description="Course ID (e.g., 'LLS-2025-2026')")
+):
+    """
+    Get comprehensive course information for AI tutor context.
+
+    Returns course details including topics, weeks, and available materials.
+    This helps the AI tutor provide course-specific assistance.
+
+    **Example Request:**
+    ```
+    GET /api/tutor/course-info?course_id=LLS-2025-2026
+    ```
+
+    **Example Response:**
+    ```json
+    {
+        "course_id": "LLS-2025-2026",
+        "name": "Law & Legal Skills",
+        "topics": [...],
+        "weeks": [...],
+        "materials_count": 45,
+        "status": "success"
+    }
+    ```
+    """
+    try:
+        from app.services.files_api_service import get_files_api_service
+        from app.services.course_service import get_course_service
+
+        files_service = get_files_api_service()
+        course_service = get_course_service()
+
+        # Get course details
+        course = course_service.get_course(course_id, include_weeks=True)
+        if not course:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Course not found: {course_id}"
+            )
+
+        # Get topics
+        topics = files_service.get_course_topics(course_id)
+
+        # Get week summaries
+        weeks = []
+        for week in course.weeks or []:
+            weeks.append({
+                "number": week.weekNumber,
+                "title": week.title,
+                "topics": week.topics or [],
+                "materials_count": len(week.materials) if week.materials else 0
+            })
+
+        # Count total materials
+        total_materials = sum(w["materials_count"] for w in weeks)
+
+        return {
+            "course_id": course_id,
+            "name": course.name,
+            "description": course.description,
+            "topics": topics,
+            "weeks": weeks,
+            "materials_count": total_materials,
+            "active": course.active,
+            "status": "success"
+        }
+
+    except HTTPException:
+        # Re-raise HTTP exceptions (like 404)
+        raise
+    except ValueError as e:
+        logger.warning("Course not found: %s", course_id)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        ) from e
+    except Exception as e:
+        logger.error("Error getting course info: %s", str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve course information"
+        ) from e
+
+
 # For testing during development
 if __name__ == "__main__":
     print("AI Tutor routes module loaded successfully")
@@ -253,3 +429,4 @@ if __name__ == "__main__":
     print("  POST /api/tutor/chat")
     print("  GET  /api/tutor/topics")
     print("  GET  /api/tutor/examples")
+    print("  GET  /api/tutor/course-info")
