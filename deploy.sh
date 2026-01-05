@@ -7,7 +7,36 @@ set -e  # Exit on error
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
 NC='\033[0m' # No Color
+
+# Parse command line arguments
+ENABLE_IAP=false
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --with-iap)
+            ENABLE_IAP=true
+            shift
+            ;;
+        --help|-h)
+            echo "Usage: ./deploy.sh [OPTIONS]"
+            echo ""
+            echo "Options:"
+            echo "  --with-iap    Enable IAP authentication (blocks public access)"
+            echo "  --help, -h    Show this help message"
+            echo ""
+            echo "Examples:"
+            echo "  ./deploy.sh              # Deploy with public access"
+            echo "  ./deploy.sh --with-iap   # Deploy with IAP authentication"
+            exit 0
+            ;;
+        *)
+            echo -e "${RED}Unknown option: $1${NC}"
+            echo "Use --help for usage information"
+            exit 1
+            ;;
+    esac
+done
 
 echo -e "${GREEN}========================================${NC}"
 echo -e "${GREEN}LLS Study Portal - Cloud Run Deployment${NC}"
@@ -38,9 +67,17 @@ echo -e "${YELLOW}Configuration:${NC}"
 echo "  Project ID: $PROJECT_ID"
 echo "  Region: $REGION"
 echo "  Service Name: $SERVICE_NAME"
+if [ "$ENABLE_IAP" = true ]; then
+    echo -e "  Authentication: ${BLUE}IAP Enabled${NC}"
+else
+    echo -e "  Authentication: ${YELLOW}Public Access${NC}"
+fi
 echo ""
 
 # Confirm deployment
+if [ "$ENABLE_IAP" = true ]; then
+    echo -e "${YELLOW}⚠️  IAP mode: Service will require Google login${NC}"
+fi
 read -p "Deploy to Google Cloud Run? (y/n) " -n 1 -r
 echo ""
 if [[ ! $REPLY =~ ^[Yy]$ ]]; then
@@ -69,18 +106,33 @@ else
 fi
 
 echo -e "${GREEN}Step 4: Deploying to Cloud Run...${NC}"
-gcloud run deploy $SERVICE_NAME \
+
+# Build deployment command
+DEPLOY_CMD="gcloud run deploy $SERVICE_NAME \
     --source . \
     --region $REGION \
     --platform managed \
-    --allow-unauthenticated \
     --set-secrets=ANTHROPIC_API_KEY=anthropic-api-key:latest \
     --memory 1Gi \
     --cpu 1 \
     --min-instances 0 \
     --max-instances 10 \
     --timeout 300 \
-    --port 8080
+    --port 8080"
+
+if [ "$ENABLE_IAP" = true ]; then
+    # IAP mode: require authentication, enable auth in app
+    DEPLOY_CMD="$DEPLOY_CMD \
+        --no-allow-unauthenticated \
+        --set-env-vars=AUTH_ENABLED=true,AUTH_DOMAIN=mgms.eu"
+else
+    # Public mode: allow unauthenticated, disable auth in app
+    DEPLOY_CMD="$DEPLOY_CMD \
+        --allow-unauthenticated \
+        --set-env-vars=AUTH_ENABLED=false"
+fi
+
+eval $DEPLOY_CMD
 
 echo ""
 echo -e "${GREEN}========================================${NC}"
@@ -93,7 +145,17 @@ echo ""
 echo -e "${GREEN}Service URL:${NC} $SERVICE_URL"
 echo ""
 echo -e "${YELLOW}Next steps:${NC}"
-echo "  1. Visit your app at: $SERVICE_URL"
-echo "  2. Test the API docs: $SERVICE_URL/api/docs"
-echo "  3. Monitor logs: gcloud run services logs read $SERVICE_NAME --region $REGION"
+if [ "$ENABLE_IAP" = true ]; then
+    echo "  1. Run: ./scripts/setup-iap.sh"
+    echo "  2. Configure OAuth consent screen (see docs/IAP-SETUP.md)"
+    echo "  3. Access via Load Balancer URL (not Cloud Run URL directly)"
+else
+    echo "  1. Visit your app at: $SERVICE_URL"
+    echo "  2. Test the API docs: $SERVICE_URL/api/docs"
+fi
+echo "  📊 Monitor logs: gcloud run services logs read $SERVICE_NAME --region $REGION"
 echo ""
+if [ "$ENABLE_IAP" = true ]; then
+    echo -e "${BLUE}📖 For IAP setup, see: docs/IAP-SETUP.md${NC}"
+    echo ""
+fi
