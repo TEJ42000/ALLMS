@@ -301,6 +301,64 @@
                 </div>
             </div>
 
+            <!-- Anthropic Cross-Reference Section -->
+            <div class="chart-card" id="cross-reference-section" style="display: none;">
+                <h3>🔄 Anthropic Cross-Reference</h3>
+                <p style="color: #888; font-size: 0.875rem; margin-bottom: 1rem;">
+                    Compare internal tracking with Anthropic's actual billing data
+                </p>
+
+                <!-- Cross-Reference KPIs -->
+                <div class="kpi-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); margin-bottom: 1.5rem;">
+                    <div class="kpi-card">
+                        <div class="kpi-value" id="xref-internal-cost">-</div>
+                        <div class="kpi-label">Internal Cost</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-value" id="xref-anthropic-cost">-</div>
+                        <div class="kpi-label">Anthropic Cost</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-value" id="xref-variance">-</div>
+                        <div class="kpi-label">Variance</div>
+                    </div>
+                    <div class="kpi-card" id="xref-status-card">
+                        <div class="kpi-value" id="xref-status">-</div>
+                        <div class="kpi-label">Match Status</div>
+                    </div>
+                </div>
+
+                <!-- Token Comparison Table -->
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 0.875rem;">
+                        <thead>
+                            <tr style="border-bottom: 1px solid #333;">
+                                <th style="text-align: left; padding: 0.75rem; color: #888;">Token Type</th>
+                                <th style="text-align: right; padding: 0.75rem; color: #888;">Internal</th>
+                                <th style="text-align: right; padding: 0.75rem; color: #888;">Anthropic</th>
+                                <th style="text-align: right; padding: 0.75rem; color: #888;">Variance</th>
+                                <th style="text-align: right; padding: 0.75rem; color: #888;">Variance %</th>
+                            </tr>
+                        </thead>
+                        <tbody id="xref-token-table">
+                            <tr>
+                                <td colspan="5" style="text-align: center; padding: 2rem; color: #666;">
+                                    Loading...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Error Message -->
+                <div id="xref-error" style="display: none; padding: 1rem; background: rgba(255, 107, 107, 0.1); border: 1px solid #ff6b6b; border-radius: 8px; margin-top: 1rem;">
+                    <strong style="color: #ff6b6b;">⚠️ Cross-Reference Unavailable</strong>
+                    <p style="margin: 0.5rem 0 0 0; color: #ccc; font-size: 0.875rem;" id="xref-error-message">
+                        Anthropic Admin API not configured. Please add 'anthropic-admin-api-key' to Secret Manager.
+                    </p>
+                </div>
+            </div>
+
             <!-- Data Grid -->
             <div class="chart-card">
                 <div class="grid-header">
