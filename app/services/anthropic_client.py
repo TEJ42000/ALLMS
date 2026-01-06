@@ -1,18 +1,56 @@
 """Anthropic API Client Service for the LLS Study Portal."""
 
 import logging
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from anthropic import AsyncAnthropic
 
 from app.models.usage_models import UserContext
 from app.services.gcp_service import get_anthropic_api_key
-from app.services.usage_tracking_service import track_llm_usage_from_response
+from app.services.usage_tracking_service import get_usage_tracking_service
 
 logger = logging.getLogger(__name__)
 
 # Default model
 DEFAULT_MODEL = "claude-sonnet-4-20250514"
+
+
+async def _track_llm_usage(
+    response: Any,
+    user_context: Optional[UserContext],
+    model: str,
+    operation_type: str,
+    request_metadata: Optional[Dict[str, Any]] = None,
+) -> None:
+    """Helper to extract usage from response and record it.
+
+    Args:
+        response: Anthropic API response object
+        user_context: User context for tracking (if None, no tracking)
+        model: Model used for the request
+        operation_type: Type of operation ('tutor', 'assessment', etc.)
+        request_metadata: Optional additional context to store
+    """
+    if not user_context:
+        return
+
+    try:
+        usage = response.usage
+        await get_usage_tracking_service().record_usage(
+            user_email=user_context.email,
+            user_id=user_context.user_id,
+            model=model,
+            operation_type=operation_type,
+            input_tokens=getattr(usage, 'input_tokens', 0) or 0,
+            output_tokens=getattr(usage, 'output_tokens', 0) or 0,
+            cache_creation_tokens=getattr(usage, 'cache_creation_input_tokens', 0) or 0,
+            cache_read_tokens=getattr(usage, 'cache_read_input_tokens', 0) or 0,
+            course_id=user_context.course_id,
+            request_metadata=request_metadata,
+        )
+    except Exception as e:
+        # Don't fail the request if usage tracking fails
+        logger.warning("Failed to track LLM usage: %s", e)
 
 # Initialize Anthropic client using ADC-based secret retrieval (with .env fallback)
 client = AsyncAnthropic(api_key=get_anthropic_api_key())
@@ -230,12 +268,12 @@ async def get_ai_tutor_response(
         # Extract text from response
         response_text = response.content[0].text
 
-        # Track usage if user context provided
-        await track_llm_usage_from_response(
+        # Track usage using helper function
+        await _track_llm_usage(
             response=response,
             user_context=user_context,
-            operation_type="tutor",
             model=DEFAULT_MODEL,
+            operation_type="tutor",
             request_metadata={"context": context},
         )
 
@@ -294,12 +332,12 @@ async def get_assessment_response(
         # Extract text from response
         response_text = response.content[0].text
 
-        # Track usage if user context provided
-        await track_llm_usage_from_response(
+        # Track usage using helper function
+        await _track_llm_usage(
             response=response,
             user_context=user_context,
-            operation_type="assessment",
             model=DEFAULT_MODEL,
+            operation_type="assessment",
             request_metadata={"topic": topic},
         )
 
@@ -345,12 +383,12 @@ async def get_simple_response(
 
         response_text = response.content[0].text
 
-        # Track usage if user context provided
-        await track_llm_usage_from_response(
+        # Track usage using helper function
+        await _track_llm_usage(
             response=response,
             user_context=user_context,
-            operation_type=operation_type,
             model=DEFAULT_MODEL,
+            operation_type=operation_type,
         )
 
         return response_text

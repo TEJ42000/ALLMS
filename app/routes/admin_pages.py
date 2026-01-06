@@ -129,3 +129,33 @@ async def admin_users(
             "auth_enabled": auth_config.auth_enabled
         }
     )
+
+
+@router.get("/usage", response_class=HTMLResponse)
+async def admin_usage_dashboard(
+    request: Request,
+    user: User = Depends(require_mgms_domain)
+):
+    """
+    LLM Usage Analytics Dashboard.
+
+    Requires @mgms.eu domain authentication.
+
+    Provides:
+    - KPI summary cards (total requests, cost, users)
+    - Cost over time chart with granularity options
+    - Usage breakdown by operation type
+    - Top users by cost
+    - Filterable data grid with export
+    """
+    auth_config = get_auth_config()
+    return templates.TemplateResponse(
+        "admin/usage_dashboard.html",
+        {
+            "request": request,
+            "title": "Usage Analytics",
+            "version": "2.0.0",
+            "user": user,
+            "auth_enabled": auth_config.auth_enabled
+        }
+    )
