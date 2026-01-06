@@ -16,7 +16,7 @@ import uuid
 from datetime import datetime, timezone, timedelta
 from typing import Optional, List, Dict, Any
 
-from google.cloud.firestore_v1 import FieldFilter
+from google.cloud.firestore_v1 import FieldFilter, Increment
 
 from app.models.gamification_models import (
     UserStats,
@@ -95,7 +95,7 @@ class GamificationService:
     # User Stats Methods
     # =========================================================================
 
-    async def get_user_stats(self, user_id: str) -> Optional[UserStats]:
+    def get_user_stats(self, user_id: str) -> Optional[UserStats]:
         """Get user gamification stats.
 
         Args:
@@ -122,7 +122,7 @@ class GamificationService:
             logger.error(f"Error getting user stats for {user_id}: {e}")
             return None
 
-    async def create_user_stats(
+    def create_user_stats(
         self,
         user_id: str,
         user_email: str,
@@ -159,7 +159,7 @@ class GamificationService:
             logger.error(f"Error creating user stats for {user_id}: {e}")
             return None
 
-    async def get_or_create_user_stats(
+    def get_or_create_user_stats(
         self,
         user_id: str,
         user_email: str,
@@ -175,12 +175,12 @@ class GamificationService:
         Returns:
             UserStats object or None on error
         """
-        stats = await self.get_user_stats(user_id)
+        stats = self.get_user_stats(user_id)
         if stats is None:
-            stats = await self.create_user_stats(user_id, user_email, course_id)
+            stats = self.create_user_stats(user_id, user_email, course_id)
         return stats
 
-    async def update_user_stats(self, user_id: str, updates: Dict[str, Any]) -> bool:
+    def update_user_stats(self, user_id: str, updates: Dict[str, Any]) -> bool:
         """Update user stats.
 
         Args:
@@ -297,7 +297,7 @@ class GamificationService:
     # Activity Logging Methods
     # =========================================================================
 
-    async def log_activity(
+    def log_activity(
         self,
         user_id: str,
         user_email: str,
@@ -307,6 +307,8 @@ class GamificationService:
         session_id: Optional[str] = None
     ) -> Optional[ActivityLogResponse]:
         """Log a user activity and award XP.
+
+        Uses Firestore atomic operations to prevent race conditions.
 
         Args:
             user_id: User's IAP user ID
@@ -324,15 +326,46 @@ class GamificationService:
             return None
 
         try:
-            # Get or create user stats
-            stats = await self.get_or_create_user_stats(user_id, user_email, course_id)
+            # Get or create user stats (for reading current values)
+            stats = self.get_or_create_user_stats(user_id, user_email, course_id)
             if not stats:
                 return None
 
             # Calculate XP
             xp_awarded = self.calculate_xp_for_activity(activity_type, activity_data)
 
-            # Calculate new totals
+            if xp_awarded == 0:
+                logger.info(f"No XP awarded for {activity_type} (did not meet criteria)")
+                # Still log the activity but don't update stats
+                activity_id = str(uuid.uuid4())
+                activity = UserActivity(
+                    id=activity_id,
+                    user_id=user_id,
+                    user_email=user_email,
+                    course_id=course_id,
+                    activity_type=activity_type,
+                    activity_data=activity_data,
+                    session_id=session_id,
+                    xp_awarded=0,
+                    streak_maintained=True,
+                    badges_earned=[],
+                    metadata={"time_of_day": self._get_time_of_day()}
+                )
+                activity_ref = self.db.collection(USER_ACTIVITIES_COLLECTION).document(activity_id)
+                activity_ref.set(activity.model_dump(mode='json'))
+
+                return ActivityLogResponse(
+                    activity_id=activity_id,
+                    xp_awarded=0,
+                    new_total_xp=stats.total_xp,
+                    level_up=False,
+                    new_level=None,
+                    new_level_title=None,
+                    streak_maintained=True,
+                    badges_earned=[]
+                )
+
+            # Calculate new totals (for response)
             new_total_xp = stats.total_xp + xp_awarded
             old_level = stats.current_level
             new_level, new_level_title, xp_to_next = self.calculate_level_from_xp(new_total_xp)
@@ -340,7 +373,7 @@ class GamificationService:
 
             # Check for streak freeze award (every 500 XP)
             old_freeze_count = stats.streak.freezes_available
-            new_freeze_count = old_freeze_count + (new_total_xp // STREAK_FREEZE_XP_REQUIREMENT) - (stats.total_xp // STREAK_FREEZE_XP_REQUIREMENT)
+            freezes_to_add = (new_total_xp // STREAK_FREEZE_XP_REQUIREMENT) - (stats.total_xp // STREAK_FREEZE_XP_REQUIREMENT)
 
             # Create activity record
             activity_id = str(uuid.uuid4())
@@ -364,29 +397,36 @@ class GamificationService:
             activity_ref = self.db.collection(USER_ACTIVITIES_COLLECTION).document(activity_id)
             activity_ref.set(activity.model_dump(mode='json'))
 
-            # Update user stats
+            # Use atomic increments to prevent race conditions
+            doc_ref = self.db.collection(USER_STATS_COLLECTION).document(user_id)
             updates = {
-                "total_xp": new_total_xp,
+                "total_xp": Increment(xp_awarded),
                 "current_level": new_level,
                 "level_title": new_level_title,
                 "xp_to_next_level": xp_to_next,
                 "last_active": datetime.now(timezone.utc),
-                f"streak.freezes_available": new_freeze_count,
+                "updated_at": datetime.now(timezone.utc),
             }
 
-            # Update activity counters
-            if activity_type == "quiz_completed":
-                updates["activities.quizzes_completed"] = stats.activities.quizzes_completed + 1
-                if activity_data.get("score", 0) / activity_data.get("total_questions", 1) >= 0.6:
-                    updates["activities.quizzes_passed"] = stats.activities.quizzes_passed + 1
-            elif activity_type == "flashcard_set_completed":
-                updates["activities.flashcards_reviewed"] = stats.activities.flashcards_reviewed + activity_data.get("total_count", 0)
-            elif activity_type == "study_guide_completed":
-                updates["activities.guides_completed"] = stats.activities.guides_completed + 1
-            elif activity_type == "evaluation_completed":
-                updates["activities.evaluations_submitted"] = stats.activities.evaluations_submitted + 1
+            # Add freeze increment if earned
+            if freezes_to_add > 0:
+                updates["streak.freezes_available"] = Increment(freezes_to_add)
 
-            await self.update_user_stats(user_id, updates)
+            # Update activity counters with atomic increments
+            if activity_type == "quiz_completed":
+                updates["activities.quizzes_completed"] = Increment(1)
+                if activity_data.get("score", 0) / activity_data.get("total_questions", 1) >= 0.6:
+                    updates["activities.quizzes_passed"] = Increment(1)
+            elif activity_type == "flashcard_set_completed":
+                total_count = activity_data.get("total_count", 0)
+                if total_count > 0:
+                    updates["activities.flashcards_reviewed"] = Increment(total_count)
+            elif activity_type == "study_guide_completed":
+                updates["activities.guides_completed"] = Increment(1)
+            elif activity_type == "evaluation_completed":
+                updates["activities.evaluations_submitted"] = Increment(1)
+
+            doc_ref.update(updates)
 
             logger.info(f"Logged activity {activity_type} for {user_id}, awarded {xp_awarded} XP")
 
@@ -417,25 +457,27 @@ class GamificationService:
         else:
             return "night"
 
-    async def get_user_activities(
+    def get_user_activities(
         self,
         user_id: str,
         limit: int = DEFAULT_QUERY_LIMIT,
-        activity_type: Optional[str] = None
-    ) -> List[UserActivity]:
-        """Get user's recent activities.
+        activity_type: Optional[str] = None,
+        start_after_id: Optional[str] = None
+    ) -> tuple[List[UserActivity], Optional[str]]:
+        """Get user's recent activities with pagination support.
 
         Args:
             user_id: User's IAP user ID
             limit: Maximum number of activities to return
             activity_type: Optional filter by activity type
+            start_after_id: Optional activity ID to start after (for pagination)
 
         Returns:
-            List of UserActivity objects
+            Tuple of (List of UserActivity objects, next_cursor for pagination)
         """
         if not self.db:
             logger.warning("Firestore unavailable")
-            return []
+            return [], None
 
         try:
             query = self.db.collection(USER_ACTIVITIES_COLLECTION).where(
@@ -445,7 +487,13 @@ class GamificationService:
             if activity_type:
                 query = query.where(filter=FieldFilter("activity_type", "==", activity_type))
 
-            docs = query.stream()
+            # Add pagination support
+            if start_after_id:
+                start_doc = self.db.collection(USER_ACTIVITIES_COLLECTION).document(start_after_id).get()
+                if start_doc.exists:
+                    query = query.start_after(start_doc)
+
+            docs = list(query.stream())
             activities = []
             for doc in docs:
                 try:
@@ -453,17 +501,19 @@ class GamificationService:
                 except Exception as e:
                     logger.warning(f"Error parsing activity {doc.id}: {e}")
 
-            return activities
+            # Return next cursor for pagination
+            next_cursor = docs[-1].id if docs and len(docs) == limit else None
+            return activities, next_cursor
 
         except Exception as e:
             logger.error(f"Error getting activities for {user_id}: {e}")
-            return []
+            return [], None
 
     # =========================================================================
     # Session Management Methods
     # =========================================================================
 
-    async def start_session(
+    def start_session(
         self,
         user_id: str,
         course_id: Optional[str] = None
@@ -506,13 +556,13 @@ class GamificationService:
             logger.error(f"Error starting session for {user_id}: {e}")
             return None
 
-    async def update_session_heartbeat(
+    def update_session_heartbeat(
         self,
         session_id: str,
         active_seconds: int,
         current_page: str
     ) -> bool:
-        """Update session with heartbeat.
+        """Update session with heartbeat using atomic increment.
 
         Args:
             session_id: Session ID
@@ -535,7 +585,6 @@ class GamificationService:
                 return False
 
             session_data = session_doc.to_dict()
-            current_active = session_data.get("active_time_seconds", 0)
             page_views = session_data.get("page_views", [])
 
             # Add page view
@@ -546,9 +595,9 @@ class GamificationService:
             )
             page_views.append(page_view.model_dump(mode='json'))
 
-            # Update session
+            # Update session with atomic increment for active_time_seconds
             updates = {
-                "active_time_seconds": current_active + active_seconds,
+                "active_time_seconds": Increment(active_seconds),
                 "page_views": page_views
             }
             session_ref.update(updates)
@@ -559,7 +608,7 @@ class GamificationService:
             logger.error(f"Error updating session {session_id}: {e}")
             return False
 
-    async def end_session(self, session_id: str) -> bool:
+    def end_session(self, session_id: str) -> bool:
         """End a tracking session.
 
         Args:

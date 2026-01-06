@@ -177,6 +177,8 @@ class ActivityTracker {
     async sendHeartbeat() {
         if (!this.sessionId || this.activeSeconds === 0) return;
 
+        const secondsToSend = this.activeSeconds;
+
         try {
             const response = await fetch('/api/gamification/session/heartbeat', {
                 method: 'POST',
@@ -185,19 +187,22 @@ class ActivityTracker {
                 },
                 body: JSON.stringify({
                     session_id: this.sessionId,
-                    active_seconds: this.activeSeconds,
+                    active_seconds: secondsToSend,
                     current_page: this.currentPage
                 })
             });
 
             if (response.ok) {
-                console.log(`[ActivityTracker] Heartbeat sent: ${this.activeSeconds}s active`);
-                this.activeSeconds = 0; // Reset counter after successful heartbeat
+                console.log(`[ActivityTracker] Heartbeat sent: ${secondsToSend}s active`);
+                // Only subtract what was successfully sent
+                this.activeSeconds -= secondsToSend;
             } else {
-                console.error('[ActivityTracker] Failed to send heartbeat:', response.status);
+                console.error('[ActivityTracker] Failed to send heartbeat, will retry:', response.status);
+                // Keep accumulating for next attempt
             }
         } catch (error) {
-            console.error('[ActivityTracker] Error sending heartbeat:', error);
+            console.error('[ActivityTracker] Error sending heartbeat, will retry:', error);
+            // Keep accumulating for next attempt
         }
     }
 
@@ -217,12 +222,35 @@ class ActivityTracker {
 
         try {
             // Use sendBeacon for reliable delivery on page unload
-            const data = new URLSearchParams({ session_id: this.sessionId });
-            navigator.sendBeacon('/api/gamification/session/end', data);
-            console.log('[ActivityTracker] Session ended:', this.sessionId);
+            // Send as query parameter since sendBeacon doesn't support JSON body well
+            const url = `/api/gamification/session/end?session_id=${encodeURIComponent(this.sessionId)}`;
+            const success = navigator.sendBeacon(url, new Blob());
+            if (success) {
+                console.log('[ActivityTracker] Session ended:', this.sessionId);
+            } else {
+                console.warn('[ActivityTracker] sendBeacon failed, session may not have ended');
+            }
         } catch (error) {
             console.error('[ActivityTracker] Error ending session:', error);
         }
+    }
+
+    /**
+     * Cleanup method to remove event listeners and timers
+     */
+    destroy() {
+        console.log('[ActivityTracker] Destroying tracker');
+
+        // End session
+        this.endSession();
+
+        // Clear all timers
+        if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
+        if (this.idleCheckTimer) clearInterval(this.idleCheckTimer);
+        if (this.activeTimer) clearInterval(this.activeTimer);
+
+        // Note: Event listeners are on document, so they'll be cleaned up when page unloads
+        // If we need to recreate the tracker, we should store listener references
     }
 
     /**

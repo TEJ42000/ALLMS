@@ -32,24 +32,24 @@ router = APIRouter(prefix="/api/gamification", tags=["gamification"])
 # =============================================================================
 
 @router.get("/stats", response_model=UserStatsResponse)
-async def get_user_stats(
+def get_user_stats(
     user: User = Depends(get_current_user)
 ):
     """Get current user's gamification stats.
-    
+
     Returns:
         User's gamification statistics including XP, level, streak, and activities
     """
     try:
         service = get_gamification_service()
-        stats = await service.get_or_create_user_stats(
+        stats = service.get_or_create_user_stats(
             user_id=user.user_id,
             user_email=user.email
         )
-        
+
         if not stats:
             raise HTTPException(500, detail="Failed to get user stats")
-        
+
         return UserStatsResponse(
             total_xp=stats.total_xp,
             current_level=stats.current_level,
@@ -75,7 +75,7 @@ async def get_user_stats(
                 "double_xp_earned": stats.week7_quest.double_xp_earned,
             } if stats.week7_quest.active else None
         )
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -88,33 +88,33 @@ async def get_user_stats(
 # =============================================================================
 
 @router.post("/activity", response_model=ActivityLogResponse)
-async def log_activity(
+def log_activity(
     request: ActivityLogRequest,
     user: User = Depends(get_current_user)
 ):
     """Log a user activity and award XP.
-    
+
     Args:
         request: Activity log request with type and data
-        
+
     Returns:
         Activity log response with XP awarded and level info
     """
     try:
         service = get_gamification_service()
-        response = await service.log_activity(
+        response = service.log_activity(
             user_id=user.user_id,
             user_email=user.email,
             activity_type=request.activity_type,
             activity_data=request.activity_data,
             course_id=request.course_id
         )
-        
+
         if not response:
             raise HTTPException(500, detail="Failed to log activity")
-        
+
         return response
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -122,31 +122,37 @@ async def log_activity(
         raise HTTPException(500, detail=str(e)) from e
 
 
-@router.get("/activities", response_model=list[UserActivity])
-async def get_activities(
+@router.get("/activities")
+def get_activities(
     limit: int = Query(50, ge=1, le=100, description="Number of activities to return"),
     activity_type: Optional[str] = Query(None, description="Filter by activity type"),
+    start_after: Optional[str] = Query(None, description="Activity ID to start after (pagination)"),
     user: User = Depends(get_current_user)
 ):
-    """Get user's recent activities.
-    
+    """Get user's recent activities with pagination support.
+
     Args:
         limit: Maximum number of activities to return
         activity_type: Optional filter by activity type
-        
+        start_after: Optional activity ID for pagination
+
     Returns:
-        List of user activities
+        Dict with activities list and next_cursor for pagination
     """
     try:
         service = get_gamification_service()
-        activities = await service.get_user_activities(
+        activities, next_cursor = service.get_user_activities(
             user_id=user.user_id,
             limit=limit,
-            activity_type=activity_type
+            activity_type=activity_type,
+            start_after_id=start_after
         )
-        
-        return activities
-        
+
+        return {
+            "activities": [activity.model_dump(mode='json') for activity in activities],
+            "next_cursor": next_cursor
+        }
+
     except Exception as e:
         logger.error(f"Error getting activities: {e}")
         raise HTTPException(500, detail=str(e)) from e
@@ -157,7 +163,7 @@ async def get_activities(
 # =============================================================================
 
 @router.post("/session/start", response_model=SessionStartResponse)
-async def start_session(
+def start_session(
     course_id: Optional[str] = None,
     user: User = Depends(get_current_user)
 ):
@@ -171,7 +177,7 @@ async def start_session(
     """
     try:
         service = get_gamification_service()
-        response = await service.start_session(
+        response = service.start_session(
             user_id=user.user_id,
             course_id=course_id
         )
@@ -189,7 +195,7 @@ async def start_session(
 
 
 @router.post("/session/heartbeat")
-async def session_heartbeat(
+def session_heartbeat(
     request: SessionHeartbeatRequest,
     user: User = Depends(get_current_user)
 ):
@@ -203,7 +209,7 @@ async def session_heartbeat(
     """
     try:
         service = get_gamification_service()
-        success = await service.update_session_heartbeat(
+        success = service.update_session_heartbeat(
             session_id=request.session_id,
             active_seconds=request.active_seconds,
             current_page=request.current_page
@@ -222,21 +228,21 @@ async def session_heartbeat(
 
 
 @router.post("/session/end")
-async def end_session(
-    session_id: str,
+def end_session(
+    session_id: str = Query(..., description="Session ID to end"),
     user: User = Depends(get_current_user)
 ):
     """End a tracking session.
 
     Args:
-        session_id: Session ID to end
+        session_id: Session ID to end (query parameter for sendBeacon compatibility)
 
     Returns:
         Success status
     """
     try:
         service = get_gamification_service()
-        success = await service.end_session(session_id)
+        success = service.end_session(session_id)
 
         if not success:
             raise HTTPException(500, detail="Failed to end session")
