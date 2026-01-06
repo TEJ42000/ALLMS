@@ -424,11 +424,13 @@ class GamificationUI {
         try {
             // Fetch user's earned badges
             const earnedResponse = await fetch('/api/gamification/badges');
-            const earnedBadges = earnedResponse.ok ? await earnedResponse.json() : [];
+            const earnedData = earnedResponse.ok ? await earnedResponse.json() : { badges: [] };
+            const earnedBadges = earnedData.badges || [];
 
             // Fetch all badge definitions
             const defsResponse = await fetch('/api/gamification/badges/definitions');
-            const allBadges = defsResponse.ok ? await defsResponse.json() : [];
+            const defsData = defsResponse.ok ? await defsResponse.json() : { badge_definitions: [] };
+            const allBadges = defsData.badge_definitions || [];
 
             console.log('[GamificationUI] Badges loaded:', { earned: earnedBadges.length, total: allBadges.length });
 

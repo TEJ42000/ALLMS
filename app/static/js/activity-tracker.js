@@ -374,7 +374,8 @@ class ActivityTracker {
         try {
             const response = await fetch('/api/gamification/badges/definitions');
             if (response.ok) {
-                const badges = await response.json();
+                const data = await response.json();
+                const badges = data.badge_definitions || [];
                 const badge = badges.find(b => b.badge_id === badgeId);
 
                 if (badge) {

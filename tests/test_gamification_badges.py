@@ -194,7 +194,8 @@ def test_get_badge_definitions_success(gamification_service, mock_firestore, sam
         mock_doc.to_dict.return_value = badge_def.model_dump(mode='json')
         mock_docs.append(mock_doc)
 
-    mock_firestore.collection.return_value.where.return_value.stream.return_value = mock_docs
+    # No filter anymore - just stream all badges
+    mock_firestore.collection.return_value.stream.return_value = mock_docs
 
     # Execute
     result = gamification_service.get_badge_definitions()
@@ -464,10 +465,17 @@ def test_badge_tier_upgrade_bronze_to_silver(gamification_service, mock_firestor
 
     # Verify
     assert "combo_king" in earned_badges  # Badge returned because tier upgraded
-    mock_user_badge_ref.update.assert_called_once()
-    update_call = mock_user_badge_ref.update.call_args[0][0]
-    assert update_call["times_earned"] == 5
-    assert update_call["tier"] == "silver"
+    # Now we have 2 update calls: one for increment, one for tier
+    assert mock_user_badge_ref.update.call_count == 2
+
+    # First call: atomic increment
+    first_call = mock_user_badge_ref.update.call_args_list[0][0][0]
+    assert "times_earned" in first_call
+    assert "last_earned_at" in first_call
+
+    # Second call: tier upgrade
+    second_call = mock_user_badge_ref.update.call_args_list[1][0][0]
+    assert second_call["tier"] == "silver"
 
 
 def test_badge_no_tier_upgrade(gamification_service, mock_firestore):
@@ -508,10 +516,14 @@ def test_badge_no_tier_upgrade(gamification_service, mock_firestore):
 
     # Verify
     assert "combo_king" not in earned_badges  # Not returned because no tier upgrade
+    # Only one update call (atomic increment, no tier change)
     mock_user_badge_ref.update.assert_called_once()
     update_call = mock_user_badge_ref.update.call_args[0][0]
-    assert update_call["times_earned"] == 3
-    assert update_call["tier"] == "bronze"
+    # Check for Increment object instead of integer
+    assert "times_earned" in update_call
+    assert "last_earned_at" in update_call
+    # Tier should not be in the update call since it didn't change
+    assert "tier" not in update_call
 
 
 # =============================================================================

@@ -1011,9 +1011,8 @@ class GamificationService:
             return []
 
         try:
-            docs = self.db.collection(BADGE_DEFINITIONS_COLLECTION).where(
-                filter=FieldFilter("active", "==", True)
-            ).stream()
+            # Get all badge definitions (no filter - all badges are active)
+            docs = self.db.collection(BADGE_DEFINITIONS_COLLECTION).stream()
 
             badges = []
             for doc in docs:
@@ -1183,30 +1182,34 @@ class GamificationService:
             user_badge_doc = user_badge_ref.get()
 
             if user_badge_doc.exists:
-                # Increment times_earned and check for tier upgrade
+                # Use atomic increment to prevent race conditions
                 user_badge_data = user_badge_doc.to_dict()
-                times_earned = user_badge_data.get("times_earned", 0) + 1
                 current_tier = user_badge_data.get("tier", "bronze")
+                current_times_earned = user_badge_data.get("times_earned", 0)
+
+                # Atomically increment times_earned
+                user_badge_ref.update({
+                    "times_earned": Increment(1),
+                    "last_earned_at": datetime.now(timezone.utc)
+                })
+
+                # Calculate new times_earned for tier check
+                new_times_earned = current_times_earned + 1
 
                 # Check for tier upgrade
                 new_tier = current_tier
                 for tier in ["gold", "silver", "bronze"]:  # Check from highest to lowest
-                    if times_earned >= badge_def.tier_requirements.get(tier, 999):
+                    if new_times_earned >= badge_def.tier_requirements.get(tier, 999):
                         new_tier = tier
                         break
 
-                # Update badge
-                user_badge_ref.update({
-                    "times_earned": times_earned,
-                    "tier": new_tier
-                })
-
-                # Return badge_id only if tier upgraded
+                # Update tier if upgraded
                 if new_tier != current_tier:
-                    logger.info(f"Badge {badge_id} upgraded to {new_tier} for {user_id}")
+                    user_badge_ref.update({"tier": new_tier})
+                    logger.info(f"Badge {badge_id} upgraded to {new_tier} for {user_id} (earned {new_times_earned} times)")
                     return badge_id
                 else:
-                    logger.debug(f"Badge {badge_id} times_earned incremented for {user_id}")
+                    logger.debug(f"Badge {badge_id} times_earned incremented to {new_times_earned} for {user_id}")
                     return None
             else:
                 # Create new badge

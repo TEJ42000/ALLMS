@@ -5,6 +5,7 @@ sessions, and badges.
 """
 
 import logging
+import os
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -409,9 +410,21 @@ def seed_badges(
 
     Returns:
         Success status
+
+    Raises:
+        HTTPException 403: If user is not an admin
     """
-    # TODO: Add admin role check
-    # For now, any authenticated user can seed (will add proper admin check in Phase 7)
+    # Check if user is admin
+    # Admin users are defined in ADMIN_EMAILS environment variable (comma-separated)
+    admin_emails = os.getenv("ADMIN_EMAILS", "").split(",")
+    admin_emails = [email.strip() for email in admin_emails if email.strip()]
+
+    if user.email not in admin_emails:
+        logger.warning(f"Non-admin user {user.email} attempted to seed badges")
+        raise HTTPException(
+            status_code=403,
+            detail="Admin access required. This endpoint is restricted to administrators."
+        )
 
     try:
         service = get_gamification_service()
@@ -420,6 +433,7 @@ def seed_badges(
         if not success:
             raise HTTPException(500, detail="Failed to seed badge definitions")
 
+        logger.info(f"Badge definitions seeded successfully by admin {user.email}")
         return {"status": "ok", "message": "Badge definitions seeded successfully"}
 
     except HTTPException:
