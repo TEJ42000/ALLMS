@@ -1,7 +1,7 @@
 """Anthropic API Client Service for the LLS Study Portal."""
 
 import logging
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from anthropic import AsyncAnthropic
 
@@ -13,6 +13,44 @@ logger = logging.getLogger(__name__)
 
 # Default model
 DEFAULT_MODEL = "claude-sonnet-4-20250514"
+
+
+async def _track_llm_usage(
+    response: Any,
+    user_context: Optional[UserContext],
+    model: str,
+    operation_type: str,
+    request_metadata: Optional[Dict[str, Any]] = None,
+) -> None:
+    """Helper to extract usage from response and record it.
+
+    Args:
+        response: Anthropic API response object
+        user_context: User context for tracking (if None, no tracking)
+        model: Model used for the request
+        operation_type: Type of operation ('tutor', 'assessment', etc.)
+        request_metadata: Optional additional context to store
+    """
+    if not user_context:
+        return
+
+    try:
+        usage = response.usage
+        await get_usage_tracking_service().record_usage(
+            user_email=user_context.email,
+            user_id=user_context.user_id,
+            model=model,
+            operation_type=operation_type,
+            input_tokens=getattr(usage, 'input_tokens', 0) or 0,
+            output_tokens=getattr(usage, 'output_tokens', 0) or 0,
+            cache_creation_tokens=getattr(usage, 'cache_creation_input_tokens', 0) or 0,
+            cache_read_tokens=getattr(usage, 'cache_read_input_tokens', 0) or 0,
+            course_id=user_context.course_id,
+            request_metadata=request_metadata,
+        )
+    except Exception as e:
+        # Don't fail the request if usage tracking fails
+        logger.warning("Failed to track LLM usage: %s", e)
 
 # Initialize Anthropic client using ADC-based secret retrieval (with .env fallback)
 client = AsyncAnthropic(api_key=get_anthropic_api_key())
@@ -230,21 +268,14 @@ async def get_ai_tutor_response(
         # Extract text from response
         response_text = response.content[0].text
 
-        # Track usage if user context provided
-        if user_context:
-            usage = response.usage
-            await get_usage_tracking_service().record_usage(
-                user_email=user_context.email,
-                user_id=user_context.user_id,
-                model=DEFAULT_MODEL,
-                operation_type="tutor",
-                input_tokens=getattr(usage, 'input_tokens', 0) or 0,
-                output_tokens=getattr(usage, 'output_tokens', 0) or 0,
-                cache_creation_tokens=getattr(usage, 'cache_creation_input_tokens', 0) or 0,
-                cache_read_tokens=getattr(usage, 'cache_read_input_tokens', 0) or 0,
-                course_id=user_context.course_id,
-                request_metadata={"context": context},
-            )
+        # Track usage using helper function
+        await _track_llm_usage(
+            response=response,
+            user_context=user_context,
+            model=DEFAULT_MODEL,
+            operation_type="tutor",
+            request_metadata={"context": context},
+        )
 
         materials_count = len(materials_content) if materials_content else 0
         logger.info(
@@ -301,21 +332,14 @@ async def get_assessment_response(
         # Extract text from response
         response_text = response.content[0].text
 
-        # Track usage if user context provided
-        if user_context:
-            usage = response.usage
-            await get_usage_tracking_service().record_usage(
-                user_email=user_context.email,
-                user_id=user_context.user_id,
-                model=DEFAULT_MODEL,
-                operation_type="assessment",
-                input_tokens=getattr(usage, 'input_tokens', 0) or 0,
-                output_tokens=getattr(usage, 'output_tokens', 0) or 0,
-                cache_creation_tokens=getattr(usage, 'cache_creation_input_tokens', 0) or 0,
-                cache_read_tokens=getattr(usage, 'cache_read_input_tokens', 0) or 0,
-                course_id=user_context.course_id,
-                request_metadata={"topic": topic},
-            )
+        # Track usage using helper function
+        await _track_llm_usage(
+            response=response,
+            user_context=user_context,
+            model=DEFAULT_MODEL,
+            operation_type="assessment",
+            request_metadata={"topic": topic},
+        )
 
         logger.info("AI Assessment generated for topic: %s", topic)
 
@@ -359,20 +383,13 @@ async def get_simple_response(
 
         response_text = response.content[0].text
 
-        # Track usage if user context provided
-        if user_context:
-            usage = response.usage
-            await get_usage_tracking_service().record_usage(
-                user_email=user_context.email,
-                user_id=user_context.user_id,
-                model=DEFAULT_MODEL,
-                operation_type=operation_type,
-                input_tokens=getattr(usage, 'input_tokens', 0) or 0,
-                output_tokens=getattr(usage, 'output_tokens', 0) or 0,
-                cache_creation_tokens=getattr(usage, 'cache_creation_input_tokens', 0) or 0,
-                cache_read_tokens=getattr(usage, 'cache_read_input_tokens', 0) or 0,
-                course_id=user_context.course_id,
-            )
+        # Track usage using helper function
+        await _track_llm_usage(
+            response=response,
+            user_context=user_context,
+            model=DEFAULT_MODEL,
+            operation_type=operation_type,
+        )
 
         return response_text
 

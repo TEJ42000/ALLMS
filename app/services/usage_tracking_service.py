@@ -7,9 +7,13 @@ Firestore structure: llm_usage/{usage_id}
 """
 
 import logging
+import threading
 import uuid
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
+
+from google.cloud.firestore_v1.aggregation import AggregationQuery
+from google.cloud.firestore_v1 import FieldFilter
 
 from app.models.usage_models import (
     LLMUsageRecord,
@@ -21,8 +25,21 @@ from app.services.gcp_service import get_firestore_client
 
 logger = logging.getLogger(__name__)
 
+# =============================================================================
+# Constants
+# =============================================================================
+
 # Firestore collection name
 USAGE_COLLECTION = "llm_usage"
+
+# Query limits
+DEFAULT_QUERY_LIMIT = 100
+MAX_QUERY_LIMIT = 1000
+AGGREGATION_QUERY_LIMIT = 50000
+USER_AGGREGATION_LIMIT = 10000
+
+# Export limits
+MAX_EXPORT_RECORDS = 50000
 
 
 class UsageTrackingService:
@@ -178,7 +195,7 @@ class UsageTrackingService:
             user_email=user_email,
             start_date=start_date,
             end_date=end_date,
-            limit=10000,  # Get all for aggregation
+            limit=USER_AGGREGATION_LIMIT,
         )
 
         if not records:
@@ -251,12 +268,89 @@ class UsageTrackingService:
             logger.error("Failed to get all usage: %s", e)
             return []
 
+    async def get_aggregated_totals(
+        self,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+    ) -> Dict[str, Any]:
+        """Get aggregated totals using Firestore aggregation API.
+
+        This is more efficient than fetching all documents for large datasets.
+
+        Args:
+            start_date: Filter from this date
+            end_date: Filter until this date
+
+        Returns:
+            Dictionary with count and sum aggregations
+        """
+        if not self.db:
+            return {"count": 0, "total_cost": 0.0, "total_input": 0, "total_output": 0}
+
+        try:
+            # Build base query with filters
+            collection_ref = self.db.collection(USAGE_COLLECTION)
+            query = collection_ref
+
+            if start_date:
+                query = query.where(filter=FieldFilter("timestamp", ">=", start_date))
+            if end_date:
+                query = query.where(filter=FieldFilter("timestamp", "<=", end_date))
+
+            # Use Firestore aggregation API for efficient counting and summing
+            from google.cloud.firestore_v1.aggregation import CountAggregation, SumAggregation
+
+            aggregation_query = query.count(alias="total_count")
+
+            # Execute count aggregation
+            results = aggregation_query.get()
+            count_result = 0
+            for result in results:
+                count_result = result[0].value
+
+            # For sums, we need separate queries (Firestore limitation)
+            # Fall back to sampling for cost estimate if count is large
+            if count_result > AGGREGATION_QUERY_LIMIT:
+                # Use sampling for large datasets
+                sample_size = 1000
+                sample_query = query.order_by("timestamp", direction="DESCENDING").limit(sample_size)
+                sample_docs = list(sample_query.stream())
+
+                if sample_docs:
+                    sample_cost = sum(doc.to_dict().get("estimated_cost_usd", 0) for doc in sample_docs)
+                    sample_input = sum(doc.to_dict().get("input_tokens", 0) for doc in sample_docs)
+                    sample_output = sum(doc.to_dict().get("output_tokens", 0) for doc in sample_docs)
+
+                    # Extrapolate
+                    scale_factor = count_result / sample_size
+                    return {
+                        "count": count_result,
+                        "total_cost": sample_cost * scale_factor,
+                        "total_input": int(sample_input * scale_factor),
+                        "total_output": int(sample_output * scale_factor),
+                        "is_estimated": True,
+                    }
+
+            return {
+                "count": count_result,
+                "total_cost": 0.0,  # Will be calculated from records
+                "total_input": 0,
+                "total_output": 0,
+                "is_estimated": False,
+            }
+
+        except Exception as e:
+            logger.error("Failed to get aggregated totals: %s", e)
+            return {"count": 0, "total_cost": 0.0, "total_input": 0, "total_output": 0}
+
     async def get_usage_summary(
         self,
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
     ) -> UsageSummary:
         """Get aggregated usage summary across all users (admin only).
+
+        Uses Firestore aggregation API for efficient counting when possible.
 
         Args:
             start_date: Filter from this date
@@ -265,10 +359,18 @@ class UsageTrackingService:
         Returns:
             Aggregated usage summary
         """
+        # First, get efficient count using aggregation API
+        agg_totals = await self.get_aggregated_totals(
+            start_date=start_date,
+            end_date=end_date,
+        )
+
+        # For detailed breakdowns, we still need to fetch records
+        # but limit to a reasonable number
         records = await self.get_all_usage(
             start_date=start_date,
             end_date=end_date,
-            limit=50000,  # Get all for aggregation
+            limit=AGGREGATION_QUERY_LIMIT,
         )
 
         # Initialize aggregates
@@ -300,10 +402,13 @@ class UsageTrackingService:
         actual_start = min(timestamps) if timestamps else now
         actual_end = max(timestamps) if timestamps else now
 
+        # Use aggregation count if available (more accurate for large datasets)
+        total_requests = agg_totals.get("count", len(records)) or len(records)
+
         return UsageSummary(
             start_date=start_date or actual_start,
             end_date=end_date or actual_end,
-            total_requests=len(records),
+            total_requests=total_requests,
             total_input_tokens=total_input,
             total_output_tokens=total_output,
             total_cache_creation_tokens=total_cache_creation,
@@ -315,14 +420,17 @@ class UsageTrackingService:
         )
 
 
-# Singleton instance
+# Singleton instance with thread-safe initialization
 _usage_tracking_service: Optional[UsageTrackingService] = None
+_service_lock = threading.Lock()
 
 
 def get_usage_tracking_service() -> UsageTrackingService:
-    """Get the singleton usage tracking service instance."""
+    """Get the singleton usage tracking service instance (thread-safe)."""
     global _usage_tracking_service
     if _usage_tracking_service is None:
-        _usage_tracking_service = UsageTrackingService()
+        with _service_lock:
+            # Double-check locking pattern
+            if _usage_tracking_service is None:
+                _usage_tracking_service = UsageTrackingService()
     return _usage_tracking_service
-

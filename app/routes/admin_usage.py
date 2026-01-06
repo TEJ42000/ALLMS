@@ -20,9 +20,26 @@ from pydantic import BaseModel
 from app.dependencies.auth import require_mgms_domain
 from app.models.auth_models import User
 from app.models.usage_models import UsageSummary, UserUsageSummary, LLMUsageRecord
-from app.services.usage_tracking_service import get_usage_tracking_service
+from app.services.usage_tracking_service import (
+    get_usage_tracking_service,
+    DEFAULT_QUERY_LIMIT,
+    MAX_QUERY_LIMIT,
+    MAX_EXPORT_RECORDS,
+)
 
 logger = logging.getLogger(__name__)
+
+# =============================================================================
+# Query Parameter Constants
+# =============================================================================
+
+DEFAULT_DAYS = 30
+MAX_DAYS = 365
+DEFAULT_RECORDS_DAYS = 7
+MAX_RECORDS_DAYS = 90
+DEFAULT_TOP_USERS_LIMIT = 10
+MIN_TOP_USERS_LIMIT = 5
+MAX_TOP_USERS_LIMIT = 50
 
 
 # ============================================================================
@@ -113,7 +130,7 @@ router = APIRouter(
 
 @router.get("/summary", response_model=UsageSummary)
 async def get_usage_summary(
-    days: int = Query(30, ge=1, le=365, description="Number of days to include"),
+    days: int = Query(DEFAULT_DAYS, ge=1, le=MAX_DAYS, description="Number of days to include"),
     user: User = Depends(require_mgms_domain),
 ):
     """
@@ -146,7 +163,7 @@ async def get_usage_summary(
 @router.get("/users/{email}", response_model=UserUsageSummary)
 async def get_user_usage(
     email: str,
-    days: int = Query(30, ge=1, le=365, description="Number of days to include"),
+    days: int = Query(DEFAULT_DAYS, ge=1, le=MAX_DAYS, description="Number of days to include"),
     user: User = Depends(require_mgms_domain),
 ):
     """
@@ -182,8 +199,8 @@ async def get_user_usage(
 
 @router.get("/records")
 async def list_usage_records(
-    days: int = Query(7, ge=1, le=90, description="Number of days to include"),
-    limit: int = Query(100, ge=1, le=1000, description="Max records to return"),
+    days: int = Query(DEFAULT_RECORDS_DAYS, ge=1, le=MAX_RECORDS_DAYS, description="Number of days to include"),
+    limit: int = Query(DEFAULT_QUERY_LIMIT, ge=1, le=MAX_QUERY_LIMIT, description="Max records to return"),
     user: User = Depends(require_mgms_domain),
 ):
     """
@@ -214,7 +231,7 @@ async def list_usage_records(
 
 @router.get("/export")
 async def export_usage_csv(
-    days: int = Query(30, ge=1, le=365, description="Number of days to include"),
+    days: int = Query(DEFAULT_DAYS, ge=1, le=MAX_DAYS, description="Number of days to include"),
     user: User = Depends(require_mgms_domain),
 ):
     """
@@ -228,7 +245,7 @@ async def export_usage_csv(
         records = await service.get_all_usage(
             start_date=start_date,
             end_date=end_date,
-            limit=50000,
+            limit=MAX_EXPORT_RECORDS,
         )
 
         # Create CSV in memory
@@ -276,7 +293,7 @@ async def export_usage_csv(
 
 @router.get("/dashboard/kpis", response_model=DashboardKPIs)
 async def get_dashboard_kpis(
-    days: int = Query(30, ge=1, le=365, description="Number of days to include"),
+    days: int = Query(DEFAULT_DAYS, ge=1, le=MAX_DAYS, description="Number of days to include"),
     user: User = Depends(require_mgms_domain),
 ):
     """
@@ -292,7 +309,7 @@ async def get_dashboard_kpis(
         records = await service.get_all_usage(
             start_date=start_date,
             end_date=end_date,
-            limit=50000,
+            limit=MAX_EXPORT_RECORDS,
         )
 
         # Calculate KPIs
@@ -347,7 +364,7 @@ async def get_usage_timeseries(
         records = await service.get_all_usage(
             start_date=start_dt,
             end_date=end_dt,
-            limit=50000,
+            limit=MAX_EXPORT_RECORDS,
         )
 
         # Bucket records by time
@@ -410,8 +427,8 @@ def _get_bucket_key(timestamp: datetime, granularity: GranularityEnum) -> str:
 
 @router.get("/top-users", response_model=TopUsersResponse)
 async def get_top_users(
-    days: int = Query(30, ge=1, le=365, description="Number of days to include"),
-    limit: int = Query(10, ge=5, le=50, description="Number of top users to return"),
+    days: int = Query(DEFAULT_DAYS, ge=1, le=MAX_DAYS, description="Number of days to include"),
+    limit: int = Query(DEFAULT_TOP_USERS_LIMIT, ge=MIN_TOP_USERS_LIMIT, le=MAX_TOP_USERS_LIMIT, description="Number of top users to return"),
     sort_by: str = Query("cost", description="Sort by: cost, requests, or tokens"),
     user: User = Depends(require_mgms_domain),
 ):
@@ -428,7 +445,7 @@ async def get_top_users(
         records = await service.get_all_usage(
             start_date=start_date,
             end_date=end_date,
-            limit=50000,
+            limit=MAX_EXPORT_RECORDS,
         )
 
         # Aggregate by user
@@ -481,7 +498,7 @@ async def get_top_users(
 
 @router.get("/breakdown", response_model=BreakdownResponse)
 async def get_usage_breakdown(
-    days: int = Query(30, ge=1, le=365, description="Number of days to include"),
+    days: int = Query(DEFAULT_DAYS, ge=1, le=MAX_DAYS, description="Number of days to include"),
     dimension: str = Query("operation_type", description="Dimension: operation_type, model, course_id"),
     user: User = Depends(require_mgms_domain),
 ):
@@ -501,7 +518,7 @@ async def get_usage_breakdown(
         records = await service.get_all_usage(
             start_date=start_date,
             end_date=end_date,
-            limit=50000,
+            limit=MAX_EXPORT_RECORDS,
         )
 
         # Aggregate by dimension
