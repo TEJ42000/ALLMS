@@ -1467,3 +1467,73 @@ textarea { resize: vertical; font-family: inherit; }
         text-align: left;
     }
 }
+
+/* ========== Essay Assessment Styles ========== */
+.assessment-tabs { display: flex; gap: 10px; margin-bottom: 20px; }
+.assessment-tab { padding: 12px 24px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 10px; color: var(--text-secondary); cursor: pointer; transition: all 0.3s; font-weight: 500; }
+.assessment-tab:hover { background: rgba(255, 255, 255, 0.1); border-color: var(--gold); }
+.assessment-tab.active { background: linear-gradient(135deg, var(--gold) 0%, #b8941f 100%); color: var(--navy-dark); border-color: var(--gold); }
+
+.essay-intro-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 15px; padding: 30px; margin-bottom: 25px; }
+.essay-intro-card h3 { color: var(--gold-light); margin-bottom: 15px; font-size: 1.5em; }
+.essay-intro-card p { color: var(--text-secondary); margin-bottom: 15px; }
+.essay-features { list-style: none; padding: 0; }
+.essay-features li { color: var(--text-primary); padding: 8px 0; font-size: 1em; }
+
+.btn-large { padding: 15px 40px; font-size: 1.1em; }
+
+.essay-question-card { background: linear-gradient(135deg, rgba(212, 175, 55, 0.1), rgba(212, 175, 55, 0.05)); border: 1px solid var(--gold); border-radius: 15px; padding: 25px; margin-bottom: 25px; }
+.essay-question-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px; }
+.essay-topic-badge { background: var(--gold); color: var(--navy-dark); padding: 5px 15px; border-radius: 20px; font-weight: 600; font-size: 0.9em; }
+.essay-expected { color: var(--text-secondary); font-size: 0.9em; }
+.essay-question-text { color: var(--text-primary); font-size: 1.2em; line-height: 1.6; margin-bottom: 15px; }
+.essay-key-concepts { margin-top: 15px; }
+.concept-tag { display: inline-block; background: rgba(255, 255, 255, 0.1); border: 1px solid var(--border-color); padding: 4px 12px; border-radius: 15px; margin: 3px; font-size: 0.85em; color: var(--text-secondary); }
+.essay-guidance { color: var(--text-secondary); margin-top: 15px; padding: 10px; background: rgba(255, 255, 255, 0.05); border-radius: 8px; }
+
+.essay-word-count { text-align: right; color: var(--text-secondary); font-size: 0.9em; margin-top: 5px; }
+.essay-actions { display: flex; gap: 15px; margin-top: 20px; flex-wrap: wrap; }
+
+.essay-evaluation { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 15px; padding: 25px; margin-top: 25px; }
+.essay-grade { text-align: center; margin-bottom: 25px; padding: 20px; background: linear-gradient(135deg, rgba(212, 175, 55, 0.2), rgba(212, 175, 55, 0.05)); border-radius: 15px; }
+.grade-number { font-size: 4em; font-weight: bold; color: var(--gold); }
+.grade-label { font-size: 1.5em; color: var(--text-secondary); }
+.essay-strengths, .essay-improvements { margin-bottom: 20px; padding: 15px; border-radius: 10px; }
+.essay-strengths { background: rgba(72, 187, 120, 0.1); border: 1px solid var(--success); }
+.essay-strengths h4 { color: var(--success); margin-bottom: 10px; }
+.essay-improvements { background: rgba(236, 201, 75, 0.1); border: 1px solid var(--warning); }
+.essay-improvements h4 { color: var(--warning); margin-bottom: 10px; }
+.essay-strengths ul, .essay-improvements ul { padding-left: 20px; }
+.essay-strengths li, .essay-improvements li { margin: 8px 0; color: var(--text-primary); }
+.essay-feedback { margin-top: 20px; }
+.essay-feedback h4 { color: var(--gold-light); margin-bottom: 15px; }
+
+/* Essay History */
+.essay-history-list { display: flex; flex-direction: column; gap: 15px; }
+.essay-history-item { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; cursor: pointer; transition: all 0.3s; }
+.essay-history-item:hover { border-color: var(--gold); transform: translateX(5px); }
+.history-item-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.history-topic { color: var(--gold-light); font-weight: 600; }
+.history-grade { padding: 4px 12px; border-radius: 15px; font-weight: bold; font-size: 0.9em; }
+.history-grade.grade-good { background: rgba(72, 187, 120, 0.2); color: var(--success); }
+.history-grade.grade-ok { background: rgba(236, 201, 75, 0.2); color: var(--warning); }
+.history-grade.grade-low { background: rgba(245, 101, 101, 0.2); color: var(--error); }
+.history-question { color: var(--text-secondary); font-size: 0.95em; margin-bottom: 8px; }
+.history-date { color: var(--text-secondary); font-size: 0.85em; }
+
+/* Essay Modal */
+.essay-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.8); display: flex; justify-content: center; align-items: center; z-index: 1000; padding: 20px; }
+.essay-modal-content { background: var(--navy-dark); border: 1px solid var(--border-color); border-radius: 20px; max-width: 800px; width: 100%; max-height: 90vh; overflow-y: auto; padding: 30px; position: relative; }
+.modal-close { position: absolute; top: 15px; right: 20px; background: none; border: none; color: var(--text-secondary); font-size: 2em; cursor: pointer; transition: color 0.3s; }
+.modal-close:hover { color: var(--gold); }
+.attempt-answer { background: var(--bg-card); border-radius: 10px; padding: 20px; margin: 15px 0; white-space: pre-wrap; color: var(--text-primary); }
+.attempt-feedback { margin-top: 15px; }
+
+.empty-state { text-align: center; padding: 40px; color: var(--text-secondary); }
+.empty-state p { margin: 10px 0; }
+
+@media (max-width: 768px) {
+    .assessment-tabs { flex-direction: column; }
+    .essay-actions { flex-direction: column; }
+    .essay-actions .btn { width: 100%; }
+}

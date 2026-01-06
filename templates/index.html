@@ -127,31 +127,73 @@
                 </div>
             </section>
             <section id="assessment-section" class="section">
-                <h2 class="section-title">📝 Assessment</h2>
-                <p class="section-description">Get your answers graded with detailed AI feedback</p>
-                <div class="assessment-form">
-                    <div class="form-group">
-                        <label for="assessment-topic">Topic</label>
-                        <select id="assessment-topic" class="form-select">
-                            {% if topics %}
-                            {% for topic in topics %}
-                            <option value="{{ topic.name }}">Week {{ topic.weekNumber }}: {{ topic.name }}</option>
-                            {% endfor %}
-                            {% else %}
-                            <option value="General">General</option>
-                            {% endif %}
-                        </select>
+                <h2 class="section-title">📝 Essay Assessment</h2>
+                <p class="section-description">Practice essay-style exam questions with AI-powered grading</p>
+
+                <!-- Assessment Tabs -->
+                <div class="assessment-tabs">
+                    <button class="assessment-tab active" data-assessment-tab="new">✨ New Essay</button>
+                    <button class="assessment-tab" data-assessment-tab="history">📚 My History</button>
+                </div>
+
+                <!-- New Essay Tab -->
+                <div id="new-essay-tab" class="assessment-tab-content">
+                    <!-- Essay Question View (hidden until question generated) -->
+                    <div id="essay-question-view" style="display: none;">
+                        <div class="essay-question-card">
+                            <div class="essay-question-header">
+                                <span class="essay-topic-badge" id="essay-topic-badge"></span>
+                                <span class="essay-expected">Expected: 3-7 paragraphs</span>
+                            </div>
+                            <h3 id="essay-question-text" class="essay-question-text"></h3>
+                            <div id="essay-key-concepts" class="essay-key-concepts"></div>
+                            <div id="essay-guidance" class="essay-guidance"></div>
+                        </div>
+                        <div class="form-group">
+                            <label for="essay-answer">Your Essay Answer</label>
+                            <textarea id="essay-answer" placeholder="Write your essay answer here (3-7 paragraphs recommended)..." rows="12"></textarea>
+                            <div class="essay-word-count">Words: <span id="essay-word-count">0</span></div>
+                        </div>
+                        <div class="essay-actions">
+                            <button id="submit-essay-btn" class="btn btn-primary">Submit for Evaluation</button>
+                            <button id="new-question-btn" class="btn btn-secondary">Generate New Question</button>
+                        </div>
+                        <div id="essay-result" class="result-box"></div>
                     </div>
-                    <div class="form-group">
-                        <label for="assessment-question">Question (Optional)</label>
-                        <textarea id="assessment-question" placeholder="Enter the question or prompt..." rows="2"></textarea>
+
+                    <!-- Generate Question View -->
+                    <div id="generate-question-view">
+                        <div class="essay-intro-card">
+                            <h3>🎓 Practice Essay Questions</h3>
+                            <p>Generate exam-style essay questions and get detailed AI feedback on your answers.</p>
+                            <ul class="essay-features">
+                                <li>✅ Questions similar to actual exam questions</li>
+                                <li>✅ AI evaluation with grade (1-10)</li>
+                                <li>✅ Detailed feedback on strengths and improvements</li>
+                                <li>✅ Save and track your progress</li>
+                            </ul>
+                        </div>
+                        <div class="form-group">
+                            <label for="essay-topic-select">Select Topic</label>
+                            <select id="essay-topic-select" class="form-select">
+                                {% if topics %}
+                                {% for topic in topics %}
+                                <option value="{{ topic.name }}">Week {{ topic.weekNumber }}: {{ topic.name }}</option>
+                                {% endfor %}
+                                {% else %}
+                                <option value="General">General</option>
+                                {% endif %}
+                            </select>
+                        </div>
+                        <button id="generate-essay-btn" class="btn btn-primary btn-large">📝 Generate Essay Question</button>
                     </div>
-                    <div class="form-group">
-                        <label for="assessment-answer">Your Answer</label>
-                        <textarea id="assessment-answer" placeholder="Enter your answer here..." rows="8"></textarea>
+                </div>
+
+                <!-- History Tab -->
+                <div id="essay-history-tab" class="assessment-tab-content" style="display: none;">
+                    <div id="essay-history-list" class="essay-history-list">
+                        <p class="loading-text">Loading your assessment history...</p>
                     </div>
-                    <button id="assess-btn" class="btn btn-primary">Get Assessment</button>
-                    <div id="assessment-result" class="result-box"></div>
                 </div>
             </section>
             <section id="quiz-section" class="section">
