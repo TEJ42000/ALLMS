@@ -16,7 +16,11 @@ from fastapi.responses import StreamingResponse
 from app.dependencies.auth import require_mgms_domain
 from app.models.auth_models import User
 from app.models.usage_models import UsageSummary, UserUsageSummary, LLMUsageRecord
-from app.services.usage_tracking_service import get_usage_tracking_service
+from app.services.usage_tracking_service import (
+    get_usage_tracking_service,
+    DEFAULT_RECORD_LIMIT,
+    MAX_RECORD_LIMIT,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -99,7 +103,12 @@ async def get_user_usage(
 @router.get("/records")
 async def list_usage_records(
     days: int = Query(7, ge=1, le=90, description="Number of days to include"),
-    limit: int = Query(100, ge=1, le=1000, description="Max records to return"),
+    limit: int = Query(
+        DEFAULT_RECORD_LIMIT,
+        ge=1,
+        le=MAX_RECORD_LIMIT,
+        description="Max records to return",
+    ),
     user: User = Depends(require_mgms_domain),
 ):
     """
@@ -141,10 +150,12 @@ async def export_usage_csv(
         start_date = end_date - timedelta(days=days)
 
         service = get_usage_tracking_service()
+        # Use MAX_RECORD_LIMIT for exports to prevent memory issues
+        # For larger exports, consider implementing pagination
         records = await service.get_all_usage(
             start_date=start_date,
             end_date=end_date,
-            limit=50000,
+            limit=MAX_RECORD_LIMIT,
         )
 
         # Create CSV in memory
