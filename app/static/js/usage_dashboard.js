@@ -9,6 +9,7 @@ const state = {
     startDate: null,
     endDate: null,
     granularity: 'daily',
+    tokenGranularity: 'daily',
     gridLimit: 100,
 };
 
@@ -17,11 +18,13 @@ let timeseriesChart = null;
 let breakdownChart = null;
 let topUsersChart = null;
 let modelsChart = null;
+let tokenBreakdownChart = null;
 let usageGrid = null;
 
 // Initialize dashboard
 document.addEventListener('DOMContentLoaded', () => {
     initializeDateControls();
+    initializeTokenGranularityControls();
     initializeGrid();
     loadDashboardData();
 });
@@ -117,6 +120,8 @@ async function loadDashboardData() {
             loadKPIs(),
             loadTimeseriesChart(),
             loadBreakdownChart(),
+            loadTokenBreakdownChart(),
+            loadCacheAnalytics(),
             loadTopUsersChart(),
             loadModelsChart(),
             loadGridData(),
@@ -133,14 +138,30 @@ async function loadKPIs() {
     try {
         const response = await fetch(`/api/admin/usage/dashboard/kpis?days=${state.days}`);
         const data = await response.json();
-        
+
         document.getElementById('kpi-requests').textContent = data.total_requests.toLocaleString();
         document.getElementById('kpi-cost').textContent = `$${data.total_cost.toFixed(2)}`;
         document.getElementById('kpi-users').textContent = data.unique_users.toLocaleString();
         document.getElementById('kpi-avg').textContent = `$${data.avg_cost_per_request.toFixed(4)}`;
+
+        // New KPIs
+        document.getElementById('kpi-input-tokens').textContent = formatTokens(data.total_input_tokens);
+        document.getElementById('kpi-output-tokens').textContent = formatTokens(data.total_output_tokens);
+        document.getElementById('kpi-cache-hit-rate').textContent = `${data.cache_hit_rate.toFixed(1)}%`;
+        document.getElementById('kpi-cache-savings').textContent = `$${data.cache_cost_savings.toFixed(2)}`;
     } catch (error) {
         console.error('Error loading KPIs:', error);
     }
+}
+
+// Helper function to format large token numbers
+function formatTokens(tokens) {
+    if (tokens >= 1000000) {
+        return `${(tokens / 1000000).toFixed(1)}M`;
+    } else if (tokens >= 1000) {
+        return `${(tokens / 1000).toFixed(1)}K`;
+    }
+    return tokens.toLocaleString();
 }
 
 // Time series chart
@@ -343,6 +364,139 @@ async function loadModelsChart() {
     }
 }
 
+// Token breakdown chart
+async function loadTokenBreakdownChart() {
+    try {
+        const { startDate, endDate } = getDateRange();
+        const response = await fetch(
+            `/api/admin/usage/token-breakdown?start_date=${startDate}&end_date=${endDate}&granularity=${state.tokenGranularity}`
+        );
+        const data = await response.json();
+
+        const categories = data.data.map(d => formatBucketLabel(d.bucket, state.tokenGranularity));
+
+        const series = [
+            {
+                name: 'Input Tokens',
+                data: data.data.map(d => d.input_tokens),
+                color: '#6c63ff'
+            },
+            {
+                name: 'Output Tokens',
+                data: data.data.map(d => d.output_tokens),
+                color: '#00d4aa'
+            },
+            {
+                name: 'Cache Write',
+                data: data.data.map(d => d.cache_creation_tokens),
+                color: '#ff6b6b'
+            },
+            {
+                name: 'Cache Read',
+                data: data.data.map(d => d.cache_read_tokens),
+                color: '#4ecdc4'
+            }
+        ];
+
+        const options = {
+            series: series,
+            chart: {
+                type: 'area',
+                height: 320,
+                stacked: true,
+                toolbar: { show: true },
+                background: 'transparent',
+            },
+            dataLabels: { enabled: false },
+            stroke: { curve: 'smooth', width: 2 },
+            fill: {
+                type: 'gradient',
+                gradient: {
+                    opacityFrom: 0.6,
+                    opacityTo: 0.1,
+                }
+            },
+            xaxis: {
+                categories: categories,
+                labels: { style: { colors: '#888' } }
+            },
+            yaxis: {
+                labels: {
+                    style: { colors: '#888' },
+                    formatter: (val) => formatTokens(val)
+                }
+            },
+            legend: {
+                position: 'top',
+                labels: { colors: '#888' }
+            },
+            tooltip: {
+                theme: 'dark',
+                y: {
+                    formatter: (val) => val.toLocaleString() + ' tokens'
+                }
+            },
+            grid: {
+                borderColor: '#333',
+                strokeDashArray: 4,
+            }
+        };
+
+        if (tokenBreakdownChart) {
+            tokenBreakdownChart.destroy();
+        }
+        tokenBreakdownChart = new ApexCharts(document.querySelector('#chart-token-breakdown'), options);
+        tokenBreakdownChart.render();
+    } catch (error) {
+        console.error('Error loading token breakdown chart:', error);
+    }
+}
+
+// Cache analytics
+async function loadCacheAnalytics() {
+    try {
+        const response = await fetch(`/api/admin/usage/cache-analytics?days=${state.days}`);
+        const data = await response.json();
+
+        document.getElementById('cache-hit-rate-detail').textContent = `${data.cache_hit_rate.toFixed(1)}%`;
+        document.getElementById('cache-reads-detail').textContent = formatTokens(data.total_cache_reads);
+        document.getElementById('total-input-detail').textContent = formatTokens(data.total_input_tokens + data.total_cache_reads);
+
+        document.getElementById('cache-savings-detail').textContent = `$${data.cache_cost_savings.toFixed(2)}`;
+        document.getElementById('cache-overhead-detail').textContent = `$${data.cache_write_overhead.toFixed(2)}`;
+
+        const netColor = data.net_cache_benefit >= 0 ? '#00d4aa' : '#ff6b6b';
+        const netSign = data.net_cache_benefit >= 0 ? '+' : '';
+        document.getElementById('cache-net-detail').innerHTML =
+            `<span style="color: ${netColor}">${netSign}$${data.net_cache_benefit.toFixed(2)}</span>`;
+
+        document.getElementById('cache-operations-detail').textContent =
+            `${data.operations_using_cache}/${data.total_operations}`;
+        document.getElementById('cache-writes-detail').textContent = formatTokens(data.total_cache_writes);
+        document.getElementById('cache-reads-count').textContent = formatTokens(data.total_cache_reads);
+    } catch (error) {
+        console.error('Error loading cache analytics:', error);
+    }
+}
+
+// Initialize token granularity controls
+function initializeTokenGranularityControls() {
+    const controls = document.getElementById('token-granularity-controls');
+    if (!controls) return;
+
+    controls.querySelectorAll('button').forEach(button => {
+        button.addEventListener('click', () => {
+            const granularity = button.dataset.granularity;
+            state.tokenGranularity = granularity;
+
+            controls.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+            button.classList.add('active');
+
+            loadTokenBreakdownChart();
+        });
+    });
+}
+
 // Data grid
 function initializeGrid() {
     usageGrid = new Tabulator('#usage-grid', {
@@ -357,10 +511,22 @@ function initializeGrid() {
             { title: 'Operation', field: 'operation_type', sorter: 'string' },
             { title: 'Model', field: 'model', sorter: 'string',
               formatter: (cell) => cell.getValue()?.replace('claude-', '') || '-' },
-            { title: 'Input Tokens', field: 'input_tokens', sorter: 'number',
+            { title: 'Input', field: 'input_tokens', sorter: 'number',
               formatter: (cell) => cell.getValue()?.toLocaleString() || '0' },
-            { title: 'Output Tokens', field: 'output_tokens', sorter: 'number',
+            { title: 'Output', field: 'output_tokens', sorter: 'number',
               formatter: (cell) => cell.getValue()?.toLocaleString() || '0' },
+            { title: 'Cache Write', field: 'cache_creation_tokens', sorter: 'number',
+              formatter: (cell) => cell.getValue()?.toLocaleString() || '0' },
+            { title: 'Cache Read', field: 'cache_read_tokens', sorter: 'number',
+              formatter: (cell) => cell.getValue()?.toLocaleString() || '0' },
+            { title: 'Cache %', field: 'cache_percentage', sorter: 'number',
+              formatter: (cell) => {
+                  const row = cell.getRow().getData();
+                  const totalInput = row.input_tokens + row.cache_read_tokens;
+                  const cachePercent = totalInput > 0 ? (row.cache_read_tokens / totalInput * 100) : 0;
+                  return cachePercent > 0 ? `${cachePercent.toFixed(1)}%` : '-';
+              }
+            },
             { title: 'Cost', field: 'estimated_cost_usd', sorter: 'number',
               formatter: (cell) => `$${cell.getValue()?.toFixed(4) || '0.0000'}` },
             { title: 'Course', field: 'course_id', sorter: 'string',
