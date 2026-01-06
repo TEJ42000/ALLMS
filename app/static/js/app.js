@@ -1396,6 +1396,26 @@ async function submitQuizResults() {
         // Update local stats
         updateLocalQuizStats();
 
+        // Log activity for gamification (don't block quiz submission if this fails)
+        try {
+            if (window.activityTracker) {
+                const totalQuestions = quizState.questions.length;
+                const percentage = (quizState.score / totalQuestions) * 100;
+
+                await window.activityTracker.logActivity('quiz_completed', {
+                    quiz_id: quizState.quizId,
+                    score: quizState.score,
+                    total_questions: totalQuestions,
+                    difficulty: quizState.difficulty || 'easy',
+                    time_taken_seconds: timeTaken,
+                    percentage: percentage
+                }, quizState.courseId);
+            }
+        } catch (gamificationError) {
+            console.error('Failed to log quiz activity for gamification:', gamificationError);
+            // Don't throw - gamification failure shouldn't block quiz submission
+        }
+
     } catch (error) {
         console.error('Error submitting quiz results:', error);
     }
