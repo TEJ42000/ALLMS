@@ -3,6 +3,18 @@
  * Handles charts, data grid, and API interactions
  */
 
+// Chart color constants
+const CHART_COLORS = {
+    INPUT_TOKENS: '#6c63ff',      // Purple
+    OUTPUT_TOKENS: '#00d4aa',     // Teal
+    CACHE_WRITE: '#ff6b6b',       // Red
+    CACHE_READ: '#4ecdc4',        // Cyan
+    PRIMARY: '#6c63ff',
+    SUCCESS: '#00d4aa',
+    WARNING: '#ffa500',
+    DANGER: '#ff6b6b',
+};
+
 // State management
 const state = {
     days: 7,
@@ -379,22 +391,22 @@ async function loadTokenBreakdownChart() {
             {
                 name: 'Input Tokens',
                 data: data.data.map(d => d.input_tokens),
-                color: '#6c63ff'
+                color: CHART_COLORS.INPUT_TOKENS
             },
             {
                 name: 'Output Tokens',
                 data: data.data.map(d => d.output_tokens),
-                color: '#00d4aa'
+                color: CHART_COLORS.OUTPUT_TOKENS
             },
             {
                 name: 'Cache Write',
                 data: data.data.map(d => d.cache_creation_tokens),
-                color: '#ff6b6b'
+                color: CHART_COLORS.CACHE_WRITE
             },
             {
                 name: 'Cache Read',
                 data: data.data.map(d => d.cache_read_tokens),
-                color: '#4ecdc4'
+                color: CHART_COLORS.CACHE_READ
             }
         ];
 

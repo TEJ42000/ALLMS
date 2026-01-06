@@ -19,7 +19,15 @@ from pydantic import BaseModel
 
 from app.dependencies.auth import require_mgms_domain
 from app.models.auth_models import User
-from app.models.usage_models import UsageSummary, UserUsageSummary, LLMUsageRecord
+from app.models.usage_models import (
+    UsageSummary,
+    UserUsageSummary,
+    LLMUsageRecord,
+    COST_INPUT_PER_MILLION,
+    COST_OUTPUT_PER_MILLION,
+    COST_CACHE_READ_PER_MILLION,
+    COST_CACHE_WRITE_PER_MILLION,
+)
 from app.services.usage_tracking_service import (
     get_usage_tracking_service,
     DEFAULT_QUERY_LIMIT,
@@ -28,6 +36,58 @@ from app.services.usage_tracking_service import (
 )
 
 logger = logging.getLogger(__name__)
+
+# =============================================================================
+# Helper Functions
+# =============================================================================
+
+
+def calculate_cache_metrics(
+    total_input: int,
+    total_cache_reads: int,
+    total_cache_writes: int,
+) -> Dict[str, float]:
+    """
+    Calculate cache efficiency metrics.
+
+    Args:
+        total_input: Total input tokens (non-cached)
+        total_cache_reads: Total tokens read from cache
+        total_cache_writes: Total tokens written to cache
+
+    Returns:
+        Dictionary with cache_hit_rate, cache_savings, cache_overhead, net_benefit
+    """
+    # Cache hit rate: percentage of input that came from cache
+    total_potential_input = total_input + total_cache_reads
+    cache_hit_rate = (
+        (total_cache_reads / total_potential_input * 100)
+        if total_potential_input > 0
+        else 0.0
+    )
+
+    # Cache cost savings: difference between cache read cost and regular input cost
+    # Cache read: $0.30/M tokens, Regular input: $3.00/M tokens
+    cache_savings = (total_cache_reads / 1_000_000) * (
+        COST_INPUT_PER_MILLION - COST_CACHE_READ_PER_MILLION
+    )
+
+    # Cache write overhead: extra cost for writing to cache vs regular input
+    # Cache write: $3.75/M tokens, Regular input: $3.00/M tokens
+    cache_overhead = (total_cache_writes / 1_000_000) * (
+        COST_CACHE_WRITE_PER_MILLION - COST_INPUT_PER_MILLION
+    )
+
+    # Net benefit: savings minus overhead
+    net_benefit = cache_savings - cache_overhead
+
+    return {
+        "cache_hit_rate": round(cache_hit_rate, 2),
+        "cache_savings": round(cache_savings, 4),
+        "cache_overhead": round(cache_overhead, 4),
+        "net_benefit": round(net_benefit, 4),
+    }
+
 
 # =============================================================================
 # Query Parameter Constants
@@ -400,16 +460,12 @@ async def get_dashboard_kpis(
         total_cache_read = sum(r.cache_read_tokens for r in records)
         avg_cost = total_cost / total_requests if total_requests > 0 else 0.0
 
-        # Calculate cache metrics
-        # Cache hit rate: percentage of input that came from cache
-        total_potential_input = total_input + total_cache_read
-        cache_hit_rate = (total_cache_read / total_potential_input * 100) if total_potential_input > 0 else 0.0
-
-        # Cache cost savings: difference between cache read cost and regular input cost
-        # Cache read: $0.30/M tokens, Regular input: $3.00/M tokens
-        # Savings = (cache_read_tokens * $3.00/M) - (cache_read_tokens * $0.30/M)
-        from app.models.usage_models import COST_INPUT_PER_MILLION, COST_CACHE_READ_PER_MILLION
-        cache_savings = (total_cache_read / 1_000_000) * (COST_INPUT_PER_MILLION - COST_CACHE_READ_PER_MILLION)
+        # Calculate cache metrics using helper function
+        cache_metrics = calculate_cache_metrics(
+            total_input=total_input,
+            total_cache_reads=total_cache_read,
+            total_cache_writes=total_cache_creation,
+        )
 
         return DashboardKPIs(
             total_requests=total_requests,
@@ -420,8 +476,8 @@ async def get_dashboard_kpis(
             total_output_tokens=total_output,
             total_cache_creation_tokens=total_cache_creation,
             total_cache_read_tokens=total_cache_read,
-            cache_hit_rate=round(cache_hit_rate, 2),
-            cache_cost_savings=round(cache_savings, 4),
+            cache_hit_rate=cache_metrics["cache_hit_rate"],
+            cache_cost_savings=cache_metrics["cache_savings"],
             period_days=days,
         )
 
@@ -776,37 +832,26 @@ async def get_cache_analytics(
         total_cache_reads = sum(r.cache_read_tokens for r in records)
         total_cache_writes = sum(r.cache_creation_tokens for r in records)
 
-        # Cache hit rate: percentage of input that came from cache
-        total_potential_input = total_input + total_cache_reads
-        cache_hit_rate = (total_cache_reads / total_potential_input * 100) if total_potential_input > 0 else 0.0
-
-        # Cost calculations
-        from app.models.usage_models import (
-            COST_INPUT_PER_MILLION,
-            COST_CACHE_READ_PER_MILLION,
-            COST_CACHE_WRITE_PER_MILLION
+        # Use helper function for cache calculations
+        cache_metrics = calculate_cache_metrics(
+            total_input=total_input,
+            total_cache_reads=total_cache_reads,
+            total_cache_writes=total_cache_writes,
         )
 
-        # Savings: what we would have paid for input minus what we paid for cache reads
-        cache_savings = (total_cache_reads / 1_000_000) * (COST_INPUT_PER_MILLION - COST_CACHE_READ_PER_MILLION)
-
-        # Overhead: extra cost for writing to cache vs regular input
-        cache_overhead = (total_cache_writes / 1_000_000) * (COST_CACHE_WRITE_PER_MILLION - COST_INPUT_PER_MILLION)
-
-        # Net benefit
-        net_benefit = cache_savings - cache_overhead
-
         # Count operations using cache
-        operations_with_cache = sum(1 for r in records if r.cache_read_tokens > 0 or r.cache_creation_tokens > 0)
+        operations_with_cache = sum(
+            1 for r in records if r.cache_read_tokens > 0 or r.cache_creation_tokens > 0
+        )
 
         return CacheAnalytics(
-            cache_hit_rate=round(cache_hit_rate, 2),
+            cache_hit_rate=cache_metrics["cache_hit_rate"],
             total_cache_reads=total_cache_reads,
             total_cache_writes=total_cache_writes,
             total_input_tokens=total_input,
-            cache_cost_savings=round(cache_savings, 4),
-            cache_write_overhead=round(cache_overhead, 4),
-            net_cache_benefit=round(net_benefit, 4),
+            cache_cost_savings=cache_metrics["cache_savings"],
+            cache_write_overhead=cache_metrics["cache_overhead"],
+            net_cache_benefit=cache_metrics["net_benefit"],
             operations_using_cache=operations_with_cache,
             total_operations=len(records),
         )
