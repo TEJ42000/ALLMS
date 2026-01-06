@@ -31,6 +31,7 @@ from app.models.gamification_models import (
     ActivityCounters,
     Week7Quest,
     PageView,
+    XPConfig,
 )
 from app.services.gcp_service import get_firestore_client
 
@@ -46,6 +47,8 @@ USER_ACTIVITIES_COLLECTION = "user_activities"
 USER_SESSIONS_COLLECTION = "user_sessions"
 BADGE_DEFINITIONS_COLLECTION = "badge_definitions"
 USER_ACHIEVEMENTS_COLLECTION = "user_achievements"
+XP_CONFIG_COLLECTION = "xp_config"
+XP_CONFIG_DOC_ID = "default"
 
 # Query limits
 DEFAULT_QUERY_LIMIT = 50
@@ -83,6 +86,9 @@ class GamificationService:
     def __init__(self):
         """Initialize the gamification service."""
         self._db = None
+        self._xp_config_cache = None
+        self._xp_config_cache_time = None
+        self._xp_config_cache_ttl = 300  # 5 minutes
 
     @property
     def db(self):
@@ -90,6 +96,87 @@ class GamificationService:
         if self._db is None:
             self._db = get_firestore_client()
         return self._db
+
+    def get_xp_config(self) -> Dict[str, int]:
+        """Get XP configuration from Firestore with caching.
+
+        Returns:
+            Dictionary of XP values for each activity type
+        """
+        # Check cache
+        if self._xp_config_cache and self._xp_config_cache_time:
+            age = (datetime.now(timezone.utc) - self._xp_config_cache_time).total_seconds()
+            if age < self._xp_config_cache_ttl:
+                return self._xp_config_cache
+
+        # Load from Firestore
+        if not self.db:
+            logger.warning("Firestore unavailable, using default XP values")
+            return XP_VALUES
+
+        try:
+            doc_ref = self.db.collection(XP_CONFIG_COLLECTION).document(XP_CONFIG_DOC_ID)
+            doc = doc_ref.get()
+
+            if doc.exists:
+                config = doc.to_dict()
+                # Cache the config
+                self._xp_config_cache = {
+                    "flashcard_set_completed": config.get("flashcard_set_completed", XP_VALUES["flashcard_set_completed"]),
+                    "study_guide_completed": config.get("study_guide_completed", XP_VALUES["study_guide_completed"]),
+                    "quiz_easy_passed": config.get("quiz_easy_passed", XP_VALUES["quiz_easy_passed"]),
+                    "quiz_hard_passed": config.get("quiz_hard_passed", XP_VALUES["quiz_hard_passed"]),
+                    "evaluation_low": config.get("evaluation_low", XP_VALUES["evaluation_low"]),
+                    "evaluation_high": config.get("evaluation_high", XP_VALUES["evaluation_high"]),
+                }
+                self._xp_config_cache_time = datetime.now(timezone.utc)
+                return self._xp_config_cache
+            else:
+                # Create default config
+                logger.info("Creating default XP config")
+                doc_ref.set({
+                    **XP_VALUES,
+                    "updated_at": datetime.now(timezone.utc),
+                    "updated_by": "system"
+                })
+                self._xp_config_cache = XP_VALUES.copy()
+                self._xp_config_cache_time = datetime.now(timezone.utc)
+                return self._xp_config_cache
+
+        except Exception as e:
+            logger.error(f"Error loading XP config: {e}")
+            return XP_VALUES
+
+    def update_xp_config(self, updates: Dict[str, int], updated_by: str) -> bool:
+        """Update XP configuration.
+
+        Args:
+            updates: Dictionary of XP values to update
+            updated_by: User who is updating the config
+
+        Returns:
+            True if successful, False otherwise
+        """
+        if not self.db:
+            logger.warning("Firestore unavailable")
+            return False
+
+        try:
+            doc_ref = self.db.collection(XP_CONFIG_COLLECTION).document(XP_CONFIG_DOC_ID)
+            updates["updated_at"] = datetime.now(timezone.utc)
+            updates["updated_by"] = updated_by
+            doc_ref.update(updates)
+
+            # Clear cache
+            self._xp_config_cache = None
+            self._xp_config_cache_time = None
+
+            logger.info(f"XP config updated by {updated_by}: {updates}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Error updating XP config: {e}")
+            return False
 
     # =========================================================================
     # User Stats Methods
@@ -213,7 +300,7 @@ class GamificationService:
         activity_type: str,
         activity_data: Dict[str, Any]
     ) -> int:
-        """Calculate XP for an activity.
+        """Calculate XP for an activity using configurable XP values.
 
         Args:
             activity_type: Type of activity
@@ -222,6 +309,9 @@ class GamificationService:
         Returns:
             XP amount to award
         """
+        # Get current XP configuration
+        xp_config = self.get_xp_config()
+
         # Quiz completion
         if activity_type == "quiz_completed":
             difficulty = activity_data.get("difficulty", "easy")
@@ -232,28 +322,28 @@ class GamificationService:
             # Only award XP if passed (>= 60%)
             if percentage >= 60:
                 if difficulty == "hard":
-                    return XP_VALUES["quiz_hard_passed"]
+                    return xp_config["quiz_hard_passed"]
                 else:
-                    return XP_VALUES["quiz_easy_passed"]
+                    return xp_config["quiz_easy_passed"]
             return 0
 
         # Flashcard review
         elif activity_type == "flashcard_set_completed":
             correct = activity_data.get("correct_count", 0)
-            # Award 5 XP per 10 cards reviewed correctly
-            return (correct // 10) * XP_VALUES["flashcard_set_completed"]
+            # Award XP per 10 cards reviewed correctly
+            return (correct // 10) * xp_config["flashcard_set_completed"]
 
         # Study guide completion
         elif activity_type == "study_guide_completed":
-            return XP_VALUES["study_guide_completed"]
+            return xp_config["study_guide_completed"]
 
         # AI Evaluation
         elif activity_type == "evaluation_completed":
             grade = activity_data.get("grade", 0)
             if grade >= 7:
-                return XP_VALUES["evaluation_high"]
+                return xp_config["evaluation_high"]
             elif grade >= 1:
-                return XP_VALUES["evaluation_low"]
+                return xp_config["evaluation_low"]
             return 0
 
         # Default: no XP

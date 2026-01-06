@@ -19,6 +19,8 @@ from app.models.gamification_models import (
     SessionHeartbeatRequest,
     UserStatsResponse,
     UserActivity,
+    XPConfigResponse,
+    XPConfigUpdateRequest,
 )
 from app.services.gamification_service import get_gamification_service
 
@@ -253,5 +255,97 @@ def end_session(
         raise
     except Exception as e:
         logger.error(f"Error ending session: {e}")
+        raise HTTPException(500, detail=str(e)) from e
+
+
+# =============================================================================
+# XP Configuration Endpoints (Admin)
+# =============================================================================
+
+@router.get("/config/xp", response_model=XPConfigResponse)
+def get_xp_config(
+    user: User = Depends(get_current_user)
+):
+    """Get current XP configuration.
+
+    Returns:
+        Current XP values for all activity types
+    """
+    try:
+        service = get_gamification_service()
+        config = service.get_xp_config()
+
+        # Get metadata from Firestore
+        if service.db:
+            doc = service.db.collection("xp_config").document("default").get()
+            if doc.exists:
+                data = doc.to_dict()
+                return XPConfigResponse(
+                    **config,
+                    updated_at=data.get("updated_at"),
+                    updated_by=data.get("updated_by")
+                )
+
+        # Return config with defaults
+        from datetime import datetime, timezone
+        return XPConfigResponse(
+            **config,
+            updated_at=datetime.now(timezone.utc),
+            updated_by="system"
+        )
+
+    except Exception as e:
+        logger.error(f"Error getting XP config: {e}")
+        raise HTTPException(500, detail=str(e)) from e
+
+
+@router.patch("/config/xp")
+def update_xp_config(
+    request: XPConfigUpdateRequest,
+    user: User = Depends(get_current_user)
+):
+    """Update XP configuration (admin only).
+
+    Args:
+        request: XP values to update
+
+    Returns:
+        Success status
+    """
+    # TODO: Add admin role check
+    # For now, any authenticated user can update (will add proper admin check in Phase 7)
+
+    try:
+        service = get_gamification_service()
+
+        # Build updates dict from request
+        updates = {}
+        if request.flashcard_set_completed is not None:
+            updates["flashcard_set_completed"] = request.flashcard_set_completed
+        if request.study_guide_completed is not None:
+            updates["study_guide_completed"] = request.study_guide_completed
+        if request.quiz_easy_passed is not None:
+            updates["quiz_easy_passed"] = request.quiz_easy_passed
+        if request.quiz_hard_passed is not None:
+            updates["quiz_hard_passed"] = request.quiz_hard_passed
+        if request.evaluation_low is not None:
+            updates["evaluation_low"] = request.evaluation_low
+        if request.evaluation_high is not None:
+            updates["evaluation_high"] = request.evaluation_high
+
+        if not updates:
+            raise HTTPException(400, detail="No updates provided")
+
+        success = service.update_xp_config(updates, user.email)
+
+        if not success:
+            raise HTTPException(500, detail="Failed to update XP config")
+
+        return {"status": "ok", "message": "XP configuration updated successfully"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating XP config: {e}")
         raise HTTPException(500, detail=str(e)) from e
 
