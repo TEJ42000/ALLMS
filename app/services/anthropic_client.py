@@ -1,13 +1,18 @@
 """Anthropic API Client Service for the LLS Study Portal."""
 
 import logging
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from anthropic import AsyncAnthropic
 
+from app.models.usage_models import UserContext
 from app.services.gcp_service import get_anthropic_api_key
+from app.services.usage_tracking_service import get_usage_tracking_service
 
 logger = logging.getLogger(__name__)
+
+# Default model
+DEFAULT_MODEL = "claude-sonnet-4-20250514"
 
 # Initialize Anthropic client using ADC-based secret retrieval (with .env fallback)
 client = AsyncAnthropic(api_key=get_anthropic_api_key())
@@ -158,7 +163,8 @@ async def get_ai_tutor_response(
     message: str,
     context: str = "Law & Legal Skills",
     conversation_history: Optional[List[Dict[str, str]]] = None,
-    materials_content: Optional[List[Dict[str, str]]] = None
+    materials_content: Optional[List[Dict[str, str]]] = None,
+    user_context: Optional[UserContext] = None,
 ) -> str:
     """
     Get AI tutor response for a user message.
@@ -169,6 +175,7 @@ async def get_ai_tutor_response(
         conversation_history: Previous conversation messages
         materials_content: Optional list of dicts with 'title' and 'text' keys
                           containing course material content to include
+        user_context: User context for usage tracking
 
     Returns:
         AI-generated response text
@@ -214,7 +221,7 @@ async def get_ai_tutor_response(
 
         # Call Anthropic API
         response = await client.messages.create(
-            model="claude-sonnet-4-20250514",
+            model=DEFAULT_MODEL,
             max_tokens=2048,
             system=system_prompt,
             messages=messages
@@ -222,6 +229,22 @@ async def get_ai_tutor_response(
 
         # Extract text from response
         response_text = response.content[0].text
+
+        # Track usage if user context provided
+        if user_context:
+            usage = response.usage
+            await get_usage_tracking_service().record_usage(
+                user_email=user_context.email,
+                user_id=user_context.user_id,
+                model=DEFAULT_MODEL,
+                operation_type="tutor",
+                input_tokens=getattr(usage, 'input_tokens', 0) or 0,
+                output_tokens=getattr(usage, 'output_tokens', 0) or 0,
+                cache_creation_tokens=getattr(usage, 'cache_creation_input_tokens', 0) or 0,
+                cache_read_tokens=getattr(usage, 'cache_read_input_tokens', 0) or 0,
+                course_id=user_context.course_id,
+                request_metadata={"context": context},
+            )
 
         materials_count = len(materials_content) if materials_content else 0
         logger.info(
@@ -239,7 +262,8 @@ async def get_ai_tutor_response(
 async def get_assessment_response(
     topic: str,
     question: Optional[str],
-    answer: str
+    answer: str,
+    user_context: Optional[UserContext] = None,
 ) -> str:
     """
     Get AI assessment and grading for a student answer.
@@ -248,6 +272,7 @@ async def get_assessment_response(
         topic: Subject area (e.g., "Private Law", "Criminal Law")
         question: Optional question/prompt
         answer: Student's answer text
+        user_context: User context for usage tracking
 
     Returns:
         AI-generated assessment with grade and feedback
@@ -264,7 +289,7 @@ async def get_assessment_response(
 
         # Call Anthropic API
         response = await client.messages.create(
-            model="claude-sonnet-4-20250514",
+            model=DEFAULT_MODEL,
             max_tokens=3000,
             system=system_prompt,
             messages=[{
@@ -275,6 +300,22 @@ async def get_assessment_response(
 
         # Extract text from response
         response_text = response.content[0].text
+
+        # Track usage if user context provided
+        if user_context:
+            usage = response.usage
+            await get_usage_tracking_service().record_usage(
+                user_email=user_context.email,
+                user_id=user_context.user_id,
+                model=DEFAULT_MODEL,
+                operation_type="assessment",
+                input_tokens=getattr(usage, 'input_tokens', 0) or 0,
+                output_tokens=getattr(usage, 'output_tokens', 0) or 0,
+                cache_creation_tokens=getattr(usage, 'cache_creation_input_tokens', 0) or 0,
+                cache_read_tokens=getattr(usage, 'cache_read_input_tokens', 0) or 0,
+                course_id=user_context.course_id,
+                request_metadata={"topic": topic},
+            )
 
         logger.info("AI Assessment generated for topic: %s", topic)
 
@@ -288,7 +329,9 @@ async def get_assessment_response(
 async def get_simple_response(
     prompt: str,
     max_tokens: int = 1024,
-    temperature: float = 1.0
+    temperature: float = 1.0,
+    user_context: Optional[UserContext] = None,
+    operation_type: str = "simple",
 ) -> str:
     """
     Get a simple AI response without special formatting.
@@ -297,13 +340,15 @@ async def get_simple_response(
         prompt: User prompt
         max_tokens: Maximum tokens in response
         temperature: Response creativity (0.0 - 1.0)
+        user_context: User context for usage tracking
+        operation_type: Type of operation for tracking (default: "simple")
 
     Returns:
         AI-generated response text
     """
     try:
         response = await client.messages.create(
-            model="claude-sonnet-4-20250514",
+            model=DEFAULT_MODEL,
             max_tokens=max_tokens,
             temperature=temperature,
             messages=[{
@@ -312,7 +357,24 @@ async def get_simple_response(
             }]
         )
 
-        return response.content[0].text
+        response_text = response.content[0].text
+
+        # Track usage if user context provided
+        if user_context:
+            usage = response.usage
+            await get_usage_tracking_service().record_usage(
+                user_email=user_context.email,
+                user_id=user_context.user_id,
+                model=DEFAULT_MODEL,
+                operation_type=operation_type,
+                input_tokens=getattr(usage, 'input_tokens', 0) or 0,
+                output_tokens=getattr(usage, 'output_tokens', 0) or 0,
+                cache_creation_tokens=getattr(usage, 'cache_creation_input_tokens', 0) or 0,
+                cache_read_tokens=getattr(usage, 'cache_read_input_tokens', 0) or 0,
+                course_id=user_context.course_id,
+            )
+
+        return response_text
 
     except Exception as e:
         logger.error("Error getting simple response: %s", str(e))

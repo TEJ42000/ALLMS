@@ -10,13 +10,16 @@ Provides endpoints for:
 import logging
 from typing import Optional, List
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
+from app.dependencies.auth import get_optional_user
+from app.models.auth_models import User
 from app.models.schemas import (
     CreateStudyGuideRequest,
     StoredStudyGuide,
     StoredStudyGuideSummary,
 )
+from app.models.usage_models import UserContext
 from app.services.study_guide_persistence_service import get_study_guide_persistence_service
 from app.services.files_api_service import get_files_api_service
 
@@ -78,7 +81,8 @@ async def get_study_guide(course_id: str, guide_id: str):
 @router.post("/courses/{course_id}")
 async def create_study_guide(
     course_id: str,
-    request: CreateStudyGuideRequest
+    request: CreateStudyGuideRequest,
+    user: Optional[User] = Depends(get_optional_user),
 ):
     """Generate and save a new study guide.
 
@@ -98,12 +102,22 @@ async def create_study_guide(
         else:
             topic = f"Course '{course_id}' - All Materials"
 
+        # Build user context for usage tracking
+        user_context = None
+        if user:
+            user_context = UserContext(
+                email=user.email,
+                user_id=user.user_id,
+                course_id=course_id,
+            )
+
         # Generate the study guide content
         logger.info("Generating study guide for %s, weeks=%s", course_id, request.weeks)
         content = await files_service.generate_study_guide_from_course(
             course_id=course_id,
             topic=topic,
-            week_numbers=request.weeks
+            week_numbers=request.weeks,
+            user_context=user_context,
         )
 
         # Check for duplicates unless explicitly allowed

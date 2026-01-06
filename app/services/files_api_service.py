@@ -26,8 +26,10 @@ from typing import Dict, List, Optional, Tuple
 from anthropic import AsyncAnthropic, RateLimitError
 
 from app.models.course_models import CourseMaterial
+from app.models.usage_models import UserContext
 from app.services.gcp_service import get_anthropic_api_key, get_firestore_client
 from app.services.text_extractor import extract_text, detect_file_type, ExtractionResult
+from app.services.usage_tracking_service import get_usage_tracking_service
 
 logger = logging.getLogger(__name__)
 
@@ -358,7 +360,8 @@ Return ONLY valid JSON:
         topic: str,
         num_questions: int = 10,
         difficulty: str = "medium",
-        week_number: Optional[int] = None
+        week_number: Optional[int] = None,
+        user_context: Optional[UserContext] = None,
     ) -> Dict:
         """Generate quiz using Firestore materials with text extraction.
 
@@ -371,6 +374,7 @@ Return ONLY valid JSON:
             num_questions: Number of questions to generate
             difficulty: 'easy', 'medium', or 'hard'
             week_number: Optional week filter
+            user_context: User context for usage tracking
 
         Returns:
             Dictionary with quiz questions
@@ -457,6 +461,27 @@ Return ONLY valid JSON:
             }]
         )
 
+        # Track usage if user context provided
+        if user_context:
+            usage = response.usage
+            await get_usage_tracking_service().record_usage(
+                user_email=user_context.email,
+                user_id=user_context.user_id,
+                model="claude-sonnet-4-20250514",
+                operation_type="quiz",
+                input_tokens=getattr(usage, 'input_tokens', 0) or 0,
+                output_tokens=getattr(usage, 'output_tokens', 0) or 0,
+                cache_creation_tokens=getattr(usage, 'cache_creation_input_tokens', 0) or 0,
+                cache_read_tokens=getattr(usage, 'cache_read_input_tokens', 0) or 0,
+                course_id=course_id,
+                request_metadata={
+                    "topic": topic,
+                    "num_questions": num_questions,
+                    "difficulty": difficulty,
+                    "week_number": week_number,
+                },
+            )
+
         # Parse response
         text = response.content[0].text
         quiz_data = self._parse_json(text)
@@ -472,7 +497,8 @@ Return ONLY valid JSON:
         self,
         course_id: str,
         topic: str,
-        week_numbers: Optional[List[int]] = None
+        week_numbers: Optional[List[int]] = None,
+        user_context: Optional[UserContext] = None,
     ) -> str:
         """Generate comprehensive study guide using Firestore materials with text extraction.
 
@@ -483,6 +509,7 @@ Return ONLY valid JSON:
             course_id: Course ID
             topic: Topic description for the study guide
             week_numbers: Optional list of week numbers to filter by (e.g., [1, 2, 3])
+            user_context: User context for usage tracking
 
         Returns:
             Formatted study guide in Markdown
@@ -698,6 +725,25 @@ OUTPUT QUALITY:
             "💰 Token usage - Input: %d, Output: %d, Cache read: %d, Cache created: %d",
             input_tokens, output_tokens, cache_read, cache_created
         )
+
+        # Track usage if user context provided
+        if user_context:
+            await get_usage_tracking_service().record_usage(
+                user_email=user_context.email,
+                user_id=user_context.user_id,
+                model="claude-sonnet-4-20250514",
+                operation_type="study_guide",
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                cache_creation_tokens=cache_created,
+                cache_read_tokens=cache_read,
+                course_id=course_id,
+                request_metadata={
+                    "topic": topic,
+                    "week_numbers": week_numbers,
+                    "materials_count": len(materials_with_text),
+                },
+            )
 
         # With extended thinking, response has thinking blocks and text blocks
         # Extract just the text content (not the thinking)
