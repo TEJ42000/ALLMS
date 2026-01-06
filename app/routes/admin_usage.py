@@ -1022,8 +1022,8 @@ async def get_anthropic_usage(
             detail="Anthropic Admin API not configured. Please add 'anthropic-admin-api-key' to Secret Manager."
         ) from e
     except Exception as e:
-        logger.error("Error fetching Anthropic usage: %s", e)
-        raise HTTPException(500, detail=str(e)) from e
+        logger.error("Error fetching Anthropic usage: %s", e, exc_info=True)
+        raise HTTPException(500, detail=f"Error fetching Anthropic usage: {str(e)}") from e
 
 
 @router.get(
@@ -1071,8 +1071,8 @@ async def get_anthropic_cost(
             detail="Anthropic Admin API not configured. Please add 'anthropic-admin-api-key' to Secret Manager."
         ) from e
     except Exception as e:
-        logger.error("Error fetching Anthropic cost: %s", e)
-        raise HTTPException(500, detail=str(e)) from e
+        logger.error("Error fetching Anthropic cost: %s", e, exc_info=True)
+        raise HTTPException(500, detail=f"Error fetching Anthropic cost: {str(e)}") from e
 
 
 @router.get(
@@ -1191,6 +1191,8 @@ async def get_reconciliation_report(
             503,
             detail="Anthropic Admin API not configured. Please add 'anthropic-admin-api-key' to Secret Manager."
         ) from e
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error("Error generating reconciliation report: %s", e)
-        raise HTTPException(500, detail=str(e)) from e
+        logger.error("Error generating reconciliation report: %s", e, exc_info=True)
+        raise HTTPException(500, detail=f"Error generating reconciliation report: {str(e)}") from e
