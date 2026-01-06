@@ -4,14 +4,22 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Select Your Course - LLS Study Portal</title>
+    <link rel="icon" type="image/svg+xml" href="/static/images/favicon.svg">
     <link rel="stylesheet" href="/static/css/styles.css">
     <link rel="stylesheet" href="/static/css/course-selection.css">
 </head>
 <body>
     <div class="container">
         <header class="landing-header">
-            <h1 class="landing-title">⚖️ LLS Study Portal</h1>
-            <p class="landing-subtitle">Select your course to begin studying</p>
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; width: 100%;">
+                <div>
+                    <h1 class="landing-title">⚖️ LLS Study Portal</h1>
+                    <p class="landing-subtitle">Select your course to begin studying</p>
+                </div>
+                {% if user %}
+                {% include "partials/user_header.html" %}
+                {% endif %}
+            </div>
         </header>
 
         <main class="landing-main">

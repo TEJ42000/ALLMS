@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }} - LLS Admin</title>
+    <link rel="icon" type="image/svg+xml" href="/static/images/favicon.svg">
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <link rel="stylesheet" href="/static/css/admin.css">
+</head>
+<body>
+    {% include "admin/partials/dev_mode_banner.html" %}
+    <div class="container">
+        <header class="nav-header">
+            <div class="header-row">
+                <h1 class="nav-title">⚙️ LLS Admin Portal</h1>
+                <div style="display: flex; align-items: center; gap: 1rem;">
+                    {% if user %}
+                    {% include "admin/partials/user_info.html" %}
+                    {% endif %}
+                    <a href="/" class="btn btn-secondary">← Back to Study Portal</a>
+                </div>
+            </div>
+            <div class="nav-tabs">
+                <a href="/admin/courses" class="nav-tab">📚 Courses</a>
+                <button class="nav-tab active">👥 Users</button>
+            </div>
+        </header>
+
+        <main id="main-content">
+            <section class="admin-section active">
+                <div class="section-header">
+                    <h2 class="section-title">👥 Allow List Management</h2>
+                    <div class="header-actions">
+                        <button id="add-user-btn" class="btn btn-primary">+ Add User</button>
+                    </div>
+                </div>
+
+                <!-- Stats Summary -->
+                <div id="stats-summary" class="stats-row" style="margin-bottom: 1rem;">
+                    <span class="stat-badge stat-active">Active: <span id="active-count">-</span></span>
+                    <span class="stat-badge stat-expired">Expired: <span id="expired-count">-</span></span>
+                    <span class="stat-badge stat-inactive">Inactive: <span id="inactive-count">-</span></span>
+                </div>
+
+                <!-- Filters -->
+                <div class="filters-row" style="margin-bottom: 1rem;">
+                    <label><input type="checkbox" id="show-expired"> Show Expired</label>
+                    <label><input type="checkbox" id="show-inactive"> Show Inactive</label>
+                </div>
+
+                <!-- Users Table -->
+                <div id="users-table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Email</th>
+                                <th>Status</th>
+                                <th>Reason</th>
+                                <th>Added By</th>
+                                <th>Expires</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="users-tbody">
+                            <tr><td colspan="6" class="loading">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Add User Modal -->
+    <div id="add-user-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Add User to Allow List</h3>
+                <button class="modal-close" type="button">&times;</button>
+            </div>
+            <form id="add-user-form">
+                <div class="form-group">
+                    <label for="email">Email Address *</label>
+                    <input type="email" id="email" required placeholder="user@external.com">
+                    <small>Cannot add @mgms.eu users (they already have access)</small>
+                </div>
+                <div class="form-group">
+                    <label for="reason">Reason *</label>
+                    <input type="text" id="reason" required placeholder="Guest lecturer, Research assistant, etc.">
+                </div>
+                <div class="form-group">
+                    <label for="expires_at">Expires (optional)</label>
+                    <input type="datetime-local" id="expires_at">
+                </div>
+                <div class="form-group">
+                    <label for="notes">Notes (optional)</label>
+                    <textarea id="notes" rows="2" placeholder="Additional notes..."></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" id="cancel-btn">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Add User</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="/static/js/admin-users.js"></script>
+</body>
+</html>
+

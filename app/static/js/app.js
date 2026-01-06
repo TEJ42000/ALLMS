@@ -73,10 +73,174 @@ function hideLoading() {
 }
 
 // ========== Markdown Formatting ==========
+// Configure marked.js for rendering
+if (typeof marked !== 'undefined') {
+    marked.setOptions({
+        breaks: true,
+        gfm: true,
+        headerIds: false,
+        mangle: false
+    });
+}
+
+// Initialize Mermaid for diagram rendering
+if (typeof mermaid !== 'undefined') {
+    mermaid.initialize({
+        startOnLoad: false,
+        theme: 'default',
+        securityLevel: 'loose'
+    });
+}
+
+/**
+ * Pre-process text to wrap ASCII art diagrams in code fences
+ * Detects box-drawing characters and wraps them properly
+ */
+function preprocessAsciiArt(text) {
+    if (!text) return text;
+
+    // Box-drawing characters pattern
+    const boxChars = /[┌┐└┘├┤┬┴┼─│═║╔╗╚╝╠╣╦╩╬]/;
+
+    const lines = text.split('\n');
+    const result = [];
+    let inAsciiBlock = false;
+    let asciiBuffer = [];
+
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const hasBoxChars = boxChars.test(line);
+
+        if (hasBoxChars && !inAsciiBlock) {
+            // Start of ASCII art block
+            inAsciiBlock = true;
+            asciiBuffer = [line];
+        } else if (hasBoxChars && inAsciiBlock) {
+            // Continue ASCII art block
+            asciiBuffer.push(line);
+        } else if (!hasBoxChars && inAsciiBlock) {
+            // End of ASCII art block - wrap in code fence
+            result.push('```');
+            result.push(...asciiBuffer);
+            result.push('```');
+            result.push(line);
+            inAsciiBlock = false;
+            asciiBuffer = [];
+        } else {
+            result.push(line);
+        }
+    }
+
+    // Handle case where ASCII art is at the end
+    if (inAsciiBlock && asciiBuffer.length > 0) {
+        result.push('```');
+        result.push(...asciiBuffer);
+        result.push('```');
+    }
+
+    return result.join('\n');
+}
+
+/**
+ * Format markdown text using marked.js library
+ * Falls back to simple formatting if marked is not available
+ */
 function formatMarkdown(text) {
     if (!text) return '';
 
-    // Split into lines for processing
+    // Pre-process to wrap ASCII art in code fences
+    text = preprocessAsciiArt(text);
+
+    // Use marked.js if available
+    if (typeof marked !== 'undefined') {
+        try {
+            return marked.parse(text);
+        } catch (e) {
+            console.error('Marked.js error:', e);
+            return formatMarkdownFallback(text);
+        }
+    }
+
+    return formatMarkdownFallback(text);
+}
+
+/**
+ * Render Mermaid diagrams in a container
+ * Call this after inserting HTML with mermaid code blocks
+ */
+async function renderMermaidDiagrams(container) {
+    if (typeof mermaid === 'undefined') return;
+
+    // Mermaid diagram type keywords
+    const mermaidKeywords = [
+        'graph ', 'graph\n', 'flowchart ', 'flowchart\n',
+        'sequenceDiagram', 'classDiagram', 'stateDiagram',
+        'erDiagram', 'gantt', 'pie', 'journey', 'gitGraph',
+        'mindmap', 'timeline', 'quadrantChart', 'xychart'
+    ];
+
+    // Find all code blocks that might be mermaid
+    const codeBlocks = container.querySelectorAll('pre code');
+    for (const block of codeBlocks) {
+        const text = block.textContent.trim();
+
+        // Check if text contains mermaid keywords (anywhere, not just at start)
+        // This handles cases where there's a title before the diagram definition
+        const isMermaid = mermaidKeywords.some(keyword => text.includes(keyword));
+
+        if (isMermaid) {
+            try {
+                const pre = block.parentElement;
+                const id = 'mermaid-' + Math.random().toString(36).substr(2, 9);
+
+                // Extract just the mermaid code (skip title lines before graph/flowchart)
+                let mermaidCode = text;
+                const lines = text.split('\n');
+                const diagramStartIndex = lines.findIndex(line =>
+                    mermaidKeywords.some(kw => line.trim().startsWith(kw.trim()))
+                );
+                if (diagramStartIndex > 0) {
+                    // There's a title - extract just the diagram part
+                    mermaidCode = lines.slice(diagramStartIndex).join('\n');
+                }
+
+                const { svg } = await mermaid.render(id, mermaidCode);
+
+                // Create container with optional title
+                const div = document.createElement('div');
+                div.className = 'mermaid-container';
+
+                // Add title if present
+                if (diagramStartIndex > 0) {
+                    const title = lines.slice(0, diagramStartIndex).join(' ').trim();
+                    if (title) {
+                        const titleEl = document.createElement('div');
+                        titleEl.className = 'mermaid-title';
+                        titleEl.textContent = title;
+                        div.appendChild(titleEl);
+                    }
+                }
+
+                const diagramDiv = document.createElement('div');
+                diagramDiv.className = 'mermaid';
+                diagramDiv.innerHTML = svg;
+                div.appendChild(diagramDiv);
+
+                pre.replaceWith(div);
+            } catch (e) {
+                console.warn('Mermaid rendering failed:', e);
+                // Leave the code block as-is for debugging
+            }
+        }
+    }
+}
+
+/**
+ * Fallback simple markdown formatting when marked.js is not available
+ */
+function formatMarkdownFallback(text) {
+    if (!text) return '';
+
     const lines = text.split('\n');
     let html = '';
     let inList = false;
@@ -85,81 +249,37 @@ function formatMarkdown(text) {
     for (let i = 0; i < lines.length; i++) {
         let line = lines[i];
 
-        // Skip empty lines but add spacing
         if (line.trim() === '') {
-            if (inList) {
-                html += '</ul>';
-                inList = false;
-            }
-            if (inNumberedList) {
-                html += '</ol>';
-                inNumberedList = false;
-            }
+            if (inList) { html += '</ul>'; inList = false; }
+            if (inNumberedList) { html += '</ol>'; inNumberedList = false; }
             html += '<br>';
             continue;
         }
 
         // Headers
+        if (line.startsWith('# ')) {
+            if (inList) { html += '</ul>'; inList = false; }
+            if (inNumberedList) { html += '</ol>'; inNumberedList = false; }
+            html += `<h1>${escapeHtml(line.substring(2))}</h1>`;
+            continue;
+        }
         if (line.startsWith('## ')) {
             if (inList) { html += '</ul>'; inList = false; }
             if (inNumberedList) { html += '</ol>'; inNumberedList = false; }
-            html += `<h2 class="md-h2">${escapeHtml(line.substring(3))}</h2>`;
+            html += `<h2>${escapeHtml(line.substring(3))}</h2>`;
             continue;
         }
         if (line.startsWith('### ')) {
             if (inList) { html += '</ul>'; inList = false; }
             if (inNumberedList) { html += '</ol>'; inNumberedList = false; }
-            html += `<h3 class="md-h3">${escapeHtml(line.substring(4))}</h3>`;
+            html += `<h3>${escapeHtml(line.substring(4))}</h3>`;
             continue;
         }
 
-        // Special callout boxes
-        if (line.startsWith('💡 ')) {
-            if (inList) { html += '</ul>'; inList = false; }
+        // Bullet lists
+        if (line.match(/^[•\-\*] /)) {
             if (inNumberedList) { html += '</ol>'; inNumberedList = false; }
-            html += `<div class="callout callout-tip">💡 ${formatInline(line.substring(3))}</div>`;
-            continue;
-        }
-        if (line.startsWith('✅ ')) {
-            if (inList) { html += '</ul>'; inList = false; }
-            if (inNumberedList) { html += '</ol>'; inNumberedList = false; }
-            html += `<div class="callout callout-success">✅ ${formatInline(line.substring(3))}</div>`;
-            continue;
-        }
-        if (line.startsWith('❌ ')) {
-            if (inList) { html += '</ul>'; inList = false; }
-            if (inNumberedList) { html += '</ol>'; inNumberedList = false; }
-            html += `<div class="callout callout-error">❌ ${formatInline(line.substring(3))}</div>`;
-            continue;
-        }
-        if (line.startsWith('⚠️ ')) {
-            if (inList) { html += '</ul>'; inList = false; }
-            if (inNumberedList) { html += '</ol>'; inNumberedList = false; }
-            html += `<div class="callout callout-warning">⚠️ ${formatInline(line.substring(3))}</div>`;
-            continue;
-        }
-        if (line.startsWith('❓ ')) {
-            if (inList) { html += '</ul>'; inList = false; }
-            if (inNumberedList) { html += '</ol>'; inNumberedList = false; }
-            html += `<div class="callout callout-question">❓ ${formatInline(line.substring(3))}</div>`;
-            continue;
-        }
-
-        // STEP markers
-        if (line.match(/^STEP \d+:/)) {
-            if (inList) { html += '</ul>'; inList = false; }
-            if (inNumberedList) { html += '</ol>'; inNumberedList = false; }
-            html += `<div class="step-marker">${formatInline(line)}</div>`;
-            continue;
-        }
-
-        // Bullet lists (• or -)
-        if (line.match(/^[•\-] /)) {
-            if (inNumberedList) { html += '</ol>'; inNumberedList = false; }
-            if (!inList) {
-                html += '<ul class="md-list">';
-                inList = true;
-            }
+            if (!inList) { html += '<ul>'; inList = true; }
             html += `<li>${formatInline(line.substring(2))}</li>`;
             continue;
         }
@@ -167,10 +287,7 @@ function formatMarkdown(text) {
         // Numbered lists
         if (line.match(/^\d+\. /)) {
             if (inList) { html += '</ul>'; inList = false; }
-            if (!inNumberedList) {
-                html += '<ol class="md-list-numbered">';
-                inNumberedList = true;
-            }
+            if (!inNumberedList) { html += '<ol>'; inNumberedList = true; }
             const content = line.replace(/^\d+\. /, '');
             html += `<li>${formatInline(content)}</li>`;
             continue;
@@ -179,10 +296,9 @@ function formatMarkdown(text) {
         // Regular paragraph
         if (inList) { html += '</ul>'; inList = false; }
         if (inNumberedList) { html += '</ol>'; inNumberedList = false; }
-        html += `<p class="md-p">${formatInline(line)}</p>`;
+        html += `<p>${formatInline(line)}</p>`;
     }
 
-    // Close any open lists
     if (inList) html += '</ul>';
     if (inNumberedList) html += '</ol>';
 
@@ -191,18 +307,10 @@ function formatMarkdown(text) {
 
 // Format inline markdown (bold, italic, code, etc.)
 function formatInline(text) {
-    // First escape HTML to prevent XSS
     text = escapeHtml(text);
-
-    // Bold
-    text = text.replace(/\*\*(.*?)\*\*/g, '<strong class="md-bold">$1</strong>');
-    // Italic
-    text = text.replace(/\*(.*?)\*/g, '<em class="md-italic">$1</em>');
-    // Code/Articles
-    text = text.replace(/`(.*?)`/g, '<code class="md-code">$1</code>');
-    // Article references (Art. X:XX format)
-    text = text.replace(/Art\. ([\d:]+\s+[A-Z]+)/g, '<span class="article-ref">Art. $1</span>');
-
+    text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    text = text.replace(/\*(.*?)\*/g, '<em>$1</em>');
+    text = text.replace(/`(.*?)`/g, '<code>$1</code>');
     return text;
 }
 
@@ -228,92 +336,433 @@ function initTutorListeners() {
 
 async function askTutor() {
     const message = document.getElementById('tutor-input').value.trim();
-    const context = document.getElementById('context-select').value;
+    const contextSelect = document.getElementById('context-select');
+    const contextValue = contextSelect.value;
     const messagesDiv = document.getElementById('chat-messages');
-    
+
     if (!message) return;
-    
+
+    // Parse context value to extract week number if present
+    // Format from template: "Week X: Topic Name" stored as topic name,
+    // but option value could be topic name directly
+    let context = contextValue;
+    let week_number = null;
+
+    // Check if a week-specific option was selected by looking at the option text
+    const selectedOption = contextSelect.options[contextSelect.selectedIndex];
+    if (selectedOption && selectedOption.text.startsWith('Week ')) {
+        // Extract week number from "Week X: Topic Name"
+        const weekMatch = selectedOption.text.match(/^Week (\d+):/);
+        if (weekMatch) {
+            week_number = parseInt(weekMatch[1]);
+        }
+    }
+
     // Add user message
     addMessage('user', message);
     document.getElementById('tutor-input').value = '';
-    
-    showLoading();
-    
+
+    // Show typing indicator (bouncing dots)
+    showTypingIndicator();
+
     try {
+        // Build request with optional week_number
+        const requestBody = addCourseContext({message, context});
+        if (week_number !== null) {
+            requestBody.week_number = week_number;
+        }
+
         const response = await fetch(`${API_BASE}/api/tutor/chat`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(addCourseContext({message, context}))
+            body: JSON.stringify(requestBody)
         });
-        
+
         if (!response.ok) throw new Error(`API error: ${response.status}`);
-        
+
         const data = await response.json();
+
+        // Hide typing indicator and show response
+        hideTypingIndicator();
         addMessage('assistant', data.content);
-        
+
     } catch (error) {
         console.error('Error:', error);
+        hideTypingIndicator();
         addMessage('error', 'Sorry, there was an error processing your request.');
-    } finally {
-        hideLoading();
     }
 }
 
 function addMessage(role, content) {
     const messagesDiv = document.getElementById('chat-messages');
+
+    // Create wrapper for avatar + message bubble layout
+    const wrapperDiv = document.createElement('div');
+    wrapperDiv.className = `message-wrapper ${role}`;
+
+    // Create avatar
+    const avatarDiv = document.createElement('div');
+    avatarDiv.className = 'message-avatar';
+    if (role === 'user') {
+        avatarDiv.textContent = '👤';
+    } else if (role === 'assistant') {
+        avatarDiv.textContent = '🤖';
+    } else {
+        avatarDiv.textContent = '⚠️';
+    }
+
+    // Create message bubble
     const messageDiv = document.createElement('div');
-    messageDiv.className = `message message-${role}`;
+    messageDiv.className = 'message';
     messageDiv.innerHTML = formatMarkdown(content);
-    messagesDiv.appendChild(messageDiv);
+
+    // Assemble
+    wrapperDiv.appendChild(avatarDiv);
+    wrapperDiv.appendChild(messageDiv);
+    messagesDiv.appendChild(wrapperDiv);
     messagesDiv.scrollTop = messagesDiv.scrollHeight;
 }
 
-// ========== Assessment ==========
-function initAssessmentListeners() {
-    document.getElementById('assess-btn').addEventListener('click', assessAnswer);
+function showTypingIndicator() {
+    const messagesDiv = document.getElementById('chat-messages');
+
+    // Remove any existing typing indicator
+    hideTypingIndicator();
+
+    const typingDiv = document.createElement('div');
+    typingDiv.className = 'typing-indicator';
+    typingDiv.id = 'typing-indicator';
+
+    typingDiv.innerHTML = `
+        <div class="message-avatar">🤖</div>
+        <div class="typing-bubble">
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+        </div>
+    `;
+
+    messagesDiv.appendChild(typingDiv);
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
 }
 
-async function assessAnswer() {
-    const topic = document.getElementById('assessment-topic').value;
-    const question = document.getElementById('assessment-question').value.trim();
-    const answer = document.getElementById('assessment-answer').value.trim();
-    const resultDiv = document.getElementById('assessment-result');
-    
-    if (!answer) {
-        alert('Please enter your answer');
-        return;
+function hideTypingIndicator() {
+    const typingIndicator = document.getElementById('typing-indicator');
+    if (typingIndicator) {
+        typingIndicator.remove();
     }
-    
+}
+
+// ========== Essay Assessment ==========
+// Essay assessment state
+let essayState = {
+    assessmentId: null,
+    question: null,
+    topic: null,
+    keyConcepts: []
+};
+
+function initAssessmentListeners() {
+    // Tab navigation
+    document.querySelectorAll('.assessment-tab').forEach(tab => {
+        tab.addEventListener('click', () => switchAssessmentTab(tab.dataset.assessmentTab));
+    });
+
+    // Generate question button
+    const generateBtn = document.getElementById('generate-essay-btn');
+    if (generateBtn) generateBtn.addEventListener('click', generateEssayQuestion);
+
+    // Submit essay button
+    const submitBtn = document.getElementById('submit-essay-btn');
+    if (submitBtn) submitBtn.addEventListener('click', submitEssayAnswer);
+
+    // New question button
+    const newQuestionBtn = document.getElementById('new-question-btn');
+    if (newQuestionBtn) newQuestionBtn.addEventListener('click', showGenerateView);
+
+    // Word count tracker
+    const essayAnswer = document.getElementById('essay-answer');
+    if (essayAnswer) {
+        essayAnswer.addEventListener('input', updateWordCount);
+    }
+}
+
+function switchAssessmentTab(tabName) {
+    // Update active tab
+    document.querySelectorAll('.assessment-tab').forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.assessmentTab === tabName);
+    });
+
+    // Show corresponding content
+    document.getElementById('new-essay-tab').style.display = tabName === 'new' ? 'block' : 'none';
+    document.getElementById('essay-history-tab').style.display = tabName === 'history' ? 'block' : 'none';
+
+    // Load history if switching to history tab
+    if (tabName === 'history') {
+        loadEssayHistory();
+    }
+}
+
+function showGenerateView() {
+    document.getElementById('generate-question-view').style.display = 'block';
+    document.getElementById('essay-question-view').style.display = 'none';
+    document.getElementById('essay-result').innerHTML = '';
+    essayState = { assessmentId: null, question: null, topic: null, keyConcepts: [] };
+}
+
+function updateWordCount() {
+    const answer = document.getElementById('essay-answer').value.trim();
+    const wordCount = answer ? answer.split(/\s+/).filter(w => w.length > 0).length : 0;
+    document.getElementById('essay-word-count').textContent = wordCount;
+}
+
+async function generateEssayQuestion() {
+    const topic = document.getElementById('essay-topic-select').value;
     showLoading();
-    
+
     try {
-        const response = await fetch(`${API_BASE}/api/assessment/assess`, {
+        const response = await fetch(`${API_BASE}/api/assessment/essay/generate`, {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(addCourseContext({topic, question: question || null, answer}))
+            headers: {
+                'Content-Type': 'application/json',
+                'X-User-ID': getUserId()
+            },
+            body: JSON.stringify({
+                course_id: COURSE_ID,
+                topic: topic
+            })
         });
 
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
-            const errorMessage = errorData.detail || `API error: ${response.status}`;
-            throw new Error(errorMessage);
+            throw new Error(errorData.detail || `API error: ${response.status}`);
         }
 
         const data = await response.json();
-        resultDiv.innerHTML = `
-            <div class="assessment-feedback">
-                ${formatMarkdown(data.feedback)}
-            </div>
-        `;
-        resultDiv.style.display = 'block';
+
+        // Store state
+        essayState.assessmentId = data.assessment_id;
+        essayState.question = data.question;
+        essayState.topic = data.topic;
+        essayState.keyConcepts = data.key_concepts || [];
+
+        // Display question
+        document.getElementById('essay-topic-badge').textContent = data.topic;
+        document.getElementById('essay-question-text').textContent = data.question;
+
+        // Show key concepts if available
+        const conceptsDiv = document.getElementById('essay-key-concepts');
+        if (data.key_concepts && data.key_concepts.length > 0) {
+            conceptsDiv.innerHTML = '<strong>Key concepts to address:</strong> ' +
+                data.key_concepts.map(c => `<span class="concept-tag">${escapeHtml(c)}</span>`).join(' ');
+            conceptsDiv.style.display = 'block';
+        } else {
+            conceptsDiv.style.display = 'none';
+        }
+
+        // Show guidance if available
+        const guidanceDiv = document.getElementById('essay-guidance');
+        if (data.guidance) {
+            guidanceDiv.innerHTML = `<em>💡 ${escapeHtml(data.guidance)}</em>`;
+            guidanceDiv.style.display = 'block';
+        } else {
+            guidanceDiv.style.display = 'none';
+        }
+
+        // Switch to question view
+        document.getElementById('generate-question-view').style.display = 'none';
+        document.getElementById('essay-question-view').style.display = 'block';
+        document.getElementById('essay-answer').value = '';
+        document.getElementById('essay-result').innerHTML = '';
+        updateWordCount();
 
     } catch (error) {
-        console.error('Error:', error);
-        const errorMessage = error.message || 'Error getting assessment. Please try again.';
-        resultDiv.innerHTML = `<p class="error">${escapeHtml(errorMessage)}</p>`;
+        console.error('Error generating question:', error);
+        alert(`Error generating question: ${error.message}`);
     } finally {
         hideLoading();
     }
+}
+
+async function submitEssayAnswer() {
+    const answer = document.getElementById('essay-answer').value.trim();
+    const resultDiv = document.getElementById('essay-result');
+
+    if (!answer) {
+        alert('Please write your essay answer before submitting.');
+        return;
+    }
+
+    if (answer.length < 100) {
+        alert('Your answer seems too short. Please write a more detailed response (at least 100 characters).');
+        return;
+    }
+
+    if (!essayState.assessmentId) {
+        alert('No active assessment. Please generate a new question.');
+        return;
+    }
+
+    showLoading();
+
+    try {
+        const response = await fetch(`${API_BASE}/api/assessment/essay/submit`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-User-ID': getUserId()
+            },
+            body: JSON.stringify({
+                assessment_id: essayState.assessmentId,
+                course_id: COURSE_ID,
+                answer: answer
+            })
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.detail || `API error: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        // Display results
+        let strengthsHtml = '';
+        if (data.strengths && data.strengths.length > 0) {
+            strengthsHtml = `
+                <div class="essay-strengths">
+                    <h4>✅ Strengths</h4>
+                    <ul>${data.strengths.map(s => `<li>${escapeHtml(s)}</li>`).join('')}</ul>
+                </div>
+            `;
+        }
+
+        let improvementsHtml = '';
+        if (data.improvements && data.improvements.length > 0) {
+            improvementsHtml = `
+                <div class="essay-improvements">
+                    <h4>⚠️ Areas for Improvement</h4>
+                    <ul>${data.improvements.map(i => `<li>${escapeHtml(i)}</li>`).join('')}</ul>
+                </div>
+            `;
+        }
+
+        resultDiv.innerHTML = `
+            <div class="essay-evaluation">
+                <div class="essay-grade">
+                    <span class="grade-number">${data.grade}</span>
+                    <span class="grade-label">/10</span>
+                </div>
+                ${strengthsHtml}
+                ${improvementsHtml}
+                <div class="essay-feedback">
+                    <h4>📝 Detailed Feedback</h4>
+                    ${formatMarkdown(data.feedback)}
+                </div>
+            </div>
+        `;
+        resultDiv.style.display = 'block';
+        resultDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    } catch (error) {
+        console.error('Error submitting essay:', error);
+        resultDiv.innerHTML = `<p class="error">Error: ${escapeHtml(error.message)}</p>`;
+        resultDiv.style.display = 'block';
+    } finally {
+        hideLoading();
+    }
+}
+
+async function loadEssayHistory() {
+    const historyList = document.getElementById('essay-history-list');
+    historyList.innerHTML = '<p class="loading-text">Loading...</p>';
+
+    try {
+        const response = await fetch(`${API_BASE}/api/assessment/essay/my-history?course_id=${COURSE_ID}`, {
+            headers: { 'X-User-ID': getUserId() }
+        });
+
+        if (!response.ok) {
+            throw new Error(`API error: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        if (!data.history || data.history.length === 0) {
+            historyList.innerHTML = `
+                <div class="empty-state">
+                    <p>📝 No essay assessments yet.</p>
+                    <p>Complete your first essay to see your history here!</p>
+                </div>
+            `;
+            return;
+        }
+
+        historyList.innerHTML = data.history.map(item => `
+            <div class="essay-history-item" onclick="viewEssayAttempt('${item.attemptId}')">
+                <div class="history-item-header">
+                    <span class="history-topic">${escapeHtml(item.topic)}</span>
+                    <span class="history-grade grade-${item.grade >= 7 ? 'good' : item.grade >= 5 ? 'ok' : 'low'}">${item.grade}/10</span>
+                </div>
+                <p class="history-question">${escapeHtml(item.question.substring(0, 100))}...</p>
+                <span class="history-date">${new Date(item.submittedAt).toLocaleDateString()}</span>
+            </div>
+        `).join('');
+
+    } catch (error) {
+        console.error('Error loading history:', error);
+        historyList.innerHTML = `<p class="error">Error loading history: ${escapeHtml(error.message)}</p>`;
+    }
+}
+
+async function viewEssayAttempt(attemptId) {
+    showLoading();
+
+    try {
+        const response = await fetch(`${API_BASE}/api/assessment/essay/attempt/${attemptId}`, {
+            headers: { 'X-User-ID': getUserId() }
+        });
+
+        if (!response.ok) {
+            throw new Error(`API error: ${response.status}`);
+        }
+
+        const data = await response.json();
+        const attempt = data.attempt;
+
+        // Create modal or detailed view
+        const modal = document.createElement('div');
+        modal.className = 'essay-modal';
+        modal.innerHTML = `
+            <div class="essay-modal-content">
+                <button class="modal-close" onclick="this.closest('.essay-modal').remove()">&times;</button>
+                <h3>Essay Attempt - ${attempt.grade}/10</h3>
+                <div class="attempt-details">
+                    <h4>Your Answer:</h4>
+                    <div class="attempt-answer">${escapeHtml(attempt.answer)}</div>
+                    <h4>Feedback:</h4>
+                    <div class="attempt-feedback">${formatMarkdown(attempt.feedback)}</div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+
+    } catch (error) {
+        console.error('Error viewing attempt:', error);
+        alert(`Error: ${error.message}`);
+    } finally {
+        hideLoading();
+    }
+}
+
+function getUserId() {
+    // Get or create a persistent user ID
+    let userId = localStorage.getItem('lls_user_id');
+    if (!userId) {
+        userId = 'user-' + Math.random().toString(36).substring(2, 15);
+        localStorage.setItem('lls_user_id', userId);
+    }
+    return userId;
 }
 
 // ========== Quiz Generator ==========
@@ -575,14 +1024,43 @@ async function generateQuiz() {
     const topicSelect = document.getElementById('quiz-topic-select');
     const difficultySelect = document.getElementById('quiz-difficulty-select');
     const numQuestionsSelect = document.getElementById('quiz-num-questions');
-    const topic = topicSelect ? topicSelect.value : 'all';
+    const topicValue = topicSelect ? topicSelect.value : 'all';
     const difficulty = difficultySelect ? difficultySelect.value : 'medium';
     const num_questions = numQuestionsSelect ? parseInt(numQuestionsSelect.value) : 10;
+
+    // Parse topic value - if it starts with "week-", extract week number
+    let topic = topicValue;
+    let week = null;
+    if (topicValue.startsWith('week-')) {
+        week = parseInt(topicValue.replace('week-', ''));
+        // Get the topic name from the selected option text
+        const selectedOption = topicSelect.options[topicSelect.selectedIndex];
+        if (selectedOption) {
+            // Extract topic name after "Week X: "
+            const optionText = selectedOption.text;
+            const colonIndex = optionText.indexOf(': ');
+            topic = colonIndex > 0 ? optionText.substring(colonIndex + 2) : topicValue;
+        }
+    }
 
     isGeneratingQuiz = true;
     showLoading();
 
     try {
+        // Build request body with optional week filter
+        const requestBody = {
+            course_id: COURSE_ID,
+            topic: topic,
+            num_questions: num_questions,
+            difficulty: difficulty,
+            allow_duplicate: false
+        };
+
+        // Add week filter if a specific week was selected
+        if (week !== null) {
+            requestBody.week = week;
+        }
+
         // Use the new quiz persistence API
         const response = await fetch(`${API_BASE}/api/quizzes/courses/${COURSE_ID}`, {
             method: 'POST',
@@ -590,13 +1068,7 @@ async function generateQuiz() {
                 'Content-Type': 'application/json',
                 'X-User-ID': getUserId()
             },
-            body: JSON.stringify({
-                course_id: COURSE_ID,
-                topic: topic,
-                num_questions: num_questions,
-                difficulty: difficulty,
-                allow_duplicate: false
-            })
+            body: JSON.stringify(requestBody)
         });
 
         if (!response.ok) {
@@ -1011,21 +1483,243 @@ function reviewQuiz() {
     }
 }
 
-// ========== Study Guide Generator ==========
+// ========== Study Guide Management ==========
 function initStudyListeners() {
-    document.getElementById('generate-study-btn').addEventListener('click', generateStudyGuide);
+    // Generate button
+    const generateBtn = document.getElementById('generate-study-btn');
+    if (generateBtn) {
+        generateBtn.addEventListener('click', generateStudyGuide);
+    }
+
+    // Estimate tokens button
+    const estimateBtn = document.getElementById('estimate-tokens-btn');
+    if (estimateBtn) {
+        estimateBtn.addEventListener('click', estimateStudyGuideTokens);
+    }
+
+    // Sub-tab navigation
+    const subTabs = document.querySelectorAll('[data-study-tab]');
+    subTabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            const tabName = tab.dataset.studyTab;
+
+            // Update active tab
+            subTabs.forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+
+            // Show corresponding content
+            document.getElementById('saved-guides-tab').style.display =
+                tabName === 'saved-guides' ? 'block' : 'none';
+            document.getElementById('new-guide-tab').style.display =
+                tabName === 'new-guide' ? 'block' : 'none';
+
+            // Clear result when switching tabs
+            document.getElementById('study-result').style.display = 'none';
+            // Hide debug panel when switching tabs
+            document.getElementById('token-debug-panel').style.display = 'none';
+        });
+    });
+
+    // Load saved guides on init
+    loadSavedStudyGuides();
 }
 
+/**
+ * Estimate tokens for the selected week(s) before generating
+ */
+async function estimateStudyGuideTokens() {
+    const debugPanel = document.getElementById('token-debug-panel');
+    const debugContent = document.getElementById('token-debug-content');
+    const weekSelect = document.getElementById('study-week-select');
+    const estimateBtn = document.getElementById('estimate-tokens-btn');
+
+    // Show loading state
+    estimateBtn.disabled = true;
+    estimateBtn.textContent = '⏳ Estimating...';
+
+    try {
+        // Build query params
+        let url = `${API_BASE}/api/study-guides/courses/${COURSE_ID}/estimate-tokens`;
+        if (weekSelect && weekSelect.value) {
+            url += `?weeks=${weekSelect.value}`;
+        }
+
+        const response = await fetch(url, { method: 'POST' });
+
+        if (!response.ok) {
+            throw new Error(`API error: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        // Build debug HTML
+        const statusClass = data.will_exceed_rate_limit ? 'debug-warning' : 'debug-success';
+        const statusIcon = data.will_exceed_rate_limit ? '⚠️' : '✅';
+
+        let materialsHtml = data.materials.map(m => `
+            <tr>
+                <td>${escapeHtml(m.title)}</td>
+                <td>Week ${m.week || 'N/A'}</td>
+                <td>${m.characters.toLocaleString()}</td>
+                <td>${m.estimated_tokens.toLocaleString()}</td>
+            </tr>
+        `).join('');
+
+        debugContent.innerHTML = `
+            <div class="debug-summary ${statusClass}">
+                <strong>${statusIcon} ${data.recommendation}</strong>
+            </div>
+            <div class="debug-stats">
+                <div class="debug-stat">
+                    <span class="debug-label">Materials:</span>
+                    <span class="debug-value">${data.material_count}</span>
+                </div>
+                <div class="debug-stat">
+                    <span class="debug-label">Total Characters:</span>
+                    <span class="debug-value">${data.total_characters.toLocaleString()}</span>
+                </div>
+                <div class="debug-stat">
+                    <span class="debug-label">Estimated Input Tokens:</span>
+                    <span class="debug-value">${data.estimated_input_tokens.toLocaleString()}</span>
+                </div>
+                <div class="debug-stat">
+                    <span class="debug-label">Rate Limit:</span>
+                    <span class="debug-value">${data.rate_limit.toLocaleString()} tokens/min</span>
+                </div>
+            </div>
+            <table class="debug-table">
+                <thead>
+                    <tr>
+                        <th>Material</th>
+                        <th>Week</th>
+                        <th>Characters</th>
+                        <th>Est. Tokens</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${materialsHtml}
+                </tbody>
+            </table>
+        `;
+
+        // Show and open the panel
+        debugPanel.style.display = 'block';
+        debugPanel.open = true;
+
+    } catch (error) {
+        console.error('Error estimating tokens:', error);
+        debugContent.innerHTML = `<div class="debug-error">❌ Error: ${escapeHtml(error.message)}</div>`;
+        debugPanel.style.display = 'block';
+        debugPanel.open = true;
+    } finally {
+        estimateBtn.disabled = false;
+        estimateBtn.textContent = '📊 Estimate Tokens';
+    }
+}
+
+/**
+ * Load and display saved study guides for the current course
+ */
+async function loadSavedStudyGuides() {
+    const listDiv = document.getElementById('study-guides-list');
+    if (!listDiv || !COURSE_ID) {
+        if (listDiv) {
+            listDiv.innerHTML = '<p class="no-guides-message">Select a course to view saved study guides.</p>';
+        }
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE}/api/study-guides/courses/${COURSE_ID}`);
+        if (!response.ok) throw new Error('Failed to load study guides');
+
+        const data = await response.json();
+
+        if (data.guides && data.guides.length > 0) {
+            listDiv.innerHTML = data.guides.map(guide => `
+                <div class="study-guide-card">
+                    <div class="guide-content" onclick="loadStudyGuide('${guide.id}')">
+                        <h4>${escapeHtml(guide.title)}</h4>
+                        <div class="guide-meta">
+                            <span>📅 ${formatDate(guide.created_at)}</span>
+                            <span>📝 ${guide.word_count || 0} words</span>
+                            ${guide.week_numbers ? `<span>📚 Weeks: ${guide.week_numbers.join(', ')}</span>` : ''}
+                        </div>
+                    </div>
+                    <div class="guide-actions">
+                        <button class="btn btn-small btn-danger" onclick="event.stopPropagation(); deleteStudyGuide('${guide.id}', '${escapeHtml(guide.title).replace(/'/g, "\\'")}')">
+                            🗑️ Delete
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        } else {
+            listDiv.innerHTML = `
+                <div class="no-guides-message">
+                    <p>No saved study guides yet.</p>
+                    <p>Click "Generate New" to create your first study guide!</p>
+                </div>
+            `;
+        }
+    } catch (error) {
+        console.error('Error loading study guides:', error);
+        listDiv.innerHTML = '<p class="error">Failed to load study guides.</p>';
+    }
+}
+
+/**
+ * Load and display a specific study guide
+ */
+async function loadStudyGuide(guideId) {
+    const resultDiv = document.getElementById('study-result');
+    showLoading();
+
+    try {
+        const response = await fetch(`${API_BASE}/api/study-guides/courses/${COURSE_ID}/${guideId}`);
+        if (!response.ok) throw new Error('Failed to load study guide');
+
+        const guide = await response.json();
+
+        resultDiv.innerHTML = formatMarkdown(guide.content);
+        resultDiv.style.display = 'block';
+
+        // Render any Mermaid diagrams
+        await renderMermaidDiagrams(resultDiv);
+
+        // Scroll to result
+        resultDiv.scrollIntoView({ behavior: 'smooth' });
+
+    } catch (error) {
+        console.error('Error loading study guide:', error);
+        resultDiv.innerHTML = `<p class="error">Failed to load study guide: ${escapeHtml(error.message)}</p>`;
+        resultDiv.style.display = 'block';
+    } finally {
+        hideLoading();
+    }
+}
+
+/**
+ * Generate a new study guide using the persistence API
+ */
 async function generateStudyGuide() {
     const resultDiv = document.getElementById('study-result');
+    const weekSelect = document.getElementById('study-week-select');
 
     showLoading();
 
     try {
-        // Build request with course context (course_id will be added if available)
-        const requestBody = addCourseContext({});
+        // Build request
+        const requestBody = {
+            course_id: COURSE_ID
+        };
 
-        const response = await fetch(`${API_BASE}/api/files-content/study-guide`, {
+        // Add week filter if selected
+        if (weekSelect && weekSelect.value) {
+            requestBody.weeks = [parseInt(weekSelect.value, 10)];
+        }
+
+        // Use new persistence API
+        const response = await fetch(`${API_BASE}/api/study-guides/courses/${COURSE_ID}`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(requestBody)
@@ -1033,20 +1727,86 @@ async function generateStudyGuide() {
 
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
-            const errorMessage = errorData.detail || `API error: ${response.status}`;
-            throw new Error(errorMessage);
+            throw new Error(errorData.detail || `API error: ${response.status}`);
         }
 
         const data = await response.json();
-        resultDiv.innerHTML = `<div class="study-guide">${formatMarkdown(data.guide)}</div>`;
+        const guide = data.guide;
+
+        // Display the generated content
+        resultDiv.innerHTML = formatMarkdown(guide.content);
         resultDiv.style.display = 'block';
+
+        // Render any Mermaid diagrams
+        await renderMermaidDiagrams(resultDiv);
+
+        // Refresh saved guides list
+        await loadSavedStudyGuides();
+
+        // Show success message if it was a new guide
+        if (!data.is_duplicate) {
+            console.log('Study guide saved:', guide.title);
+        }
 
     } catch (error) {
         console.error('Error:', error);
-        // Backend now provides user-friendly error messages directly
-        const errorMessage = error.message || 'Error generating study guide. Please try again.';
-        resultDiv.innerHTML = `<p class="error">${escapeHtml(errorMessage)}</p>`;
+        resultDiv.innerHTML = `<p class="error">${escapeHtml(error.message || 'Error generating study guide. Please try again.')}</p>`;
         resultDiv.style.display = 'block';
+    } finally {
+        hideLoading();
+    }
+}
+
+/**
+ * Format a date string for display
+ */
+function formatDate(dateStr) {
+    if (!dateStr) return 'Unknown';
+    try {
+        const date = new Date(dateStr);
+        return date.toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric'
+        });
+    } catch (e) {
+        return dateStr;
+    }
+}
+
+/**
+ * Delete a study guide with confirmation
+ */
+async function deleteStudyGuide(guideId, guideTitle) {
+    // Confirm before deleting
+    const confirmed = confirm(`Are you sure you want to delete "${guideTitle}"?\n\nThis action cannot be undone.`);
+    if (!confirmed) return;
+
+    showLoading();
+
+    try {
+        const response = await fetch(`${API_BASE}/api/study-guides/courses/${COURSE_ID}/${guideId}`, {
+            method: 'DELETE'
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.detail || 'Failed to delete study guide');
+        }
+
+        // Clear the result display if showing the deleted guide
+        const resultDiv = document.getElementById('study-result');
+        resultDiv.style.display = 'none';
+        resultDiv.innerHTML = '';
+
+        // Refresh the list
+        await loadSavedStudyGuides();
+
+        console.log('Study guide deleted:', guideTitle);
+
+    } catch (error) {
+        console.error('Error deleting study guide:', error);
+        alert(`Failed to delete study guide: ${error.message}`);
     } finally {
         hideLoading();
     }
@@ -1082,29 +1842,173 @@ function initDashboard() {
     if (statTopics) statTopics.textContent = stats.topics;
     if (statQuizzes) statQuizzes.textContent = stats.quizzes;
 
-    // Add topic card click handlers with context passing
-    document.querySelectorAll('.topic-card').forEach(card => {
-        card.addEventListener('click', () => {
-            const topic = card.dataset.topic;
-            const tutorTab = document.querySelector('.nav-tab[data-tab="tutor"]');
-            if (tutorTab) tutorTab.click();
+    // Load course weeks dynamically
+    loadCourseWeeks();
+}
 
-            // Set the context select to match the clicked topic
-            const contextSelect = document.getElementById('context-select');
-            if (contextSelect && topic) {
-                const topicMap = {
-                    'criminal': 'Criminal Law',
-                    'private': 'Private Law',
-                    'constitutional': 'Constitutional Law',
-                    'administrative': 'Administrative Law',
-                    'international': 'International Law'
-                };
-                if (topicMap[topic]) {
-                    contextSelect.value = topicMap[topic];
-                }
-            }
+/**
+ * Fetch course weeks from API and render them in the dashboard
+ */
+async function loadCourseWeeks() {
+    const weeksGrid = document.getElementById('weeks-grid');
+    if (!weeksGrid) return;
+
+    // Need course context to fetch weeks
+    if (!COURSE_ID) {
+        weeksGrid.innerHTML = '<p class="no-weeks-message">No course selected</p>';
+        return;
+    }
+
+    try {
+        // Fetch course with weeks from admin API
+        const response = await fetch(`/api/admin/courses/${COURSE_ID}?include_weeks=true`);
+
+        if (!response.ok) {
+            throw new Error(`Failed to fetch course: ${response.status} ${response.statusText}`);
+        }
+
+        const course = await response.json();
+        const weeks = course.weeks || [];
+
+        if (weeks.length === 0) {
+            weeksGrid.innerHTML = '<p class="no-weeks-message">No weeks defined for this course yet.</p>';
+            return;
+        }
+
+        // Sort weeks by week number (with defensive validation)
+        weeks.sort((a, b) => {
+            const aNum = typeof a.weekNumber === 'number' ? a.weekNumber : 0;
+            const bNum = typeof b.weekNumber === 'number' ? b.weekNumber : 0;
+            return aNum - bNum;
         });
+
+        // Render week cards
+        weeksGrid.innerHTML = weeks.map(week => renderWeekCard(week)).join('');
+
+        // Setup event delegation for week card clicks (only once)
+        setupWeekCardEventDelegation(weeksGrid);
+
+        // Update topics stat to show total weeks
+        // TODO: Progress tracking will show completed/total when implemented
+        const statTopics = document.getElementById('stat-topics');
+        if (statTopics) {
+            statTopics.textContent = `${weeks.length} weeks`;
+        }
+
+    } catch (error) {
+        console.error('Error loading course weeks:', error);
+        weeksGrid.innerHTML = '<p class="error-message">Failed to load course weeks. Please try refreshing.</p>';
+    }
+}
+
+/**
+ * Render a single week card
+ * @param {Object} week - Week object from API
+ * @param {number} week.weekNumber - Week number (1-based)
+ * @param {string} [week.title] - Week title
+ * @param {string} [week.topicDescription] - Description of the week's content
+ * @param {string[]} [week.topics] - Array of topic strings
+ * @returns {string} HTML string for the week card
+ */
+function renderWeekCard(week) {
+    const weekNumber = week.weekNumber;
+    const safeWeekNumber = escapeHtml(String(weekNumber || 0));
+    const title = week.title || `Week ${weekNumber}`;
+    const description = week.topicDescription || '';
+    const topics = week.topics || [];
+
+    // Get icon based on week number or title (icons are safe literals)
+    const icon = getWeekIcon(week);
+
+    // Build topics list (show first 3 topics, ensure each is a string)
+    const topicsList = topics.slice(0, 3).map(t => `<li>${escapeHtml(String(t || ''))}</li>`).join('');
+    const moreTopics = topics.length > 3 ? `<li class="more-topics">+${topics.length - 3} more...</li>` : '';
+
+    return `
+        <div class="topic-card week-card" data-week="${safeWeekNumber}" data-title="${escapeHtml(title)}">
+            <h4>${icon} Week ${safeWeekNumber}: ${escapeHtml(title)}</h4>
+            <p>${escapeHtml(description) || (topics.length > 0 ? '' : 'No description available')}</p>
+            ${topics.length > 0 ? `<ul class="week-topics-list">${topicsList}${moreTopics}</ul>` : ''}
+            <div class="topic-progress" data-placeholder="true">
+                <div class="progress-bar"><div class="progress-fill" style="width: 0%"></div></div>
+                <span class="progress-text">0% Complete</span>
+            </div>
+        </div>
+    `;
+}
+
+/**
+ * Get an appropriate icon for the week based on title keywords
+ */
+function getWeekIcon(week) {
+    const title = (week.title || '').toLowerCase();
+
+    if (title.includes('criminal')) return '⚖️';
+    if (title.includes('constitution')) return '🏛️';
+    if (title.includes('administrative') || title.includes('gala')) return '🏢';
+    if (title.includes('private') || title.includes('contract') || title.includes('civil')) return '📜';
+    if (title.includes('international') || title.includes('european')) return '🌍';
+    if (title.includes('introduction') || title.includes('intro')) return '📚';
+    if (title.includes('property')) return '🏠';
+    if (title.includes('tort') || title.includes('liability')) return '⚠️';
+    if (title.includes('review') || title.includes('exam')) return '📝';
+
+    // Default icon based on week number (with validation)
+    const icons = ['📖', '📗', '📘', '📙', '📕', '📓'];
+    const weekNum = typeof week.weekNumber === 'number' && week.weekNumber > 0 ? week.weekNumber : 1;
+    return icons[(weekNum - 1) % icons.length];
+}
+
+/**
+ * Setup event delegation for week card clicks (prevents memory leaks)
+ * Uses a data attribute on the element to ensure the listener is only attached once,
+ * which is more robust than a global flag when dealing with DOM element lifecycle.
+ */
+function setupWeekCardEventDelegation(weeksGrid) {
+    if (!weeksGrid || weeksGrid.dataset.delegationSetup) return;
+    weeksGrid.dataset.delegationSetup = 'true';
+
+    weeksGrid.addEventListener('click', (e) => {
+        const card = e.target.closest('.week-card');
+        if (!card) return;
+
+        const weekNumber = card.dataset.week;
+        const title = card.dataset.title;
+
+        // Navigate to AI Tutor with week context
+        const tutorTab = document.querySelector('.nav-tab[data-tab="tutor"]');
+        if (tutorTab) tutorTab.click();
+
+        // Set context to the week topic
+        const contextSelect = document.getElementById('context-select');
+        if (contextSelect && title) {
+            // Try to find matching option or use the title
+            const options = Array.from(contextSelect.options);
+            const match = options.find(opt =>
+                opt.value.toLowerCase().includes(title.toLowerCase()) ||
+                title.toLowerCase().includes(opt.value.toLowerCase())
+            );
+            if (match) {
+                contextSelect.value = match.value;
+            }
+        }
+
+        // Pre-fill chat with week context
+        const chatInput = document.getElementById('chat-input');
+        if (chatInput) {
+            chatInput.placeholder = `Ask about Week ${weekNumber}: ${title}...`;
+        }
     });
+}
+
+/**
+ * Escape HTML to prevent XSS
+ */
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
 }
 
 // ========== Flashcards ==========

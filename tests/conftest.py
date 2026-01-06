@@ -6,11 +6,19 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
-# Set dummy API key before importing app
+# Set test environment variables before importing app
 os.environ["ANTHROPIC_API_KEY"] = "test-api-key-for-testing"
+os.environ["AUTH_ENABLED"] = "false"  # Disable auth for tests by default
+os.environ["AUTH_MOCK_USER_EMAIL"] = "dev@mgms.eu"  # Use valid domain for mock user
+
+# Clear any cached auth config before importing app
+# This ensures our test environment variables are used
+from app.services.auth_service import get_auth_config
+get_auth_config.cache_clear()
 
 # pylint: disable=wrong-import-position
 from app.main import app  # noqa: E402
+from app.models.auth_models import User  # noqa: E402
 
 
 @pytest.fixture
@@ -180,3 +188,58 @@ def mock_firestore_cache():
         )
         mock_cache.return_value = mock_instance
         yield mock_instance
+
+
+# =============================================================================
+# Authentication Fixtures
+# =============================================================================
+
+@pytest.fixture
+def mock_admin_user():
+    """Create a mock admin user from @mgms.eu domain."""
+    return User(
+        email="admin@mgms.eu",
+        user_id="admin-user-123",
+        domain="mgms.eu",
+        is_admin=True
+    )
+
+
+@pytest.fixture
+def mock_regular_user():
+    """Create a mock regular user from @mgms.eu domain."""
+    return User(
+        email="user@mgms.eu",
+        user_id="regular-user-456",
+        domain="mgms.eu",
+        is_admin=True  # Domain users are admins
+    )
+
+
+@pytest.fixture
+def mock_external_user():
+    """Create a mock external user (not from mgms.eu domain)."""
+    return User(
+        email="guest@external.com",
+        user_id="external-user-789",
+        domain="external.com",
+        is_admin=False
+    )
+
+
+@pytest.fixture
+def mock_iap_headers():
+    """Create mock IAP headers for authenticated requests."""
+    return {
+        "X-Goog-Authenticated-User-Email": "accounts.google.com:user@mgms.eu",
+        "X-Goog-Authenticated-User-Id": "accounts.google.com:123456789"
+    }
+
+
+@pytest.fixture
+def mock_iap_headers_external():
+    """Create mock IAP headers for external user."""
+    return {
+        "X-Goog-Authenticated-User-Email": "accounts.google.com:guest@external.com",
+        "X-Goog-Authenticated-User-Id": "accounts.google.com:987654321"
+    }
