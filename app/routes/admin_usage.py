@@ -367,6 +367,83 @@ async def list_usage_records(
         raise HTTPException(500, detail=str(e)) from e
 
 
+@router.delete("/users/{email}")
+async def delete_user_records(
+    email: str,
+    days: int = Query(
+        None,
+        ge=1,
+        le=365,
+        description="Only delete records from the last N days (optional)",
+    ),
+    confirm: str = Query(
+        ...,
+        description="Must be 'DELETE' to confirm deletion",
+    ),
+    user: User = Depends(require_mgms_domain),
+):
+    """
+    Delete all LLM usage records for a specific user.
+
+    **⚠️ WARNING: This is a destructive operation that cannot be undone!**
+
+    Query Parameters:
+    - email: User email to delete records for
+    - days: Optional - only delete records from the last N days
+    - confirm: Must be exactly "DELETE" to proceed
+
+    Returns statistics about deleted records.
+    """
+    # Require explicit confirmation
+    if confirm != "DELETE":
+        raise HTTPException(
+            400,
+            detail="Confirmation required. Set confirm='DELETE' to proceed.",
+        )
+
+    # Prevent accidental deletion of all admin users
+    if email.lower().endswith("@mgms.eu") and email.lower() != "dev@mgms.eu":
+        raise HTTPException(
+            403,
+            detail="Cannot delete records for @mgms.eu users (except dev@mgms.eu). "
+            "This is a safety measure.",
+        )
+
+    try:
+        # Calculate date range if days specified
+        start_date = None
+        end_date = None
+        if days:
+            end_date = datetime.now(timezone.utc)
+            start_date = end_date - timedelta(days=days)
+
+        service = get_usage_tracking_service()
+        result = await service.delete_user_records(
+            user_email=email.lower(),
+            start_date=start_date,
+            end_date=end_date,
+        )
+
+        if not result["success"]:
+            raise HTTPException(500, detail=result.get("error", "Unknown error"))
+
+        logger.warning(
+            "User %s deleted %d records for %s (cost: $%.2f)",
+            user.email,
+            result["deleted_count"],
+            email,
+            result.get("total_cost_deleted", 0),
+        )
+
+        return result
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Error deleting user records: %s", e)
+        raise HTTPException(500, detail=str(e)) from e
+
+
 @router.get("/export")
 async def export_usage_csv(
     days: int = Query(DEFAULT_DAYS, ge=1, le=MAX_DAYS, description="Number of days to include"),

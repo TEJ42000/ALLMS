@@ -695,3 +695,163 @@ function updateTokenComparisonTable(data) {
     }).join('');
 }
 
+// =============================================================================
+// Data Management Functions
+// =============================================================================
+
+// Initialize data management controls
+document.addEventListener('DOMContentLoaded', () => {
+    const previewBtn = document.getElementById('preview-delete-btn');
+    const deleteBtn = document.getElementById('delete-records-btn');
+
+    if (previewBtn) {
+        previewBtn.addEventListener('click', previewDeleteRecords);
+    }
+
+    if (deleteBtn) {
+        deleteBtn.addEventListener('click', deleteUserRecords);
+    }
+});
+
+async function previewDeleteRecords() {
+    const email = document.getElementById('delete-user-email').value.trim();
+    const days = document.getElementById('delete-days').value;
+    const statusDiv = document.getElementById('delete-status');
+    const previewDiv = document.getElementById('delete-preview');
+    const previewContent = document.getElementById('delete-preview-content');
+
+    if (!email) {
+        statusDiv.textContent = '⚠️ Please enter a user email';
+        statusDiv.style.color = '#ffa500';
+        return;
+    }
+
+    statusDiv.textContent = '🔍 Loading preview...';
+    statusDiv.style.color = '#6c63ff';
+    previewDiv.style.display = 'none';
+
+    try {
+        // Build query string
+        let url = `/api/admin/usage/users/${encodeURIComponent(email)}`;
+        if (days) {
+            url += `?days=${days}`;
+        } else {
+            url += '?days=36500'; // ~100 years for "all time"
+        }
+
+        const response = await fetch(url);
+
+        if (!response.ok) {
+            if (response.status === 404) {
+                statusDiv.textContent = '✅ No records found for this user';
+                statusDiv.style.color = '#00d4aa';
+                return;
+            }
+            throw new Error(`HTTP ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        // Display preview
+        previewContent.innerHTML = `
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1rem;">
+                <div>
+                    <div style="font-size: 0.75rem; color: #888; text-transform: uppercase; margin-bottom: 0.25rem;">Records</div>
+                    <div style="font-size: 1.5rem; font-weight: 700; color: #6c63ff;">${data.total_requests.toLocaleString()}</div>
+                </div>
+                <div>
+                    <div style="font-size: 0.75rem; color: #888; text-transform: uppercase; margin-bottom: 0.25rem;">Total Cost</div>
+                    <div style="font-size: 1.5rem; font-weight: 700; color: #ff6b6b;">$${data.total_estimated_cost_usd.toFixed(2)}</div>
+                </div>
+                <div>
+                    <div style="font-size: 0.75rem; color: #888; text-transform: uppercase; margin-bottom: 0.25rem;">Input Tokens</div>
+                    <div style="font-size: 1.5rem; font-weight: 700; color: #6c63ff;">${(data.total_input_tokens / 1000000).toFixed(2)}M</div>
+                </div>
+                <div>
+                    <div style="font-size: 0.75rem; color: #888; text-transform: uppercase; margin-bottom: 0.25rem;">Output Tokens</div>
+                    <div style="font-size: 1.5rem; font-weight: 700; color: #00d4aa;">${(data.total_output_tokens / 1000000).toFixed(2)}M</div>
+                </div>
+            </div>
+            <p style="margin: 0; color: #aaa; font-size: 0.875rem;">
+                Date range: ${new Date(data.start_date).toLocaleDateString()} to ${new Date(data.end_date).toLocaleDateString()}
+            </p>
+        `;
+
+        previewDiv.style.display = 'block';
+        statusDiv.textContent = `✅ Found ${data.total_requests} records`;
+        statusDiv.style.color = '#00d4aa';
+
+    } catch (error) {
+        console.error('Error previewing records:', error);
+        statusDiv.textContent = `❌ Error: ${error.message}`;
+        statusDiv.style.color = '#ff6b6b';
+    }
+}
+
+async function deleteUserRecords() {
+    const email = document.getElementById('delete-user-email').value.trim();
+    const days = document.getElementById('delete-days').value;
+    const statusDiv = document.getElementById('delete-status');
+    const previewDiv = document.getElementById('delete-preview');
+
+    if (!email) {
+        statusDiv.textContent = '⚠️ Please enter a user email';
+        statusDiv.style.color = '#ffa500';
+        return;
+    }
+
+    // Confirmation dialog
+    const timeRange = days ? `from the last ${days} days` : 'from all time';
+    const confirmMessage = `⚠️ DELETE ALL RECORDS?\n\nThis will permanently delete all usage records for:\n${email}\n\nTime range: ${timeRange}\n\nThis action CANNOT be undone!\n\nType "DELETE" to confirm:`;
+
+    const confirmation = prompt(confirmMessage);
+
+    if (confirmation !== 'DELETE') {
+        statusDiv.textContent = '❌ Deletion cancelled';
+        statusDiv.style.color = '#ffa500';
+        return;
+    }
+
+    statusDiv.textContent = '🗑️ Deleting records...';
+    statusDiv.style.color = '#ff6b6b';
+
+    try {
+        // Build query string
+        let url = `/api/admin/usage/users/${encodeURIComponent(email)}?confirm=DELETE`;
+        if (days) {
+            url += `&days=${days}`;
+        }
+
+        const response = await fetch(url, {
+            method: 'DELETE',
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || `HTTP ${response.status}`);
+        }
+
+        const result = await response.json();
+
+        // Display success
+        statusDiv.textContent = `✅ Deleted ${result.deleted_count} records (cost: $${result.total_cost_deleted.toFixed(2)})`;
+        statusDiv.style.color = '#00d4aa';
+
+        // Hide preview
+        previewDiv.style.display = 'none';
+
+        // Clear form
+        document.getElementById('delete-user-email').value = '';
+
+        // Reload dashboard data
+        setTimeout(() => {
+            loadDashboardData();
+        }, 1000);
+
+    } catch (error) {
+        console.error('Error deleting records:', error);
+        statusDiv.textContent = `❌ Error: ${error.message}`;
+        statusDiv.style.color = '#ff6b6b';
+    }
+}
+

@@ -176,6 +176,98 @@ class UsageTrackingService:
             logger.error("Failed to get user usage: %s", e)
             return []
 
+    async def delete_user_records(
+        self,
+        user_email: str,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+    ) -> Dict[str, Any]:
+        """Delete all usage records for a specific user.
+
+        Args:
+            user_email: User's email address
+            start_date: Only delete records from this date onwards
+            end_date: Only delete records until this date
+
+        Returns:
+            Dictionary with deletion statistics
+        """
+        if not self.db:
+            logger.warning("Firestore unavailable - cannot delete records")
+            return {"success": False, "error": "Firestore unavailable"}
+
+        try:
+            # Build query
+            query = self.db.collection(USAGE_COLLECTION).where(
+                "user_email", "==", user_email.lower()
+            )
+
+            if start_date:
+                query = query.where("timestamp", ">=", start_date)
+            if end_date:
+                query = query.where("timestamp", "<=", end_date)
+
+            # Get all matching documents
+            docs = list(query.stream())
+            total_docs = len(docs)
+
+            if total_docs == 0:
+                logger.info("No records found for user %s", user_email)
+                return {
+                    "success": True,
+                    "deleted_count": 0,
+                    "message": f"No records found for {user_email}",
+                }
+
+            # Calculate statistics before deletion
+            total_cost = sum(doc.to_dict().get("estimated_cost_usd", 0) for doc in docs)
+            total_tokens = sum(
+                doc.to_dict().get("input_tokens", 0) + doc.to_dict().get("output_tokens", 0)
+                for doc in docs
+            )
+
+            # Delete in batches (Firestore batch limit is 500)
+            batch_size = 500
+            deleted_count = 0
+
+            for i in range(0, total_docs, batch_size):
+                batch = self.db.batch()
+                batch_docs = docs[i : i + batch_size]
+
+                for doc in batch_docs:
+                    batch.delete(doc.reference)
+
+                batch.commit()
+                deleted_count += len(batch_docs)
+
+                logger.info(
+                    "Deleted batch %d-%d of %d records for user %s",
+                    i + 1,
+                    min(i + batch_size, total_docs),
+                    total_docs,
+                    user_email,
+                )
+
+            logger.info(
+                "Successfully deleted %d records for user %s (total cost: $%.2f, total tokens: %d)",
+                deleted_count,
+                user_email,
+                total_cost,
+                total_tokens,
+            )
+
+            return {
+                "success": True,
+                "deleted_count": deleted_count,
+                "total_cost_deleted": total_cost,
+                "total_tokens_deleted": total_tokens,
+                "message": f"Successfully deleted {deleted_count} records for {user_email}",
+            }
+
+        except Exception as e:
+            logger.error("Failed to delete user records: %s", e)
+            return {"success": False, "error": str(e)}
+
     async def get_user_summary(
         self,
         user_email: str,

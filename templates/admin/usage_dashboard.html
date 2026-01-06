@@ -359,6 +359,59 @@
                 </div>
             </div>
 
+            <!-- Data Management Section -->
+            <div class="chart-card" style="border: 2px solid #ff6b6b;">
+                <h3>🗑️ Data Management</h3>
+                <p style="color: #aaa; margin-bottom: 1.5rem;">
+                    Delete usage records for a specific user. This is useful for removing test data or bad records.
+                </p>
+
+                <div style="background: rgba(255, 107, 107, 0.1); border: 1px solid #ff6b6b; border-radius: 8px; padding: 1rem; margin-bottom: 1.5rem;">
+                    <strong style="color: #ff6b6b;">⚠️ WARNING: This action cannot be undone!</strong>
+                    <p style="margin: 0.5rem 0 0 0; color: #ccc; font-size: 0.875rem;">
+                        Deleted records are permanently removed from the database.
+                    </p>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                    <div>
+                        <label for="delete-user-email" style="display: block; margin-bottom: 0.5rem; color: #aaa; font-size: 0.875rem;">
+                            User Email
+                        </label>
+                        <input type="email" id="delete-user-email" placeholder="user@example.com"
+                               style="width: 100%; padding: 0.75rem; border-radius: 4px; border: 1px solid var(--border-color, #333); background: var(--surface-color, #1a1a2e); color: #fff;">
+                    </div>
+                    <div>
+                        <label for="delete-days" style="display: block; margin-bottom: 0.5rem; color: #aaa; font-size: 0.875rem;">
+                            Time Range (optional)
+                        </label>
+                        <select id="delete-days" style="width: 100%; padding: 0.75rem; border-radius: 4px; border: 1px solid var(--border-color, #333); background: var(--surface-color, #1a1a2e); color: #fff;">
+                            <option value="">All time</option>
+                            <option value="7">Last 7 days</option>
+                            <option value="30">Last 30 days</option>
+                            <option value="90">Last 90 days</option>
+                            <option value="365">Last year</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 1rem; align-items: center;">
+                    <button id="preview-delete-btn" class="btn btn-secondary">
+                        👁️ Preview Records
+                    </button>
+                    <button id="delete-records-btn" class="btn" style="background: #ff6b6b; border-color: #ff6b6b;">
+                        🗑️ Delete Records
+                    </button>
+                    <div id="delete-status" style="flex: 1; color: #aaa; font-size: 0.875rem;"></div>
+                </div>
+
+                <!-- Preview Results -->
+                <div id="delete-preview" style="display: none; margin-top: 1.5rem; padding: 1rem; background: rgba(108, 99, 255, 0.1); border: 1px solid #6c63ff; border-radius: 8px;">
+                    <h4 style="margin-top: 0; color: #6c63ff;">Preview Results</h4>
+                    <div id="delete-preview-content"></div>
+                </div>
+            </div>
+
             <!-- Data Grid -->
             <div class="chart-card">
                 <div class="grid-header">
