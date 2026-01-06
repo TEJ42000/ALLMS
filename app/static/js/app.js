@@ -2186,3 +2186,17 @@ function updateFlashcardStats() {
     if (masteredEl) masteredEl.textContent = mastered;
     if (totalEl) totalEl.textContent = flashcards.length;
 }
+
+// ========== Cleanup on Page Unload ==========
+// Prevent memory leaks by cleaning up event listeners
+window.addEventListener('beforeunload', () => {
+    // Cleanup GamificationUI if it exists
+    if (window.gamificationUI && typeof window.gamificationUI.cleanup === 'function') {
+        window.gamificationUI.cleanup();
+    }
+
+    // Cleanup ActivityTracker if it exists
+    if (window.activityTracker && typeof window.activityTracker.cleanup === 'function') {
+        window.activityTracker.cleanup();
+    }
+});

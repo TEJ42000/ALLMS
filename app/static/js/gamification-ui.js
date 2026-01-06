@@ -334,13 +334,18 @@ class GamificationUI {
             <div style="font-size: 2em; font-weight: 700; margin-bottom: 0.5rem;">Level Up!</div>
             <div style="font-size: 1.5em; margin-bottom: 0.5rem;">Level ${newLevel}</div>
             <div style="font-size: 1.2em; opacity: 0.9;">${newLevelTitle}</div>
-            <button onclick="this.closest('.level-up-overlay').remove()"
-                    style="margin-top: 2rem; padding: 0.75rem 2rem; background: white; color: #667eea;
-                           border: none; border-radius: 8px; font-size: 1em; font-weight: 600;
-                           cursor: pointer;">
-                Continue
-            </button>
         `;
+
+        // Create continue button with event listener (CSP compliant)
+        const continueBtn = document.createElement('button');
+        continueBtn.textContent = 'Continue';
+        continueBtn.style.cssText = 'margin-top: 2rem; padding: 0.75rem 2rem; background: white; color: #667eea; border: none; border-radius: 8px; font-size: 1em; font-weight: 600; cursor: pointer;';
+        continueBtn.addEventListener('click', () => {
+            if (overlay.parentNode) {
+                overlay.remove();
+            }
+        });
+        card.appendChild(continueBtn);
 
         overlay.appendChild(card);
         document.body.appendChild(overlay);

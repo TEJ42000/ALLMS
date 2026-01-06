@@ -82,7 +82,7 @@ class ActivityTracker {
      * Setup activity listeners (mouse, keyboard)
      */
     setupActivityListeners() {
-        const updateActivity = () => {
+        this.updateActivity = () => {
             this.lastActivityTime = Date.now();
             if (!this.isActive) {
                 console.log('[ActivityTracker] User active again');
@@ -90,11 +90,37 @@ class ActivityTracker {
                 this.resumeTimer();
             }
         };
-        
-        document.addEventListener('mousemove', updateActivity);
-        document.addEventListener('keydown', updateActivity);
-        document.addEventListener('click', updateActivity);
-        document.addEventListener('scroll', updateActivity);
+
+        document.addEventListener('mousemove', this.updateActivity);
+        document.addEventListener('keydown', this.updateActivity);
+        document.addEventListener('click', this.updateActivity);
+        document.addEventListener('scroll', this.updateActivity);
+    }
+
+    /**
+     * Cleanup event listeners to prevent memory leaks
+     * Call this method when destroying the ActivityTracker instance
+     */
+    cleanup() {
+        // Remove activity listeners
+        if (this.updateActivity) {
+            document.removeEventListener('mousemove', this.updateActivity);
+            document.removeEventListener('keydown', this.updateActivity);
+            document.removeEventListener('click', this.updateActivity);
+            document.removeEventListener('scroll', this.updateActivity);
+        }
+
+        // Clear timers
+        if (this.activeTimer) {
+            clearInterval(this.activeTimer);
+            this.activeTimer = null;
+        }
+        if (this.inactivityTimer) {
+            clearTimeout(this.inactivityTimer);
+            this.inactivityTimer = null;
+        }
+
+        console.log('[ActivityTracker] Cleaned up event listeners and timers');
     }
     
     /**
@@ -390,11 +416,38 @@ class ActivityTracker {
                         }
                     });
                     document.dispatchEvent(event);
+                } else {
+                    console.warn(`[ActivityTracker] Badge ${badgeId} not found in definitions`);
+                    // Dispatch event with minimal info as fallback
+                    this.dispatchFallbackBadgeEvent(badgeId, activityData);
                 }
+            } else {
+                console.error('[ActivityTracker] Failed to fetch badge details, status:', response.status);
+                // Dispatch event with minimal info as fallback
+                this.dispatchFallbackBadgeEvent(badgeId, activityData);
             }
         } catch (error) {
             console.error('[ActivityTracker] Error fetching badge details:', error);
+            // Dispatch event with minimal info as fallback
+            this.dispatchFallbackBadgeEvent(badgeId, activityData);
         }
+    }
+
+    /**
+     * Dispatch fallback badge event when API fails
+     */
+    dispatchFallbackBadgeEvent(badgeId, activityData) {
+        const event = new CustomEvent('badge-earned', {
+            detail: {
+                badge_id: badgeId,
+                badge_name: badgeId.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+                badge_icon: '🏆',
+                badge_description: 'Badge earned!',
+                tier: activityData.badge_tier || 'bronze'
+            }
+        });
+        document.dispatchEvent(event);
+    }
     }
 }
 

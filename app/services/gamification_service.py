@@ -1087,6 +1087,24 @@ class GamificationService:
         earned_badge_ids = []
 
         try:
+            # Validate activity data inputs
+            consecutive_correct = activity_data.get("consecutive_correct", 0)
+            if not isinstance(consecutive_correct, int) or consecutive_correct < 0:
+                logger.warning(f"Invalid consecutive_correct value: {consecutive_correct}, defaulting to 0")
+                consecutive_correct = 0
+                activity_data["consecutive_correct"] = consecutive_correct
+
+            time_spent_minutes = activity_data.get("time_spent_minutes", 0)
+            if not isinstance(time_spent_minutes, (int, float)) or time_spent_minutes < 0:
+                logger.warning(f"Invalid time_spent_minutes value: {time_spent_minutes}, defaulting to 0")
+                time_spent_minutes = 0
+                activity_data["time_spent_minutes"] = time_spent_minutes
+
+            difficulty = activity_data.get("difficulty")
+            if difficulty and not isinstance(difficulty, str):
+                logger.warning(f"Invalid difficulty value: {difficulty}, setting to None")
+                activity_data["difficulty"] = None
+
             # Get current time for time-based badges
             current_time = datetime.now(timezone.utc)
             hour = current_time.hour
@@ -1171,7 +1189,7 @@ class GamificationService:
             badge_def_doc = badge_def_ref.get()
 
             if not badge_def_doc.exists:
-                logger.warning(f"Badge definition not found: {badge_id}")
+                logger.error(f"Badge definition not found: {badge_id} - possible configuration error. Badge may not be seeded or badge_id is misspelled.")
                 return None
 
             badge_def_data = badge_def_doc.to_dict()
@@ -1185,7 +1203,6 @@ class GamificationService:
                 # Use atomic increment to prevent race conditions
                 user_badge_data = user_badge_doc.to_dict()
                 current_tier = user_badge_data.get("tier", "bronze")
-                current_times_earned = user_badge_data.get("times_earned", 0)
 
                 # Atomically increment times_earned
                 user_badge_ref.update({
@@ -1193,10 +1210,17 @@ class GamificationService:
                     "last_earned_at": datetime.now(timezone.utc)
                 })
 
-                # Calculate new times_earned for tier check
-                new_times_earned = current_times_earned + 1
+                # Re-read document to get accurate times_earned after atomic increment
+                # This prevents race conditions where concurrent requests could cause incorrect tier calculations
+                refreshed_doc = user_badge_ref.get()
+                if refreshed_doc.exists:
+                    refreshed_data = refreshed_doc.to_dict()
+                    new_times_earned = refreshed_data.get("times_earned", 0)
+                else:
+                    logger.error(f"Badge document disappeared after update: {badge_id} for {user_id}")
+                    return None
 
-                # Check for tier upgrade
+                # Check for tier upgrade based on accurate times_earned
                 new_tier = current_tier
                 for tier in ["gold", "silver", "bronze"]:  # Check from highest to lowest
                     if new_times_earned >= badge_def.tier_requirements.get(tier, 999):
@@ -1252,22 +1276,27 @@ class GamificationService:
             if score != total or total == 0:
                 return False
 
-            # Get last 2 quiz activities
-            activities, _ = self.get_user_activities(user_id, limit=10, activity_type="quiz_completed")
+            # Get last 3 quiz activities (need to check the 2 immediately preceding quizzes)
+            activities, _ = self.get_user_activities(user_id, limit=3, activity_type="quiz_completed")
 
-            # Filter for hard quizzes with 100% accuracy
-            perfect_hard_quizzes = []
-            for activity in activities:
+            # Check that the 2 most recent quizzes (before current) are CONSECUTIVE perfect hard quizzes
+            # This ensures we have 3 in a row: [previous-2, previous-1, current]
+            perfect_hard_count = 0
+            for activity in activities[:2]:  # Only check the 2 most recent (before current)
                 if activity.activity_data.get("difficulty") == "hard":
                     act_score = activity.activity_data.get("score", 0)
                     act_total = activity.activity_data.get("total_questions", 1)
                     if act_score == act_total and act_total > 0:
-                        perfect_hard_quizzes.append(activity)
-                        if len(perfect_hard_quizzes) >= 2:
-                            break
+                        perfect_hard_count += 1
+                    else:
+                        # Not perfect - sequence broken
+                        break
+                else:
+                    # Not hard quiz - sequence broken
+                    break
 
-            # Need 2 previous perfect hard quizzes + current one = 3 in a row
-            return len(perfect_hard_quizzes) >= 2
+            # Need 2 consecutive previous perfect hard quizzes + current one = 3 in a row
+            return perfect_hard_count >= 2
 
         except Exception as e:
             logger.error(f"Error checking Hat Trick for {user_id}: {e}")
@@ -1289,23 +1318,22 @@ class GamificationService:
             if current_grade < 9:
                 return False
 
-            # Get last 2 evaluation activities
-            activities, _ = self.get_user_activities(user_id, limit=10, activity_type="evaluation_completed")
+            # Get last 3 evaluation activities (need to check the 2 immediately preceding evaluations)
+            activities, _ = self.get_user_activities(user_id, limit=3, activity_type="evaluation_completed")
 
-            # Filter for high grades (9-10)
-            high_grade_evals = []
-            for activity in activities:
+            # Check that the 2 most recent evaluations (before current) are CONSECUTIVE high grades
+            # This ensures we have 3 in a row: [previous-2, previous-1, current]
+            high_grade_count = 0
+            for activity in activities[:2]:  # Only check the 2 most recent (before current)
                 grade = activity.activity_data.get("grade", 0)
                 if grade >= 9:
-                    high_grade_evals.append(activity)
-                    if len(high_grade_evals) >= 2:
-                        break
+                    high_grade_count += 1
                 else:
-                    # Sequence broken
+                    # Grade below 9 - sequence broken
                     break
 
-            # Need 2 previous high grades + current one = 3 in a row
-            return len(high_grade_evals) >= 2
+            # Need 2 consecutive previous high grades + current one = 3 in a row
+            return high_grade_count >= 2
 
         except Exception as e:
             logger.error(f"Error checking Legal Scholar for {user_id}: {e}")

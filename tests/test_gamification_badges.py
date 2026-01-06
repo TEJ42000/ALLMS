@@ -451,8 +451,20 @@ def test_badge_tier_upgrade_bronze_to_silver(gamification_service, mock_firestor
         "times_earned": 4
     }
 
+    # Mock refreshed document after atomic increment (now at 5, should upgrade to silver)
+    mock_refreshed_doc = MagicMock()
+    mock_refreshed_doc.exists = True
+    mock_refreshed_doc.to_dict.return_value = {
+        "badge_id": "combo_king",
+        "tier": "bronze",
+        "times_earned": 5
+    }
+
     # Setup Firestore mocks
     mock_user_badge_ref = setup_firestore_mocks(mock_firestore, mock_badge_def_doc, mock_user_badge_doc)
+
+    # Mock get() to return initial doc first, then refreshed doc
+    mock_user_badge_ref.get.side_effect = [mock_user_badge_doc, mock_refreshed_doc]
 
     # Execute - 5th time earning should upgrade to silver
     activity_data = {"consecutive_correct": 25}
@@ -502,8 +514,20 @@ def test_badge_no_tier_upgrade(gamification_service, mock_firestore):
         "times_earned": 2
     }
 
+    # Mock refreshed document after atomic increment (now at 3, still bronze)
+    mock_refreshed_doc = MagicMock()
+    mock_refreshed_doc.exists = True
+    mock_refreshed_doc.to_dict.return_value = {
+        "badge_id": "combo_king",
+        "tier": "bronze",
+        "times_earned": 3
+    }
+
     # Setup Firestore mocks
     mock_user_badge_ref = setup_firestore_mocks(mock_firestore, mock_badge_def_doc, mock_user_badge_doc)
+
+    # Mock get() to return initial doc first, then refreshed doc
+    mock_user_badge_ref.get.side_effect = [mock_user_badge_doc, mock_refreshed_doc]
 
     # Execute - 3rd time earning, still bronze
     activity_data = {"consecutive_correct": 25}
@@ -758,5 +782,198 @@ def test_award_badge_definition_not_found(gamification_service, mock_firestore):
     )
 
     # Verify
+    assert result is None
+
+
+def test_concurrent_badge_earning_race_condition(gamification_service, mock_firestore):
+    """Test that concurrent badge earning uses atomic operations correctly.
+
+    This test verifies that when the same badge is earned concurrently,
+    the atomic Increment operation prevents race conditions and the
+    tier calculation is based on the refreshed times_earned value.
+    """
+    from google.cloud.firestore import Increment
+
+    # Setup badge definition
+    badge_def_data = {
+        "badge_id": "combo_king",
+        "name": "Combo King",
+        "description": "Flip 20 flashcards in a row without marking one incorrect",
+        "icon": "🔥",
+        "category": "achievement",
+        "tier_requirements": {"bronze": 1, "silver": 3, "gold": 5}
+    }
+    mock_badge_def_doc = MagicMock()
+    mock_badge_def_doc.exists = True
+    mock_badge_def_doc.to_dict.return_value = badge_def_data
+
+    # Setup existing user badge (already earned once, bronze tier)
+    user_badge_data = {
+        "badge_id": "combo_king",
+        "user_id": "test-user-123",
+        "tier": "bronze",
+        "times_earned": 1,
+        "first_earned_at": datetime.now(timezone.utc),
+        "last_earned_at": datetime.now(timezone.utc)
+    }
+    mock_user_badge_doc = MagicMock()
+    mock_user_badge_doc.exists = True
+    mock_user_badge_doc.to_dict.return_value = user_badge_data
+
+    # Setup refreshed document after atomic increment (simulates concurrent earning)
+    # Simulate that another concurrent request also incremented, so we're at 3 now
+    refreshed_badge_data = {
+        "badge_id": "combo_king",
+        "user_id": "test-user-123",
+        "tier": "bronze",
+        "times_earned": 3,  # Incremented by 2 concurrent requests
+        "first_earned_at": datetime.now(timezone.utc),
+        "last_earned_at": datetime.now(timezone.utc)
+    }
+    mock_refreshed_doc = MagicMock()
+    mock_refreshed_doc.exists = True
+    mock_refreshed_doc.to_dict.return_value = refreshed_badge_data
+
+    # Setup mock references
+    mock_user_badge_ref = MagicMock()
+
+    # First get() returns existing badge, second get() returns refreshed badge
+    mock_user_badge_ref.get.side_effect = [mock_user_badge_doc, mock_refreshed_doc]
+
+    # Setup Firestore collection chain
+    def collection_side_effect(collection_name):
+        if collection_name == "badge_definitions":
+            mock_badge_def_collection = MagicMock()
+            mock_badge_def_collection.document.return_value.get.return_value = mock_badge_def_doc
+            return mock_badge_def_collection
+        elif collection_name == "user_achievements":
+            mock_user_achievements = MagicMock()
+            mock_user_doc = MagicMock()
+            mock_badges_collection = MagicMock()
+            mock_badges_collection.document.return_value = mock_user_badge_ref
+            mock_user_doc.collection.return_value = mock_badges_collection
+            mock_user_achievements.document.return_value = mock_user_doc
+            return mock_user_achievements
+        return MagicMock()
+
+    mock_firestore.collection.side_effect = collection_side_effect
+
+    # Execute - award badge (simulating one of the concurrent requests)
+    result = gamification_service._award_badge(
+        "test-user-123",
+        "test@example.com",
+        "combo_king"
+    )
+
+    # Verify atomic increment was called
+    assert mock_user_badge_ref.update.call_count >= 1
+    first_update_call = mock_user_badge_ref.update.call_args_list[0][0][0]
+    assert "times_earned" in first_update_call
+    # Verify it's using Increment, not a direct value
+    assert isinstance(first_update_call["times_earned"], Increment)
+
+    # Verify document was re-read after atomic increment
+    assert mock_user_badge_ref.get.call_count == 2
+
+    # Verify tier upgrade to silver (times_earned=3 meets silver requirement)
+    tier_update_calls = [call for call in mock_user_badge_ref.update.call_args_list
+                         if "tier" in call[0][0]]
+    assert len(tier_update_calls) == 1
+    assert tier_update_calls[0][0][0]["tier"] == "silver"
+
+    # Verify badge ID returned (tier upgrade occurred)
+    assert result == "combo_king"
+
+
+def test_concurrent_badge_earning_no_tier_upgrade(gamification_service, mock_firestore):
+    """Test concurrent badge earning when no tier upgrade occurs.
+
+    Verifies that atomic increment works correctly even when the
+    times_earned doesn't reach the next tier threshold.
+    """
+    from google.cloud.firestore import Increment
+
+    # Setup badge definition
+    badge_def_data = {
+        "badge_id": "night_owl",
+        "name": "Night Owl",
+        "description": "Complete activity late at night",
+        "icon": "🦉",
+        "category": "behavioral",
+        "tier_requirements": {"bronze": 1, "silver": 5, "gold": 10}
+    }
+    mock_badge_def_doc = MagicMock()
+    mock_badge_def_doc.exists = True
+    mock_badge_def_doc.to_dict.return_value = badge_def_data
+
+    # Setup existing user badge (earned 2 times, still bronze)
+    user_badge_data = {
+        "badge_id": "night_owl",
+        "user_id": "test-user-123",
+        "tier": "bronze",
+        "times_earned": 2,
+        "first_earned_at": datetime.now(timezone.utc),
+        "last_earned_at": datetime.now(timezone.utc)
+    }
+    mock_user_badge_doc = MagicMock()
+    mock_user_badge_doc.exists = True
+    mock_user_badge_doc.to_dict.return_value = user_badge_data
+
+    # Setup refreshed document (now at 3, still below silver threshold of 5)
+    refreshed_badge_data = {
+        "badge_id": "night_owl",
+        "user_id": "test-user-123",
+        "tier": "bronze",
+        "times_earned": 3,
+        "first_earned_at": datetime.now(timezone.utc),
+        "last_earned_at": datetime.now(timezone.utc)
+    }
+    mock_refreshed_doc = MagicMock()
+    mock_refreshed_doc.exists = True
+    mock_refreshed_doc.to_dict.return_value = refreshed_badge_data
+
+    # Setup mock references
+    mock_user_badge_ref = MagicMock()
+    mock_user_badge_ref.get.side_effect = [mock_user_badge_doc, mock_refreshed_doc]
+
+    # Setup Firestore collection chain
+    def collection_side_effect(collection_name):
+        if collection_name == "badge_definitions":
+            mock_badge_def_collection = MagicMock()
+            mock_badge_def_collection.document.return_value.get.return_value = mock_badge_def_doc
+            return mock_badge_def_collection
+        elif collection_name == "user_achievements":
+            mock_user_achievements = MagicMock()
+            mock_user_doc = MagicMock()
+            mock_badges_collection = MagicMock()
+            mock_badges_collection.document.return_value = mock_user_badge_ref
+            mock_user_doc.collection.return_value = mock_badges_collection
+            mock_user_achievements.document.return_value = mock_user_doc
+            return mock_user_achievements
+        return MagicMock()
+
+    mock_firestore.collection.side_effect = collection_side_effect
+
+    # Execute
+    result = gamification_service._award_badge(
+        "test-user-123",
+        "test@example.com",
+        "night_owl"
+    )
+
+    # Verify atomic increment was called
+    assert mock_user_badge_ref.update.call_count == 1
+    first_update_call = mock_user_badge_ref.update.call_args_list[0][0][0]
+    assert isinstance(first_update_call["times_earned"], Increment)
+
+    # Verify document was re-read
+    assert mock_user_badge_ref.get.call_count == 2
+
+    # Verify NO tier upgrade (still bronze, only 1 update call for increment)
+    tier_update_calls = [call for call in mock_user_badge_ref.update.call_args_list
+                         if "tier" in call[0][0]]
+    assert len(tier_update_calls) == 0
+
+    # Verify None returned (no tier upgrade)
     assert result is None
 

@@ -419,6 +419,14 @@ def seed_badges(
     admin_emails = os.getenv("ADMIN_EMAILS", "").split(",")
     admin_emails = [email.strip() for email in admin_emails if email.strip()]
 
+    # Explicit check: if ADMIN_EMAILS is not configured, deny all access
+    if not admin_emails:
+        logger.error("ADMIN_EMAILS environment variable not configured, denying badge seed request")
+        raise HTTPException(
+            status_code=403,
+            detail="Admin configuration required. ADMIN_EMAILS environment variable must be set."
+        )
+
     if user.email not in admin_emails:
         logger.warning(f"Non-admin user {user.email} attempted to seed badges")
         raise HTTPException(
