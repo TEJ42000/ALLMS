@@ -51,6 +51,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     section.classList.add('active');
                 }
             });
+
+            // Dispatch tab-changed event
+            const event = new CustomEvent('tab-changed', {
+                detail: { tab: tabName }
+            });
+            document.dispatchEvent(event);
         });
     });
 

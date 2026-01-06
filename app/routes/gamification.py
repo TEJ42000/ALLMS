@@ -5,6 +5,7 @@ sessions, and badges.
 """
 
 import logging
+import os
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -21,6 +22,8 @@ from app.models.gamification_models import (
     UserActivity,
     XPConfigResponse,
     XPConfigUpdateRequest,
+    BadgeDefinition,
+    UserBadge,
 )
 from app.services.gamification_service import get_gamification_service
 
@@ -348,4 +351,95 @@ def update_xp_config(
     except Exception as e:
         logger.error(f"Error updating XP config: {e}")
         raise HTTPException(500, detail=str(e)) from e
+
+# =============================================================================
+# Badge Endpoints
+# =============================================================================
+
+@router.get("/badges")
+def get_user_badges(
+    user: User = Depends(get_current_user)
+):
+    """Get all badges earned by the current user.
+
+    Returns:
+        List of user's earned badges with tier and times_earned info
+    """
+    try:
+        service = get_gamification_service()
+        badges = service.get_user_badges(user.user_id)
+
+        return {
+            "badges": [badge.model_dump(mode='json') for badge in badges]
+        }
+
+    except Exception as e:
+        logger.error(f"Error getting user badges: {e}")
+        raise HTTPException(500, detail=str(e)) from e
+
+
+@router.get("/badges/definitions")
+def get_badge_definitions(
+    user: User = Depends(get_current_user)
+):
+    """Get all available badge definitions.
+
+    Returns:
+        List of all badge definitions with requirements and tiers
+    """
+    try:
+        service = get_gamification_service()
+        definitions = service.get_badge_definitions()
+
+        return {
+            "badge_definitions": [badge.model_dump(mode='json') for badge in definitions]
+        }
+
+    except Exception as e:
+        logger.error(f"Error getting badge definitions: {e}")
+        raise HTTPException(500, detail=str(e)) from e
+
+
+@router.post("/badges/seed")
+def seed_badges(
+    user: User = Depends(get_current_user)
+):
+    """Seed initial badge definitions (admin only).
+
+    Safe to call multiple times - will not overwrite existing badges.
+
+    Returns:
+        Success status
+
+    Raises:
+        HTTPException 403: If user is not an admin
+    """
+    # Check if user is admin
+    # Admin users are defined in ADMIN_EMAILS environment variable (comma-separated)
+    admin_emails = os.getenv("ADMIN_EMAILS", "").split(",")
+    admin_emails = [email.strip() for email in admin_emails if email.strip()]
+
+    if user.email not in admin_emails:
+        logger.warning(f"Non-admin user {user.email} attempted to seed badges")
+        raise HTTPException(
+            status_code=403,
+            detail="Admin access required. This endpoint is restricted to administrators."
+        )
+
+    try:
+        service = get_gamification_service()
+        success = service.seed_badge_definitions()
+
+        if not success:
+            raise HTTPException(500, detail="Failed to seed badge definitions")
+
+        logger.info(f"Badge definitions seeded successfully by admin {user.email}")
+        return {"status": "ok", "message": "Badge definitions seeded successfully"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error seeding badges: {e}")
+        raise HTTPException(500, detail=str(e)) from e
+
 
