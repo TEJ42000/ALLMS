@@ -1103,7 +1103,7 @@ async def get_reconciliation_report(
 
         # Fetch internal data
         service = get_usage_tracking_service()
-        records = await service.get_usage_records(
+        records = await service.get_all_usage(
             start_date=start_date,
             end_date=end_date,
             limit=MAX_EXPORT_RECORDS,  # Get all records for accurate comparison
