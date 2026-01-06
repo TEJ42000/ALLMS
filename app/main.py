@@ -12,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 # Import routers
-from app.routes import ai_tutor, assessment, pages, files_content, admin_courses, admin_pages, admin_users, admin_usage, echr, text_cache, quiz_management, study_guide_routes
+from app.routes import ai_tutor, assessment, pages, files_content, admin_courses, admin_pages, admin_users, admin_usage, echr, text_cache, quiz_management, study_guide_routes, gamification
 
 # Import authentication middleware
 from app.middleware import AuthMiddleware
@@ -110,6 +110,7 @@ app.include_router(echr.router)
 app.include_router(text_cache.router)
 app.include_router(quiz_management.router)
 app.include_router(study_guide_routes.router)
+app.include_router(gamification.router)
 
 
 # Startup event
