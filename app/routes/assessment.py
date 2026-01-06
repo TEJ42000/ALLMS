@@ -12,8 +12,10 @@ import re
 import uuid
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Header, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Header, Query, status
 
+from app.dependencies.auth import get_optional_user
+from app.models.auth_models import User
 from app.models.schemas import (
     AssessmentRequest,
     AssessmentResponse,
@@ -25,6 +27,7 @@ from app.models.schemas import (
     EssayAssessmentSummary,
     EssayAssessmentHistoryItem,
 )
+from app.models.usage_models import UserContext
 from app.services.anthropic_client import (
     get_assessment_response,
     generate_essay_question,
@@ -84,7 +87,10 @@ def extract_grade(feedback: str) -> int:
 
 
 @router.post("/assess", response_model=AssessmentResponse)
-async def assess_answer(request: AssessmentRequest):
+async def assess_answer(
+    request: AssessmentRequest,
+    user: Optional[User] = Depends(get_optional_user),
+):
     """
     Assess and grade a student's answer using AI.
 
@@ -127,11 +133,20 @@ async def assess_answer(request: AssessmentRequest):
             request.topic, len(request.answer)
         )
 
+        # Build user context for usage tracking
+        user_context = None
+        if user:
+            user_context = UserContext(
+                email=user.email,
+                user_id=user.user_id,
+            )
+
         # Get AI assessment
         feedback = await get_assessment_response(
             topic=request.topic,
             question=request.question,
-            answer=request.answer
+            answer=request.answer,
+            user_context=user_context,
         )
 
         # Extract grade from feedback
