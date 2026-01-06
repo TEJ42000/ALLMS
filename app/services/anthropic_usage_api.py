@@ -11,7 +11,7 @@ API Documentation: https://docs.anthropic.com/en/api/admin-api
 
 import logging
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional
 from urllib.parse import urlencode
 
 import httpx
@@ -210,10 +210,14 @@ class AnthropicUsageAPIClient:
                 response.raise_for_status()
                 data = response.json()
 
-                # Calculate total amount
-                total_amount = sum(
-                    float(b.get("amount", "0")) for b in data.get("data", [])
-                )
+                # Calculate total amount with validation
+                try:
+                    total_amount = sum(
+                        float(b.get("amount", "0")) for b in data.get("data", [])
+                    )
+                except (ValueError, TypeError) as e:
+                    logger.error(f"Invalid amount format in cost report: {e}")
+                    raise AnthropicUsageAPIError(f"Invalid cost data format: {e}")
 
                 return AnthropicCostReport(
                     data=[AnthropicCostBucket(**b) for b in data.get("data", [])],

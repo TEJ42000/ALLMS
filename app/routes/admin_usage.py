@@ -1067,7 +1067,7 @@ async def get_reconciliation_report(
         variance_cache_read = internal_cache_read - anthropic_cache_read
         variance_cost = internal_cost - anthropic_cost
         variance_cost_percent = (
-            (variance_cost / anthropic_cost * 100) if anthropic_cost > 0 else 0.0
+            (variance_cost / anthropic_cost * 100) if anthropic_cost != 0 else 0.0
         )
 
         # Determine match status

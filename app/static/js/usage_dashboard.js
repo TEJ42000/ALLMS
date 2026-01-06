@@ -589,13 +589,26 @@ async function loadCrossReference() {
         document.getElementById('xref-internal-cost').textContent = `$${data.internal_cost.toFixed(4)}`;
         document.getElementById('xref-anthropic-cost').textContent = `$${data.anthropic_cost.toFixed(4)}`;
 
+        // Update variance with safe DOM manipulation
         const varianceColor = data.variance_cost >= 0 ? '#ff6b6b' : '#00d4aa';
         const varianceSign = data.variance_cost >= 0 ? '+' : '';
-        document.getElementById('xref-variance').innerHTML =
-            `<span style="color: ${varianceColor}">${varianceSign}$${data.variance_cost.toFixed(4)}</span>` +
-            `<div style="font-size: 0.75rem; color: #888; margin-top: 0.25rem;">${varianceSign}${data.variance_cost_percent.toFixed(2)}%</div>`;
+        const varianceEl = document.getElementById('xref-variance');
+        varianceEl.innerHTML = ''; // Clear existing content
 
-        // Update status with color
+        const varianceSpan = document.createElement('span');
+        varianceSpan.style.color = varianceColor;
+        varianceSpan.textContent = `${varianceSign}$${data.variance_cost.toFixed(4)}`;
+
+        const variancePercent = document.createElement('div');
+        variancePercent.style.fontSize = '0.75rem';
+        variancePercent.style.color = '#888';
+        variancePercent.style.marginTop = '0.25rem';
+        variancePercent.textContent = `${varianceSign}${data.variance_cost_percent.toFixed(2)}%`;
+
+        varianceEl.appendChild(varianceSpan);
+        varianceEl.appendChild(variancePercent);
+
+        // Update status with color using safe DOM manipulation
         const statusCard = document.getElementById('xref-status-card');
         const statusEl = document.getElementById('xref-status');
         let statusColor, statusText, statusEmoji;
@@ -614,14 +627,18 @@ async function loadCrossReference() {
             statusEmoji = '❌';
         }
 
-        statusEl.innerHTML = `<span style="color: ${statusColor}">${statusEmoji} ${statusText}</span>`;
+        statusEl.innerHTML = ''; // Clear existing content
+        const statusSpan = document.createElement('span');
+        statusSpan.style.color = statusColor;
+        statusSpan.textContent = `${statusEmoji} ${statusText}`;
+        statusEl.appendChild(statusSpan);
 
         // Update token comparison table
         updateTokenComparisonTable(data);
 
     } catch (error) {
         console.error('Error loading cross-reference:', error);
-        showCrossReferenceError('Failed to load cross-reference data. ' + error.message);
+        showCrossReferenceError(`Failed to load cross-reference data. ${error?.message || 'Unknown error'}`);
     }
 }
 
