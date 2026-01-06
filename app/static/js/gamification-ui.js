@@ -173,12 +173,20 @@ class GamificationUI {
             'xp-awarded': (event) => this.handleXPAwarded(event.detail),
             'level-up': (event) => this.handleLevelUp(event.detail),
             'streak-updated': (event) => this.handleStreakUpdated(event.detail),
-            'freeze-used': (event) => this.handleFreezeUsed(event.detail)
+            'freeze-used': (event) => this.handleFreezeUsed(event.detail),
+            'badge-earned': (event) => this.handleBadgeEarned(event.detail)
         };
 
         // Add event listeners
         Object.entries(this.listeners).forEach(([eventName, handler]) => {
             document.addEventListener(eventName, handler);
+        });
+
+        // Listen for tab changes to load badges when badges tab is opened
+        document.addEventListener('tab-changed', (event) => {
+            if (event.detail.tab === 'badges') {
+                this.loadBadges();
+            }
         });
     }
 
@@ -407,6 +415,180 @@ class GamificationUI {
         setTimeout(() => {
             notification.remove();
         }, 4000);
+    }
+
+    /**
+     * Load and display badges
+     */
+    async loadBadges() {
+        try {
+            // Fetch user's earned badges
+            const earnedResponse = await fetch('/api/gamification/badges');
+            const earnedBadges = earnedResponse.ok ? await earnedResponse.json() : [];
+
+            // Fetch all badge definitions
+            const defsResponse = await fetch('/api/gamification/badges/definitions');
+            const allBadges = defsResponse.ok ? await defsResponse.json() : [];
+
+            console.log('[GamificationUI] Badges loaded:', { earned: earnedBadges.length, total: allBadges.length });
+
+            // Render badges
+            this.renderBadges(earnedBadges, allBadges);
+        } catch (error) {
+            console.error('[GamificationUI] Error loading badges:', error);
+        }
+    }
+
+    /**
+     * Render badges in the UI
+     */
+    renderBadges(earnedBadges, allBadges) {
+        const earnedGrid = document.getElementById('earned-badges-grid');
+        const availableGrid = document.getElementById('available-badges-grid');
+
+        if (!earnedGrid || !availableGrid) return;
+
+        // Create a map of earned badges for quick lookup
+        const earnedMap = new Map(earnedBadges.map(b => [b.badge_id, b]));
+
+        // Separate earned and available badges
+        const earned = [];
+        const available = [];
+
+        allBadges.forEach(badge => {
+            if (earnedMap.has(badge.badge_id)) {
+                earned.push({ ...badge, ...earnedMap.get(badge.badge_id) });
+            } else {
+                available.push(badge);
+            }
+        });
+
+        // Render earned badges
+        if (earned.length > 0) {
+            earnedGrid.innerHTML = earned.map(badge => this.createBadgeCard(badge, true)).join('');
+        } else {
+            earnedGrid.innerHTML = '<div class="loading-placeholder">No badges earned yet. Complete challenges to earn your first badge!</div>';
+        }
+
+        // Render available badges
+        if (available.length > 0) {
+            availableGrid.innerHTML = available.map(badge => this.createBadgeCard(badge, false)).join('');
+        } else {
+            availableGrid.innerHTML = '<div class="loading-placeholder">All badges earned! 🎉</div>';
+        }
+    }
+
+    /**
+     * Create a badge card HTML
+     */
+    createBadgeCard(badge, isEarned) {
+        const tier = isEarned ? badge.tier : 'bronze';
+        const timesEarned = isEarned ? badge.times_earned : 0;
+        const nextTierIndex = badge.tiers.indexOf(tier) + 1;
+        const nextTier = nextTierIndex < badge.tiers.length ? badge.tiers[nextTierIndex] : null;
+        const nextTierRequirement = nextTier ? badge.tier_requirements[nextTier] : null;
+
+        // Calculate progress to next tier
+        let progressPercent = 0;
+        let progressText = '';
+        if (isEarned && nextTier) {
+            progressPercent = (timesEarned / nextTierRequirement) * 100;
+            progressText = `${timesEarned}/${nextTierRequirement} to ${nextTier}`;
+        } else if (!isEarned) {
+            progressText = 'Not earned yet';
+        } else {
+            progressText = 'Max tier reached!';
+        }
+
+        return `
+            <div class="badge-card ${isEarned ? 'earned' : 'locked'}">
+                <span class="badge-category-tag ${badge.category}">${badge.category}</span>
+                <div class="badge-icon">${badge.icon}</div>
+                <div class="badge-name">${badge.name}</div>
+                ${isEarned ? `<div class="badge-tier ${tier}">${tier}</div>` : ''}
+                <div class="badge-description">${badge.description}</div>
+                ${isEarned && nextTier ? `
+                    <div class="badge-progress">
+                        <div class="badge-progress-label">
+                            <span>Progress to ${nextTier}</span>
+                            <span>${progressText}</span>
+                        </div>
+                        <div class="badge-progress-bar">
+                            <div class="badge-progress-fill" style="width: ${progressPercent}%"></div>
+                        </div>
+                    </div>
+                ` : ''}
+                ${isEarned ? `<div class="badge-times-earned">Earned ${timesEarned} time${timesEarned !== 1 ? 's' : ''}</div>` : ''}
+            </div>
+        `;
+    }
+
+    /**
+     * Handle badge earned event
+     */
+    async handleBadgeEarned(data) {
+        console.log('[GamificationUI] Badge earned:', data);
+
+        // Show badge notification with confetti
+        this.showBadgeEarnedNotification(data);
+
+        // Reload badges
+        await this.loadBadges();
+    }
+
+    /**
+     * Show badge earned notification with confetti
+     */
+    showBadgeEarnedNotification(data) {
+        // Create notification element
+        const notification = document.createElement('div');
+        notification.className = 'badge-notification';
+
+        notification.innerHTML = `
+            <div class="badge-notification-icon">${data.badge_icon || '🏆'}</div>
+            <div class="badge-notification-title">Badge Earned!</div>
+            <div class="badge-notification-description">${data.badge_name}</div>
+            ${data.tier ? `<div class="badge-tier ${data.tier}" style="margin-top: 0.5rem;">${data.tier}</div>` : ''}
+        `;
+
+        document.body.appendChild(notification);
+
+        // Trigger confetti animation
+        if (typeof confetti !== 'undefined') {
+            // Gold confetti burst
+            confetti({
+                particleCount: 100,
+                spread: 70,
+                origin: { y: 0.6 },
+                colors: ['#FFD700', '#FFA500', '#FF8C00', '#d4af37']
+            });
+
+            // Second burst after a delay
+            setTimeout(() => {
+                confetti({
+                    particleCount: 50,
+                    angle: 60,
+                    spread: 55,
+                    origin: { x: 0 },
+                    colors: ['#FFD700', '#FFA500', '#FF8C00', '#d4af37']
+                });
+            }, 250);
+
+            setTimeout(() => {
+                confetti({
+                    particleCount: 50,
+                    angle: 120,
+                    spread: 55,
+                    origin: { x: 1 },
+                    colors: ['#FFD700', '#FFA500', '#FF8C00', '#d4af37']
+                });
+            }, 400);
+        }
+
+        // Remove after animation
+        setTimeout(() => {
+            notification.remove();
+        }, 5000);
     }
 }
 

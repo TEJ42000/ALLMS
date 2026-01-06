@@ -294,6 +294,13 @@ class ActivityTracker {
                     this.showFreezeUsedNotification(data);
                 }
 
+                // Show badge earned notifications
+                if (data.badges_earned && data.badges_earned.length > 0) {
+                    data.badges_earned.forEach(badgeId => {
+                        this.showBadgeEarnedNotification(badgeId, data);
+                    });
+                }
+
                 return data;
             } else {
                 console.error('[ActivityTracker] Failed to log activity:', response.status);
@@ -355,6 +362,38 @@ class ActivityTracker {
             detail: data
         });
         document.dispatchEvent(event);
+    }
+
+    /**
+     * Show badge earned notification
+     */
+    async showBadgeEarnedNotification(badgeId, activityData) {
+        console.log(`[ActivityTracker] Badge earned: ${badgeId}`);
+
+        // Fetch badge details to get name and icon
+        try {
+            const response = await fetch('/api/gamification/badges/definitions');
+            if (response.ok) {
+                const badges = await response.json();
+                const badge = badges.find(b => b.badge_id === badgeId);
+
+                if (badge) {
+                    // Dispatch custom event for UI to handle
+                    const event = new CustomEvent('badge-earned', {
+                        detail: {
+                            badge_id: badgeId,
+                            badge_name: badge.name,
+                            badge_icon: badge.icon,
+                            badge_description: badge.description,
+                            tier: activityData.badge_tier || 'bronze'
+                        }
+                    });
+                    document.dispatchEvent(event);
+                }
+            }
+        } catch (error) {
+            console.error('[ActivityTracker] Error fetching badge details:', error);
+        }
     }
 }
 
