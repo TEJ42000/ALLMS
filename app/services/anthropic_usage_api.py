@@ -27,23 +27,67 @@ ANTHROPIC_ADMIN_API_BASE = "https://api.anthropic.com/v1/organizations"
 ANTHROPIC_API_VERSION = "2023-06-01"
 
 
+class CacheCreation(BaseModel):
+    """Cache creation token breakdown."""
+    ephemeral_1h_input_tokens: int = 0
+    ephemeral_5m_input_tokens: int = 0
+
+
+class ServerToolUse(BaseModel):
+    """Server-side tool usage."""
+    web_search_requests: int = 0
+
+
+class UsageResult(BaseModel):
+    """Individual usage result within a bucket."""
+    uncached_input_tokens: int
+    cache_creation: CacheCreation
+    cache_read_input_tokens: int
+    output_tokens: int
+    server_tool_use: ServerToolUse
+    api_key_id: Optional[str] = None
+    workspace_id: Optional[str] = None
+    model: Optional[str] = None
+    service_tier: Optional[str] = None
+    context_window: Optional[str] = None
+
+
 class AnthropicUsageBucket(BaseModel):
     """Usage data for a time bucket."""
-    bucket: str  # ISO datetime
-    input_tokens: int
-    output_tokens: int
-    cache_creation_tokens: int
-    cache_read_tokens: int
-    count: int  # Number of requests
+    starting_at: str  # ISO datetime
+    ending_at: str  # ISO datetime
+    results: List[UsageResult]
 
 
 class AnthropicUsageReport(BaseModel):
     """Response from usage_report/messages endpoint."""
     data: List[AnthropicUsageBucket]
-    granularity: str
-    start_date: str
-    end_date: str
-    totals: Dict[str, int]
+    has_more: bool
+    next_page: Optional[str] = None
+
+    def get_totals(self) -> Dict[str, int]:
+        """Calculate total token counts across all buckets and results."""
+        total_input = 0
+        total_output = 0
+        total_cache_creation = 0
+        total_cache_read = 0
+
+        for bucket in self.data:
+            for result in bucket.results:
+                total_input += result.uncached_input_tokens
+                total_output += result.output_tokens
+                total_cache_creation += (
+                    result.cache_creation.ephemeral_1h_input_tokens +
+                    result.cache_creation.ephemeral_5m_input_tokens
+                )
+                total_cache_read += result.cache_read_input_tokens
+
+        return {
+            "input_tokens": total_input,
+            "output_tokens": total_output,
+            "cache_creation_tokens": total_cache_creation,
+            "cache_read_tokens": total_cache_read,
+        }
 
 
 class AnthropicCostBucket(BaseModel):
@@ -147,22 +191,8 @@ class AnthropicUsageAPIClient:
                 response = await client.get(url, headers=self.headers)
                 response.raise_for_status()
                 data = response.json()
-                
-                # Calculate totals
-                totals = {
-                    "input_tokens": sum(b.get("input_tokens", 0) for b in data.get("data", [])),
-                    "output_tokens": sum(b.get("output_tokens", 0) for b in data.get("data", [])),
-                    "cache_creation_tokens": sum(b.get("cache_creation_tokens", 0) for b in data.get("data", [])),
-                    "cache_read_tokens": sum(b.get("cache_read_tokens", 0) for b in data.get("data", [])),
-                }
-                
-                return AnthropicUsageReport(
-                    data=[AnthropicUsageBucket(**b) for b in data.get("data", [])],
-                    granularity=bucket_width,
-                    start_date=params["starting_at"],
-                    end_date=params["ending_at"],
-                    totals=totals,
-                )
+
+                return AnthropicUsageReport(**data)
         except httpx.HTTPStatusError as e:
             logger.error(f"Anthropic API error: {e.response.status_code} - {e.response.text}")
             raise AnthropicUsageAPIError(

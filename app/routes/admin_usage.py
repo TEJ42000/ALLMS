@@ -1131,10 +1131,11 @@ async def get_reconciliation_report(
         )
 
         # Anthropic totals
-        anthropic_input = usage_report.totals["input_tokens"]
-        anthropic_output = usage_report.totals["output_tokens"]
-        anthropic_cache_creation = usage_report.totals["cache_creation_tokens"]
-        anthropic_cache_read = usage_report.totals["cache_read_tokens"]
+        totals = usage_report.get_totals()
+        anthropic_input = totals["input_tokens"]
+        anthropic_output = totals["output_tokens"]
+        anthropic_cache_creation = totals["cache_creation_tokens"]
+        anthropic_cache_read = totals["cache_read_tokens"]
         anthropic_cost = float(cost_report.total_amount) / 100.0  # Convert cents to dollars
 
         # Calculate variances
