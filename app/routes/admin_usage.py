@@ -19,7 +19,15 @@ from pydantic import BaseModel
 
 from app.dependencies.auth import require_mgms_domain
 from app.models.auth_models import User
-from app.models.usage_models import UsageSummary, UserUsageSummary, LLMUsageRecord
+from app.models.usage_models import (
+    UsageSummary,
+    UserUsageSummary,
+    LLMUsageRecord,
+    COST_INPUT_PER_MILLION,
+    COST_OUTPUT_PER_MILLION,
+    COST_CACHE_READ_PER_MILLION,
+    COST_CACHE_WRITE_PER_MILLION,
+)
 from app.services.usage_tracking_service import (
     get_usage_tracking_service,
     DEFAULT_QUERY_LIMIT,
@@ -28,6 +36,58 @@ from app.services.usage_tracking_service import (
 )
 
 logger = logging.getLogger(__name__)
+
+# =============================================================================
+# Helper Functions
+# =============================================================================
+
+
+def calculate_cache_metrics(
+    total_input: int,
+    total_cache_reads: int,
+    total_cache_writes: int,
+) -> Dict[str, float]:
+    """
+    Calculate cache efficiency metrics.
+
+    Args:
+        total_input: Total input tokens (non-cached)
+        total_cache_reads: Total tokens read from cache
+        total_cache_writes: Total tokens written to cache
+
+    Returns:
+        Dictionary with cache_hit_rate, cache_savings, cache_overhead, net_benefit
+    """
+    # Cache hit rate: percentage of input that came from cache
+    total_potential_input = total_input + total_cache_reads
+    cache_hit_rate = (
+        (total_cache_reads / total_potential_input * 100)
+        if total_potential_input > 0
+        else 0.0
+    )
+
+    # Cache cost savings: difference between cache read cost and regular input cost
+    # Cache read: $0.30/M tokens, Regular input: $3.00/M tokens
+    cache_savings = (total_cache_reads / 1_000_000) * (
+        COST_INPUT_PER_MILLION - COST_CACHE_READ_PER_MILLION
+    )
+
+    # Cache write overhead: extra cost for writing to cache vs regular input
+    # Cache write: $3.75/M tokens, Regular input: $3.00/M tokens
+    cache_overhead = (total_cache_writes / 1_000_000) * (
+        COST_CACHE_WRITE_PER_MILLION - COST_INPUT_PER_MILLION
+    )
+
+    # Net benefit: savings minus overhead
+    net_benefit = cache_savings - cache_overhead
+
+    return {
+        "cache_hit_rate": round(cache_hit_rate, 2),
+        "cache_savings": round(cache_savings, 4),
+        "cache_overhead": round(cache_overhead, 4),
+        "net_benefit": round(net_benefit, 4),
+    }
+
 
 # =============================================================================
 # Query Parameter Constants
@@ -110,6 +170,16 @@ class TimeSeriesBucket(BaseModel):
     count: int  # Number of requests in this bucket
 
 
+class TokenBreakdownBucket(BaseModel):
+    """Token breakdown for a single time bucket."""
+    bucket: str  # ISO date/datetime string
+    input_tokens: int
+    output_tokens: int
+    cache_creation_tokens: int
+    cache_read_tokens: int
+    count: int  # Number of requests in this bucket
+
+
 class TimeSeriesResponse(BaseModel):
     """Response for time series endpoint."""
     data: List[TimeSeriesBucket]
@@ -118,6 +188,15 @@ class TimeSeriesResponse(BaseModel):
     total: float
     start_date: str
     end_date: str
+
+
+class TokenBreakdownResponse(BaseModel):
+    """Response for token breakdown time series."""
+    data: List[TokenBreakdownBucket]
+    granularity: str
+    start_date: str
+    end_date: str
+    totals: Dict[str, int]  # Total tokens by type
 
 
 class TopUserItem(BaseModel):
@@ -153,6 +232,19 @@ class BreakdownResponse(BaseModel):
     total_requests: int
 
 
+class CacheAnalytics(BaseModel):
+    """Detailed cache analytics."""
+    cache_hit_rate: float  # Percentage
+    total_cache_reads: int
+    total_cache_writes: int
+    total_input_tokens: int
+    cache_cost_savings: float  # USD saved
+    cache_write_overhead: float  # Extra cost for writing to cache
+    net_cache_benefit: float  # Savings minus overhead
+    operations_using_cache: int  # Number of operations that used cache
+    total_operations: int
+
+
 class DashboardKPIs(BaseModel):
     """Key performance indicators for dashboard."""
     total_requests: int
@@ -161,6 +253,10 @@ class DashboardKPIs(BaseModel):
     avg_cost_per_request: float
     total_input_tokens: int
     total_output_tokens: int
+    total_cache_creation_tokens: int
+    total_cache_read_tokens: int
+    cache_hit_rate: float  # Percentage of tokens from cache
+    cache_cost_savings: float  # Cost saved by using cache reads vs regular input
     period_days: int
 
 router = APIRouter(
@@ -360,7 +456,16 @@ async def get_dashboard_kpis(
         unique_users = len(set(r.user_email for r in records))
         total_input = sum(r.input_tokens for r in records)
         total_output = sum(r.output_tokens for r in records)
+        total_cache_creation = sum(r.cache_creation_tokens for r in records)
+        total_cache_read = sum(r.cache_read_tokens for r in records)
         avg_cost = total_cost / total_requests if total_requests > 0 else 0.0
+
+        # Calculate cache metrics using helper function
+        cache_metrics = calculate_cache_metrics(
+            total_input=total_input,
+            total_cache_reads=total_cache_read,
+            total_cache_writes=total_cache_creation,
+        )
 
         return DashboardKPIs(
             total_requests=total_requests,
@@ -369,6 +474,10 @@ async def get_dashboard_kpis(
             avg_cost_per_request=round(avg_cost, 6),
             total_input_tokens=total_input,
             total_output_tokens=total_output,
+            total_cache_creation_tokens=total_cache_creation,
+            total_cache_read_tokens=total_cache_read,
+            cache_hit_rate=cache_metrics["cache_hit_rate"],
+            cache_cost_savings=cache_metrics["cache_savings"],
             period_days=days,
         )
 
@@ -449,6 +558,92 @@ async def get_usage_timeseries(
         raise HTTPException(400, detail=f"Invalid date format: {e}") from e
     except Exception as e:
         logger.error("Error getting time series: %s", e)
+        raise HTTPException(500, detail=str(e)) from e
+
+
+@router.get("/token-breakdown", response_model=TokenBreakdownResponse)
+async def get_token_breakdown_timeseries(
+    start_date: str = Query(..., description="Start date (ISO format: YYYY-MM-DD)"),
+    end_date: str = Query(..., description="End date (ISO format: YYYY-MM-DD)"),
+    granularity: GranularityEnum = Query(GranularityEnum.DAILY, description="Time granularity"),
+    user: User = Depends(require_mgms_domain),
+):
+    """
+    Get token breakdown over time (input, output, cache creation, cache read).
+
+    Returns token usage broken down by type for each time bucket.
+    """
+    try:
+        # Parse dates
+        start_dt = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+        if start_dt.tzinfo is None:
+            start_dt = start_dt.replace(tzinfo=timezone.utc)
+
+        end_dt = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+        if end_dt.tzinfo is None:
+            end_dt = end_dt.replace(tzinfo=timezone.utc)
+        # Include the full end day
+        end_dt = end_dt.replace(hour=23, minute=59, second=59)
+
+        service = get_usage_tracking_service()
+        records = await service.get_all_usage(
+            start_date=start_dt,
+            end_date=end_dt,
+            limit=MAX_EXPORT_RECORDS,
+        )
+
+        # Bucket records by time
+        buckets: Dict[str, Dict[str, int]] = defaultdict(
+            lambda: {
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "cache_creation_tokens": 0,
+                "cache_read_tokens": 0,
+                "count": 0
+            }
+        )
+
+        for record in records:
+            bucket_key = _get_bucket_key(record.timestamp, granularity)
+            buckets[bucket_key]["input_tokens"] += record.input_tokens
+            buckets[bucket_key]["output_tokens"] += record.output_tokens
+            buckets[bucket_key]["cache_creation_tokens"] += record.cache_creation_tokens
+            buckets[bucket_key]["cache_read_tokens"] += record.cache_read_tokens
+            buckets[bucket_key]["count"] += 1
+
+        # Convert to sorted list
+        data = [
+            TokenBreakdownBucket(
+                bucket=key,
+                input_tokens=val["input_tokens"],
+                output_tokens=val["output_tokens"],
+                cache_creation_tokens=val["cache_creation_tokens"],
+                cache_read_tokens=val["cache_read_tokens"],
+                count=val["count"],
+            )
+            for key, val in sorted(buckets.items())
+        ]
+
+        # Calculate totals
+        totals = {
+            "input_tokens": sum(b.input_tokens for b in data),
+            "output_tokens": sum(b.output_tokens for b in data),
+            "cache_creation_tokens": sum(b.cache_creation_tokens for b in data),
+            "cache_read_tokens": sum(b.cache_read_tokens for b in data),
+        }
+
+        return TokenBreakdownResponse(
+            data=data,
+            granularity=granularity.value,
+            start_date=start_date,
+            end_date=end_date,
+            totals=totals,
+        )
+
+    except ValueError as e:
+        raise HTTPException(400, detail=f"Invalid date format: {e}") from e
+    except Exception as e:
+        logger.error("Error getting token breakdown: %s", e)
         raise HTTPException(500, detail=str(e)) from e
 
 
@@ -607,4 +802,60 @@ async def get_usage_breakdown(
         raise
     except Exception as e:
         logger.error("Error getting breakdown: %s", e)
+        raise HTTPException(500, detail=str(e)) from e
+
+
+@router.get("/cache-analytics", response_model=CacheAnalytics)
+async def get_cache_analytics(
+    days: int = Query(DEFAULT_DAYS, ge=1, le=MAX_DAYS, description="Number of days to include"),
+    user: User = Depends(require_mgms_domain),
+):
+    """
+    Get detailed cache analytics and efficiency metrics.
+
+    Returns comprehensive cache usage statistics including hit rates,
+    cost savings, and efficiency metrics.
+    """
+    try:
+        end_date = datetime.now(timezone.utc)
+        start_date = end_date - timedelta(days=days)
+
+        service = get_usage_tracking_service()
+        records = await service.get_all_usage(
+            start_date=start_date,
+            end_date=end_date,
+            limit=MAX_EXPORT_RECORDS,
+        )
+
+        # Calculate cache metrics
+        total_input = sum(r.input_tokens for r in records)
+        total_cache_reads = sum(r.cache_read_tokens for r in records)
+        total_cache_writes = sum(r.cache_creation_tokens for r in records)
+
+        # Use helper function for cache calculations
+        cache_metrics = calculate_cache_metrics(
+            total_input=total_input,
+            total_cache_reads=total_cache_reads,
+            total_cache_writes=total_cache_writes,
+        )
+
+        # Count operations using cache
+        operations_with_cache = sum(
+            1 for r in records if r.cache_read_tokens > 0 or r.cache_creation_tokens > 0
+        )
+
+        return CacheAnalytics(
+            cache_hit_rate=cache_metrics["cache_hit_rate"],
+            total_cache_reads=total_cache_reads,
+            total_cache_writes=total_cache_writes,
+            total_input_tokens=total_input,
+            cache_cost_savings=cache_metrics["cache_savings"],
+            cache_write_overhead=cache_metrics["cache_overhead"],
+            net_cache_benefit=cache_metrics["net_benefit"],
+            operations_using_cache=operations_with_cache,
+            total_operations=len(records),
+        )
+
+    except Exception as e:
+        logger.error("Error getting cache analytics: %s", e)
         raise HTTPException(500, detail=str(e)) from e

@@ -204,6 +204,22 @@
                     <div class="kpi-value" id="kpi-avg">-</div>
                     <div class="kpi-label">Avg Cost/Request</div>
                 </div>
+                <div class="kpi-card">
+                    <div class="kpi-value" id="kpi-input-tokens">-</div>
+                    <div class="kpi-label">Input Tokens</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-value" id="kpi-output-tokens">-</div>
+                    <div class="kpi-label">Output Tokens</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-value" id="kpi-cache-hit-rate">-</div>
+                    <div class="kpi-label">Cache Hit Rate</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-value" id="kpi-cache-savings">-</div>
+                    <div class="kpi-label">Cache Savings</div>
+                </div>
             </div>
 
             <!-- Main Charts Row -->
@@ -221,6 +237,55 @@
                 <div class="chart-card">
                     <h3>📊 Usage by Operation</h3>
                     <div id="chart-breakdown" style="height: 320px;"></div>
+                </div>
+            </div>
+
+            <!-- Token Breakdown Chart -->
+            <div class="chart-card">
+                <h3>🔢 Token Breakdown Over Time</h3>
+                <div class="chart-controls" id="token-granularity-controls">
+                    <button data-granularity="hourly">Hourly</button>
+                    <button data-granularity="daily" class="active">Daily</button>
+                    <button data-granularity="weekly">Weekly</button>
+                    <button data-granularity="monthly">Monthly</button>
+                </div>
+                <div id="chart-token-breakdown" style="height: 320px;"></div>
+            </div>
+
+            <!-- Cache Analytics Section -->
+            <div class="chart-card">
+                <h3>💾 Cache Analytics</h3>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; margin-top: 1rem;">
+                    <div>
+                        <div style="font-size: 0.875rem; color: #888; margin-bottom: 0.5rem;">Cache Efficiency</div>
+                        <div style="display: flex; align-items: baseline; gap: 0.5rem;">
+                            <span id="cache-hit-rate-detail" style="font-size: 2rem; font-weight: 600; color: #00d4aa;">-</span>
+                            <span style="color: #888;">hit rate</span>
+                        </div>
+                        <div style="font-size: 0.75rem; color: #666; margin-top: 0.25rem;">
+                            <span id="cache-reads-detail">-</span> cache reads / <span id="total-input-detail">-</span> total input
+                        </div>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.875rem; color: #888; margin-bottom: 0.5rem;">Cost Impact</div>
+                        <div style="display: flex; align-items: baseline; gap: 0.5rem;">
+                            <span id="cache-savings-detail" style="font-size: 2rem; font-weight: 600; color: #00d4aa;">-</span>
+                            <span style="color: #888;">saved</span>
+                        </div>
+                        <div style="font-size: 0.75rem; color: #666; margin-top: 0.25rem;">
+                            Overhead: <span id="cache-overhead-detail">-</span> | Net: <span id="cache-net-detail">-</span>
+                        </div>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.875rem; color: #888; margin-bottom: 0.5rem;">Cache Usage</div>
+                        <div style="display: flex; align-items: baseline; gap: 0.5rem;">
+                            <span id="cache-operations-detail" style="font-size: 2rem; font-weight: 600; color: #6c63ff;">-</span>
+                            <span style="color: #888;">operations</span>
+                        </div>
+                        <div style="font-size: 0.75rem; color: #666; margin-top: 0.25rem;">
+                            Writes: <span id="cache-writes-detail">-</span> | Reads: <span id="cache-reads-count">-</span>
+                        </div>
+                    </div>
                 </div>
             </div>
 
