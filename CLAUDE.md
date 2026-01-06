@@ -18,6 +18,15 @@ ALLMS (AI-Powered Learning Management System) is a FastAPI-based web application
 - **Testing**: pytest (Python), Playwright (frontend)
 - **Deployment**: Google Cloud Run, Docker
 
+## Deployment Process
+
+**Automated Production Deployment:**
+- Deployment to production is automatically handled by a GitHub Action
+- Any commit tagged with a semantic version (e.g., `v2.9.0`, `v1.2.3`) triggers the deployment
+- The GitHub Action automatically deploys to Google Cloud Run
+- See `.github/` folder for workflow configuration and deployment scripts
+- **Do NOT manually deploy to production** - always use version tags to trigger automated deployment
+
 ## Code Review Focus Areas
 
 ### Security (CRITICAL)
