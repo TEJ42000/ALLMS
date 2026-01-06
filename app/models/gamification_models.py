@@ -276,6 +276,8 @@ class ActivityLogResponse(BaseModel):
     new_level: Optional[int] = Field(None, description="New level if leveled up")
     new_level_title: Optional[str] = Field(None, description="New level title if leveled up")
     streak_maintained: bool = Field(..., description="Whether streak was maintained")
+    new_streak_count: Optional[int] = Field(None, description="New streak count")
+    freeze_used: Optional[bool] = Field(None, description="Whether a streak freeze was used")
     badges_earned: List[str] = Field(default_factory=list, description="Badge IDs earned")
 
 

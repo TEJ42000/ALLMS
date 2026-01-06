@@ -175,6 +175,14 @@ class GamificationUI {
         document.addEventListener('level-up', (event) => {
             this.handleLevelUp(event.detail);
         });
+
+        document.addEventListener('streak-updated', (event) => {
+            this.handleStreakUpdated(event.detail);
+        });
+
+        document.addEventListener('freeze-used', (event) => {
+            this.handleFreezeUsed(event.detail);
+        });
     }
 
     /**
@@ -209,6 +217,29 @@ class GamificationUI {
 
         // Show level up animation
         this.showLevelUpAnimation(data.new_level, data.new_level_title);
+    }
+
+    /**
+     * Handle streak updated event
+     */
+    handleStreakUpdated(data) {
+        console.log('[GamificationUI] Streak updated:', data);
+
+        // Check for milestone streaks
+        const milestones = [7, 14, 30, 60, 100];
+        if (milestones.includes(data.new_streak_count)) {
+            this.showStreakMilestoneNotification(data.new_streak_count);
+        }
+    }
+
+    /**
+     * Handle freeze used event
+     */
+    handleFreezeUsed(data) {
+        console.log('[GamificationUI] Freeze used:', data);
+
+        // Show freeze used notification
+        this.showFreezeUsedNotification(data.new_streak_count);
     }
 
     /**
@@ -302,6 +333,70 @@ class GamificationUI {
                 overlay.remove();
             }
         }, 5000);
+    }
+
+    /**
+     * Show streak milestone notification
+     */
+    showStreakMilestoneNotification(streakCount) {
+        const notification = document.createElement('div');
+        notification.className = 'streak-milestone-notification';
+        notification.style.cssText = `
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            z-index: 10000;
+            animation: slideInRight 0.3s ease, fadeOut 0.3s ease 3.7s;
+            font-weight: 600;
+        `;
+
+        notification.innerHTML = `
+            <div style="font-size: 1.5em; margin-bottom: 0.25rem;">🔥 ${streakCount} Day Streak!</div>
+            <div style="font-size: 0.9em; opacity: 0.9;">Keep it going!</div>
+        `;
+
+        document.body.appendChild(notification);
+
+        setTimeout(() => {
+            notification.remove();
+        }, 4000);
+    }
+
+    /**
+     * Show freeze used notification
+     */
+    showFreezeUsedNotification(streakCount) {
+        const notification = document.createElement('div');
+        notification.className = 'freeze-used-notification';
+        notification.style.cssText = `
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+            color: #333;
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            z-index: 10000;
+            animation: slideInRight 0.3s ease, fadeOut 0.3s ease 3.7s;
+            font-weight: 600;
+        `;
+
+        notification.innerHTML = `
+            <div style="font-size: 1.3em; margin-bottom: 0.25rem;">❄️ Streak Freeze Used!</div>
+            <div style="font-size: 0.9em; opacity: 0.8;">Your ${streakCount}-day streak is safe!</div>
+        `;
+
+        document.body.appendChild(notification);
+
+        setTimeout(() => {
+            notification.remove();
+        }, 4000);
     }
 }
 
