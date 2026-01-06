@@ -210,13 +210,13 @@ class FilesAPIService:
                 MAX_TEXT_LENGTH
             )
             # Try to truncate at last period within limit to avoid breaking mid-sentence
-            # rfind searches up to MAX_TEXT_LENGTH, so truncate_at is always <= MAX_TEXT_LENGTH
+            # rfind searches up to MAX_TEXT_LENGTH, returns -1 if no period found
             truncate_at = text.rfind('.', 0, MAX_TEXT_LENGTH)
-            # Only use sentence boundary if it's within 10% of the limit (90% of MAX_TEXT_LENGTH)
-            if truncate_at > MAX_TEXT_LENGTH * 0.9:
+            # Only use sentence boundary if found AND within 10% of the limit (90% of MAX_TEXT_LENGTH)
+            if truncate_at != -1 and truncate_at > MAX_TEXT_LENGTH * 0.9:
                 text = text[:truncate_at + 1] + "\n\n[... content truncated ...]"
             else:
-                # Fall back to hard truncation if no good sentence boundary found
+                # Fall back to hard truncation if no good sentence boundary found (or truncate_at == -1)
                 text = text[:MAX_TEXT_LENGTH] + "\n\n[... content truncated ...]"
 
         logger.info(

@@ -2089,16 +2089,6 @@ function setupWeekCardEventDelegation(weeksGrid) {
     });
 }
 
-/**
- * Escape HTML to prevent XSS
- */
-function escapeHtml(text) {
-    if (!text) return '';
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-
 // ========== Flashcards ==========
 // Course-aware flashcard system - loads flashcards dynamically from backend API
 // Flashcards are generated from actual course materials using FilesAPIService
