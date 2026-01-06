@@ -119,9 +119,25 @@ class AnthropicCostReport(BaseModel):
     def get_total_amount(self) -> float:
         """Calculate total cost across all buckets and results."""
         total = 0.0
-        for bucket in self.data:
-            for result in bucket.results:
-                total += float(result.amount)
+        logger.info("=" * 80)
+        logger.info("COST REPORT BREAKDOWN:")
+        logger.info(f"Total buckets: {len(self.data)}")
+
+        for i, bucket in enumerate(self.data):
+            logger.info(f"\nBucket {i+1}: {bucket.starting_at} to {bucket.ending_at}")
+            logger.info(f"  Number of results: {len(bucket.results)}")
+
+            for j, result in enumerate(bucket.results):
+                amount = float(result.amount)
+                logger.info(
+                    f"  Result {j+1}: ${amount:.6f} "
+                    f"[model={result.model}, token_type={result.token_type}, "
+                    f"cost_type={result.cost_type}, workspace_id={result.workspace_id}]"
+                )
+                total += amount
+
+        logger.info(f"\nTOTAL COST: ${total:.6f}")
+        logger.info("=" * 80)
         return total
 
 
