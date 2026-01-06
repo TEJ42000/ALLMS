@@ -1,11 +1,11 @@
 """Anthropic API Client Service for the LLS Study Portal."""
 
 import logging
-from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 
 from anthropic import AsyncAnthropic
 
+from app.models.usage_models import UserContext
 from app.services.gcp_service import get_anthropic_api_key
 from app.services.usage_tracking_service import get_usage_tracking_service
 
@@ -13,14 +13,6 @@ logger = logging.getLogger(__name__)
 
 # Default model
 DEFAULT_MODEL = "claude-sonnet-4-20250514"
-
-
-@dataclass
-class UserContext:
-    """User context for tracking LLM usage."""
-    email: str
-    user_id: str
-    course_id: Optional[str] = None
 
 # Initialize Anthropic client using ADC-based secret retrieval (with .env fallback)
 client = AsyncAnthropic(api_key=get_anthropic_api_key())

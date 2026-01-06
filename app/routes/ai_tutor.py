@@ -20,7 +20,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from app.dependencies.auth import get_optional_user
 from app.models.auth_models import User
 from app.models.schemas import ChatRequest, ChatResponse, ErrorResponse
-from app.services.anthropic_client import get_ai_tutor_response, UserContext
+from app.models.usage_models import UserContext
+from app.services.anthropic_client import get_ai_tutor_response
 from app.services.gcp_service import get_firestore_client
 
 logger = logging.getLogger(__name__)

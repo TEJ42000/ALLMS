@@ -6,10 +6,22 @@ storing the data in Firestore and associating it with authenticated users.
 Firestore structure: llm_usage/{usage_id}
 """
 
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Optional, Dict, Any
 
 from pydantic import BaseModel, Field
+
+
+@dataclass
+class UserContext:
+    """User context for tracking LLM usage.
+
+    This is passed to LLM service functions to enable usage tracking.
+    """
+    email: str
+    user_id: str
+    course_id: Optional[str] = None
 
 
 class LLMUsageRecord(BaseModel):

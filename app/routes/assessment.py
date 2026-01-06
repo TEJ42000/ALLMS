@@ -9,7 +9,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from app.dependencies.auth import get_optional_user
 from app.models.auth_models import User
 from app.models.schemas import AssessmentRequest, AssessmentResponse, ErrorResponse
-from app.services.anthropic_client import get_assessment_response, UserContext
+from app.models.usage_models import UserContext
+from app.services.anthropic_client import get_assessment_response
 
 logger = logging.getLogger(__name__)
 
