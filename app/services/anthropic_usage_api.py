@@ -4,7 +4,8 @@ This service fetches actual usage and cost data from Anthropic's Admin API
 for reconciliation with internal tracking.
 
 Requires an Admin API key (starts with sk-ant-admin...) stored in Secret Manager
-as 'anthropic-admin-api-key'.
+as 'anthropic-admin-api-key'. The Cloud Run service account must have the
+'roles/secretmanager.secretAccessor' role for this secret.
 
 API Documentation: https://docs.anthropic.com/en/api/admin-api
 """
