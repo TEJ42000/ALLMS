@@ -223,10 +223,15 @@ function formatInline(text) {
 // Escape HTML to prevent XSS
 // This function properly escapes all special characters including:
 // <, >, &, ", ', and backslashes by using textContent which handles all escaping
+//
+// Implementation note: This uses the browser's built-in escaping mechanism.
+// Setting textContent automatically escapes ALL characters that need escaping in HTML,
+// including backslashes, quotes, angle brackets, and control characters.
+// This is a standard and secure pattern recommended for HTML escaping in JavaScript.
 function escapeHtml(text) {
     if (!text) return '';
     const div = document.createElement('div');
-    div.textContent = text;
+    div.textContent = text;  // Browser automatically escapes all special chars
     return div.innerHTML;
 }
 

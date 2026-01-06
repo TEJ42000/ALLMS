@@ -209,9 +209,10 @@ class FilesAPIService:
                 MAX_TEXT_LENGTH
             )
             # Try to truncate at last period within limit to avoid breaking mid-sentence
+            # rfind searches up to MAX_TEXT_LENGTH, so truncate_at is always <= MAX_TEXT_LENGTH
             truncate_at = text.rfind('.', 0, MAX_TEXT_LENGTH)
-            # Only use sentence boundary if it's within 10% of the limit AND within the limit
-            if truncate_at > MAX_TEXT_LENGTH * 0.9 and truncate_at < MAX_TEXT_LENGTH:
+            # Only use sentence boundary if it's within 10% of the limit (90% of MAX_TEXT_LENGTH)
+            if truncate_at > MAX_TEXT_LENGTH * 0.9:
                 text = text[:truncate_at + 1] + "\n\n[... content truncated ...]"
             else:
                 # Fall back to hard truncation if no good sentence boundary found
@@ -769,13 +770,13 @@ Use proper legal analysis method and cite articles.""" % (topic, case_facts)
         Args:
             topic: Topic name
             file_keys: Files to use
-            num_cards: Number of flashcards to generate
+            num_cards: Number of flashcards to generate (5-50)
 
         Returns:
             List of flashcard dictionaries
 
         Raises:
-            ValueError: If file_keys is empty or topic is invalid
+            ValueError: If file_keys is empty, topic is invalid, or num_cards out of range
             TypeError: If file_keys contains non-string values
         """
         # Input validation
@@ -783,6 +784,10 @@ Use proper legal analysis method and cite articles.""" % (topic, case_facts)
             raise ValueError("file_keys cannot be empty")
         if not all(isinstance(k, str) for k in file_keys):
             raise TypeError("All file_keys must be strings")
+
+        # Validate num_cards range (consistent with course-aware method)
+        if not 5 <= num_cards <= 50:
+            raise ValueError("num_cards must be between 5 and 50")
 
         # Validate and sanitize topic to prevent prompt injection (same as course-aware method)
         if topic:
@@ -893,7 +898,9 @@ Include:
         )
 
         if not materials_with_text:
-            raise ValueError(f"No materials found for course {course_id}")
+            # Include week context in error message for better debugging
+            week_msg = f" for week {week_number}" if week_number else ""
+            raise ValueError(f"No materials found for course {course_id}{week_msg}")
 
         # Build content blocks using extracted text
         content_blocks = []
