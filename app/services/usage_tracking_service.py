@@ -441,3 +441,57 @@ def get_usage_tracking_service() -> UsageTrackingService:
         _usage_tracking_service = UsageTrackingService()
     return _usage_tracking_service
 
+
+async def track_llm_usage_from_response(
+    response: Any,
+    user_context: Optional[Any],
+    operation_type: str,
+    model: str,
+    request_metadata: Optional[Dict[str, Any]] = None,
+) -> None:
+    """Helper function to track LLM usage from an Anthropic API response.
+
+    Extracts token usage from the response and records it via the usage tracking service.
+    This helper reduces code duplication across multiple LLM operation handlers.
+
+    Args:
+        response: Anthropic API response object with usage attribute
+        user_context: User context containing email, user_id, and course_id
+        operation_type: Type of operation (e.g., "tutor", "assessment", "quiz", "study_guide")
+        model: Model identifier used for the request
+        request_metadata: Optional metadata about the request (e.g., topic, parameters)
+
+    Returns:
+        None. Logs errors if tracking fails but doesn't raise exceptions.
+
+    Example:
+        >>> await track_llm_usage_from_response(
+        ...     response=anthropic_response,
+        ...     user_context=user_context,
+        ...     operation_type="tutor",
+        ...     model="claude-sonnet-4-20250514",
+        ...     request_metadata={"context": "algebra"}
+        ... )
+    """
+    if not user_context:
+        return
+
+    try:
+        usage = response.usage
+        await get_usage_tracking_service().record_usage(
+            user_email=user_context.email,
+            user_id=user_context.user_id,
+            model=model,
+            operation_type=operation_type,
+            input_tokens=getattr(usage, "input_tokens", 0) or 0,
+            output_tokens=getattr(usage, "output_tokens", 0) or 0,
+            cache_creation_tokens=getattr(usage, "cache_creation_input_tokens", 0) or 0,
+            cache_read_tokens=getattr(usage, "cache_read_input_tokens", 0) or 0,
+            course_id=user_context.course_id,
+            request_metadata=request_metadata,
+        )
+    except Exception as e:
+        logger.error(
+            "Failed to track usage for operation %s: %s", operation_type, e
+        )
+

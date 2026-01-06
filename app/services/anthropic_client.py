@@ -7,7 +7,7 @@ from anthropic import AsyncAnthropic
 
 from app.models.usage_models import UserContext
 from app.services.gcp_service import get_anthropic_api_key
-from app.services.usage_tracking_service import get_usage_tracking_service
+from app.services.usage_tracking_service import track_llm_usage_from_response
 
 logger = logging.getLogger(__name__)
 
@@ -231,20 +231,13 @@ async def get_ai_tutor_response(
         response_text = response.content[0].text
 
         # Track usage if user context provided
-        if user_context:
-            usage = response.usage
-            await get_usage_tracking_service().record_usage(
-                user_email=user_context.email,
-                user_id=user_context.user_id,
-                model=DEFAULT_MODEL,
-                operation_type="tutor",
-                input_tokens=getattr(usage, 'input_tokens', 0) or 0,
-                output_tokens=getattr(usage, 'output_tokens', 0) or 0,
-                cache_creation_tokens=getattr(usage, 'cache_creation_input_tokens', 0) or 0,
-                cache_read_tokens=getattr(usage, 'cache_read_input_tokens', 0) or 0,
-                course_id=user_context.course_id,
-                request_metadata={"context": context},
-            )
+        await track_llm_usage_from_response(
+            response=response,
+            user_context=user_context,
+            operation_type="tutor",
+            model=DEFAULT_MODEL,
+            request_metadata={"context": context},
+        )
 
         materials_count = len(materials_content) if materials_content else 0
         logger.info(
@@ -302,20 +295,13 @@ async def get_assessment_response(
         response_text = response.content[0].text
 
         # Track usage if user context provided
-        if user_context:
-            usage = response.usage
-            await get_usage_tracking_service().record_usage(
-                user_email=user_context.email,
-                user_id=user_context.user_id,
-                model=DEFAULT_MODEL,
-                operation_type="assessment",
-                input_tokens=getattr(usage, 'input_tokens', 0) or 0,
-                output_tokens=getattr(usage, 'output_tokens', 0) or 0,
-                cache_creation_tokens=getattr(usage, 'cache_creation_input_tokens', 0) or 0,
-                cache_read_tokens=getattr(usage, 'cache_read_input_tokens', 0) or 0,
-                course_id=user_context.course_id,
-                request_metadata={"topic": topic},
-            )
+        await track_llm_usage_from_response(
+            response=response,
+            user_context=user_context,
+            operation_type="assessment",
+            model=DEFAULT_MODEL,
+            request_metadata={"topic": topic},
+        )
 
         logger.info("AI Assessment generated for topic: %s", topic)
 
@@ -360,19 +346,12 @@ async def get_simple_response(
         response_text = response.content[0].text
 
         # Track usage if user context provided
-        if user_context:
-            usage = response.usage
-            await get_usage_tracking_service().record_usage(
-                user_email=user_context.email,
-                user_id=user_context.user_id,
-                model=DEFAULT_MODEL,
-                operation_type=operation_type,
-                input_tokens=getattr(usage, 'input_tokens', 0) or 0,
-                output_tokens=getattr(usage, 'output_tokens', 0) or 0,
-                cache_creation_tokens=getattr(usage, 'cache_creation_input_tokens', 0) or 0,
-                cache_read_tokens=getattr(usage, 'cache_read_input_tokens', 0) or 0,
-                course_id=user_context.course_id,
-            )
+        await track_llm_usage_from_response(
+            response=response,
+            user_context=user_context,
+            operation_type=operation_type,
+            model=DEFAULT_MODEL,
+        )
 
         return response_text
 
