@@ -306,3 +306,51 @@ class UserStatsResponse(BaseModel):
     activities: Dict[str, int] = Field(..., description="Activity counters")
     week7_quest: Optional[Dict[str, Any]] = Field(None, description="Week 7 quest info if active")
 
+
+# =============================================================================
+# XP Configuration Models
+# =============================================================================
+
+class XPConfig(BaseModel):
+    """XP configuration for activities.
+
+    Stored in Firestore: xp_config/default
+    """
+
+    flashcard_set_completed: int = Field(5, ge=0, description="XP per 10 cards reviewed correctly")
+    study_guide_completed: int = Field(15, ge=0, description="XP per study guide completion")
+    quiz_easy_passed: int = Field(10, ge=0, description="XP for passing easy quiz")
+    quiz_hard_passed: int = Field(25, ge=0, description="XP for passing hard quiz")
+    evaluation_low: int = Field(20, ge=0, description="XP for AI evaluation grade 1-6")
+    evaluation_high: int = Field(50, ge=0, description="XP for AI evaluation grade 7-10")
+
+    updated_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        description="When config was last updated"
+    )
+    updated_by: Optional[str] = Field(None, description="User who updated the config")
+
+
+class XPConfigResponse(BaseModel):
+    """Response with XP configuration."""
+
+    flashcard_set_completed: int
+    study_guide_completed: int
+    quiz_easy_passed: int
+    quiz_hard_passed: int
+    evaluation_low: int
+    evaluation_high: int
+    updated_at: datetime
+    updated_by: Optional[str]
+
+
+class XPConfigUpdateRequest(BaseModel):
+    """Request to update XP configuration."""
+
+    flashcard_set_completed: Optional[int] = Field(None, ge=0)
+    study_guide_completed: Optional[int] = Field(None, ge=0)
+    quiz_easy_passed: Optional[int] = Field(None, ge=0)
+    quiz_hard_passed: Optional[int] = Field(None, ge=0)
+    evaluation_low: Optional[int] = Field(None, ge=0)
+    evaluation_high: Optional[int] = Field(None, ge=0)
+

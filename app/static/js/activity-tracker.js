@@ -299,16 +299,26 @@ class ActivityTracker {
      * Show XP notification
      */
     showXPNotification(data) {
-        // TODO: Implement toast notification
         console.log(`[ActivityTracker] +${data.xp_awarded} XP! Total: ${data.new_total_xp}`);
+
+        // Dispatch custom event for UI to handle
+        const event = new CustomEvent('xp-awarded', {
+            detail: data
+        });
+        document.dispatchEvent(event);
     }
 
     /**
      * Show level up notification
      */
     showLevelUpNotification(data) {
-        // TODO: Implement level up animation
         console.log(`[ActivityTracker] Level Up! Now level ${data.new_level}: ${data.new_level_title}`);
+
+        // Dispatch custom event for UI to handle
+        const event = new CustomEvent('level-up', {
+            detail: data
+        });
+        document.dispatchEvent(event);
     }
 }
 
