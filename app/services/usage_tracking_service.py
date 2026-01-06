@@ -7,6 +7,7 @@ Firestore structure: llm_usage/{usage_id}
 """
 
 import logging
+import threading
 import uuid
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
@@ -18,6 +19,7 @@ from app.models.usage_models import (
     LLMUsageRecord,
     UsageSummary,
     UserUsageSummary,
+    UserContext,
     calculate_cost,
 )
 from app.services.gcp_service import get_firestore_client
@@ -430,21 +432,36 @@ class UsageTrackingService:
             )
 
 
-# Singleton instance
+# Singleton instance with thread-safe initialization
 _usage_tracking_service: Optional[UsageTrackingService] = None
+_usage_tracking_service_lock = threading.Lock()
 
 
 def get_usage_tracking_service() -> UsageTrackingService:
-    """Get the singleton usage tracking service instance."""
+    """Get the singleton usage tracking service instance.
+
+    Uses double-checked locking pattern for thread-safe lazy initialization.
+    This ensures only one instance is created even in multi-threaded environments.
+
+    Returns:
+        The singleton UsageTrackingService instance
+    """
     global _usage_tracking_service
+
+    # First check without lock (fast path for already initialized)
     if _usage_tracking_service is None:
-        _usage_tracking_service = UsageTrackingService()
+        # Acquire lock for initialization
+        with _usage_tracking_service_lock:
+            # Double-check after acquiring lock
+            if _usage_tracking_service is None:
+                _usage_tracking_service = UsageTrackingService()
+
     return _usage_tracking_service
 
 
 async def track_llm_usage_from_response(
-    response: Any,
-    user_context: Optional[Any],
+    response: Any,  # anthropic.types.Message - using Any to avoid hard dependency
+    user_context: Optional[UserContext],
     operation_type: str,
     model: str,
     request_metadata: Optional[Dict[str, Any]] = None,
