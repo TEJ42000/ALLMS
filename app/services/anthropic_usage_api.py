@@ -22,7 +22,8 @@ from app.services.gcp_service import get_secret
 logger = logging.getLogger(__name__)
 
 # Anthropic Admin API base URL
-ANTHROPIC_ADMIN_API_BASE = "https://api.anthropic.com/v1/organizations"
+# Note: The organization ID is automatically determined by the Admin API key
+ANTHROPIC_ADMIN_API_BASE = "https://api.anthropic.com/v1"
 ANTHROPIC_API_VERSION = "2023-06-01"
 
 
@@ -139,7 +140,7 @@ class AnthropicUsageAPIClient:
             for dimension in group_by:
                 params[f"group_by[]"] = dimension
         
-        url = f"{self.base_url}/usage_report/messages?{urlencode(params, doseq=True)}"
+        url = f"{self.base_url}/messages/usage?{urlencode(params, doseq=True)}"
         
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
@@ -202,7 +203,7 @@ class AnthropicUsageAPIClient:
             for dimension in group_by:
                 params[f"group_by[]"] = dimension
 
-        url = f"{self.base_url}/cost_report?{urlencode(params, doseq=True)}"
+        url = f"{self.base_url}/messages/cost?{urlencode(params, doseq=True)}"
 
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
