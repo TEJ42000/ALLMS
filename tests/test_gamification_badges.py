@@ -138,9 +138,11 @@ def test_seed_badge_definitions_skip_existing(gamification_service, mock_firesto
 
 def test_seed_badge_definitions_no_firestore(gamification_service):
     """Test seeding fails gracefully without Firestore."""
-    gamification_service._db = None
+    # Create a new service without db
+    service = GamificationService()
+    # Don't set _db, so it will be None
 
-    result = gamification_service.seed_badge_definitions()
+    result = service.seed_badge_definitions()
 
     assert result is False
 
@@ -279,6 +281,10 @@ def test_early_riser_badge_earned(mock_datetime, gamification_service, mock_fire
     mock_badge_def_doc.to_dict.return_value = {
         "badge_id": "early_riser",
         "name": "Early Riser",
+        "description": "Complete a Study Guide before 8:00 AM",
+        "icon": "☀️",
+        "category": "behavioral",
+        "tiers": ["bronze", "silver", "gold"],
         "tier_requirements": {"bronze": 1, "silver": 5, "gold": 10}
     }
 
@@ -314,6 +320,10 @@ def test_deep_diver_badge_earned(gamification_service, mock_firestore):
     mock_badge_def_doc.to_dict.return_value = {
         "badge_id": "deep_diver",
         "name": "Deep Diver",
+        "description": "Spend 45+ minutes interacting with a single Study Guide",
+        "icon": "📖",
+        "category": "behavioral",
+        "tiers": ["bronze", "silver", "gold"],
         "tier_requirements": {"bronze": 1, "silver": 5, "gold": 10}
     }
 
@@ -368,6 +378,10 @@ def test_combo_king_badge_earned(gamification_service, mock_firestore):
     mock_badge_def_doc.to_dict.return_value = {
         "badge_id": "combo_king",
         "name": "Combo King",
+        "description": "Flip 20 Flashcards in a row without marking one as incorrect",
+        "icon": "🔥",
+        "category": "achievement",
+        "tiers": ["bronze", "silver", "gold"],
         "tier_requirements": {"bronze": 1, "silver": 5, "gold": 10}
     }
 
@@ -407,6 +421,10 @@ def test_badge_tier_upgrade_bronze_to_silver(gamification_service, mock_firestor
     mock_badge_def_doc.to_dict.return_value = {
         "badge_id": "combo_king",
         "name": "Combo King",
+        "description": "Flip 20 Flashcards in a row without marking one as incorrect",
+        "icon": "🔥",
+        "category": "achievement",
+        "tiers": ["bronze", "silver", "gold"],
         "tier_requirements": {"bronze": 1, "silver": 5, "gold": 10}
     }
 
@@ -452,6 +470,10 @@ def test_badge_no_tier_upgrade(gamification_service, mock_firestore):
     mock_badge_def_doc.to_dict.return_value = {
         "badge_id": "combo_king",
         "name": "Combo King",
+        "description": "Flip 20 Flashcards in a row without marking one as incorrect",
+        "icon": "🔥",
+        "category": "achievement",
+        "tiers": ["bronze", "silver", "gold"],
         "tier_requirements": {"bronze": 1, "silver": 5, "gold": 10}
     }
 
@@ -501,6 +523,10 @@ def test_hat_trick_badge_earned(gamification_service, mock_firestore):
     mock_badge_def_doc.to_dict.return_value = {
         "badge_id": "hat_trick",
         "name": "Hat Trick",
+        "description": "Pass 3 Hard Quizzes in a row with 100% score",
+        "icon": "🎩",
+        "category": "achievement",
+        "tiers": ["bronze", "silver", "gold"],
         "tier_requirements": {"bronze": 1, "silver": 3, "gold": 5}
     }
 
@@ -510,7 +536,7 @@ def test_hat_trick_badge_earned(gamification_service, mock_firestore):
     # Mock previous activities - 2 perfect hard quizzes
     mock_activities = [
         UserActivity(
-            activity_id="act1",
+            id="act1",
             user_id="test-user-123",
             user_email="test@example.com",
             activity_type="quiz_completed",
@@ -518,7 +544,7 @@ def test_hat_trick_badge_earned(gamification_service, mock_firestore):
             timestamp=datetime.now(timezone.utc) - timedelta(hours=2)
         ),
         UserActivity(
-            activity_id="act2",
+            id="act2",
             user_id="test-user-123",
             user_email="test@example.com",
             activity_type="quiz_completed",
@@ -555,7 +581,7 @@ def test_hat_trick_badge_not_earned_not_perfect(gamification_service, mock_fires
     # Mock previous activities - 2 perfect hard quizzes
     mock_activities = [
         UserActivity(
-            activity_id="act1",
+            id="act1",
             user_id="test-user-123",
             user_email="test@example.com",
             activity_type="quiz_completed",
@@ -563,7 +589,7 @@ def test_hat_trick_badge_not_earned_not_perfect(gamification_service, mock_fires
             timestamp=datetime.now(timezone.utc) - timedelta(hours=2)
         ),
         UserActivity(
-            activity_id="act2",
+            id="act2",
             user_id="test-user-123",
             user_email="test@example.com",
             activity_type="quiz_completed",
@@ -595,6 +621,10 @@ def test_legal_scholar_badge_earned(gamification_service, mock_firestore):
     mock_badge_def_doc.to_dict.return_value = {
         "badge_id": "legal_scholar",
         "name": "Legal Scholar",
+        "description": "Achieve AI Grade of 9-10 on 3 consecutive Evaluations",
+        "icon": "⚖️",
+        "category": "achievement",
+        "tiers": ["bronze", "silver", "gold"],
         "tier_requirements": {"bronze": 1, "silver": 3, "gold": 5}
     }
 
@@ -604,7 +634,7 @@ def test_legal_scholar_badge_earned(gamification_service, mock_firestore):
     # Mock previous activities - 2 high-grade evaluations
     mock_activities = [
         UserActivity(
-            activity_id="act1",
+            id="act1",
             user_id="test-user-123",
             user_email="test@example.com",
             activity_type="evaluation_completed",
@@ -612,7 +642,7 @@ def test_legal_scholar_badge_earned(gamification_service, mock_firestore):
             timestamp=datetime.now(timezone.utc) - timedelta(hours=2)
         ),
         UserActivity(
-            activity_id="act2",
+            id="act2",
             user_id="test-user-123",
             user_email="test@example.com",
             activity_type="evaluation_completed",
@@ -649,7 +679,7 @@ def test_legal_scholar_badge_not_earned_sequence_broken(gamification_service, mo
     # Mock previous activities - 1 high grade, then low grade (sequence broken)
     mock_activities = [
         UserActivity(
-            activity_id="act1",
+            id="act1",
             user_id="test-user-123",
             user_email="test@example.com",
             activity_type="evaluation_completed",
@@ -657,7 +687,7 @@ def test_legal_scholar_badge_not_earned_sequence_broken(gamification_service, mo
             timestamp=datetime.now(timezone.utc) - timedelta(hours=3)
         ),
         UserActivity(
-            activity_id="act2",
+            id="act2",
             user_id="test-user-123",
             user_email="test@example.com",
             activity_type="evaluation_completed",
@@ -665,7 +695,7 @@ def test_legal_scholar_badge_not_earned_sequence_broken(gamification_service, mo
             timestamp=datetime.now(timezone.utc) - timedelta(hours=2)
         ),
         UserActivity(
-            activity_id="act3",
+            id="act3",
             user_id="test-user-123",
             user_email="test@example.com",
             activity_type="evaluation_completed",
