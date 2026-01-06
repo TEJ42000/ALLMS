@@ -284,6 +284,16 @@ class ActivityTracker {
                     this.showLevelUpNotification(data);
                 }
 
+                // Show streak notification
+                if (data.new_streak_count) {
+                    this.showStreakNotification(data);
+                }
+
+                // Show freeze used notification
+                if (data.freeze_used) {
+                    this.showFreezeUsedNotification(data);
+                }
+
                 return data;
             } else {
                 console.error('[ActivityTracker] Failed to log activity:', response.status);
@@ -316,6 +326,32 @@ class ActivityTracker {
 
         // Dispatch custom event for UI to handle
         const event = new CustomEvent('level-up', {
+            detail: data
+        });
+        document.dispatchEvent(event);
+    }
+
+    /**
+     * Show streak notification
+     */
+    showStreakNotification(data) {
+        console.log(`[ActivityTracker] Streak: ${data.new_streak_count} days`);
+
+        // Dispatch custom event for UI to handle
+        const event = new CustomEvent('streak-updated', {
+            detail: data
+        });
+        document.dispatchEvent(event);
+    }
+
+    /**
+     * Show freeze used notification
+     */
+    showFreezeUsedNotification(data) {
+        console.log(`[ActivityTracker] Streak freeze used! Streak maintained: ${data.new_streak_count} days`);
+
+        // Dispatch custom event for UI to handle
+        const event = new CustomEvent('freeze-used', {
             detail: data
         });
         document.dispatchEvent(event);

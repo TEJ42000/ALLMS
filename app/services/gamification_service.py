@@ -16,6 +16,7 @@ import uuid
 from datetime import datetime, timezone, timedelta
 from typing import Optional, List, Dict, Any
 
+from fastapi import HTTPException
 from google.cloud.firestore_v1 import FieldFilter, Increment
 
 from app.models.gamification_models import (
@@ -465,6 +466,12 @@ class GamificationService:
             old_freeze_count = stats.streak.freezes_available
             freezes_to_add = (new_total_xp // STREAK_FREEZE_XP_REQUIREMENT) - (stats.total_xp // STREAK_FREEZE_XP_REQUIREMENT)
 
+            # Check streak status
+            current_time = datetime.now(timezone.utc)
+            streak_maintained, new_streak_count, freeze_used = self.check_streak_status(
+                user_id, current_time
+            )
+
             # Create activity record
             activity_id = str(uuid.uuid4())
             activity = UserActivity(
@@ -476,10 +483,11 @@ class GamificationService:
                 activity_data=activity_data,
                 session_id=session_id,
                 xp_awarded=xp_awarded,
-                streak_maintained=True,  # TODO: Implement streak logic
+                streak_maintained=streak_maintained,
                 badges_earned=[],  # TODO: Implement badge logic
                 metadata={
                     "time_of_day": self._get_time_of_day(),
+                    "freeze_used": freeze_used,
                 }
             )
 
@@ -498,9 +506,21 @@ class GamificationService:
                 "updated_at": datetime.now(timezone.utc),
             }
 
-            # Add freeze increment if earned
-            if freezes_to_add > 0:
-                updates["streak.freezes_available"] = Increment(freezes_to_add)
+            # Update streak
+            updates["streak.current_count"] = new_streak_count
+            updates["streak.last_activity_date"] = current_time
+            if new_streak_count > stats.streak.longest_streak:
+                updates["streak.longest_streak"] = new_streak_count
+
+            # Calculate net freeze change (earned - used)
+            # This prevents race condition when both earning and using a freeze in same activity
+            freeze_delta = freezes_to_add
+            if freeze_used:
+                freeze_delta -= 1
+
+            # Apply freeze change if non-zero
+            if freeze_delta != 0:
+                updates["streak.freezes_available"] = Increment(freeze_delta)
 
             # Update activity counters with atomic increments
             if activity_type == "quiz_completed":
@@ -518,7 +538,7 @@ class GamificationService:
 
             doc_ref.update(updates)
 
-            logger.info(f"Logged activity {activity_type} for {user_id}, awarded {xp_awarded} XP")
+            logger.info(f"Logged activity {activity_type} for {user_id}, awarded {xp_awarded} XP, streak: {new_streak_count}")
 
             return ActivityLogResponse(
                 activity_id=activity_id,
@@ -527,7 +547,9 @@ class GamificationService:
                 level_up=level_up,
                 new_level=new_level if level_up else None,
                 new_level_title=new_level_title if level_up else None,
-                streak_maintained=True,
+                streak_maintained=streak_maintained,
+                new_streak_count=new_streak_count,
+                freeze_used=freeze_used,
                 badges_earned=[]
             )
 
@@ -546,6 +568,161 @@ class GamificationService:
             return "evening"
         else:
             return "night"
+
+    # =========================================================================
+    # Streak Methods
+    # =========================================================================
+
+    def _get_streak_day(self, dt: datetime) -> datetime:
+        """Get the streak day for a given datetime.
+
+        A streak day starts at 4:00 AM and ends at 3:59:59 AM the next day.
+
+        Args:
+            dt: Datetime to get streak day for (should be in UTC)
+
+        Returns:
+            Date representing the streak day (normalized to midnight UTC)
+        """
+        # If before 4 AM, it's still the previous day's streak
+        if dt.hour < STREAK_RESET_HOUR:
+            streak_date = (dt - timedelta(days=1)).date()
+        else:
+            streak_date = dt.date()
+
+        # Return as datetime at midnight UTC for consistency
+        return datetime.combine(streak_date, datetime.min.time()).replace(tzinfo=timezone.utc)
+
+    def check_streak_status(
+        self,
+        user_id: str,
+        current_activity_time: datetime
+    ) -> tuple[bool, int, bool]:
+        """Check if activity maintains streak and calculate new streak count.
+
+        Args:
+            user_id: User's IAP user ID
+            current_activity_time: Time of current activity (UTC)
+
+        Returns:
+            Tuple of (streak_maintained, new_streak_count, freeze_used)
+
+        Raises:
+            ValueError: If activity time is in the future
+            HTTPException: If Firestore is unavailable
+        """
+        # Validate timestamp is not in future (allow 5 min clock skew)
+        if current_activity_time > datetime.now(timezone.utc) + timedelta(minutes=5):
+            raise ValueError("Activity time cannot be in the future")
+
+        if not self.db:
+            logger.error("Firestore unavailable - cannot check streak")
+            raise HTTPException(status_code=503, detail="Database unavailable")
+
+        try:
+            # Get user stats
+            stats = self.get_user_stats(user_id)
+            if not stats:
+                # First activity ever
+                return True, 1, False
+
+            # Get current streak day
+            current_day = self._get_streak_day(current_activity_time)
+
+            # Get last activity day
+            if not stats.last_active:
+                # No previous activity
+                return True, 1, False
+
+            last_day = self._get_streak_day(stats.last_active)
+
+            # Calculate days difference between streak days
+            # Note: days_diff represents the number of streak days between activities
+            # Example: Last activity Monday, current activity Wednesday = days_diff of 2
+            # This means the user missed exactly 1 day (Tuesday)
+            days_diff = (current_day - last_day).days
+
+            if days_diff == 0:
+                # Same streak day - maintain current streak
+                # Example: Multiple activities on same calendar day (after 4 AM)
+                return True, stats.streak.current_count, False
+
+            elif days_diff == 1:
+                # Consecutive streak days - increment streak
+                # Example: Activity Monday, then activity Tuesday (both after 4 AM)
+                return True, stats.streak.current_count + 1, False
+
+            elif days_diff == 2 and stats.streak.freezes_available > 0:
+                # Missed exactly 1 day but have freeze available - use it
+                # Example: Activity Monday, skip Tuesday, activity Wednesday
+                # days_diff = 2 means we missed exactly 1 day (Tuesday)
+                # Use freeze to maintain streak without incrementing
+                return True, stats.streak.current_count, True
+
+            else:
+                # Streak broken - either missed >1 day or no freeze available
+                # Reset streak to 1 for this new activity
+                return False, 1, False
+
+        except ValueError as e:
+            # Re-raise validation errors (e.g., future timestamp)
+            logger.error(f"Invalid data for streak check: {e}")
+            raise
+        except Exception as e:
+            # Log unexpected errors and re-raise as HTTPException
+            logger.error(f"Unexpected error checking streak status for {user_id}: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail="Error checking streak status")
+
+    def update_streak(
+        self,
+        user_id: str,
+        streak_maintained: bool,
+        new_streak_count: int,
+        freeze_used: bool
+    ) -> bool:
+        """Update user's streak information.
+
+        Args:
+            user_id: User's IAP user ID
+            streak_maintained: Whether streak was maintained
+            new_streak_count: New streak count
+            freeze_used: Whether a freeze was used
+
+        Returns:
+            True if successful, False otherwise
+        """
+        if not self.db:
+            logger.warning("Firestore unavailable")
+            return False
+
+        try:
+            stats = self.get_user_stats(user_id)
+            if not stats:
+                return False
+
+            updates = {
+                "streak.current_count": new_streak_count,
+                "streak.last_activity_date": datetime.now(timezone.utc),
+                "updated_at": datetime.now(timezone.utc)
+            }
+
+            # Update longest streak if current is higher
+            if new_streak_count > stats.streak.longest_streak:
+                updates["streak.longest_streak"] = new_streak_count
+
+            # Decrement freeze if used
+            if freeze_used:
+                updates["streak.freezes_available"] = Increment(-1)
+                logger.info(f"Streak freeze used for {user_id}, new count: {stats.streak.freezes_available - 1}")
+
+            doc_ref = self.db.collection(USER_STATS_COLLECTION).document(user_id)
+            doc_ref.update(updates)
+
+            return True
+
+        except Exception as e:
+            logger.error(f"Error updating streak for {user_id}: {e}")
+            return False
 
     def get_user_activities(
         self,
