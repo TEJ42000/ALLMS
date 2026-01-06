@@ -4,18 +4,26 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ title }} - LLS Admin</title>
+    <link rel="icon" type="image/svg+xml" href="/static/images/favicon.svg">
     <link rel="stylesheet" href="/static/css/styles.css">
     <link rel="stylesheet" href="/static/css/admin.css">
 </head>
 <body>
+    {% include "admin/partials/dev_mode_banner.html" %}
     <div class="container">
         <header class="nav-header">
             <div class="header-row">
                 <h1 class="nav-title">⚙️ LLS Admin Portal</h1>
-                <a href="/" class="btn btn-secondary">← Back to Study Portal</a>
+                <div style="display: flex; align-items: center; gap: 1rem;">
+                    {% if user %}
+                    {% include "admin/partials/user_info.html" %}
+                    {% endif %}
+                    <a href="/" class="btn btn-secondary">← Back to Study Portal</a>
+                </div>
             </div>
             <div class="nav-tabs">
                 <button class="nav-tab active" data-view="courses">📚 Courses</button>
+                <a href="/admin/users" class="nav-tab">👥 Users</a>
                 <button class="nav-tab" data-view="course-detail" id="course-detail-tab" style="display:none;">📝 Course Details</button>
                 <button class="nav-tab" data-view="week-editor" id="week-editor-tab" style="display:none;">📅 Week Editor</button>
             </div>
@@ -323,6 +331,10 @@
                                     <label>Passing Threshold</label>
                                     <input type="number" id="extracted-threshold" class="form-input">
                                 </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Material Subjects (comma-separated)</label>
+                                <input type="text" id="extracted-subjects" class="form-input" placeholder="e.g., Constitutional Law, Criminal Law, Contracts">
                             </div>
                             <div class="form-group">
                                 <label>Weeks Found: <span id="extracted-weeks-count">0</span></label>

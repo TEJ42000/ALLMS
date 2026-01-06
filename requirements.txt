@@ -1,7 +1,7 @@
 # Core Framework
 fastapi>=0.109.0
 uvicorn[standard]>=0.27.0
-pydantic>=2.10.0
+pydantic[email]>=2.10.0  # Includes email-validator for EmailStr
 pydantic-settings>=2.1.0
 python-multipart>=0.0.6  # For file uploads
 
@@ -23,6 +23,10 @@ gunicorn>=22.0.0
 # Google Cloud
 google-cloud-secret-manager==2.18.0
 google-cloud-firestore==2.14.0  # Optional: if using Firestore
+
+# Google Authentication (for IAP)
+google-auth>=2.27.0
+google-auth-httplib2>=0.2.0
 
 # Logging
 python-json-logger==2.0.7

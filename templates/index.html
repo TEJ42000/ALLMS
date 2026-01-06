@@ -4,7 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ title }}</title>
+    <link rel="icon" type="image/svg+xml" href="/static/images/favicon.svg">
     <link rel="stylesheet" href="/static/css/styles.css">
+    <!-- Markdown and Mermaid rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
     <!-- Course Context -->
     <script>
         // Store course context for JavaScript access
@@ -31,13 +35,18 @@
         <header class="nav-header">
             <div class="header-top">
                 <h1 class="nav-title">⚖️ {{ course_name if course_name else 'LLS' }} Study Portal</h1>
-                {% if course_id %}
-                <div class="course-badge">
-                    <span class="course-badge-label">Course:</span>
-                    <span class="course-badge-id">{{ course_id }}</span>
-                    <a href="/" class="change-course-link" title="Change Course">🔄</a>
+                <div style="display: flex; align-items: center; gap: 1rem;">
+                    {% if course_id %}
+                    <div class="course-badge">
+                        <span class="course-badge-label">Course:</span>
+                        <span class="course-badge-id">{{ course_id }}</span>
+                        <a href="/" class="change-course-link" title="Change Course">🔄</a>
+                    </div>
+                    {% endif %}
+                    {% if user %}
+                    {% include "partials/user_header.html" %}
+                    {% endif %}
                 </div>
-                {% endif %}
             </div>
             <div class="nav-tabs">
                 <button class="nav-tab active" data-tab="dashboard">📊 Dashboard</button>
@@ -79,96 +88,112 @@
                         <div class="stat-label">Quizzes Completed</div>
                     </div>
                 </div>
-                <h3 class="section-subtitle">📖 Quick Access Topics</h3>
-                <!-- TODO: Progress tracking will be implemented in a future release.
-                     Progress bars are currently static placeholders. -->
-                <div class="topics-grid">
-                    <div class="topic-card" data-topic="criminal">
-                        <h4>⚖️ Criminal Law</h4>
-                        <p>Trial procedures, decision models, defences</p>
-                        <div class="topic-progress">
-                            <div class="progress-bar"><div class="progress-fill" style="width: 0%"></div></div>
-                            <span class="progress-text">0% Complete</span>
-                        </div>
-                    </div>
-                    <div class="topic-card" data-topic="private">
-                        <h4>📜 Private Law</h4>
-                        <p>Contract law, damages, breach remedies</p>
-                        <div class="topic-progress">
-                            <div class="progress-bar"><div class="progress-fill" style="width: 0%"></div></div>
-                            <span class="progress-text">0% Complete</span>
-                        </div>
-                    </div>
-                    <div class="topic-card" data-topic="constitutional">
-                        <h4>🏛️ Constitutional Law</h4>
-                        <p>Dutch Constitution, separation of powers</p>
-                        <div class="topic-progress">
-                            <div class="progress-bar"><div class="progress-fill" style="width: 0%"></div></div>
-                            <span class="progress-text">0% Complete</span>
-                        </div>
-                    </div>
-                    <div class="topic-card" data-topic="administrative">
-                        <h4>🏢 Administrative Law</h4>
-                        <p>GALA provisions, orders, appeals</p>
-                        <div class="topic-progress">
-                            <div class="progress-bar"><div class="progress-fill" style="width: 0%"></div></div>
-                            <span class="progress-text">0% Complete</span>
-                        </div>
-                    </div>
-                    <div class="topic-card" data-topic="international">
-                        <h4>🌍 International Law</h4>
-                        <p>ICJ, ECHR, treaties, customary law</p>
-                        <div class="topic-progress">
-                            <div class="progress-bar"><div class="progress-fill" style="width: 0%"></div></div>
-                            <span class="progress-text">0% Complete</span>
-                        </div>
-                    </div>
+                <h3 class="section-subtitle">📖 Course Weeks</h3>
+                <div id="weeks-grid" class="topics-grid">
+                    <div class="loading-placeholder">Loading course weeks...</div>
                 </div>
             </section>
             <section id="tutor-section" class="section">
                 <h2 class="section-title">🤖 AI Tutor</h2>
                 <p class="section-description">Ask questions about any LLS topic and get detailed explanations</p>
                 <div class="chat-container">
-                    <div id="chat-messages" class="chat-messages"></div>
+                    <div id="chat-messages" class="chat-messages">
+                        <!-- Welcome message -->
+                        <div class="message-wrapper assistant">
+                            <div class="message-avatar">🤖</div>
+                            <div class="message">
+                                <p><strong>Hello!</strong> I'm your AI study assistant for this course.</p>
+                                <p>Select a topic from the dropdown below and ask me anything about the course material. I can help you understand concepts, explain cases, and prepare for assessments.</p>
+                            </div>
+                        </div>
+                    </div>
                     <div class="chat-input-area">
                         <label for="context-select" class="visually-hidden">Select Topic Context</label>
                         <select id="context-select" class="form-select" aria-label="Select topic context for your question">
-                            <option value="Criminal Law">Criminal Law</option>
-                            <option value="Private Law">Private Law</option>
-                            <option value="Constitutional Law">Constitutional Law</option>
-                            <option value="Administrative Law">Administrative Law</option>
-                            <option value="International Law">International Law</option>
+                            {% if topics %}
+                            {% for topic in topics %}
+                            <option value="{{ topic.name }}">Week {{ topic.weekNumber }}: {{ topic.name }}</option>
+                            {% endfor %}
+                            {% else %}
+                            <option value="General">General</option>
+                            {% endif %}
                         </select>
-                        <label for="tutor-input" class="visually-hidden">Your question for the AI Tutor</label>
-                        <textarea id="tutor-input" placeholder="Ask about concepts, cases, frameworks..." rows="2" aria-label="Enter your question for the AI Tutor"></textarea>
-                        <button id="ask-btn" class="btn btn-primary">Ask Question</button>
+                        <div class="chat-input-row">
+                            <label for="tutor-input" class="visually-hidden">Your question for the AI Tutor</label>
+                            <textarea id="tutor-input" placeholder="Ask about concepts, cases, frameworks..." rows="1" aria-label="Enter your question for the AI Tutor"></textarea>
+                            <button id="ask-btn" class="btn btn-primary">Ask</button>
+                        </div>
                     </div>
                 </div>
             </section>
             <section id="assessment-section" class="section">
-                <h2 class="section-title">📝 Assessment</h2>
-                <p class="section-description">Get your answers graded with detailed AI feedback</p>
-                <div class="assessment-form">
-                    <div class="form-group">
-                        <label for="assessment-topic">Topic</label>
-                        <select id="assessment-topic" class="form-select">
-                            <option value="Criminal Law">Criminal Law</option>
-                            <option value="Private Law">Private Law</option>
-                            <option value="Constitutional Law">Constitutional Law</option>
-                            <option value="Administrative Law">Administrative Law</option>
-                            <option value="International Law">International Law</option>
-                        </select>
+                <h2 class="section-title">📝 Essay Assessment</h2>
+                <p class="section-description">Practice essay-style exam questions with AI-powered grading</p>
+
+                <!-- Assessment Tabs -->
+                <div class="assessment-tabs">
+                    <button class="assessment-tab active" data-assessment-tab="new">✨ New Essay</button>
+                    <button class="assessment-tab" data-assessment-tab="history">📚 My History</button>
+                </div>
+
+                <!-- New Essay Tab -->
+                <div id="new-essay-tab" class="assessment-tab-content">
+                    <!-- Essay Question View (hidden until question generated) -->
+                    <div id="essay-question-view" style="display: none;">
+                        <div class="essay-question-card">
+                            <div class="essay-question-header">
+                                <span class="essay-topic-badge" id="essay-topic-badge"></span>
+                                <span class="essay-expected">Expected: 3-7 paragraphs</span>
+                            </div>
+                            <h3 id="essay-question-text" class="essay-question-text"></h3>
+                            <div id="essay-key-concepts" class="essay-key-concepts"></div>
+                            <div id="essay-guidance" class="essay-guidance"></div>
+                        </div>
+                        <div class="form-group">
+                            <label for="essay-answer">Your Essay Answer</label>
+                            <textarea id="essay-answer" placeholder="Write your essay answer here (3-7 paragraphs recommended)..." rows="12"></textarea>
+                            <div class="essay-word-count">Words: <span id="essay-word-count">0</span></div>
+                        </div>
+                        <div class="essay-actions">
+                            <button id="submit-essay-btn" class="btn btn-primary">Submit for Evaluation</button>
+                            <button id="new-question-btn" class="btn btn-secondary">Generate New Question</button>
+                        </div>
+                        <div id="essay-result" class="result-box"></div>
                     </div>
-                    <div class="form-group">
-                        <label for="assessment-question">Question (Optional)</label>
-                        <textarea id="assessment-question" placeholder="Enter the question or prompt..." rows="2"></textarea>
+
+                    <!-- Generate Question View -->
+                    <div id="generate-question-view">
+                        <div class="essay-intro-card">
+                            <h3>🎓 Practice Essay Questions</h3>
+                            <p>Generate exam-style essay questions and get detailed AI feedback on your answers.</p>
+                            <ul class="essay-features">
+                                <li>✅ Questions similar to actual exam questions</li>
+                                <li>✅ AI evaluation with grade (1-10)</li>
+                                <li>✅ Detailed feedback on strengths and improvements</li>
+                                <li>✅ Save and track your progress</li>
+                            </ul>
+                        </div>
+                        <div class="form-group">
+                            <label for="essay-topic-select">Select Topic</label>
+                            <select id="essay-topic-select" class="form-select">
+                                {% if topics %}
+                                {% for topic in topics %}
+                                <option value="{{ topic.name }}">Week {{ topic.weekNumber }}: {{ topic.name }}</option>
+                                {% endfor %}
+                                {% else %}
+                                <option value="General">General</option>
+                                {% endif %}
+                            </select>
+                        </div>
+                        <button id="generate-essay-btn" class="btn btn-primary btn-large">📝 Generate Essay Question</button>
                     </div>
-                    <div class="form-group">
-                        <label for="assessment-answer">Your Answer</label>
-                        <textarea id="assessment-answer" placeholder="Enter your answer here..." rows="8"></textarea>
+                </div>
+
+                <!-- History Tab -->
+                <div id="essay-history-tab" class="assessment-tab-content" style="display: none;">
+                    <div id="essay-history-list" class="essay-history-list">
+                        <p class="loading-text">Loading your assessment history...</p>
                     </div>
-                    <button id="assess-btn" class="btn btn-primary">Get Assessment</button>
-                    <div id="assessment-result" class="result-box"></div>
                 </div>
             </section>
             <section id="quiz-section" class="section">
@@ -197,11 +222,11 @@
                                     <label for="quiz-topic-select">Select Topic</label>
                                     <select id="quiz-topic-select" class="form-select">
                                         <option value="all">All Topics</option>
-                                        <option value="criminal">Criminal Law</option>
-                                        <option value="private">Private Law</option>
-                                        <option value="constitutional">Constitutional Law</option>
-                                        <option value="administrative">Administrative Law</option>
-                                        <option value="international">International Law</option>
+                                        {% if topics %}
+                                        {% for topic in topics %}
+                                        <option value="week-{{ topic.weekNumber }}">Week {{ topic.weekNumber }}: {{ topic.name }}</option>
+                                        {% endfor %}
+                                        {% endif %}
                                     </select>
                                 </div>
                                 <div class="form-group">
@@ -276,12 +301,53 @@
                 </div>
             </section>
             <section id="study-section" class="section">
-                <h2 class="section-title">📚 Study Guide Generator</h2>
-                <p class="section-description">Generate a comprehensive study guide from all available course materials</p>
-                <div class="study-form">
-                    <button id="generate-study-btn" class="btn btn-primary">Generate Comprehensive Study Guide</button>
-                    <div id="study-result" class="result-box"></div>
+                <h2 class="section-title">📚 Study Guide</h2>
+                <p class="section-description">Generate and view comprehensive study guides from course materials</p>
+
+                <!-- Study Guide Sub-tabs -->
+                <div class="quiz-sub-tabs">
+                    <button class="quiz-sub-tab active" data-study-tab="saved-guides">📂 Saved Guides</button>
+                    <button class="quiz-sub-tab" data-study-tab="new-guide">✨ Generate New</button>
                 </div>
+
+                <!-- Saved Guides Tab -->
+                <div id="saved-guides-tab" class="quiz-tab-content active">
+                    <div id="study-guides-list" class="saved-quizzes-list">
+                        <p class="loading-text">Loading saved study guides...</p>
+                    </div>
+                </div>
+
+                <!-- Generate New Guide Tab -->
+                <div id="new-guide-tab" class="quiz-tab-content" style="display: none;">
+                    <div class="study-form">
+                        <div class="form-group">
+                            <label for="study-week-select">Week (optional):</label>
+                            <select id="study-week-select" class="form-control">
+                                <option value="">All Weeks</option>
+                                <option value="1">Week 1</option>
+                                <option value="2">Week 2</option>
+                                <option value="3">Week 3</option>
+                                <option value="4">Week 4</option>
+                                <option value="5">Week 5</option>
+                                <option value="6">Week 6</option>
+                                <option value="7">Week 7</option>
+                            </select>
+                            <button type="button" id="estimate-tokens-btn" class="btn btn-small btn-secondary" style="margin-left: 10px;">📊 Estimate Tokens</button>
+                        </div>
+                        <button id="generate-study-btn" class="btn btn-primary">Generate Comprehensive Study Guide</button>
+                    </div>
+
+                    <!-- Collapsible Debug Panel -->
+                    <details id="token-debug-panel" class="debug-panel" style="display: none;">
+                        <summary>🔧 Token Estimation Details</summary>
+                        <div id="token-debug-content" class="debug-content">
+                            <!-- Populated by JavaScript -->
+                        </div>
+                    </details>
+                </div>
+
+                <!-- Study Guide Content Display -->
+                <div id="study-result" class="study-guide-content result-box"></div>
             </section>
         </main>
         <div id="loading" class="loading hidden">
