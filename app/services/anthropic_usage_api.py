@@ -90,19 +90,39 @@ class AnthropicUsageReport(BaseModel):
         }
 
 
+class CostResult(BaseModel):
+    """Individual cost result within a bucket."""
+    currency: str
+    amount: str  # USD as decimal string (e.g., "322.053675")
+    workspace_id: Optional[str] = None
+    description: Optional[str] = None
+    cost_type: Optional[str] = None
+    context_window: Optional[str] = None
+    model: Optional[str] = None
+    service_tier: Optional[str] = None
+    token_type: Optional[str] = None
+
+
 class AnthropicCostBucket(BaseModel):
     """Cost data for a time bucket."""
-    bucket: str  # ISO datetime
-    amount: str  # USD in cents (decimal string)
-    description: Optional[str] = None
+    starting_at: str  # ISO datetime
+    ending_at: str  # ISO datetime
+    results: List[CostResult]
 
 
 class AnthropicCostReport(BaseModel):
     """Response from cost_report endpoint."""
     data: List[AnthropicCostBucket]
-    start_date: str
-    end_date: str
-    total_amount: str  # USD in cents
+    has_more: bool
+    next_page: Optional[str] = None
+
+    def get_total_amount(self) -> float:
+        """Calculate total cost across all buckets and results."""
+        total = 0.0
+        for bucket in self.data:
+            for result in bucket.results:
+                total += float(result.amount)
+        return total
 
 
 class AnthropicUsageAPIError(Exception):
@@ -241,21 +261,7 @@ class AnthropicUsageAPIClient:
                 response.raise_for_status()
                 data = response.json()
 
-                # Calculate total amount with validation
-                try:
-                    total_amount = sum(
-                        float(b.get("amount", "0")) for b in data.get("data", [])
-                    )
-                except (ValueError, TypeError) as e:
-                    logger.error(f"Invalid amount format in cost report: {e}")
-                    raise AnthropicUsageAPIError(f"Invalid cost data format: {e}")
-
-                return AnthropicCostReport(
-                    data=[AnthropicCostBucket(**b) for b in data.get("data", [])],
-                    start_date=params["starting_at"],
-                    end_date=params["ending_at"],
-                    total_amount=str(total_amount),
-                )
+                return AnthropicCostReport(**data)
         except httpx.HTTPStatusError as e:
             logger.error(f"Anthropic API error: {e.response.status_code} - {e.response.text}")
             raise AnthropicUsageAPIError(
