@@ -137,6 +137,7 @@ async function loadDashboardData() {
             loadTopUsersChart(),
             loadModelsChart(),
             loadGridData(),
+            loadCrossReference(),  // Load Anthropic cross-reference
         ]);
     } catch (error) {
         console.error('Error loading dashboard:', error);
@@ -555,5 +556,142 @@ async function loadGridData() {
     } catch (error) {
         console.error('Error loading grid data:', error);
     }
+}
+
+// =============================================================================
+// Anthropic Cross-Reference Functions
+// =============================================================================
+
+async function loadCrossReference() {
+    const section = document.getElementById('cross-reference-section');
+    const errorDiv = document.getElementById('xref-error');
+
+    try {
+        const response = await fetch(`/api/admin/usage/reconciliation?days=${state.days}`);
+
+        if (!response.ok) {
+            if (response.status === 503) {
+                // Admin API not configured
+                const error = await response.json();
+                showCrossReferenceError(error.detail);
+                return;
+            }
+            throw new Error(`HTTP ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        // Show section and hide error
+        section.style.display = 'block';
+        errorDiv.style.display = 'none';
+
+        // Update KPIs
+        document.getElementById('xref-internal-cost').textContent = `$${data.internal_cost.toFixed(4)}`;
+        document.getElementById('xref-anthropic-cost').textContent = `$${data.anthropic_cost.toFixed(4)}`;
+
+        // Update variance with safe DOM manipulation
+        const varianceColor = data.variance_cost >= 0 ? '#ff6b6b' : '#00d4aa';
+        const varianceSign = data.variance_cost >= 0 ? '+' : '';
+        const varianceEl = document.getElementById('xref-variance');
+        varianceEl.innerHTML = ''; // Clear existing content
+
+        const varianceSpan = document.createElement('span');
+        varianceSpan.style.color = varianceColor;
+        varianceSpan.textContent = `${varianceSign}$${data.variance_cost.toFixed(4)}`;
+
+        const variancePercent = document.createElement('div');
+        variancePercent.style.fontSize = '0.75rem';
+        variancePercent.style.color = '#888';
+        variancePercent.style.marginTop = '0.25rem';
+        variancePercent.textContent = `${varianceSign}${data.variance_cost_percent.toFixed(2)}%`;
+
+        varianceEl.appendChild(varianceSpan);
+        varianceEl.appendChild(variancePercent);
+
+        // Update status with color using safe DOM manipulation
+        const statusCard = document.getElementById('xref-status-card');
+        const statusEl = document.getElementById('xref-status');
+        let statusColor, statusText, statusEmoji;
+
+        if (data.match_status === 'exact') {
+            statusColor = '#00d4aa';
+            statusText = 'Exact Match';
+            statusEmoji = '✅';
+        } else if (data.match_status === 'close') {
+            statusColor = '#ffa500';
+            statusText = 'Close Match';
+            statusEmoji = '⚠️';
+        } else {
+            statusColor = '#ff6b6b';
+            statusText = 'Mismatch';
+            statusEmoji = '❌';
+        }
+
+        statusEl.innerHTML = ''; // Clear existing content
+        const statusSpan = document.createElement('span');
+        statusSpan.style.color = statusColor;
+        statusSpan.textContent = `${statusEmoji} ${statusText}`;
+        statusEl.appendChild(statusSpan);
+
+        // Update token comparison table
+        updateTokenComparisonTable(data);
+
+    } catch (error) {
+        console.error('Error loading cross-reference:', error);
+        showCrossReferenceError(`Failed to load cross-reference data. ${error?.message || 'Unknown error'}`);
+    }
+}
+
+function showCrossReferenceError(message) {
+    const section = document.getElementById('cross-reference-section');
+    const errorDiv = document.getElementById('xref-error');
+    const errorMessage = document.getElementById('xref-error-message');
+
+    section.style.display = 'block';
+    errorDiv.style.display = 'block';
+    errorMessage.textContent = message;
+
+    // Hide KPIs and table
+    document.querySelector('#cross-reference-section .kpi-grid').style.display = 'none';
+    document.querySelector('#cross-reference-section table').parentElement.style.display = 'none';
+}
+
+function updateTokenComparisonTable(data) {
+    const tbody = document.getElementById('xref-token-table');
+
+    const tokenTypes = [
+        { key: 'input_tokens', label: 'Input Tokens', color: CHART_COLORS.INPUT_TOKENS },
+        { key: 'output_tokens', label: 'Output Tokens', color: CHART_COLORS.OUTPUT_TOKENS },
+        { key: 'cache_creation_tokens', label: 'Cache Write Tokens', color: CHART_COLORS.CACHE_WRITE },
+        { key: 'cache_read_tokens', label: 'Cache Read Tokens', color: CHART_COLORS.CACHE_READ },
+    ];
+
+    tbody.innerHTML = tokenTypes.map(type => {
+        const internal = data.internal_usage[type.key];
+        const anthropic = data.anthropic_usage[type.key];
+        const variance = data.variance_tokens[type.key];
+        const variancePercent = anthropic > 0 ? (variance / anthropic * 100) : 0;
+
+        const varianceColor = Math.abs(variancePercent) < 1 ? '#00d4aa' :
+                             Math.abs(variancePercent) < 5 ? '#ffa500' : '#ff6b6b';
+        const varianceSign = variance >= 0 ? '+' : '';
+
+        return `
+            <tr style="border-bottom: 1px solid #222;">
+                <td style="padding: 0.75rem;">
+                    <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: ${type.color}; margin-right: 0.5rem;"></span>
+                    ${type.label}
+                </td>
+                <td style="text-align: right; padding: 0.75rem;">${formatTokens(internal)}</td>
+                <td style="text-align: right; padding: 0.75rem;">${formatTokens(anthropic)}</td>
+                <td style="text-align: right; padding: 0.75rem; color: ${varianceColor};">
+                    ${varianceSign}${formatTokens(variance)}
+                </td>
+                <td style="text-align: right; padding: 0.75rem; color: ${varianceColor};">
+                    ${varianceSign}${variancePercent.toFixed(2)}%
+                </td>
+            </tr>
+        `;
+    }).join('');
 }
 

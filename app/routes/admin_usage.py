@@ -859,3 +859,261 @@ async def get_cache_analytics(
     except Exception as e:
         logger.error("Error getting cache analytics: %s", e)
         raise HTTPException(500, detail=str(e)) from e
+
+
+# =============================================================================
+# Anthropic Cross-Reference Endpoints
+# =============================================================================
+
+
+class AnthropicUsageData(BaseModel):
+    """Usage data from Anthropic Admin API."""
+    total_input_tokens: int
+    total_output_tokens: int
+    total_cache_creation_tokens: int
+    total_cache_read_tokens: int
+    total_requests: int
+    start_date: str
+    end_date: str
+
+
+class AnthropicCostData(BaseModel):
+    """Cost data from Anthropic Admin API."""
+    total_cost_usd: float
+    start_date: str
+    end_date: str
+
+
+class ReconciliationReport(BaseModel):
+    """Comparison between internal tracking and Anthropic's data."""
+    internal_usage: Dict[str, int]
+    anthropic_usage: Dict[str, int]
+    internal_cost: float
+    anthropic_cost: float
+    variance_tokens: Dict[str, int]
+    variance_cost: float
+    variance_cost_percent: float
+    match_status: str  # "exact", "close", "mismatch"
+    start_date: str
+    end_date: str
+
+
+@router.get(
+    "/anthropic/usage",
+    response_model=AnthropicUsageData,
+    summary="Get usage data from Anthropic Admin API",
+    description="Fetch actual usage data from Anthropic for cross-reference",
+)
+async def get_anthropic_usage(
+    days: int = Query(7, ge=1, le=365, description="Number of days to query"),
+    _user: User = Depends(require_mgms_domain),
+):
+    """Get usage data from Anthropic Admin API.
+
+    Requires Admin API key stored in Secret Manager as 'anthropic-admin-api-key'.
+    """
+    try:
+        from app.services.anthropic_usage_api import get_anthropic_usage_client
+
+        # Calculate date range
+        end_date = datetime.now(timezone.utc)
+        start_date = end_date - timedelta(days=days)
+
+        # Fetch from Anthropic
+        client = get_anthropic_usage_client()
+        report = await client.fetch_usage_report(
+            start_date=start_date,
+            end_date=end_date,
+            bucket_width="1d",
+        )
+
+        return AnthropicUsageData(
+            total_input_tokens=report.totals["input_tokens"],
+            total_output_tokens=report.totals["output_tokens"],
+            total_cache_creation_tokens=report.totals["cache_creation_tokens"],
+            total_cache_read_tokens=report.totals["cache_read_tokens"],
+            total_requests=sum(b.count for b in report.data),
+            start_date=report.start_date,
+            end_date=report.end_date,
+        )
+
+    except ValueError as e:
+        # Admin API key not configured
+        logger.error("Admin API key not configured: %s", e)
+        raise HTTPException(
+            503,
+            detail="Anthropic Admin API not configured. Please add 'anthropic-admin-api-key' to Secret Manager."
+        ) from e
+    except Exception as e:
+        logger.error("Error fetching Anthropic usage: %s", e)
+        raise HTTPException(500, detail=str(e)) from e
+
+
+@router.get(
+    "/anthropic/cost",
+    response_model=AnthropicCostData,
+    summary="Get cost data from Anthropic Admin API",
+    description="Fetch actual cost data from Anthropic for cross-reference",
+)
+async def get_anthropic_cost(
+    days: int = Query(7, ge=1, le=365, description="Number of days to query"),
+    _user: User = Depends(require_mgms_domain),
+):
+    """Get cost data from Anthropic Admin API.
+
+    Requires Admin API key stored in Secret Manager as 'anthropic-admin-api-key'.
+    """
+    try:
+        from app.services.anthropic_usage_api import get_anthropic_usage_client
+
+        # Calculate date range
+        end_date = datetime.now(timezone.utc)
+        start_date = end_date - timedelta(days=days)
+
+        # Fetch from Anthropic
+        client = get_anthropic_usage_client()
+        report = await client.fetch_cost_report(
+            start_date=start_date,
+            end_date=end_date,
+        )
+
+        # Convert from cents to dollars
+        total_cost_usd = float(report.total_amount) / 100.0
+
+        return AnthropicCostData(
+            total_cost_usd=round(total_cost_usd, 6),
+            start_date=report.start_date,
+            end_date=report.end_date,
+        )
+
+    except ValueError as e:
+        # Admin API key not configured
+        logger.error("Admin API key not configured: %s", e)
+        raise HTTPException(
+            503,
+            detail="Anthropic Admin API not configured. Please add 'anthropic-admin-api-key' to Secret Manager."
+        ) from e
+    except Exception as e:
+        logger.error("Error fetching Anthropic cost: %s", e)
+        raise HTTPException(500, detail=str(e)) from e
+
+
+@router.get(
+    "/reconciliation",
+    response_model=ReconciliationReport,
+    summary="Compare internal tracking with Anthropic's data",
+    description="Cross-reference internal usage tracking with Anthropic's actual billing data",
+)
+async def get_reconciliation_report(
+    days: int = Query(7, ge=1, le=365, description="Number of days to query"),
+    _user: User = Depends(require_mgms_domain),
+):
+    """Generate reconciliation report comparing internal vs Anthropic data.
+
+    Compares:
+    - Token counts (input, output, cache creation, cache read)
+    - Total costs
+    - Identifies discrepancies
+
+    Requires Admin API key stored in Secret Manager as 'anthropic-admin-api-key'.
+    """
+    try:
+        from app.services.anthropic_usage_api import get_anthropic_usage_client
+
+        # Calculate date range
+        end_date = datetime.now(timezone.utc)
+        start_date = end_date - timedelta(days=days)
+
+        # Fetch internal data
+        service = get_usage_tracking_service()
+        records = await service.get_usage_records(
+            start_date=start_date,
+            end_date=end_date,
+            limit=MAX_EXPORT_RECORDS,  # Get all records for accurate comparison
+        )
+
+        # Calculate internal totals
+        internal_input = sum(r.input_tokens for r in records)
+        internal_output = sum(r.output_tokens for r in records)
+        internal_cache_creation = sum(r.cache_creation_tokens for r in records)
+        internal_cache_read = sum(r.cache_read_tokens for r in records)
+        internal_cost = sum(r.estimated_cost_usd for r in records)
+
+        # Fetch Anthropic data
+        client = get_anthropic_usage_client()
+
+        usage_report = await client.fetch_usage_report(
+            start_date=start_date,
+            end_date=end_date,
+            bucket_width="1d",
+        )
+
+        cost_report = await client.fetch_cost_report(
+            start_date=start_date,
+            end_date=end_date,
+        )
+
+        # Anthropic totals
+        anthropic_input = usage_report.totals["input_tokens"]
+        anthropic_output = usage_report.totals["output_tokens"]
+        anthropic_cache_creation = usage_report.totals["cache_creation_tokens"]
+        anthropic_cache_read = usage_report.totals["cache_read_tokens"]
+        anthropic_cost = float(cost_report.total_amount) / 100.0  # Convert cents to dollars
+
+        # Calculate variances
+        variance_input = internal_input - anthropic_input
+        variance_output = internal_output - anthropic_output
+        variance_cache_creation = internal_cache_creation - anthropic_cache_creation
+        variance_cache_read = internal_cache_read - anthropic_cache_read
+        variance_cost = internal_cost - anthropic_cost
+        variance_cost_percent = (
+            (variance_cost / anthropic_cost * 100) if anthropic_cost != 0 else 0.0
+        )
+
+        # Determine match status
+        # Consider "close" if within 1% variance
+        if abs(variance_cost_percent) < 0.01:
+            match_status = "exact"
+        elif abs(variance_cost_percent) < 1.0:
+            match_status = "close"
+        else:
+            match_status = "mismatch"
+
+        return ReconciliationReport(
+            internal_usage={
+                "input_tokens": internal_input,
+                "output_tokens": internal_output,
+                "cache_creation_tokens": internal_cache_creation,
+                "cache_read_tokens": internal_cache_read,
+            },
+            anthropic_usage={
+                "input_tokens": anthropic_input,
+                "output_tokens": anthropic_output,
+                "cache_creation_tokens": anthropic_cache_creation,
+                "cache_read_tokens": anthropic_cache_read,
+            },
+            internal_cost=round(internal_cost, 6),
+            anthropic_cost=round(anthropic_cost, 6),
+            variance_tokens={
+                "input_tokens": variance_input,
+                "output_tokens": variance_output,
+                "cache_creation_tokens": variance_cache_creation,
+                "cache_read_tokens": variance_cache_read,
+            },
+            variance_cost=round(variance_cost, 6),
+            variance_cost_percent=round(variance_cost_percent, 2),
+            match_status=match_status,
+            start_date=start_date.isoformat(),
+            end_date=end_date.isoformat(),
+        )
+
+    except ValueError as e:
+        # Admin API key not configured
+        logger.error("Admin API key not configured: %s", e)
+        raise HTTPException(
+            503,
+            detail="Anthropic Admin API not configured. Please add 'anthropic-admin-api-key' to Secret Manager."
+        ) from e
+    except Exception as e:
+        logger.error("Error generating reconciliation report: %s", e)
+        raise HTTPException(500, detail=str(e)) from e
