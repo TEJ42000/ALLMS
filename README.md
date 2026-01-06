@@ -16,7 +16,8 @@ AI-Powered Learning System for Law & Legal Skills using Anthropic Claude and Goo
 - **Backend**: FastAPI (Python 3.11+)
 - **AI**: Anthropic Claude 3.5 Sonnet with Files API
 - **Deployment**: Google Cloud Run (europe-west4)
-- **Storage**: Google Secret Manager for API keys
+- **Authentication**: Google Cloud Identity-Aware Proxy (IAP)
+- **Storage**: Google Secret Manager for API keys, Firestore for data
 - **Frontend**: Vanilla JavaScript with modern CSS
 
 ## 📁 Project Structure
@@ -87,7 +88,10 @@ LLMRMS/
 3. **Configure environment variables**
    ```bash
    cp .env.example .env
-   # Edit .env and add your ANTHROPIC_API_KEY
+   # Edit .env and configure:
+   # - ANTHROPIC_API_KEY (required)
+   # - AUTH_ENABLED=false (for local development)
+   # - AUTH_MOCK_USER_EMAIL=dev@mgms.eu (mock user)
    ```
 
 4. **Get API key from Google Secret Manager** (if already stored)
@@ -106,6 +110,8 @@ LLMRMS/
    - API docs: http://localhost:8080/api/docs
    - Health check: http://localhost:8080/health
 
+> **Note**: Authentication is disabled by default for local development. See [Local Development Guide](docs/LOCAL-DEVELOPMENT.md) for details.
+
 ### Upload Course Materials (Optional)
 
 If you want to use the Files API features (quiz generation, study guides):
@@ -122,6 +128,54 @@ This will automatically discover and upload all materials from the three-tier `M
 - **Tier 3: `Supplementary_Sources/`** - External and supplementary resources
 
 See `Materials/README.md` for detailed information about the three-tier organization system.
+
+## 🔐 Authentication
+
+The application uses **Google Cloud Identity-Aware Proxy (IAP)** for authentication and authorization.
+
+### Access Control
+
+- **`@mgms.eu` domain users**: Full access to all features including admin endpoints
+- **External users**: Can be granted access via admin-managed allow list
+- **Local development**: Authentication disabled by default (mock user mode)
+
+### Environment Variables
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `AUTH_ENABLED` | No | `true` | Enable/disable authentication |
+| `AUTH_DOMAIN` | Yes | `mgms.eu` | Primary allowed domain |
+| `GOOGLE_CLIENT_ID` | Yes* | - | OAuth client ID for JWT verification |
+| `AUTH_MOCK_USER_EMAIL` | No** | `dev@mgms.eu` | Mock user email (local dev) |
+| `AUTH_MOCK_USER_IS_ADMIN` | No** | `true` | Mock user admin status (local dev) |
+
+\* Required in production when `AUTH_ENABLED=true`
+\*\* Only used when `AUTH_ENABLED=false`
+
+### Quick Start
+
+**Local Development** (no IAP required):
+```bash
+# In .env
+AUTH_ENABLED=false
+AUTH_MOCK_USER_EMAIL=dev@mgms.eu
+AUTH_MOCK_USER_IS_ADMIN=true
+```
+
+**Production** (with IAP):
+```bash
+# In .env or Cloud Run environment
+AUTH_ENABLED=true
+AUTH_DOMAIN=mgms.eu
+GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
+```
+
+### Documentation
+
+- **[Authentication System](docs/AUTHENTICATION.md)** - Architecture and security model
+- **[IAP Setup Guide](docs/IAP-SETUP.md)** - Configure Google Cloud IAP
+- **[Local Development](docs/LOCAL-DEVELOPMENT.md)** - Run locally without IAP
+- **[Allow List Management](docs/ALLOW-LIST-MANAGEMENT.md)** - Manage external user access
 
 ## ☁️ Deploy to Google Cloud Run
 
