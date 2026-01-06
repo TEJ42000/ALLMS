@@ -472,6 +472,11 @@ class GamificationService:
                 user_id, current_time
             )
 
+            # Check for badge earning
+            badges_earned = self.check_and_award_badges(
+                user_id, user_email, activity_type, activity_data, course_id
+            )
+
             # Create activity record
             activity_id = str(uuid.uuid4())
             activity = UserActivity(
@@ -484,7 +489,7 @@ class GamificationService:
                 session_id=session_id,
                 xp_awarded=xp_awarded,
                 streak_maintained=streak_maintained,
-                badges_earned=[],  # TODO: Implement badge logic
+                badges_earned=badges_earned,
                 metadata={
                     "time_of_day": self._get_time_of_day(),
                     "freeze_used": freeze_used,
@@ -550,7 +555,7 @@ class GamificationService:
                 streak_maintained=streak_maintained,
                 new_streak_count=new_streak_count,
                 freeze_used=freeze_used,
-                badges_earned=[]
+                badges_earned=badges_earned
             )
 
         except Exception as e:
@@ -903,6 +908,406 @@ class GamificationService:
         except Exception as e:
             logger.error(f"Error ending session {session_id}: {e}")
             return False
+
+    # =========================================================================
+    # Badge Management Methods
+    # =========================================================================
+
+    def seed_badge_definitions(self) -> bool:
+        """Seed initial badge definitions to Firestore.
+
+        Creates the 6 core badge types with their tier requirements.
+        Safe to call multiple times - will not overwrite existing badges.
+
+        Returns:
+            True if successful, False otherwise
+        """
+        if not self.db:
+            logger.warning("Firestore unavailable")
+            return False
+
+        try:
+            badges = [
+                BadgeDefinition(
+                    badge_id="night_owl",
+                    name="Night Owl",
+                    description="Complete a Hard Quiz or AI Evaluation between 11:00 PM and 3:00 AM",
+                    icon="🦉",
+                    category="behavioral",
+                    tiers=["bronze", "silver", "gold"],
+                    tier_requirements={"bronze": 1, "silver": 5, "gold": 10}
+                ),
+                BadgeDefinition(
+                    badge_id="early_riser",
+                    name="Early Riser",
+                    description="Complete a Study Guide before 8:00 AM",
+                    icon="☀️",
+                    category="behavioral",
+                    tiers=["bronze", "silver", "gold"],
+                    tier_requirements={"bronze": 1, "silver": 5, "gold": 10}
+                ),
+                BadgeDefinition(
+                    badge_id="hat_trick",
+                    name="Hat Trick",
+                    description="Pass 3 separate Hard Quizzes in a row with 100% accuracy",
+                    icon="🎩",
+                    category="achievement",
+                    tiers=["bronze", "silver", "gold"],
+                    tier_requirements={"bronze": 1, "silver": 3, "gold": 5}
+                ),
+                BadgeDefinition(
+                    badge_id="combo_king",
+                    name="Combo King",
+                    description="Flip 20 Flashcards in a row without marking one as incorrect",
+                    icon="🔥",
+                    category="achievement",
+                    tiers=["bronze", "silver", "gold"],
+                    tier_requirements={"bronze": 1, "silver": 5, "gold": 10}
+                ),
+                BadgeDefinition(
+                    badge_id="legal_scholar",
+                    name="Legal Scholar",
+                    description="Achieve an AI Grade of 9 or 10 on three consecutive Evaluations",
+                    icon="⚖️",
+                    category="achievement",
+                    tiers=["bronze", "silver", "gold"],
+                    tier_requirements={"bronze": 1, "silver": 3, "gold": 5}
+                ),
+                BadgeDefinition(
+                    badge_id="deep_diver",
+                    name="Deep Diver",
+                    description="Spend 45+ minutes interacting with a single Study Guide without navigating away",
+                    icon="📖",
+                    category="behavioral",
+                    tiers=["bronze", "silver", "gold"],
+                    tier_requirements={"bronze": 1, "silver": 5, "gold": 10}
+                )
+            ]
+
+            for badge in badges:
+                badge_ref = self.db.collection(BADGE_DEFINITIONS_COLLECTION).document(badge.badge_id)
+                # Only create if doesn't exist
+                if not badge_ref.get().exists:
+                    badge_ref.set(badge.model_dump(mode='json'))
+                    logger.info(f"Created badge definition: {badge.badge_id}")
+                else:
+                    logger.debug(f"Badge definition already exists: {badge.badge_id}")
+
+            logger.info("Badge definitions seeded successfully")
+            return True
+
+        except Exception as e:
+            logger.error(f"Error seeding badge definitions: {e}")
+            return False
+
+    def get_badge_definitions(self) -> List[BadgeDefinition]:
+        """Get all badge definitions.
+
+        Returns:
+            List of BadgeDefinition objects
+        """
+        if not self.db:
+            logger.warning("Firestore unavailable")
+            return []
+
+        try:
+            docs = self.db.collection(BADGE_DEFINITIONS_COLLECTION).where(
+                filter=FieldFilter("active", "==", True)
+            ).stream()
+
+            badges = []
+            for doc in docs:
+                try:
+                    badge_data = doc.to_dict()
+                    badges.append(BadgeDefinition(**badge_data))
+                except Exception as e:
+                    logger.warning(f"Error parsing badge {doc.id}: {e}")
+                    continue
+
+            return badges
+
+        except Exception as e:
+            logger.error(f"Error getting badge definitions: {e}")
+            return []
+
+    def get_user_badges(self, user_id: str) -> List[UserBadge]:
+        """Get all badges earned by a user.
+
+        Args:
+            user_id: User's IAP user ID
+
+        Returns:
+            List of UserBadge objects
+        """
+        if not self.db:
+            logger.warning("Firestore unavailable")
+            return []
+
+        try:
+            docs = self.db.collection(USER_ACHIEVEMENTS_COLLECTION).document(user_id).collection("badges").stream()
+
+            badges = []
+            for doc in docs:
+                try:
+                    badge_data = doc.to_dict()
+                    badges.append(UserBadge(**badge_data))
+                except Exception as e:
+                    logger.warning(f"Error parsing user badge {doc.id}: {e}")
+                    continue
+
+            return badges
+
+        except Exception as e:
+            logger.error(f"Error getting user badges for {user_id}: {e}")
+            return []
+
+    def check_and_award_badges(
+        self,
+        user_id: str,
+        user_email: str,
+        activity_type: str,
+        activity_data: Dict[str, Any],
+        course_id: Optional[str] = None
+    ) -> List[str]:
+        """Check if activity earns any badges and award them.
+
+        Args:
+            user_id: User's IAP user ID
+            user_email: User's email address
+            activity_type: Type of activity
+            activity_data: Activity-specific data
+            course_id: Course ID if applicable
+
+        Returns:
+            List of badge IDs earned
+        """
+        if not self.db:
+            logger.warning("Firestore unavailable")
+            return []
+
+        earned_badge_ids = []
+
+        try:
+            # Get current time for time-based badges
+            current_time = datetime.now(timezone.utc)
+            hour = current_time.hour
+
+            # Check Night Owl badge (11 PM - 3 AM)
+            if activity_type in ["quiz_completed", "evaluation_completed"]:
+                if activity_type == "quiz_completed" and activity_data.get("difficulty") == "hard":
+                    if hour >= 23 or hour < 3:
+                        badge_id = self._award_badge(user_id, user_email, "night_owl", course_id)
+                        if badge_id:
+                            earned_badge_ids.append(badge_id)
+                elif activity_type == "evaluation_completed":
+                    if hour >= 23 or hour < 3:
+                        badge_id = self._award_badge(user_id, user_email, "night_owl", course_id)
+                        if badge_id:
+                            earned_badge_ids.append(badge_id)
+
+            # Check Early Riser badge (before 8 AM)
+            if activity_type == "study_guide_completed":
+                if hour < 8:
+                    badge_id = self._award_badge(user_id, user_email, "early_riser", course_id)
+                    if badge_id:
+                        earned_badge_ids.append(badge_id)
+
+            # Check Deep Diver badge (45+ minutes on study guide)
+            if activity_type == "study_guide_completed":
+                time_spent_minutes = activity_data.get("time_spent_minutes", 0)
+                if time_spent_minutes >= 45:
+                    badge_id = self._award_badge(user_id, user_email, "deep_diver", course_id)
+                    if badge_id:
+                        earned_badge_ids.append(badge_id)
+
+            # Check Combo King badge (20 flashcards in a row correct)
+            if activity_type == "flashcard_set_completed":
+                consecutive_correct = activity_data.get("consecutive_correct", 0)
+                if consecutive_correct >= 20:
+                    badge_id = self._award_badge(user_id, user_email, "combo_king", course_id)
+                    if badge_id:
+                        earned_badge_ids.append(badge_id)
+
+            # Check sequence badges (Hat Trick, Legal Scholar)
+            # These require checking recent activity history
+            if activity_type == "quiz_completed":
+                if self._check_hat_trick(user_id, activity_data):
+                    badge_id = self._award_badge(user_id, user_email, "hat_trick", course_id)
+                    if badge_id:
+                        earned_badge_ids.append(badge_id)
+
+            if activity_type == "evaluation_completed":
+                if self._check_legal_scholar(user_id, activity_data):
+                    badge_id = self._award_badge(user_id, user_email, "legal_scholar", course_id)
+                    if badge_id:
+                        earned_badge_ids.append(badge_id)
+
+            return earned_badge_ids
+
+        except Exception as e:
+            logger.error(f"Error checking badges for {user_id}: {e}")
+            return []
+
+    def _award_badge(
+        self,
+        user_id: str,
+        user_email: str,
+        badge_id: str,
+        course_id: Optional[str] = None
+    ) -> Optional[str]:
+        """Award a badge to a user or increment times_earned.
+
+        Args:
+            user_id: User's IAP user ID
+            user_email: User's email address
+            badge_id: Badge ID to award
+            course_id: Course ID if applicable
+
+        Returns:
+            Badge ID if awarded/upgraded, None otherwise
+        """
+        try:
+            # Get badge definition
+            badge_def_ref = self.db.collection(BADGE_DEFINITIONS_COLLECTION).document(badge_id)
+            badge_def_doc = badge_def_ref.get()
+
+            if not badge_def_doc.exists:
+                logger.warning(f"Badge definition not found: {badge_id}")
+                return None
+
+            badge_def_data = badge_def_doc.to_dict()
+            badge_def = BadgeDefinition(**badge_def_data)
+
+            # Check if user already has this badge
+            user_badge_ref = self.db.collection(USER_ACHIEVEMENTS_COLLECTION).document(user_id).collection("badges").document(badge_id)
+            user_badge_doc = user_badge_ref.get()
+
+            if user_badge_doc.exists:
+                # Increment times_earned and check for tier upgrade
+                user_badge_data = user_badge_doc.to_dict()
+                times_earned = user_badge_data.get("times_earned", 0) + 1
+                current_tier = user_badge_data.get("tier", "bronze")
+
+                # Check for tier upgrade
+                new_tier = current_tier
+                for tier in ["gold", "silver", "bronze"]:  # Check from highest to lowest
+                    if times_earned >= badge_def.tier_requirements.get(tier, 999):
+                        new_tier = tier
+                        break
+
+                # Update badge
+                user_badge_ref.update({
+                    "times_earned": times_earned,
+                    "tier": new_tier
+                })
+
+                # Return badge_id only if tier upgraded
+                if new_tier != current_tier:
+                    logger.info(f"Badge {badge_id} upgraded to {new_tier} for {user_id}")
+                    return badge_id
+                else:
+                    logger.debug(f"Badge {badge_id} times_earned incremented for {user_id}")
+                    return None
+            else:
+                # Create new badge
+                user_badge = UserBadge(
+                    badge_id=badge_id,
+                    badge_name=badge_def.name,
+                    badge_description=badge_def.description,
+                    badge_icon=badge_def.icon,
+                    tier="bronze",
+                    earned_at=datetime.now(timezone.utc),
+                    times_earned=1,
+                    course_id=course_id
+                )
+
+                user_badge_ref.set(user_badge.model_dump(mode='json'))
+                logger.info(f"Badge {badge_id} awarded to {user_id}")
+                return badge_id
+
+        except Exception as e:
+            logger.error(f"Error awarding badge {badge_id} to {user_id}: {e}")
+            return None
+
+    def _check_hat_trick(self, user_id: str, current_activity_data: Dict[str, Any]) -> bool:
+        """Check if user has passed 3 hard quizzes in a row with 100% accuracy.
+
+        Args:
+            user_id: User's IAP user ID
+            current_activity_data: Current quiz activity data
+
+        Returns:
+            True if Hat Trick achieved, False otherwise
+        """
+        try:
+            # Check if current quiz qualifies
+            if current_activity_data.get("difficulty") != "hard":
+                return False
+
+            score = current_activity_data.get("score", 0)
+            total = current_activity_data.get("total_questions", 1)
+            if score != total or total == 0:
+                return False
+
+            # Get last 2 quiz activities
+            activities, _ = self.get_user_activities(user_id, limit=10, activity_type="quiz_completed")
+
+            # Filter for hard quizzes with 100% accuracy
+            perfect_hard_quizzes = []
+            for activity in activities:
+                if activity.activity_data.get("difficulty") == "hard":
+                    act_score = activity.activity_data.get("score", 0)
+                    act_total = activity.activity_data.get("total_questions", 1)
+                    if act_score == act_total and act_total > 0:
+                        perfect_hard_quizzes.append(activity)
+                        if len(perfect_hard_quizzes) >= 2:
+                            break
+
+            # Need 2 previous perfect hard quizzes + current one = 3 in a row
+            return len(perfect_hard_quizzes) >= 2
+
+        except Exception as e:
+            logger.error(f"Error checking Hat Trick for {user_id}: {e}")
+            return False
+
+    def _check_legal_scholar(self, user_id: str, current_activity_data: Dict[str, Any]) -> bool:
+        """Check if user has achieved grade 9-10 on 3 consecutive evaluations.
+
+        Args:
+            user_id: User's IAP user ID
+            current_activity_data: Current evaluation activity data
+
+        Returns:
+            True if Legal Scholar achieved, False otherwise
+        """
+        try:
+            # Check if current evaluation qualifies
+            current_grade = current_activity_data.get("grade", 0)
+            if current_grade < 9:
+                return False
+
+            # Get last 2 evaluation activities
+            activities, _ = self.get_user_activities(user_id, limit=10, activity_type="evaluation_completed")
+
+            # Filter for high grades (9-10)
+            high_grade_evals = []
+            for activity in activities:
+                grade = activity.activity_data.get("grade", 0)
+                if grade >= 9:
+                    high_grade_evals.append(activity)
+                    if len(high_grade_evals) >= 2:
+                        break
+                else:
+                    # Sequence broken
+                    break
+
+            # Need 2 previous high grades + current one = 3 in a row
+            return len(high_grade_evals) >= 2
+
+        except Exception as e:
+            logger.error(f"Error checking Legal Scholar for {user_id}: {e}")
+            return False
+
 
 
 # =============================================================================
