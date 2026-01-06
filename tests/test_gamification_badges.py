@@ -37,6 +37,42 @@ def gamification_service(mock_firestore):
     return service
 
 
+def setup_firestore_mocks(mock_firestore, badge_def_doc, user_badge_doc):
+    """Helper to setup Firestore mocks for badge tests.
+
+    Args:
+        mock_firestore: The mock Firestore client
+        badge_def_doc: Mock document for badge definition
+        user_badge_doc: Mock document for user badge
+
+    Returns:
+        mock_user_badge_ref: The mock reference for user badge operations
+    """
+    # Path 1: badge_definitions/{badge_id}
+    mock_badge_def_ref = MagicMock()
+    mock_badge_def_ref.get.return_value = badge_def_doc
+
+    # Path 2: user_achievements/{user_id}/badges/{badge_id}
+    mock_user_badge_ref = MagicMock()
+    mock_user_badge_ref.get.return_value = user_badge_doc
+
+    # Mock the collection chain
+    def collection_side_effect(collection_name):
+        mock_collection = MagicMock()
+        if collection_name == "badge_definitions":
+            mock_collection.document.return_value = mock_badge_def_ref
+        elif collection_name == "user_achievements":
+            mock_user_doc = MagicMock()
+            mock_badges_collection = MagicMock()
+            mock_badges_collection.document.return_value = mock_user_badge_ref
+            mock_user_doc.collection.return_value = mock_badges_collection
+            mock_collection.document.return_value = mock_user_doc
+        return mock_collection
+
+    mock_firestore.collection.side_effect = collection_side_effect
+    return mock_user_badge_ref
+
+
 @pytest.fixture
 def sample_badge_definitions():
     """Create sample badge definitions for testing."""
@@ -136,15 +172,13 @@ def test_seed_badge_definitions_skip_existing(gamification_service, mock_firesto
     assert mock_doc_ref.set.call_count == 0  # No badges created
 
 
-def test_seed_badge_definitions_no_firestore(gamification_service):
+def test_seed_badge_definitions_no_firestore():
     """Test seeding fails gracefully without Firestore."""
-    # Create a new service without db
-    service = GamificationService()
-    # Don't set _db, so it will be None
-
-    result = service.seed_badge_definitions()
-
-    assert result is False
+    # Mock get_firestore_client to return None
+    with patch('app.services.gamification_service.get_firestore_client', return_value=None):
+        service = GamificationService()
+        result = service.seed_badge_definitions()
+        assert result is False
 
 
 # =============================================================================
@@ -226,13 +260,7 @@ def test_night_owl_badge_earned_hard_quiz(mock_datetime, gamification_service, m
     mock_user_badge_doc.exists = False
 
     # Setup Firestore mocks
-    mock_firestore.collection.return_value.document.return_value.get.side_effect = [
-        mock_badge_def_doc,  # First call for badge definition
-        mock_user_badge_doc   # Second call for user badge
-    ]
-
-    mock_user_badge_ref = MagicMock()
-    mock_firestore.collection.return_value.document.return_value.collection.return_value.document.return_value = mock_user_badge_ref
+    mock_user_badge_ref = setup_firestore_mocks(mock_firestore, mock_badge_def_doc, mock_user_badge_doc)
 
     # Execute
     activity_data = {"difficulty": "hard", "score": 10, "total_questions": 10}
@@ -291,13 +319,8 @@ def test_early_riser_badge_earned(mock_datetime, gamification_service, mock_fire
     mock_user_badge_doc = MagicMock()
     mock_user_badge_doc.exists = False
 
-    mock_firestore.collection.return_value.document.return_value.get.side_effect = [
-        mock_badge_def_doc,
-        mock_user_badge_doc
-    ]
-
-    mock_user_badge_ref = MagicMock()
-    mock_firestore.collection.return_value.document.return_value.collection.return_value.document.return_value = mock_user_badge_ref
+    # Setup Firestore mocks
+    mock_user_badge_ref = setup_firestore_mocks(mock_firestore, mock_badge_def_doc, mock_user_badge_doc)
 
     # Execute
     activity_data = {"time_spent_minutes": 30}
@@ -330,13 +353,8 @@ def test_deep_diver_badge_earned(gamification_service, mock_firestore):
     mock_user_badge_doc = MagicMock()
     mock_user_badge_doc.exists = False
 
-    mock_firestore.collection.return_value.document.return_value.get.side_effect = [
-        mock_badge_def_doc,
-        mock_user_badge_doc
-    ]
-
-    mock_user_badge_ref = MagicMock()
-    mock_firestore.collection.return_value.document.return_value.collection.return_value.document.return_value = mock_user_badge_ref
+    # Setup Firestore mocks
+    mock_user_badge_ref = setup_firestore_mocks(mock_firestore, mock_badge_def_doc, mock_user_badge_doc)
 
     # Execute
     activity_data = {"time_spent_minutes": 50}
@@ -388,13 +406,8 @@ def test_combo_king_badge_earned(gamification_service, mock_firestore):
     mock_user_badge_doc = MagicMock()
     mock_user_badge_doc.exists = False
 
-    mock_firestore.collection.return_value.document.return_value.get.side_effect = [
-        mock_badge_def_doc,
-        mock_user_badge_doc
-    ]
-
-    mock_user_badge_ref = MagicMock()
-    mock_firestore.collection.return_value.document.return_value.collection.return_value.document.return_value = mock_user_badge_ref
+    # Setup Firestore mocks
+    mock_user_badge_ref = setup_firestore_mocks(mock_firestore, mock_badge_def_doc, mock_user_badge_doc)
 
     # Execute
     activity_data = {"consecutive_correct": 25}
@@ -437,13 +450,8 @@ def test_badge_tier_upgrade_bronze_to_silver(gamification_service, mock_firestor
         "times_earned": 4
     }
 
-    mock_firestore.collection.return_value.document.return_value.get.side_effect = [
-        mock_badge_def_doc,
-        mock_user_badge_doc
-    ]
-
-    mock_user_badge_ref = MagicMock()
-    mock_firestore.collection.return_value.document.return_value.collection.return_value.document.return_value = mock_user_badge_ref
+    # Setup Firestore mocks
+    mock_user_badge_ref = setup_firestore_mocks(mock_firestore, mock_badge_def_doc, mock_user_badge_doc)
 
     # Execute - 5th time earning should upgrade to silver
     activity_data = {"consecutive_correct": 25}
@@ -486,13 +494,8 @@ def test_badge_no_tier_upgrade(gamification_service, mock_firestore):
         "times_earned": 2
     }
 
-    mock_firestore.collection.return_value.document.return_value.get.side_effect = [
-        mock_badge_def_doc,
-        mock_user_badge_doc
-    ]
-
-    mock_user_badge_ref = MagicMock()
-    mock_firestore.collection.return_value.document.return_value.collection.return_value.document.return_value = mock_user_badge_ref
+    # Setup Firestore mocks
+    mock_user_badge_ref = setup_firestore_mocks(mock_firestore, mock_badge_def_doc, mock_user_badge_doc)
 
     # Execute - 3rd time earning, still bronze
     activity_data = {"consecutive_correct": 25}
@@ -555,13 +558,8 @@ def test_hat_trick_badge_earned(gamification_service, mock_firestore):
 
     # Mock get_user_activities to return previous perfect quizzes
     with patch.object(gamification_service, 'get_user_activities', return_value=(mock_activities, None)):
-        mock_firestore.collection.return_value.document.return_value.get.side_effect = [
-            mock_badge_def_doc,
-            mock_user_badge_doc
-        ]
-
-        mock_user_badge_ref = MagicMock()
-        mock_firestore.collection.return_value.document.return_value.collection.return_value.document.return_value = mock_user_badge_ref
+        # Setup Firestore mocks
+        mock_user_badge_ref = setup_firestore_mocks(mock_firestore, mock_badge_def_doc, mock_user_badge_doc)
 
         # Execute - current quiz is also perfect hard quiz
         activity_data = {"difficulty": "hard", "score": 8, "total_questions": 8}
@@ -653,13 +651,8 @@ def test_legal_scholar_badge_earned(gamification_service, mock_firestore):
 
     # Mock get_user_activities
     with patch.object(gamification_service, 'get_user_activities', return_value=(mock_activities, None)):
-        mock_firestore.collection.return_value.document.return_value.get.side_effect = [
-            mock_badge_def_doc,
-            mock_user_badge_doc
-        ]
-
-        mock_user_badge_ref = MagicMock()
-        mock_firestore.collection.return_value.document.return_value.collection.return_value.document.return_value = mock_user_badge_ref
+        # Setup Firestore mocks
+        mock_user_badge_ref = setup_firestore_mocks(mock_firestore, mock_badge_def_doc, mock_user_badge_doc)
 
         # Execute - current evaluation is also high grade
         activity_data = {"grade": 10}
