@@ -453,52 +453,316 @@ function hideTypingIndicator() {
     }
 }
 
-// ========== Assessment ==========
+// ========== Essay Assessment ==========
+// Essay assessment state
+let essayState = {
+    assessmentId: null,
+    question: null,
+    topic: null,
+    keyConcepts: []
+};
+
 function initAssessmentListeners() {
-    document.getElementById('assess-btn').addEventListener('click', assessAnswer);
+    // Tab navigation
+    document.querySelectorAll('.assessment-tab').forEach(tab => {
+        tab.addEventListener('click', () => switchAssessmentTab(tab.dataset.assessmentTab));
+    });
+
+    // Generate question button
+    const generateBtn = document.getElementById('generate-essay-btn');
+    if (generateBtn) generateBtn.addEventListener('click', generateEssayQuestion);
+
+    // Submit essay button
+    const submitBtn = document.getElementById('submit-essay-btn');
+    if (submitBtn) submitBtn.addEventListener('click', submitEssayAnswer);
+
+    // New question button
+    const newQuestionBtn = document.getElementById('new-question-btn');
+    if (newQuestionBtn) newQuestionBtn.addEventListener('click', showGenerateView);
+
+    // Word count tracker
+    const essayAnswer = document.getElementById('essay-answer');
+    if (essayAnswer) {
+        essayAnswer.addEventListener('input', updateWordCount);
+    }
 }
 
-async function assessAnswer() {
-    const topic = document.getElementById('assessment-topic').value;
-    const question = document.getElementById('assessment-question').value.trim();
-    const answer = document.getElementById('assessment-answer').value.trim();
-    const resultDiv = document.getElementById('assessment-result');
-    
-    if (!answer) {
-        alert('Please enter your answer');
-        return;
+function switchAssessmentTab(tabName) {
+    // Update active tab
+    document.querySelectorAll('.assessment-tab').forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.assessmentTab === tabName);
+    });
+
+    // Show corresponding content
+    document.getElementById('new-essay-tab').style.display = tabName === 'new' ? 'block' : 'none';
+    document.getElementById('essay-history-tab').style.display = tabName === 'history' ? 'block' : 'none';
+
+    // Load history if switching to history tab
+    if (tabName === 'history') {
+        loadEssayHistory();
     }
-    
+}
+
+function showGenerateView() {
+    document.getElementById('generate-question-view').style.display = 'block';
+    document.getElementById('essay-question-view').style.display = 'none';
+    document.getElementById('essay-result').innerHTML = '';
+    essayState = { assessmentId: null, question: null, topic: null, keyConcepts: [] };
+}
+
+function updateWordCount() {
+    const answer = document.getElementById('essay-answer').value.trim();
+    const wordCount = answer ? answer.split(/\s+/).filter(w => w.length > 0).length : 0;
+    document.getElementById('essay-word-count').textContent = wordCount;
+}
+
+async function generateEssayQuestion() {
+    const topic = document.getElementById('essay-topic-select').value;
     showLoading();
-    
+
     try {
-        const response = await fetch(`${API_BASE}/api/assessment/assess`, {
+        const response = await fetch(`${API_BASE}/api/assessment/essay/generate`, {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(addCourseContext({topic, question: question || null, answer}))
+            headers: {
+                'Content-Type': 'application/json',
+                'X-User-ID': getUserId()
+            },
+            body: JSON.stringify({
+                course_id: COURSE_ID,
+                topic: topic
+            })
         });
 
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
-            const errorMessage = errorData.detail || `API error: ${response.status}`;
-            throw new Error(errorMessage);
+            throw new Error(errorData.detail || `API error: ${response.status}`);
         }
 
         const data = await response.json();
-        resultDiv.innerHTML = `
-            <div class="assessment-feedback">
-                ${formatMarkdown(data.feedback)}
-            </div>
-        `;
-        resultDiv.style.display = 'block';
+
+        // Store state
+        essayState.assessmentId = data.assessment_id;
+        essayState.question = data.question;
+        essayState.topic = data.topic;
+        essayState.keyConcepts = data.key_concepts || [];
+
+        // Display question
+        document.getElementById('essay-topic-badge').textContent = data.topic;
+        document.getElementById('essay-question-text').textContent = data.question;
+
+        // Show key concepts if available
+        const conceptsDiv = document.getElementById('essay-key-concepts');
+        if (data.key_concepts && data.key_concepts.length > 0) {
+            conceptsDiv.innerHTML = '<strong>Key concepts to address:</strong> ' +
+                data.key_concepts.map(c => `<span class="concept-tag">${escapeHtml(c)}</span>`).join(' ');
+            conceptsDiv.style.display = 'block';
+        } else {
+            conceptsDiv.style.display = 'none';
+        }
+
+        // Show guidance if available
+        const guidanceDiv = document.getElementById('essay-guidance');
+        if (data.guidance) {
+            guidanceDiv.innerHTML = `<em>💡 ${escapeHtml(data.guidance)}</em>`;
+            guidanceDiv.style.display = 'block';
+        } else {
+            guidanceDiv.style.display = 'none';
+        }
+
+        // Switch to question view
+        document.getElementById('generate-question-view').style.display = 'none';
+        document.getElementById('essay-question-view').style.display = 'block';
+        document.getElementById('essay-answer').value = '';
+        document.getElementById('essay-result').innerHTML = '';
+        updateWordCount();
 
     } catch (error) {
-        console.error('Error:', error);
-        const errorMessage = error.message || 'Error getting assessment. Please try again.';
-        resultDiv.innerHTML = `<p class="error">${escapeHtml(errorMessage)}</p>`;
+        console.error('Error generating question:', error);
+        alert(`Error generating question: ${error.message}`);
     } finally {
         hideLoading();
     }
+}
+
+async function submitEssayAnswer() {
+    const answer = document.getElementById('essay-answer').value.trim();
+    const resultDiv = document.getElementById('essay-result');
+
+    if (!answer) {
+        alert('Please write your essay answer before submitting.');
+        return;
+    }
+
+    if (answer.length < 100) {
+        alert('Your answer seems too short. Please write a more detailed response (at least 100 characters).');
+        return;
+    }
+
+    if (!essayState.assessmentId) {
+        alert('No active assessment. Please generate a new question.');
+        return;
+    }
+
+    showLoading();
+
+    try {
+        const response = await fetch(`${API_BASE}/api/assessment/essay/submit`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-User-ID': getUserId()
+            },
+            body: JSON.stringify({
+                assessment_id: essayState.assessmentId,
+                course_id: COURSE_ID,
+                answer: answer
+            })
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.detail || `API error: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        // Display results
+        let strengthsHtml = '';
+        if (data.strengths && data.strengths.length > 0) {
+            strengthsHtml = `
+                <div class="essay-strengths">
+                    <h4>✅ Strengths</h4>
+                    <ul>${data.strengths.map(s => `<li>${escapeHtml(s)}</li>`).join('')}</ul>
+                </div>
+            `;
+        }
+
+        let improvementsHtml = '';
+        if (data.improvements && data.improvements.length > 0) {
+            improvementsHtml = `
+                <div class="essay-improvements">
+                    <h4>⚠️ Areas for Improvement</h4>
+                    <ul>${data.improvements.map(i => `<li>${escapeHtml(i)}</li>`).join('')}</ul>
+                </div>
+            `;
+        }
+
+        resultDiv.innerHTML = `
+            <div class="essay-evaluation">
+                <div class="essay-grade">
+                    <span class="grade-number">${data.grade}</span>
+                    <span class="grade-label">/10</span>
+                </div>
+                ${strengthsHtml}
+                ${improvementsHtml}
+                <div class="essay-feedback">
+                    <h4>📝 Detailed Feedback</h4>
+                    ${formatMarkdown(data.feedback)}
+                </div>
+            </div>
+        `;
+        resultDiv.style.display = 'block';
+        resultDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    } catch (error) {
+        console.error('Error submitting essay:', error);
+        resultDiv.innerHTML = `<p class="error">Error: ${escapeHtml(error.message)}</p>`;
+        resultDiv.style.display = 'block';
+    } finally {
+        hideLoading();
+    }
+}
+
+async function loadEssayHistory() {
+    const historyList = document.getElementById('essay-history-list');
+    historyList.innerHTML = '<p class="loading-text">Loading...</p>';
+
+    try {
+        const response = await fetch(`${API_BASE}/api/assessment/essay/my-history?course_id=${COURSE_ID}`, {
+            headers: { 'X-User-ID': getUserId() }
+        });
+
+        if (!response.ok) {
+            throw new Error(`API error: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        if (!data.history || data.history.length === 0) {
+            historyList.innerHTML = `
+                <div class="empty-state">
+                    <p>📝 No essay assessments yet.</p>
+                    <p>Complete your first essay to see your history here!</p>
+                </div>
+            `;
+            return;
+        }
+
+        historyList.innerHTML = data.history.map(item => `
+            <div class="essay-history-item" onclick="viewEssayAttempt('${item.attemptId}')">
+                <div class="history-item-header">
+                    <span class="history-topic">${escapeHtml(item.topic)}</span>
+                    <span class="history-grade grade-${item.grade >= 7 ? 'good' : item.grade >= 5 ? 'ok' : 'low'}">${item.grade}/10</span>
+                </div>
+                <p class="history-question">${escapeHtml(item.question.substring(0, 100))}...</p>
+                <span class="history-date">${new Date(item.submittedAt).toLocaleDateString()}</span>
+            </div>
+        `).join('');
+
+    } catch (error) {
+        console.error('Error loading history:', error);
+        historyList.innerHTML = `<p class="error">Error loading history: ${escapeHtml(error.message)}</p>`;
+    }
+}
+
+async function viewEssayAttempt(attemptId) {
+    showLoading();
+
+    try {
+        const response = await fetch(`${API_BASE}/api/assessment/essay/attempt/${attemptId}`, {
+            headers: { 'X-User-ID': getUserId() }
+        });
+
+        if (!response.ok) {
+            throw new Error(`API error: ${response.status}`);
+        }
+
+        const data = await response.json();
+        const attempt = data.attempt;
+
+        // Create modal or detailed view
+        const modal = document.createElement('div');
+        modal.className = 'essay-modal';
+        modal.innerHTML = `
+            <div class="essay-modal-content">
+                <button class="modal-close" onclick="this.closest('.essay-modal').remove()">&times;</button>
+                <h3>Essay Attempt - ${attempt.grade}/10</h3>
+                <div class="attempt-details">
+                    <h4>Your Answer:</h4>
+                    <div class="attempt-answer">${escapeHtml(attempt.answer)}</div>
+                    <h4>Feedback:</h4>
+                    <div class="attempt-feedback">${formatMarkdown(attempt.feedback)}</div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+
+    } catch (error) {
+        console.error('Error viewing attempt:', error);
+        alert(`Error: ${error.message}`);
+    } finally {
+        hideLoading();
+    }
+}
+
+function getUserId() {
+    // Get or create a persistent user ID
+    let userId = localStorage.getItem('lls_user_id');
+    if (!userId) {
+        userId = 'user-' + Math.random().toString(36).substring(2, 15);
+        localStorage.setItem('lls_user_id', userId);
+    }
+    return userId;
 }
 
 // ========== Quiz Generator ==========

@@ -1,16 +1,39 @@
-"""AI Assessment API Routes for the LLS Study Portal."""
+"""AI Assessment API Routes for the LLS Study Portal.
+
+Provides endpoints for:
+- Legacy assessment (quick answer grading)
+- Essay question generation with persistence
+- Essay answer submission and AI evaluation
+- Assessment history and retakes
+"""
 
 import logging
 import re
+import uuid
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Header, Query, status
 
 from app.dependencies.auth import get_optional_user
 from app.models.auth_models import User
-from app.models.schemas import AssessmentRequest, AssessmentResponse, ErrorResponse
+from app.models.schemas import (
+    AssessmentRequest,
+    AssessmentResponse,
+    ErrorResponse,
+    GenerateEssayQuestionRequest,
+    EssayQuestion,
+    SubmitEssayAnswerRequest,
+    EssayEvaluationResponse,
+    EssayAssessmentSummary,
+    EssayAssessmentHistoryItem,
+)
 from app.models.usage_models import UserContext
-from app.services.anthropic_client import get_assessment_response
+from app.services.anthropic_client import (
+    get_assessment_response,
+    generate_essay_question,
+    evaluate_essay_answer,
+)
+from app.services.assessment_persistence_service import get_assessment_persistence_service
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +44,18 @@ router = APIRouter(
         500: {"model": ErrorResponse, "description": "Internal server error"}
     }
 )
+
+
+def get_or_create_user_id(user_id_header: Optional[str] = None) -> str:
+    """Get user ID from header or generate a simulated one."""
+    if user_id_header:
+        return user_id_header
+    new_user_id = f"sim-{uuid.uuid4().hex[:12]}"
+    logger.warning(
+        "No X-User-ID header provided, generating new simulated user ID: %s",
+        new_user_id
+    )
+    return new_user_id
 
 
 def extract_grade(feedback: str) -> int:
@@ -287,6 +322,327 @@ async def get_sample_answers():
     }
 
 
+# ============================================================================
+# Essay Assessment Endpoints (New)
+# ============================================================================
+
+
+@router.post("/essay/generate")
+async def generate_essay_assessment(
+    request: GenerateEssayQuestionRequest,
+    x_user_id: Optional[str] = Header(None, alias="X-User-ID")
+):
+    """
+    Generate a new essay question for a topic.
+
+    Creates an essay-style question similar to those seen on law exams.
+    The question is saved to the database and can be answered later.
+
+    Questions are designed to require 3-7 paragraph answers.
+    """
+    try:
+        user_id = get_or_create_user_id(x_user_id)
+        topic = request.topic or "Law & Legal Skills"
+
+        logger.info(
+            "Generating essay question - Course: %s, Topic: %s",
+            request.course_id, topic
+        )
+
+        # Generate question using AI
+        question_data = await generate_essay_question(topic=topic)
+
+        # Save assessment to database
+        persistence = get_assessment_persistence_service()
+        assessment = await persistence.save_assessment(
+            course_id=request.course_id,
+            user_id=user_id,
+            question=question_data.get("question", ""),
+            topic=question_data.get("topic", topic),
+            week_number=request.week_number,
+            expected_paragraphs="3-7",
+            key_concepts=question_data.get("key_concepts", [])
+        )
+
+        return {
+            "assessment_id": assessment.get("id"),
+            "question": question_data.get("question"),
+            "topic": question_data.get("topic", topic),
+            "expected_paragraphs": "3-7",
+            "key_concepts": question_data.get("key_concepts", []),
+            "guidance": question_data.get("guidance"),
+            "status": "success"
+        }
+
+    except Exception as e:
+        logger.error("Error generating essay question: %s", str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to generate essay question. Please try again."
+        ) from e
+
+
+@router.post("/essay/submit")
+async def submit_essay_answer(
+    request: SubmitEssayAnswerRequest,
+    x_user_id: Optional[str] = Header(None, alias="X-User-ID")
+):
+    """
+    Submit an essay answer for evaluation.
+
+    The AI evaluates the answer based on:
+    - Accuracy of legal knowledge
+    - Quality of legal reasoning
+    - Use of article citations
+    - Structure and organization
+    - Completeness
+
+    Returns a grade (1-10) with detailed feedback.
+    """
+    try:
+        user_id = get_or_create_user_id(x_user_id)
+
+        logger.info(
+            "Essay submission - Assessment: %s, Answer length: %d",
+            request.assessment_id, len(request.answer)
+        )
+
+        persistence = get_assessment_persistence_service()
+
+        # Get the assessment details
+        assessment = await persistence.get_assessment(
+            request.course_id,
+            request.assessment_id
+        )
+
+        if not assessment:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Assessment {request.assessment_id} not found"
+            )
+
+        # Evaluate the answer using AI
+        evaluation = await evaluate_essay_answer(
+            question=assessment.get("question", ""),
+            answer=request.answer,
+            topic=assessment.get("topic", ""),
+            key_concepts=assessment.get("keyConcepts", [])
+        )
+
+        # Save the attempt
+        attempt = await persistence.save_attempt(
+            assessment_id=request.assessment_id,
+            course_id=request.course_id,
+            user_id=user_id,
+            answer=request.answer,
+            grade=evaluation.get("grade", 5),
+            feedback=evaluation.get("feedback", ""),
+            strengths=evaluation.get("strengths", []),
+            improvements=evaluation.get("improvements", [])
+        )
+
+        return EssayEvaluationResponse(
+            attempt_id=attempt.get("id"),
+            assessment_id=request.assessment_id,
+            grade=evaluation.get("grade", 5),
+            feedback=evaluation.get("feedback", ""),
+            strengths=evaluation.get("strengths", []),
+            improvements=evaluation.get("improvements", []),
+            status="success"
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Error evaluating essay: %s", str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to evaluate essay. Please try again."
+        ) from e
+
+
+@router.get("/essay/courses/{course_id}")
+async def list_essay_assessments(
+    course_id: str,
+    topic: Optional[str] = Query(None, description="Filter by topic"),
+    limit: int = Query(20, ge=1, le=100, description="Max results"),
+    x_user_id: Optional[str] = Header(None, alias="X-User-ID")
+):
+    """
+    List essay assessments for a course.
+
+    Returns assessments with attempt counts and grades.
+    Can optionally filter to show only the current user's assessments.
+    """
+    try:
+        user_id = get_or_create_user_id(x_user_id) if x_user_id else None
+        persistence = get_assessment_persistence_service()
+
+        assessments = await persistence.list_assessments(
+            course_id=course_id,
+            user_id=user_id,
+            topic=topic,
+            limit=limit
+        )
+
+        return {
+            "assessments": assessments,
+            "count": len(assessments),
+            "course_id": course_id
+        }
+
+    except Exception as e:
+        logger.error("Error listing assessments: %s", str(e))
+        raise HTTPException(500, detail=str(e)) from e
+
+
+@router.get("/essay/courses/{course_id}/{assessment_id}")
+async def get_essay_assessment(
+    course_id: str,
+    assessment_id: str,
+    x_user_id: str = Header(..., alias="X-User-ID")
+):
+    """
+    Get a specific essay assessment with all details.
+
+    Returns the question, topic, and all previous attempts.
+    Users can only view their own assessments.
+    """
+    try:
+        persistence = get_assessment_persistence_service()
+        assessment = await persistence.get_assessment(course_id, assessment_id)
+
+        if not assessment:
+            raise HTTPException(404, detail=f"Assessment {assessment_id} not found")
+
+        # Authorization check: users can only view their own assessments
+        if assessment.get("userId") != x_user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to view this assessment"
+            )
+
+        # Get attempts only for this user
+        attempts = await persistence.get_assessment_attempts(
+            course_id, assessment_id, user_id=x_user_id
+        )
+
+        return {
+            "assessment": assessment,
+            "attempts": attempts,
+            "attempt_count": len(attempts)
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Error getting assessment: %s", str(e))
+        raise HTTPException(500, detail=str(e)) from e
+
+
+@router.get("/essay/history/{user_id}")
+async def get_essay_history(
+    user_id: str,
+    course_id: Optional[str] = Query(None, description="Filter by course"),
+    limit: int = Query(20, ge=1, le=100, description="Max results"),
+    x_user_id: str = Header(..., alias="X-User-ID")
+):
+    """
+    Get a user's essay assessment history.
+
+    Returns list of past essay attempts with grades and timestamps.
+    Users can only view their own history.
+    """
+    try:
+        # Authorization check: users can only view their own history
+        if user_id != x_user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to view this user's history"
+            )
+
+        persistence = get_assessment_persistence_service()
+        history = await persistence.get_user_assessment_history(
+            user_id=user_id,
+            course_id=course_id,
+            limit=limit
+        )
+
+        return {
+            "history": history,
+            "count": len(history),
+            "user_id": user_id
+        }
+
+    except Exception as e:
+        logger.error("Error getting assessment history: %s", str(e))
+        raise HTTPException(500, detail=str(e)) from e
+
+
+@router.get("/essay/my-history")
+async def get_my_essay_history(
+    x_user_id: str = Header(..., alias="X-User-ID"),
+    course_id: Optional[str] = Query(None, description="Filter by course"),
+    limit: int = Query(20, ge=1, le=100, description="Max results")
+):
+    """
+    Get current user's essay assessment history.
+
+    Requires X-User-ID header. Returns list of past essay attempts.
+    """
+    try:
+        persistence = get_assessment_persistence_service()
+        history = await persistence.get_user_assessment_history(
+            user_id=x_user_id,
+            course_id=course_id,
+            limit=limit
+        )
+
+        return {
+            "history": history,
+            "count": len(history),
+            "user_id": x_user_id
+        }
+
+    except Exception as e:
+        logger.error("Error getting assessment history: %s", str(e))
+        raise HTTPException(500, detail=str(e)) from e
+
+
+@router.get("/essay/attempt/{attempt_id}")
+async def get_essay_attempt(
+    attempt_id: str,
+    x_user_id: str = Header(..., alias="X-User-ID")
+):
+    """
+    Get details of a specific essay attempt.
+
+    Returns the answer, grade, feedback, and all evaluation details.
+    Users can only view their own attempts.
+    """
+    try:
+        persistence = get_assessment_persistence_service()
+        attempt = await persistence.get_attempt(attempt_id)
+
+        if not attempt:
+            raise HTTPException(404, detail=f"Attempt {attempt_id} not found")
+
+        # Authorization check: users can only view their own attempts
+        if attempt.get("userId") != x_user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to view this attempt"
+            )
+
+        return {"attempt": attempt}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Error getting attempt: %s", str(e))
+        raise HTTPException(500, detail=str(e)) from e
+
+
 # For testing during development
 if __name__ == "__main__":
     # Test grade extraction
@@ -304,3 +660,10 @@ if __name__ == "__main__":
     print("  POST /api/assessment/assess")
     print("  GET  /api/assessment/rubric")
     print("  GET  /api/assessment/sample-answers")
+    print("  POST /api/assessment/essay/generate")
+    print("  POST /api/assessment/essay/submit")
+    print("  GET  /api/assessment/essay/courses/{course_id}")
+    print("  GET  /api/assessment/essay/courses/{course_id}/{assessment_id}")
+    print("  GET  /api/assessment/essay/history/{user_id}")
+    print("  GET  /api/assessment/essay/my-history")
+    print("  GET  /api/assessment/essay/attempt/{attempt_id}")

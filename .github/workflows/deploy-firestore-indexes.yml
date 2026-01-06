@@ -1,0 +1,102 @@
+name: Deploy Firestore Indexes
+
+on:
+  workflow_dispatch:  # Manual trigger
+  push:
+    paths:
+      - 'firestore.indexes.json'
+      - '.github/workflows/deploy-firestore-indexes.yml'
+
+env:
+  PROJECT_ID: vigilant-axis-483119-r8
+  DATABASE: "(default)"
+
+jobs:
+  deploy-indexes:
+    name: Deploy Firestore Indexes
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.PROJECT_ID }}
+
+      - name: Deploy Firestore Indexes
+        run: |
+          echo "🔥 Deploying Firestore Indexes"
+          
+          # Index 1: assessmentId + submittedAt
+          echo "Creating index: assessmentAttempts (assessmentId ASC, submittedAt DESC)..."
+          gcloud firestore indexes composite create \
+            --project="${{ env.PROJECT_ID }}" \
+            --database="${{ env.DATABASE }}" \
+            --collection-group=assessmentAttempts \
+            --field-config field-path=assessmentId,order=ascending \
+            --field-config field-path=submittedAt,order=descending \
+            --quiet || echo "Index may already exist"
+          
+          # Index 2: userId + submittedAt
+          echo "Creating index: assessmentAttempts (userId ASC, submittedAt DESC)..."
+          gcloud firestore indexes composite create \
+            --project="${{ env.PROJECT_ID }}" \
+            --database="${{ env.DATABASE }}" \
+            --collection-group=assessmentAttempts \
+            --field-config field-path=userId,order=ascending \
+            --field-config field-path=submittedAt,order=descending \
+            --quiet || echo "Index may already exist"
+          
+          # Index 3: userId + courseId + submittedAt
+          echo "Creating index: assessmentAttempts (userId ASC, courseId ASC, submittedAt DESC)..."
+          gcloud firestore indexes composite create \
+            --project="${{ env.PROJECT_ID }}" \
+            --database="${{ env.DATABASE }}" \
+            --collection-group=assessmentAttempts \
+            --field-config field-path=userId,order=ascending \
+            --field-config field-path=courseId,order=ascending \
+            --field-config field-path=submittedAt,order=descending \
+            --quiet || echo "Index may already exist"
+          
+          # Index 4: assessments createdAt
+          echo "Creating index: assessments (createdAt DESC)..."
+          gcloud firestore indexes composite create \
+            --project="${{ env.PROJECT_ID }}" \
+            --database="${{ env.DATABASE }}" \
+            --collection-group=assessments \
+            --field-config field-path=createdAt,order=descending \
+            --quiet || echo "Index may already exist"
+          
+          # Index 5: assessments topic + createdAt
+          echo "Creating index: assessments (topic ASC, createdAt DESC)..."
+          gcloud firestore indexes composite create \
+            --project="${{ env.PROJECT_ID }}" \
+            --database="${{ env.DATABASE }}" \
+            --collection-group=assessments \
+            --field-config field-path=topic,order=ascending \
+            --field-config field-path=createdAt,order=descending \
+            --quiet || echo "Index may already exist"
+          
+          echo ""
+          echo "✅ Index creation commands submitted!"
+          echo "⏳ Indexes take 5-15 minutes to build."
+
+      - name: List Indexes
+        run: |
+          echo "📋 Current Firestore Indexes:"
+          gcloud firestore indexes composite list \
+            --project="${{ env.PROJECT_ID }}" \
+            --database="${{ env.DATABASE }}" \
+            --format="table(name,state,queryScope)"
+
