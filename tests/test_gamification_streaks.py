@@ -281,18 +281,19 @@ class TestStreakFreezeEarning:
 class TestStreakIntegration:
     """Integration tests for streak system with activity logging."""
 
-    def test_firestore_unavailable_returns_safe_defaults(self, gamification_service):
-        """When Firestore is unavailable, should return safe defaults."""
-        gamification_service._db = None  # Use private attribute
+    def test_firestore_unavailable_raises_exception(self, gamification_service):
+        """When Firestore is unavailable, should raise HTTPException."""
+        from fastapi import HTTPException
 
-        current_time = datetime.now(timezone.utc)
-        maintained, count, freeze_used = gamification_service.check_streak_status(
-            "test-user", current_time
-        )
+        # Mock the db property to return None
+        with patch.object(type(gamification_service), 'db', new_callable=lambda: property(lambda self: None)):
+            current_time = datetime.now(timezone.utc)
 
-        assert maintained is True
-        assert count == 1
-        assert freeze_used is False
+            with pytest.raises(HTTPException) as exc_info:
+                gamification_service.check_streak_status("test-user", current_time)
+
+            assert exc_info.value.status_code == 503
+            assert "Database unavailable" in str(exc_info.value.detail)
 
     def test_longest_streak_tracking(self, gamification_service, sample_user_stats):
         """Should track longest streak achieved."""
@@ -324,4 +325,14 @@ class TestStreakIntegration:
             assert maintained is True
             assert count == 1
             assert freeze_used is False
+
+    def test_future_timestamp_raises_error(self, gamification_service):
+        """Activity with future timestamp should raise ValueError."""
+        # Try to submit activity 1 hour in the future
+        future_time = datetime.now(timezone.utc) + timedelta(hours=1)
+
+        with pytest.raises(ValueError) as exc_info:
+            gamification_service.check_streak_status("test-user", future_time)
+
+        assert "future" in str(exc_info.value).lower()
 

@@ -8,6 +8,7 @@ class GamificationUI {
     constructor() {
         this.stats = null;
         this.levelProgressBar = null;
+        this.listeners = {}; // Store listener references for cleanup
         this.init();
     }
     
@@ -167,22 +168,31 @@ class GamificationUI {
      * Setup event listeners for XP updates
      */
     setupEventListeners() {
-        // Listen for custom XP update events
-        document.addEventListener('xp-awarded', (event) => {
-            this.handleXPAwarded(event.detail);
-        });
+        // Store bound listener functions for cleanup
+        this.listeners = {
+            'xp-awarded': (event) => this.handleXPAwarded(event.detail),
+            'level-up': (event) => this.handleLevelUp(event.detail),
+            'streak-updated': (event) => this.handleStreakUpdated(event.detail),
+            'freeze-used': (event) => this.handleFreezeUsed(event.detail)
+        };
 
-        document.addEventListener('level-up', (event) => {
-            this.handleLevelUp(event.detail);
+        // Add event listeners
+        Object.entries(this.listeners).forEach(([eventName, handler]) => {
+            document.addEventListener(eventName, handler);
         });
+    }
 
-        document.addEventListener('streak-updated', (event) => {
-            this.handleStreakUpdated(event.detail);
+    /**
+     * Cleanup event listeners to prevent memory leaks
+     * Call this method when destroying the GamificationUI instance
+     */
+    cleanup() {
+        // Remove all event listeners
+        Object.entries(this.listeners).forEach(([eventName, handler]) => {
+            document.removeEventListener(eventName, handler);
         });
-
-        document.addEventListener('freeze-used', (event) => {
-            this.handleFreezeUsed(event.detail);
-        });
+        this.listeners = {};
+        console.log('[GamificationUI] Cleaned up event listeners');
     }
 
     /**

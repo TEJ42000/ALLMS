@@ -16,6 +16,7 @@ import uuid
 from datetime import datetime, timezone, timedelta
 from typing import Optional, List, Dict, Any
 
+from fastapi import HTTPException
 from google.cloud.firestore_v1 import FieldFilter, Increment
 
 from app.models.gamification_models import (
@@ -511,13 +512,15 @@ class GamificationService:
             if new_streak_count > stats.streak.longest_streak:
                 updates["streak.longest_streak"] = new_streak_count
 
-            # Add freeze increment if earned
-            if freezes_to_add > 0:
-                updates["streak.freezes_available"] = Increment(freezes_to_add)
-
-            # Decrement freeze if used
+            # Calculate net freeze change (earned - used)
+            # This prevents race condition when both earning and using a freeze in same activity
+            freeze_delta = freezes_to_add
             if freeze_used:
-                updates["streak.freezes_available"] = Increment(-1)
+                freeze_delta -= 1
+
+            # Apply freeze change if non-zero
+            if freeze_delta != 0:
+                updates["streak.freezes_available"] = Increment(freeze_delta)
 
             # Update activity counters with atomic increments
             if activity_type == "quiz_completed":
@@ -603,10 +606,18 @@ class GamificationService:
 
         Returns:
             Tuple of (streak_maintained, new_streak_count, freeze_used)
+
+        Raises:
+            ValueError: If activity time is in the future
+            HTTPException: If Firestore is unavailable
         """
+        # Validate timestamp is not in future (allow 5 min clock skew)
+        if current_activity_time > datetime.now(timezone.utc) + timedelta(minutes=5):
+            raise ValueError("Activity time cannot be in the future")
+
         if not self.db:
-            logger.warning("Firestore unavailable")
-            return True, 1, False
+            logger.error("Firestore unavailable - cannot check streak")
+            raise HTTPException(status_code=503, detail="Database unavailable")
 
         try:
             # Get user stats
@@ -625,28 +636,42 @@ class GamificationService:
 
             last_day = self._get_streak_day(stats.last_active)
 
-            # Calculate days difference
+            # Calculate days difference between streak days
+            # Note: days_diff represents the number of streak days between activities
+            # Example: Last activity Monday, current activity Wednesday = days_diff of 2
+            # This means the user missed exactly 1 day (Tuesday)
             days_diff = (current_day - last_day).days
 
             if days_diff == 0:
                 # Same streak day - maintain current streak
+                # Example: Multiple activities on same calendar day (after 4 AM)
                 return True, stats.streak.current_count, False
 
             elif days_diff == 1:
-                # Next day - increment streak
+                # Consecutive streak days - increment streak
+                # Example: Activity Monday, then activity Tuesday (both after 4 AM)
                 return True, stats.streak.current_count + 1, False
 
             elif days_diff == 2 and stats.streak.freezes_available > 0:
-                # Missed one day but have freeze - use it
+                # Missed exactly 1 day but have freeze available - use it
+                # Example: Activity Monday, skip Tuesday, activity Wednesday
+                # days_diff = 2 means we missed exactly 1 day (Tuesday)
+                # Use freeze to maintain streak without incrementing
                 return True, stats.streak.current_count, True
 
             else:
-                # Streak broken - reset to 1
+                # Streak broken - either missed >1 day or no freeze available
+                # Reset streak to 1 for this new activity
                 return False, 1, False
 
+        except ValueError as e:
+            # Re-raise validation errors (e.g., future timestamp)
+            logger.error(f"Invalid data for streak check: {e}")
+            raise
         except Exception as e:
-            logger.error(f"Error checking streak status for {user_id}: {e}")
-            return True, 1, False
+            # Log unexpected errors and re-raise as HTTPException
+            logger.error(f"Unexpected error checking streak status for {user_id}: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail="Error checking streak status")
 
     def update_streak(
         self,
