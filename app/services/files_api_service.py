@@ -29,7 +29,7 @@ from app.models.course_models import CourseMaterial
 from app.models.usage_models import UserContext
 from app.services.gcp_service import get_anthropic_api_key, get_firestore_client
 from app.services.text_extractor import extract_text, detect_file_type, ExtractionResult
-from app.services.usage_tracking_service import get_usage_tracking_service
+from app.services.usage_tracking_service import track_llm_usage_from_response
 
 logger = logging.getLogger(__name__)
 
@@ -462,25 +462,18 @@ Return ONLY valid JSON:
         )
 
         # Track usage if user context provided
-        if user_context:
-            usage = response.usage
-            await get_usage_tracking_service().record_usage(
-                user_email=user_context.email,
-                user_id=user_context.user_id,
-                model="claude-sonnet-4-20250514",
-                operation_type="quiz",
-                input_tokens=getattr(usage, 'input_tokens', 0) or 0,
-                output_tokens=getattr(usage, 'output_tokens', 0) or 0,
-                cache_creation_tokens=getattr(usage, 'cache_creation_input_tokens', 0) or 0,
-                cache_read_tokens=getattr(usage, 'cache_read_input_tokens', 0) or 0,
-                course_id=course_id,
-                request_metadata={
-                    "topic": topic,
-                    "num_questions": num_questions,
-                    "difficulty": difficulty,
-                    "week_number": week_number,
-                },
-            )
+        await track_llm_usage_from_response(
+            response=response,
+            user_context=user_context,
+            operation_type="quiz",
+            model="claude-sonnet-4-20250514",
+            request_metadata={
+                "topic": topic,
+                "num_questions": num_questions,
+                "difficulty": difficulty,
+                "week_number": week_number,
+            },
+        )
 
         # Parse response
         text = response.content[0].text
@@ -727,23 +720,17 @@ OUTPUT QUALITY:
         )
 
         # Track usage if user context provided
-        if user_context:
-            await get_usage_tracking_service().record_usage(
-                user_email=user_context.email,
-                user_id=user_context.user_id,
-                model="claude-sonnet-4-20250514",
-                operation_type="study_guide",
-                input_tokens=input_tokens,
-                output_tokens=output_tokens,
-                cache_creation_tokens=cache_created,
-                cache_read_tokens=cache_read,
-                course_id=course_id,
-                request_metadata={
-                    "topic": topic,
-                    "week_numbers": week_numbers,
-                    "materials_count": len(materials_with_text),
-                },
-            )
+        await track_llm_usage_from_response(
+            response=response,
+            user_context=user_context,
+            operation_type="study_guide",
+            model="claude-sonnet-4-20250514",
+            request_metadata={
+                "topic": topic,
+                "week_numbers": week_numbers,
+                "materials_count": len(materials_with_text),
+            },
+        )
 
         # With extended thinking, response has thinking blocks and text blocks
         # Extract just the text content (not the thinking)

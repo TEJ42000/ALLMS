@@ -42,6 +42,48 @@ MIN_TOP_USERS_LIMIT = 5
 MAX_TOP_USERS_LIMIT = 50
 
 
+# =============================================================================
+# Helper Functions
+# =============================================================================
+
+def sanitize_csv_field(value: str) -> str:
+    """Sanitize a field value for CSV export to prevent CSV injection attacks.
+
+    CSV injection occurs when a field starts with special characters like:
+    =, +, -, @, which can be interpreted as formulas by spreadsheet applications.
+
+    This function:
+    1. Converts value to string
+    2. Strips leading/trailing whitespace
+    3. Prepends a single quote (') if the value starts with a dangerous character
+    4. This forces spreadsheet apps to treat it as text, not a formula
+
+    Args:
+        value: The field value to sanitize
+
+    Returns:
+        Sanitized string safe for CSV export
+
+    Example:
+        >>> sanitize_csv_field("=SUM(A1:A10)")
+        "'=SUM(A1:A10)"
+        >>> sanitize_csv_field("normal text")
+        "normal text"
+    """
+    if value is None:
+        return ""
+
+    str_value = str(value).strip()
+
+    # Check if value starts with dangerous characters
+    dangerous_chars = ("=", "+", "-", "@", "\t", "\r")
+    if str_value and str_value[0] in dangerous_chars:
+        # Prepend single quote to force text interpretation
+        return f"'{str_value}"
+
+    return str_value
+
+
 # ============================================================================
 # Response Models for Dashboard Endpoints
 # ============================================================================
@@ -259,16 +301,16 @@ async def export_usage_csv(
 
         for record in records:
             writer.writerow([
-                record.timestamp.isoformat(),
-                record.user_email,
-                record.model,
-                record.operation_type,
-                record.input_tokens,
+                sanitize_csv_field(record.timestamp.isoformat()),
+                sanitize_csv_field(record.user_email),
+                sanitize_csv_field(record.model),
+                sanitize_csv_field(record.operation_type),
+                record.input_tokens,  # Numbers don't need sanitization
                 record.output_tokens,
                 record.cache_creation_tokens,
                 record.cache_read_tokens,
                 record.estimated_cost_usd,
-                record.course_id or "",
+                sanitize_csv_field(record.course_id or ""),
             ])
 
         output.seek(0)
