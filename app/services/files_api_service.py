@@ -37,6 +37,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_FALLBACK_COUNT = 5  # Number of files to return when no specific files found
 MATERIALS_ROOT = Path("Materials")
 MAX_TEXT_LENGTH = 100000  # Maximum characters per document to avoid context overflow
+MAX_MATERIALS_PER_GENERATION = 10  # Limit materials to avoid context overflow in AI generation
 
 
 class FilesAPIService:
@@ -65,6 +66,30 @@ class FilesAPIService:
         # results until they are refactored.
         # TODO: Remove once all methods are migrated to text extraction
         self.file_ids: Dict[str, Dict[str, Any]] = {}
+
+        # Beta header for Files API (used by legacy methods)
+        self.beta_header = "pdfs-2024-09-25"
+
+    def get_file_id(self, key: str) -> str:
+        """Get file_id for a course material (legacy method).
+
+        Note: This is kept for backwards compatibility with legacy methods
+        that haven't been migrated to text extraction yet. Returns empty
+        results since file_ids is no longer loaded from file_ids.json.
+
+        Args:
+            key: File key from file_ids.json
+
+        Returns:
+            File ID string
+
+        Raises:
+            ValueError: If file key not found
+        """
+        file_info = self.file_ids.get(key)
+        if not file_info:
+            raise ValueError(f"File {key} not found in file_ids.json")
+        return file_info["file_id"]
 
     def _get_course_service(self):
         """Get CourseService instance (lazy loading to avoid circular imports)."""
@@ -186,7 +211,14 @@ class FilesAPIService:
                 len(text),
                 MAX_TEXT_LENGTH
             )
-            text = text[:MAX_TEXT_LENGTH] + "\n\n[... content truncated ...]"
+            # Try to truncate at last period within limit to avoid breaking mid-sentence
+            truncate_at = text.rfind('.', 0, MAX_TEXT_LENGTH)
+            # Only use sentence boundary if it's within 10% of the limit
+            if truncate_at > MAX_TEXT_LENGTH * 0.9:
+                text = text[:truncate_at + 1] + "\n\n[... content truncated ...]"
+            else:
+                # Fall back to hard truncation if no good sentence boundary found
+                text = text[:MAX_TEXT_LENGTH] + "\n\n[... content truncated ...]"
 
         logger.info(
             "Extracted %d chars from %s (type: %s)",
@@ -391,7 +423,7 @@ Return ONLY valid JSON:
         materials_with_text = await self.get_course_materials_with_text(
             course_id=course_id,
             week_number=week_number,
-            limit=10  # Limit to avoid context overflow
+            limit=MAX_MATERIALS_PER_GENERATION
         )
 
         if not materials_with_text:
@@ -955,6 +987,124 @@ Include:
 
         data = self._parse_json(response.content[0].text)
         return data.get("flashcards", [])
+
+    async def generate_flashcards_from_course(
+        self,
+        course_id: str,
+        topic: str,
+        num_cards: int = 20,
+        week_number: Optional[int] = None
+    ) -> List[Dict]:
+        """Generate flashcards using Firestore materials with text extraction.
+
+        This method uses the materials subcollection in Firestore and
+        extracts text from local files to send as content blocks.
+
+        Args:
+            course_id: Course ID
+            topic: Topic name for the flashcards
+            num_cards: Number of flashcards to generate (5-50)
+            week_number: Optional week filter
+
+        Returns:
+            List of flashcard dictionaries with 'front' and 'back' keys
+
+        Raises:
+            ValueError: If no materials found or invalid parameters
+        """
+        # Input validation
+        if not course_id or not course_id.strip():
+            raise ValueError("course_id is required and cannot be empty")
+        if not 5 <= num_cards <= 50:
+            raise ValueError("num_cards must be between 5 and 50")
+        if week_number is not None and not 1 <= week_number <= 52:
+            raise ValueError("week_number must be between 1 and 52")
+
+        logger.info(
+            "Generating flashcards from course %s: %d cards, week=%s",
+            course_id, num_cards, week_number
+        )
+
+        # Get materials with their extracted text content
+        materials_with_text = await self.get_course_materials_with_text(
+            course_id=course_id,
+            week_number=week_number,
+            limit=MAX_MATERIALS_PER_GENERATION
+        )
+
+        if not materials_with_text:
+            raise ValueError(f"No materials found for course {course_id}")
+
+        # Build content blocks using extracted text
+        content_blocks = []
+
+        # Add each document's content as a text block with clear labeling
+        for material, text in materials_with_text:
+            title = material.title or material.filename
+            document_block = f"""
+=== DOCUMENT: {title} ===
+{text}
+=== END OF {title} ===
+"""
+            content_blocks.append({
+                "type": "text",
+                "text": document_block
+            })
+
+        # Add the flashcard generation prompt
+        prompt_text = """Based on the documents provided above, generate %d flashcards for %s.
+
+Return ONLY valid JSON:
+{
+  "flashcards": [
+    {
+      "front": "What is consensus?",
+      "back": "Meeting of the minds between parties (Art. 3:33 DCC). Both parties must intend to be legally bound and agree on essential terms."
+    }
+  ]
+}
+
+Include:
+- Article definitions with citations
+- Key legal concepts and principles
+- Important procedural rules
+- Common legal terms
+- Case law principles
+
+Make flashcards clear, concise, and exam-focused.""" % (num_cards, topic)
+
+        content_blocks.append({
+            "type": "text",
+            "text": prompt_text
+        })
+
+        logger.info(
+            "Sending %d content blocks to Anthropic (from %d materials)",
+            len(content_blocks),
+            len(materials_with_text)
+        )
+
+        # Call API (no Files API beta header needed)
+        response = await self.client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=3000,
+            messages=[{
+                "role": "user",
+                "content": content_blocks
+            }]
+        )
+
+        # Parse response
+        text = response.content[0].text
+        data = self._parse_json(text)
+        flashcards = data.get("flashcards", [])
+
+        logger.info(
+            "Generated %d flashcards from %d materials",
+            len(flashcards),
+            len(materials_with_text)
+        )
+        return flashcards
 
     async def list_available_files(self) -> List[Dict]:
         """List all uploaded files from Anthropic API."""
