@@ -8,6 +8,10 @@ const COURSE_ID = window.COURSE_CONTEXT?.courseId || null;
 const COURSE_NAME = window.COURSE_CONTEXT?.courseName || 'LLS';
 const COURSE = window.COURSE_CONTEXT?.course || null;
 
+// ========== Request Tracking ==========
+// Counter for active tutor requests to prevent race conditions with typing indicator
+let activeTutorRequests = 0;
+
 /**
  * Add course_id parameter to API requests if in course context
  */
@@ -344,18 +348,22 @@ function formatInline(text) {
     // Use character class exclusions with strict quantifiers to prevent ReDoS
     // Pattern explanation:
     // - [^*] excludes asterisks, preventing nested/overlapping matches
-    // - {0,500} strict quantifier with upper bound prevents catastrophic backtracking
+    // - {1,500} strict quantifier with upper bound prevents catastrophic backtracking
+    // - NO non-greedy quantifier (?) - character class exclusion already prevents overlapping
     // - No alternation or nested quantifiers to avoid exponential complexity
     // These patterns are O(n) time complexity, not vulnerable to ReDoS
 
     // Bold: **text** (must have at least 1 char, max 500)
-    text = text.replace(/\*\*([^*]{1,500}?)\*\*/g, '<strong>$1</strong>');
+    // Removed non-greedy ? to prevent backtracking issues
+    text = text.replace(/\*\*([^*]{1,500})\*\*/g, '<strong>$1</strong>');
 
-    // Italic: *text* (must have at least 1 char, max 500, non-greedy to prefer bold)
-    text = text.replace(/\*([^*]{1,500}?)\*/g, '<em>$1</em>');
+    // Italic: *text* (must have at least 1 char, max 500)
+    // Removed non-greedy ? - character class exclusion prevents overlapping with bold
+    text = text.replace(/\*([^*]{1,500})\*/g, '<em>$1</em>');
 
     // Code: `text` (must have at least 1 char, max 500)
-    text = text.replace(/`([^`]{1,500}?)`/g, '<code>$1</code>');
+    // Removed non-greedy ? to prevent backtracking issues
+    text = text.replace(/`([^`]{1,500})`/g, '<code>$1</code>');
 
     return text;
 }
@@ -375,6 +383,32 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
+// Compiled regex patterns for prompt injection detection (compiled once for performance)
+// These patterns are defined at module level to avoid recompilation on every validation call
+// Patterns avoid false positives for legal education (e.g., "act as a judge" is valid)
+const PROMPT_INJECTION_PATTERNS = [
+    // Instruction override attempts - target AI/system instructions specifically
+    /ignore\s+(previous|all|above|prior|earlier)\s+(instructions?|prompts?|rules?|commands?)/i,
+    /disregard\s+(previous|all|above|prior|earlier)\s+(instructions?|prompts?|rules?|commands?)/i,
+    /forget\s+(previous|all|above|prior|earlier)\s+(instructions?|prompts?|rules?|commands?)/i,
+    /override\s+(previous|all|above|prior)\s+(instructions?|prompts?|rules?|commands?)/i,
+
+    // System manipulation attempts - specific to AI system
+    /system\s+(prompt|message|instruction)/i,
+    /new\s+(instructions?|prompt)\s+(for\s+)?(you|the\s+system|the\s+ai)/i,
+
+    // Role manipulation attempts - target AI role changes, not legal roles
+    /you\s+are\s+now\s+(an?\s+)?(unrestricted|jailbroken|developer|admin|root)/i,
+    /act\s+as\s+(an?\s+)?(unrestricted|jailbroken|developer|admin|root|dan)/i,
+    /pretend\s+(to\s+be|you\s+are)\s+(an?\s+)?(unrestricted|jailbroken|developer|admin)/i,
+
+    // Direct command attempts targeting AI behavior
+    /(^|\s)(execute|run|perform)\s+(this|the|following)\s+(code|command|script)/i,
+
+    // Explicit jailbreak attempts
+    /(jailbreak|dan\s+mode|developer\s+mode|god\s+mode)/i,
+];
+
 /**
  * Validate topic input on frontend to prevent prompt injection
  * @param {string} topic - The topic to validate
@@ -390,38 +424,15 @@ function validateTopicInput(topic) {
     const trimmedTopic = topic.trim();
 
     if (trimmedTopic.length > MAX_TOPIC_LENGTH) {
-        return {valid: false, error: `topic must be less than ${MAX_TOPIC_LENGTH} characters`};
+        return {valid: false, error: `topic must not exceed ${MAX_TOPIC_LENGTH} characters`};
     }
 
-    // Check for suspicious prompt injection patterns (aligned with backend)
-    // Patterns avoid false positives for legal education (e.g., "act as a judge" is valid)
+    // Check for suspicious prompt injection patterns using pre-compiled patterns
     // Normalize whitespace for pattern matching
     const normalizedTopic = trimmedTopic.replace(/\s+/g, ' ');
 
-    const suspiciousPatterns = [
-        // Instruction override attempts - target AI/system instructions specifically
-        /ignore\s+(previous|all|above|prior|earlier)\s+(instructions?|prompts?|rules?|commands?)/i,
-        /disregard\s+(previous|all|above|prior|earlier)\s+(instructions?|prompts?|rules?|commands?)/i,
-        /forget\s+(previous|all|above|prior|earlier)\s+(instructions?|prompts?|rules?|commands?)/i,
-        /override\s+(previous|all|above|prior)\s+(instructions?|prompts?|rules?|commands?)/i,
-
-        // System manipulation attempts - specific to AI system
-        /system\s+(prompt|message|instruction)/i,
-        /new\s+(instructions?|prompt)\s+(for\s+)?(you|the\s+system|the\s+ai)/i,
-
-        // Role manipulation attempts - target AI role changes, not legal roles
-        /you\s+are\s+now\s+(an?\s+)?(unrestricted|jailbroken|developer|admin|root)/i,
-        /act\s+as\s+(an?\s+)?(unrestricted|jailbroken|developer|admin|root|dan)/i,
-        /pretend\s+(to\s+be|you\s+are)\s+(an?\s+)?(unrestricted|jailbroken|developer|admin)/i,
-
-        // Direct command attempts targeting AI behavior
-        /(^|\s)(execute|run|perform)\s+(this|the|following)\s+(code|command|script)/i,
-
-        // Explicit jailbreak attempts
-        /(jailbreak|dan\s+mode|developer\s+mode|god\s+mode)/i,
-    ];
-
-    for (const pattern of suspiciousPatterns) {
+    // Use pre-compiled patterns from module level (performance optimization)
+    for (const pattern of PROMPT_INJECTION_PATTERNS) {
         if (pattern.test(normalizedTopic)) {
             return {valid: false, error: 'topic contains suspicious content that may be a prompt injection attempt'};
         }
@@ -471,7 +482,8 @@ async function askTutor() {
     addMessage('user', message);
     document.getElementById('tutor-input').value = '';
 
-    // Show typing indicator (bouncing dots)
+    // Increment active request counter and show typing indicator
+    activeTutorRequests++;
     showTypingIndicator();
 
     try {
@@ -496,9 +508,15 @@ async function askTutor() {
         console.error('Error:', error);
         addMessage('error', 'Sorry, there was an error processing your request.');
     } finally {
-        // Always hide typing indicator, even if error occurs
-        // Using finally prevents race condition where indicator stays visible
-        hideTypingIndicator();
+        // Decrement active request counter
+        activeTutorRequests--;
+
+        // Only hide typing indicator if no other requests are active
+        // This prevents race condition where multiple simultaneous requests
+        // could hide the indicator while other requests are still in progress
+        if (activeTutorRequests === 0) {
+            hideTypingIndicator();
+        }
     }
 }
 
@@ -2098,7 +2116,20 @@ function initDashboard() {
                     dashboardSection.appendChild(courseInfoBanner);
                 } catch (fallbackError) {
                     console.error('Course banner insertion completely failed:', fallbackError);
-                    // Don't throw - banner is non-critical, continue loading page
+
+                    // Notify user that course info couldn't be displayed
+                    const errorBanner = document.createElement('div');
+                    errorBanner.className = 'alert alert-warning';
+                    errorBanner.style.margin = '10px 0';
+                    errorBanner.textContent = 'Unable to display course information banner. Course functionality may be limited.';
+
+                    // Try to insert error notification
+                    try {
+                        dashboardSection.insertAdjacentElement('afterbegin', errorBanner);
+                    } catch (e) {
+                        // If even error notification fails, just log it
+                        console.error('Could not display error notification:', e);
+                    }
                 }
             }
         }

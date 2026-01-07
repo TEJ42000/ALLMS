@@ -20,6 +20,7 @@ import asyncio
 import json
 import logging
 import re
+import unicodedata
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -45,6 +46,9 @@ MAX_FLASHCARDS = 50  # Maximum number of flashcards to generate
 MAX_TOPIC_LENGTH = 200  # Maximum length for topic parameter (prevent prompt injection)
 MAX_WEEK_NUMBER = 52  # Maximum week number in academic year
 DEFAULT_TOPIC = "Course Materials"  # Default topic when none is provided
+
+# Text truncation constants
+SENTENCE_BOUNDARY_THRESHOLD = 0.9  # Prefer sentence boundaries in last 10% of text
 
 # Compiled regex patterns for prompt injection detection (compiled once for performance)
 # These patterns detect common prompt injection attempts while avoiding false positives
@@ -247,8 +251,8 @@ class FilesAPIService:
             # Try to truncate at last period within limit to avoid breaking mid-sentence
             # rfind searches up to MAX_TEXT_LENGTH, returns -1 if no period found
             truncate_at = text.rfind('.', 0, MAX_TEXT_LENGTH)
-            # Only use sentence boundary if found AND within 10% of the limit (90% of MAX_TEXT_LENGTH)
-            if truncate_at != -1 and truncate_at > MAX_TEXT_LENGTH * 0.9:
+            # Only use sentence boundary if found AND within threshold (last 10% of limit)
+            if truncate_at != -1 and truncate_at > MAX_TEXT_LENGTH * SENTENCE_BOUNDARY_THRESHOLD:
                 text = text[:truncate_at + 1] + "\n\n[... content truncated ...]"
             else:
                 # Fall back to hard truncation if no good sentence boundary found (or truncate_at == -1)
@@ -974,7 +978,23 @@ Use proper legal analysis method and cite articles.""" % (topic, case_facts)
 
         # Validate length
         if len(topic) > MAX_TOPIC_LENGTH:
-            raise ValueError(f"topic must be less than {MAX_TOPIC_LENGTH} characters")
+            raise ValueError(f"topic must not exceed {MAX_TOPIC_LENGTH} characters")
+
+        # Unicode normalization to prevent homoglyph and zero-width character attacks
+        # NFKC normalization converts visually similar characters to canonical form
+        # Examples: ℀ -> a/c, ﬁ -> fi, zero-width spaces removed
+        topic = unicodedata.normalize('NFKC', topic)
+
+        # Remove zero-width characters that could be used for obfuscation
+        # Zero-width space (U+200B), zero-width joiner (U+200D), etc.
+        zero_width_chars = [
+            '\u200b',  # Zero-width space
+            '\u200c',  # Zero-width non-joiner
+            '\u200d',  # Zero-width joiner
+            '\ufeff',  # Zero-width no-break space (BOM)
+        ]
+        for char in zero_width_chars:
+            topic = topic.replace(char, '')
 
         # Normalize topic for pattern matching to catch obfuscation attempts
         # Remove excessive whitespace and normalize to single spaces
