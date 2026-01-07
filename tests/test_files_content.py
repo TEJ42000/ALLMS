@@ -619,15 +619,31 @@ class TestInputValidation:
 
     @pytest.mark.asyncio
     async def test_generate_flashcards_topic_whitespace_only(self):
-        """Test that topic with only whitespace is rejected."""
+        """Test that topic with only whitespace uses default topic."""
         service = FilesAPIService()
 
-        with pytest.raises(ValueError, match="topic cannot be empty or only whitespace"):
-            await service.generate_flashcards(
+        # Mock the Anthropic client
+        with patch.object(service, '_get_anthropic_client') as mock_client:
+            mock_response = MagicMock()
+            mock_response.content = [MagicMock(text='[{"front": "Q", "back": "A"}]')]
+            mock_response.usage = MagicMock(input_tokens=100, output_tokens=50)
+            mock_client.return_value.messages.create = AsyncMock(return_value=mock_response)
+
+            # Whitespace-only topic should use default "Course Materials"
+            result = await service.generate_flashcards(
                 topic="   \n\t  ",  # Only whitespace
                 file_keys=["reader_criminal_law"],
                 num_cards=10
             )
+
+            assert result is not None
+
+            # Verify default topic was used
+            call_args = mock_client.return_value.messages.create.call_args
+            messages = call_args.kwargs['messages']
+            prompt_text = messages[0]['content']
+            assert 'Course Materials' in prompt_text, \
+                "Whitespace-only topic should use default 'Course Materials'"
 
     @pytest.mark.asyncio
     async def test_generate_flashcards_prompt_injection_ignore_previous(self):
@@ -1090,15 +1106,37 @@ class TestCourseAwareFlashcardsEndpoint:
 
     @pytest.mark.asyncio
     async def test_generate_flashcards_from_course_topic_whitespace(self):
-        """Test that whitespace-only topic is rejected in course-aware generation."""
+        """Test that whitespace-only topic uses default in course-aware generation."""
         service = FilesAPIService()
 
-        with pytest.raises(ValueError, match="topic cannot be empty or only whitespace"):
-            await service.generate_flashcards_from_course(
-                course_id="LLS-2025-2026",
-                num_cards=10,
-                topic="   \t\n   "  # Only whitespace
-            )
+        # Mock the Anthropic client
+        with patch.object(service, '_get_anthropic_client') as mock_client:
+            mock_response = MagicMock()
+            mock_response.content = [MagicMock(text='[{"front": "Q", "back": "A"}]')]
+            mock_response.usage = MagicMock(input_tokens=100, output_tokens=50)
+            mock_client.return_value.messages.create = AsyncMock(return_value=mock_response)
+
+            # Mock get_course_materials_with_text
+            with patch.object(service, 'get_course_materials_with_text') as mock_materials:
+                mock_materials.return_value = [
+                    {"file_key": "test_file", "text": "Test content", "filename": "test.pdf"}
+                ]
+
+                # Whitespace-only topic should use default "Course Materials"
+                result = await service.generate_flashcards_from_course(
+                    course_id="LLS-2025-2026",
+                    num_cards=10,
+                    topic="   \t\n   "  # Only whitespace
+                )
+
+                assert result is not None
+
+                # Verify default topic was used
+                call_args = mock_client.return_value.messages.create.call_args
+                messages = call_args.kwargs['messages']
+                prompt_text = messages[0]['content'][0]['text']
+                assert 'Course Materials' in prompt_text, \
+                    "Whitespace-only topic should use default 'Course Materials'"
 
     @pytest.mark.asyncio
     async def test_generate_flashcards_from_course_topic_sanitization(self):

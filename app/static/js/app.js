@@ -340,12 +340,23 @@ function formatInline(text) {
     }
 
     text = escapeHtml(text);
-    // Use non-greedy matching with character class exclusions to prevent regex injection
-    // [^*] ensures we only match content between markers, not regex special chars
-    // Limit match length to prevent catastrophic backtracking
-    text = text.replace(/\*\*([^*]{1,500})\*\*/g, '<strong>$1</strong>');
-    text = text.replace(/\*([^*]{1,500})\*/g, '<em>$1</em>');
-    text = text.replace(/`([^`]{1,500})`/g, '<code>$1</code>');
+
+    // Use character class exclusions with strict quantifiers to prevent ReDoS
+    // Pattern explanation:
+    // - [^*] excludes asterisks, preventing nested/overlapping matches
+    // - {0,500} strict quantifier with upper bound prevents catastrophic backtracking
+    // - No alternation or nested quantifiers to avoid exponential complexity
+    // These patterns are O(n) time complexity, not vulnerable to ReDoS
+
+    // Bold: **text** (must have at least 1 char, max 500)
+    text = text.replace(/\*\*([^*]{1,500}?)\*\*/g, '<strong>$1</strong>');
+
+    // Italic: *text* (must have at least 1 char, max 500, non-greedy to prefer bold)
+    text = text.replace(/\*([^*]{1,500}?)\*/g, '<em>$1</em>');
+
+    // Code: `text` (must have at least 1 char, max 500)
+    text = text.replace(/`([^`]{1,500}?)`/g, '<code>$1</code>');
+
     return text;
 }
 
@@ -383,28 +394,31 @@ function validateTopicInput(topic) {
     }
 
     // Check for suspicious prompt injection patterns (aligned with backend)
+    // Patterns avoid false positives for legal education (e.g., "act as a judge" is valid)
     // Normalize whitespace for pattern matching
     const normalizedTopic = trimmedTopic.replace(/\s+/g, ' ');
 
     const suspiciousPatterns = [
-        // Instruction override attempts
-        /ignore\s+(previous|all|above|prior|earlier)/i,
-        /disregard\s+(previous|all|above|prior|earlier)/i,
-        /forget\s+(previous|all|above|prior|earlier|everything)/i,
-        /override\s+(previous|all|above|prior)/i,
+        // Instruction override attempts - target AI/system instructions specifically
+        /ignore\s+(previous|all|above|prior|earlier)\s+(instructions?|prompts?|rules?|commands?)/i,
+        /disregard\s+(previous|all|above|prior|earlier)\s+(instructions?|prompts?|rules?|commands?)/i,
+        /forget\s+(previous|all|above|prior|earlier)\s+(instructions?|prompts?|rules?|commands?)/i,
+        /override\s+(previous|all|above|prior)\s+(instructions?|prompts?|rules?|commands?)/i,
 
-        // System manipulation attempts
+        // System manipulation attempts - specific to AI system
         /system\s+(prompt|message|instruction)/i,
-        /new\s+(instructions?|prompt|system)/i,
+        /new\s+(instructions?|prompt)\s+(for\s+)?(you|the\s+system|the\s+ai)/i,
 
-        // Role manipulation attempts
-        /you\s+are\s+(now|a|an)/i,
-        /act\s+as\s+(a|an|if)/i,
-        /pretend\s+(to\s+be|you\s+are)/i,
-        /roleplay\s+as/i,
+        // Role manipulation attempts - target AI role changes, not legal roles
+        /you\s+are\s+now\s+(an?\s+)?(unrestricted|jailbroken|developer|admin|root)/i,
+        /act\s+as\s+(an?\s+)?(unrestricted|jailbroken|developer|admin|root|dan)/i,
+        /pretend\s+(to\s+be|you\s+are)\s+(an?\s+)?(unrestricted|jailbroken|developer|admin)/i,
 
-        // Direct command attempts
-        /(^|\s)(execute|run|perform)\s+(this|the|following)/i,
+        // Direct command attempts targeting AI behavior
+        /(^|\s)(execute|run|perform)\s+(this|the|following)\s+(code|command|script)/i,
+
+        // Explicit jailbreak attempts
+        /(jailbreak|dan\s+mode|developer\s+mode|god\s+mode)/i,
     ];
 
     for (const pattern of suspiciousPatterns) {
@@ -2067,14 +2081,25 @@ function initDashboard() {
             courseInfoBanner.appendChild(textDiv);
             courseInfoBanner.appendChild(badge);
 
-            // Insert banner at the top of the dashboard section
-            const sectionTitle = dashboardSection.querySelector('.section-title');
-            if (sectionTitle) {
-                // Insert after section title for better visual hierarchy
-                sectionTitle.insertAdjacentElement('afterend', courseInfoBanner);
-            } else {
-                // No section title - prepend to dashboard
-                dashboardSection.insertAdjacentElement('afterbegin', courseInfoBanner);
+            // Insert banner at the top of the dashboard section with error handling
+            try {
+                const sectionTitle = dashboardSection.querySelector('.section-title');
+                if (sectionTitle) {
+                    // Insert after section title for better visual hierarchy
+                    sectionTitle.insertAdjacentElement('afterend', courseInfoBanner);
+                } else {
+                    // No section title - prepend to dashboard
+                    dashboardSection.insertAdjacentElement('afterbegin', courseInfoBanner);
+                }
+            } catch (error) {
+                // Fallback: if insertAdjacentElement fails, try appendChild
+                console.warn('Course banner insertion failed, using fallback:', error);
+                try {
+                    dashboardSection.appendChild(courseInfoBanner);
+                } catch (fallbackError) {
+                    console.error('Course banner insertion completely failed:', fallbackError);
+                    // Don't throw - banner is non-critical, continue loading page
+                }
             }
         }
     }
@@ -2309,8 +2334,15 @@ async function loadFlashcards() {
     const now = Date.now();
     if (lastFlashcardErrorTime && (now - lastFlashcardErrorTime) < DEBOUNCE_MS) {
         const remainingMs = DEBOUNCE_MS - (now - lastFlashcardErrorTime);
-        console.log(`Please wait ${Math.ceil(remainingMs / 1000)}s before retrying`);
-        showFlashcardError(`Please wait ${Math.ceil(remainingMs / 1000)} seconds before retrying...`);
+        const remainingSec = Math.ceil(remainingMs / 1000);
+        console.log(`Debounce active: ${remainingSec}s remaining`);
+
+        // User-friendly message explaining why they need to wait
+        const message = remainingSec === 1
+            ? 'Please wait 1 second before trying again. This helps prevent server overload.'
+            : `Please wait ${remainingSec} seconds before trying again. This helps prevent server overload.`;
+
+        showFlashcardError(message);
         return;
     }
 

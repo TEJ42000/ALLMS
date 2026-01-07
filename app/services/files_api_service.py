@@ -47,26 +47,29 @@ MAX_WEEK_NUMBER = 52  # Maximum week number in academic year
 DEFAULT_TOPIC = "Course Materials"  # Default topic when none is provided
 
 # Compiled regex patterns for prompt injection detection (compiled once for performance)
-# These patterns detect common prompt injection attempts with flexible whitespace matching
+# These patterns detect common prompt injection attempts while avoiding false positives
+# for legitimate legal education content (e.g., "act as a judge" is valid legal topic)
 PROMPT_INJECTION_PATTERNS = [
-    # Instruction override attempts
-    re.compile(r'ignore\s+(previous|all|above|prior|earlier)', re.IGNORECASE),
-    re.compile(r'disregard\s+(previous|all|above|prior|earlier)', re.IGNORECASE),
-    re.compile(r'forget\s+(previous|all|above|prior|earlier|everything)', re.IGNORECASE),
-    re.compile(r'override\s+(previous|all|above|prior)', re.IGNORECASE),
+    # Instruction override attempts - target AI/system instructions specifically
+    re.compile(r'ignore\s+(previous|all|above|prior|earlier)\s+(instructions?|prompts?|rules?|commands?)', re.IGNORECASE),
+    re.compile(r'disregard\s+(previous|all|above|prior|earlier)\s+(instructions?|prompts?|rules?|commands?)', re.IGNORECASE),
+    re.compile(r'forget\s+(previous|all|above|prior|earlier)\s+(instructions?|prompts?|rules?|commands?)', re.IGNORECASE),
+    re.compile(r'override\s+(previous|all|above|prior)\s+(instructions?|prompts?|rules?|commands?)', re.IGNORECASE),
 
-    # System manipulation attempts
+    # System manipulation attempts - specific to AI system
     re.compile(r'system\s+(prompt|message|instruction)', re.IGNORECASE),
-    re.compile(r'new\s+(instructions?|prompt|system)', re.IGNORECASE),
+    re.compile(r'new\s+(instructions?|prompt)\s+(for\s+)?(you|the\s+system|the\s+ai)', re.IGNORECASE),
 
-    # Role manipulation attempts
-    re.compile(r'you\s+are\s+(now|a|an)', re.IGNORECASE),
-    re.compile(r'act\s+as\s+(a|an|if)', re.IGNORECASE),
-    re.compile(r'pretend\s+(to\s+be|you\s+are)', re.IGNORECASE),
-    re.compile(r'roleplay\s+as', re.IGNORECASE),
+    # Role manipulation attempts - target AI role changes, not legal roles
+    re.compile(r'you\s+are\s+now\s+(an?\s+)?(unrestricted|jailbroken|developer|admin|root)', re.IGNORECASE),
+    re.compile(r'act\s+as\s+(an?\s+)?(unrestricted|jailbroken|developer|admin|root|dan)', re.IGNORECASE),
+    re.compile(r'pretend\s+(to\s+be|you\s+are)\s+(an?\s+)?(unrestricted|jailbroken|developer|admin)', re.IGNORECASE),
 
-    # Direct command attempts
-    re.compile(r'(^|\s)(execute|run|perform)\s+(this|the|following)', re.IGNORECASE),
+    # Direct command attempts targeting AI behavior
+    re.compile(r'(^|\s)(execute|run|perform)\s+(this|the|following)\s+(code|command|script)', re.IGNORECASE),
+
+    # Explicit jailbreak attempts
+    re.compile(r'(jailbreak|dan\s+mode|developer\s+mode|god\s+mode)', re.IGNORECASE),
 ]
 
 
@@ -959,13 +962,15 @@ Use proper legal analysis method and cite articles.""" % (topic, case_facts)
         Raises:
             ValueError: If topic is too long, only whitespace, or contains suspicious patterns
         """
-        if not topic:
+        # Handle None or empty string consistently - return default
+        if topic is None or topic == '':
             return default
 
         # Strip whitespace and validate non-empty
+        # If topic becomes empty after stripping, return default (consistent behavior)
         topic = topic.strip()
         if not topic:
-            raise ValueError("topic cannot be empty or only whitespace")
+            return default
 
         # Validate length
         if len(topic) > MAX_TOPIC_LENGTH:
