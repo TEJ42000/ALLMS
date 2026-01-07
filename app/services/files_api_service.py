@@ -46,6 +46,17 @@ MAX_TOPIC_LENGTH = 200  # Maximum length for topic parameter (prevent prompt inj
 MAX_WEEK_NUMBER = 52  # Maximum week number in academic year
 DEFAULT_TOPIC = "Course Materials"  # Default topic when none is provided
 
+# Compiled regex patterns for prompt injection detection (compiled once for performance)
+PROMPT_INJECTION_PATTERNS = [
+    re.compile(r'ignore\s+(previous|all|above)', re.IGNORECASE),
+    re.compile(r'system\s+prompt', re.IGNORECASE),
+    re.compile(r'you\s+are\s+now', re.IGNORECASE),
+    re.compile(r'act\s+as', re.IGNORECASE),
+    re.compile(r'pretend\s+to\s+be', re.IGNORECASE),
+    re.compile(r'disregard\s+(previous|all)', re.IGNORECASE),
+    re.compile(r'forget\s+(previous|all)', re.IGNORECASE),
+]
+
 
 class FilesAPIService:
     """Service for generating content using course materials with text extraction.
@@ -948,21 +959,9 @@ Use proper legal analysis method and cite articles.""" % (topic, case_facts)
         if len(topic) > MAX_TOPIC_LENGTH:
             raise ValueError(f"topic must be less than {MAX_TOPIC_LENGTH} characters")
 
-        # Check for suspicious prompt injection patterns (case-insensitive)
-        import re
-        suspicious_patterns = [
-            r'ignore\s+(previous|all|above)',
-            r'system\s+prompt',
-            r'you\s+are\s+now',
-            r'act\s+as',
-            r'pretend\s+to\s+be',
-            r'disregard\s+(previous|all)',
-            r'forget\s+(previous|all)',
-        ]
-
-        topic_lower = topic.lower()
-        for pattern in suspicious_patterns:
-            if re.search(pattern, topic_lower):
+        # Check for suspicious prompt injection patterns using compiled regex (faster)
+        for pattern in PROMPT_INJECTION_PATTERNS:
+            if pattern.search(topic):
                 raise ValueError("topic contains suspicious content that may be a prompt injection attempt")
 
         # Sanitize topic by escaping special characters that could manipulate AI behavior

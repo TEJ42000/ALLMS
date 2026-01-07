@@ -2054,17 +2054,13 @@ function initDashboard() {
             courseInfoBanner.appendChild(badge);
 
             // Insert banner at the top of the dashboard section
-            // Simplified logic: try after section title, otherwise prepend
             const sectionTitle = dashboardSection.querySelector('.section-title');
-            const insertionPoint = (sectionTitle && sectionTitle.nextSibling)
-                ? sectionTitle.nextSibling
-                : dashboardSection.firstChild;
-
-            if (insertionPoint) {
-                dashboardSection.insertBefore(courseInfoBanner, insertionPoint);
+            if (sectionTitle) {
+                // Insert after section title for better visual hierarchy
+                sectionTitle.insertAdjacentElement('afterend', courseInfoBanner);
             } else {
-                // Empty section - just append
-                dashboardSection.appendChild(courseInfoBanner);
+                // No section title - prepend to dashboard
+                dashboardSection.insertAdjacentElement('afterbegin', courseInfoBanner);
             }
         }
     }
@@ -2293,20 +2289,21 @@ function initFlashcardListeners() {
  * Load flashcards from backend API using course context
  */
 async function loadFlashcards() {
-    // Prevent multiple simultaneous requests
-    if (isLoadingFlashcards) {
-        console.log('Flashcards already loading');
-        showFlashcardError('Flashcards are already loading. Please wait...');
-        return;
-    }
-
     // Debounce error retries to prevent rapid retries that could overload the backend
+    // Check this first to provide immediate feedback to users
     const DEBOUNCE_MS = 2000;
     const now = Date.now();
     if (lastFlashcardErrorTime && (now - lastFlashcardErrorTime) < DEBOUNCE_MS) {
         const remainingMs = DEBOUNCE_MS - (now - lastFlashcardErrorTime);
         console.log(`Please wait ${Math.ceil(remainingMs / 1000)}s before retrying`);
         showFlashcardError(`Please wait ${Math.ceil(remainingMs / 1000)} seconds before retrying...`);
+        return;
+    }
+
+    // Prevent multiple simultaneous requests
+    if (isLoadingFlashcards) {
+        console.log('Flashcards already loading');
+        showFlashcardError('Flashcards are already loading. Please wait...');
         return;
     }
 
@@ -2369,13 +2366,10 @@ async function loadFlashcards() {
         console.error('Error loading flashcards:', error);
         showFlashcardError(error.message || 'Error loading flashcards. Please try again.');
 
-        // Record error timestamp for debouncing (prevents race condition with setTimeout)
+        // Record error timestamp for debouncing future retry attempts
         lastFlashcardErrorTime = Date.now();
-
-        // Reset loading flag immediately - debouncing is now handled by timestamp check
-        isLoadingFlashcards = false;
     } finally {
-        // Always reset loading flag (redundant with catch block but ensures cleanup)
+        // Always reset loading flag to allow future requests
         isLoadingFlashcards = false;
     }
 }

@@ -557,24 +557,27 @@ class TestInputValidation:
                 num_cards=10
             )
 
-            # Verify the method was called and check the actual sanitized value
-            assert mock_client.return_value.messages.create.called
+            # Verify the API was called
+            assert mock_client.return_value.messages.create.called, \
+                "Anthropic API should have been called"
 
             # Get the actual prompt sent to the API
             call_args = mock_client.return_value.messages.create.call_args
             messages = call_args.kwargs['messages']
             prompt_text = messages[0]['content']
 
-            # Verify sanitization:
-            # 1. Backslashes are escaped first: \ -> \\
-            # 2. Then quotes are escaped: " -> \"
-            # 3. Newlines/carriage returns replaced with spaces
-            # Original: Test \"topic"\nwith\rnewlines
+            # Verify sanitization (Original: Test \"topic"\nwith\rnewlines)
             # Expected: Test \\\\"topic\\" with with newlines
-            assert 'Test \\\\\\"topic\\"' in prompt_text  # Backslash and quote properly escaped
-            # Newlines should be replaced with spaces (separate assertions for clarity)
-            assert '\n' not in prompt_text, "Newlines should be replaced"
-            assert 'with with' in prompt_text, "Newlines should be replaced with spaces"
+
+            # 1. Backslashes escaped first (\ -> \\), then quotes escaped (" -> \")
+            assert 'Test \\\\\\"topic\\"' in prompt_text, \
+                "Backslashes and quotes should be properly escaped"
+
+            # 2. Newlines replaced with spaces
+            assert '\n' not in prompt_text, \
+                "Newlines should be replaced with spaces"
+            assert 'with with' in prompt_text, \
+                "Consecutive 'with' confirms newline was replaced with space"
 
     @pytest.mark.asyncio
     async def test_generate_flashcards_topic_whitespace_only(self):
@@ -1051,22 +1054,27 @@ class TestCourseAwareFlashcardsEndpoint:
                     num_cards=10
                 )
 
-                # Verify the method was called and check the actual sanitized value
-                assert mock_client.return_value.messages.create.called
+                # Verify the API was called
+                assert mock_client.return_value.messages.create.called, \
+                    "Anthropic API should have been called"
 
                 # Get the actual prompt sent to the API
                 call_args = mock_client.return_value.messages.create.call_args
                 messages = call_args.kwargs['messages']
                 prompt_text = messages[0]['content'][0]['text']
 
-                # Verify sanitization:
-                # 1. Backslashes are escaped first: \ -> \\
-                # 2. Then quotes are escaped: " -> \"
-                # 3. Newlines/carriage returns replaced with spaces
-                assert 'Test \\\\\\"topic\\"' in prompt_text  # Backslash and quote properly escaped
-                # Newlines should be replaced with spaces (separate assertions for clarity)
-                assert '\n' not in prompt_text, "Newlines should be replaced"
-                assert 'with with' in prompt_text, "Newlines should be replaced with spaces"
+                # Verify sanitization (Original: Test \"topic"\nwith\rnewlines)
+                # Expected: Test \\\\"topic\\" with with newlines
+
+                # 1. Backslashes escaped first (\ -> \\), then quotes escaped (" -> \")
+                assert 'Test \\\\\\"topic\\"' in prompt_text, \
+                    "Backslashes and quotes should be properly escaped"
+
+                # 2. Newlines replaced with spaces
+                assert '\n' not in prompt_text, \
+                    "Newlines should be replaced with spaces"
+                assert 'with with' in prompt_text, \
+                    "Consecutive 'with' confirms newline was replaced with space"
 
 
 class TestCourseFilesEndpoint:
