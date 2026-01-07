@@ -197,20 +197,6 @@ def test_dockerfile_syntax():
     assert "curl" in content, "Dockerfile should use curl for health check"
 
 
-# Pytest configuration for this module
-def pytest_configure(config):
-    """Register custom markers."""
-    config.addinivalue_line(
-        "markers", "docker: marks tests that require Docker (deselect with '-m \"not docker\"')"
-    )
-    config.addinivalue_line(
-        "markers", "slow: marks tests as slow (deselect with '-m \"not slow\"')"
-    )
-    config.addinivalue_line(
-        "markers", "integration: marks tests as integration tests"
-    )
-
-
 if __name__ == "__main__":
     # Allow running this file directly with python
     sys.exit(pytest.main([__file__, "-v"]))

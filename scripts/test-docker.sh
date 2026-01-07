@@ -139,19 +139,19 @@ main() {
     
     # Step 1: Build Docker image
     print_header "Step 1: Building Docker Image"
-    print_info "Running: docker build -t $IMAGE_NAME:$IMAGE_TAG ."
-    
-    if docker build -t $IMAGE_NAME:$IMAGE_TAG . ; then
+    print_info "Running: docker build -t ${IMAGE_NAME}:${IMAGE_TAG} ."
+
+    if docker build -t "${IMAGE_NAME}:${IMAGE_TAG}" . ; then
         print_success "Docker image built successfully"
     else
         print_error "Docker build failed"
         exit 1
     fi
-    
+
     # Verify image exists
-    if docker images | grep -q "$IMAGE_NAME.*$IMAGE_TAG"; then
+    if docker images | grep -q "${IMAGE_NAME}.*${IMAGE_TAG}"; then
         print_success "Image verified in docker images list"
-        docker images | grep "$IMAGE_NAME.*$IMAGE_TAG"
+        docker images | grep "${IMAGE_NAME}.*${IMAGE_TAG}"
     else
         print_error "Image not found after build"
         exit 1
@@ -162,12 +162,12 @@ main() {
     print_info "Starting container with environment variables..."
     
     docker run -d \
-        --name "$CONTAINER_NAME" \
-        -p "$PORT":8080 \
-        -e ANTHROPIC_API_KEY="$TEST_ANTHROPIC_KEY" \
+        --name "${CONTAINER_NAME}" \
+        -p "${PORT}":8080 \
+        -e ANTHROPIC_API_KEY="${TEST_ANTHROPIC_KEY}" \
         -e AUTH_ENABLED=false \
         -e ENV=development \
-        "$IMAGE_NAME:$IMAGE_TAG"
+        "${IMAGE_NAME}:${IMAGE_TAG}"
 
     if docker ps | grep -q "$CONTAINER_NAME"; then
         print_success "Container started successfully"
@@ -192,7 +192,7 @@ main() {
         exit 1
     fi
     
-    # Step 3: Test endpoints
+    # Step 4: Test endpoints
     print_header "Step 4: Testing Endpoints"
     
     test_count=0
@@ -233,17 +233,18 @@ main() {
         ((pass_count++))
     fi
     
-    # Step 4: Check container logs for errors
+    # Step 5: Check container logs for errors
     print_header "Step 5: Checking Container Logs"
     print_info "Checking for errors in logs..."
 
-    if docker logs "$CONTAINER_NAME" 2>&1 | grep -iE "ERROR:|Exception:|Failed to" | grep -v "ANTHROPIC_API_KEY" | grep -v "0 errors"; then
-        print_warning "Found some errors in logs (see above)"
+    # More robust error detection - look for specific error patterns
+    if docker logs "$CONTAINER_NAME" 2>&1 | grep -iE "ERROR:|CRITICAL:|Exception|Traceback|Failed to start" | grep -v "test-key-placeholder"; then
+        print_warning "Found errors in logs (see above)"
     else
         print_success "No critical errors found in logs"
     fi
 
-    # Step 5: Test container stop
+    # Step 6: Test container stop
     print_header "Step 6: Testing Container Shutdown"
     print_info "Stopping container..."
 

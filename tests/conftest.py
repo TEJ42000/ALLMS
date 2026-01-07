@@ -6,6 +6,19 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
+
+def pytest_configure(config):
+    """Register custom pytest markers."""
+    config.addinivalue_line(
+        "markers", "docker: marks tests that require Docker (deselect with '-m \"not docker\"')"
+    )
+    config.addinivalue_line(
+        "markers", "slow: marks tests as slow (deselect with '-m \"not slow\"')"
+    )
+    config.addinivalue_line(
+        "markers", "integration: marks tests as integration tests"
+    )
+
 # Set test environment variables before importing app
 os.environ["ANTHROPIC_API_KEY"] = "test-api-key-for-testing"
 os.environ["AUTH_ENABLED"] = "false"  # Disable auth for tests by default
