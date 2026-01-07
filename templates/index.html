@@ -6,9 +6,14 @@
     <title>{{ title }}</title>
     <link rel="icon" type="image/svg+xml" href="/static/images/favicon.svg">
     <link rel="stylesheet" href="/static/css/styles.css">
+    <!-- EasyMDE Markdown Editor -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/easymde@2.18.0/dist/easymde.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/easymde@2.18.0/dist/easymde.min.js"></script>
     <!-- Markdown and Mermaid rendering -->
     <script src="https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+    <!-- Confetti for badge animations -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
     <!-- Course Context -->
     <script>
         // Store course context for JavaScript access
@@ -50,6 +55,7 @@
             </div>
             <div class="nav-tabs">
                 <button class="nav-tab active" data-tab="dashboard">📊 Dashboard</button>
+                <button class="nav-tab" data-tab="badges">🏆 Badges</button>
                 <button class="nav-tab" data-tab="tutor">🤖 AI Tutor</button>
                 <button class="nav-tab" data-tab="assessment">📝 Assessment</button>
                 <button class="nav-tab" data-tab="quiz">🎯 Quiz</button>
@@ -91,6 +97,29 @@
                 <h3 class="section-subtitle">📖 Course Weeks</h3>
                 <div id="weeks-grid" class="topics-grid">
                     <div class="loading-placeholder">Loading course weeks...</div>
+                </div>
+            </section>
+            <section id="badges-section" class="section">
+                <div class="badges-header">
+                    <h2 class="section-title">🏆 Badge Collection</h2>
+                    <p class="section-description">Earn badges by completing challenges and reaching milestones</p>
+                </div>
+
+                <!-- Earned Badges -->
+                <div class="badges-category">
+                    <h3 class="section-subtitle">✨ Your Badges</h3>
+                    <div id="earned-badges-grid" class="badges-grid">
+                        <div class="loading-placeholder">Loading your badges...</div>
+                    </div>
+                </div>
+
+                <!-- Available Badges -->
+                <div class="badges-category">
+                    <h3 class="section-subtitle">🔒 Available Badges</h3>
+                    <p class="badges-category-description">Complete these challenges to earn more badges!</p>
+                    <div id="available-badges-grid" class="badges-grid">
+                        <div class="loading-placeholder">Loading available badges...</div>
+                    </div>
                 </div>
             </section>
             <section id="tutor-section" class="section">
@@ -358,6 +387,8 @@
     <footer class="footer">
         <p>&copy; 2026 LLS Study Portal | University of Groningen | v{{ version }}</p>
     </footer>
+    <script src="/static/js/activity-tracker.js"></script>
+    <script src="/static/js/gamification-ui.js"></script>
     <script src="/static/js/app.js"></script>
 </body>
 </html>

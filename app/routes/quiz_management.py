@@ -14,8 +14,10 @@ import logging
 import uuid
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Header, Query
+from fastapi import APIRouter, Depends, HTTPException, Header, Query
 
+from app.dependencies.auth import get_optional_user
+from app.models.auth_models import User
 from app.models.schemas import (
     CreateQuizRequest,
     QuizSubmitRequest,
@@ -24,6 +26,7 @@ from app.models.schemas import (
     QuizAttemptResult,
     QuizHistoryItem,
 )
+from app.models.usage_models import UserContext
 from app.services.quiz_persistence_service import get_quiz_persistence_service
 from app.services.files_api_service import get_files_api_service
 
@@ -124,7 +127,8 @@ async def get_quiz(course_id: str, quiz_id: str):
 @router.post("/courses/{course_id}")
 async def create_quiz(
     course_id: str,
-    request: CreateQuizRequest
+    request: CreateQuizRequest,
+    user: Optional[User] = Depends(get_optional_user),
 ):
     """Generate and save a new quiz.
 
@@ -140,6 +144,15 @@ async def create_quiz(
 
         topic = request.topic or "Course Materials"
 
+        # Build user context for usage tracking
+        user_context = None
+        if user:
+            user_context = UserContext(
+                email=user.email,
+                user_id=user.user_id,
+                course_id=course_id,
+            )
+
         # Generate quiz
         logger.info(
             "Generating quiz for course %s: %d questions, %s difficulty",
@@ -151,7 +164,8 @@ async def create_quiz(
             topic=topic,
             num_questions=request.num_questions,
             difficulty=request.difficulty,
-            week_number=request.week
+            week_number=request.week,
+            user_context=user_context,
         )
 
         questions = quiz_data.get("questions", [])

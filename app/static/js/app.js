@@ -65,6 +65,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     section.classList.add('active');
                 }
             });
+
+            // Dispatch tab-changed event
+            const event = new CustomEvent('tab-changed', {
+                detail: { tab: tabName }
+            });
+            document.dispatchEvent(event);
         });
     });
 
@@ -484,6 +490,9 @@ let essayState = {
     keyConcepts: []
 };
 
+// EasyMDE editor instance
+let essayEditor = null;
+
 function initAssessmentListeners() {
     // Tab navigation
     document.querySelectorAll('.assessment-tab').forEach(tab => {
@@ -502,11 +511,51 @@ function initAssessmentListeners() {
     const newQuestionBtn = document.getElementById('new-question-btn');
     if (newQuestionBtn) newQuestionBtn.addEventListener('click', showGenerateView);
 
-    // Word count tracker
-    const essayAnswer = document.getElementById('essay-answer');
-    if (essayAnswer) {
-        essayAnswer.addEventListener('input', updateWordCount);
-    }
+    // Initialize EasyMDE editor for essay answer
+    initEssayEditor();
+}
+
+function initEssayEditor() {
+    const essayTextarea = document.getElementById('essay-answer');
+    if (!essayTextarea || typeof EasyMDE === 'undefined') return;
+
+    essayEditor = new EasyMDE({
+        element: essayTextarea,
+        placeholder: 'Write your essay answer here using Markdown formatting...\n\n**Bold** for emphasis\n*Italic* for subtle emphasis\n- Bullet points for lists\n1. Numbered lists for steps\n\n### Use headings to structure your answer',
+        spellChecker: false,
+        autosave: {
+            enabled: false
+        },
+        toolbar: [
+            'bold', 'italic', 'heading', '|',
+            'unordered-list', 'ordered-list', '|',
+            'preview', 'side-by-side', 'fullscreen', '|',
+            'guide'
+        ],
+        status: ['words', 'lines'],
+        minHeight: '300px',
+        maxHeight: '600px',
+        sideBySideFullscreen: false,
+        shortcuts: {
+            toggleBold: 'Cmd-B',
+            toggleItalic: 'Cmd-I',
+            toggleHeadingSmaller: 'Cmd-H',
+            toggleUnorderedList: 'Cmd-L',
+            toggleOrderedList: 'Cmd-Alt-L',
+            togglePreview: 'Cmd-P',
+            toggleSideBySide: 'F9',
+            toggleFullScreen: 'F11'
+        },
+        previewRender: function(plainText) {
+            // Use our existing formatMarkdown function for preview
+            return formatMarkdown(plainText);
+        }
+    });
+
+    // Update word count when editor content changes
+    essayEditor.codemirror.on('change', () => {
+        updateWordCount();
+    });
 }
 
 function switchAssessmentTab(tabName) {
@@ -530,10 +579,16 @@ function showGenerateView() {
     document.getElementById('essay-question-view').style.display = 'none';
     document.getElementById('essay-result').innerHTML = '';
     essayState = { assessmentId: null, question: null, topic: null, keyConcepts: [] };
+
+    // Clear editor content
+    if (essayEditor) {
+        essayEditor.value('');
+    }
 }
 
 function updateWordCount() {
-    const answer = document.getElementById('essay-answer').value.trim();
+    // Get content from EasyMDE editor or fallback to textarea
+    const answer = essayEditor ? essayEditor.value().trim() : document.getElementById('essay-answer').value.trim();
     const wordCount = answer ? answer.split(/\s+/).filter(w => w.length > 0).length : 0;
     document.getElementById('essay-word-count').textContent = wordCount;
 }
@@ -594,7 +649,14 @@ async function generateEssayQuestion() {
         // Switch to question view
         document.getElementById('generate-question-view').style.display = 'none';
         document.getElementById('essay-question-view').style.display = 'block';
-        document.getElementById('essay-answer').value = '';
+
+        // Clear editor content
+        if (essayEditor) {
+            essayEditor.value('');
+        } else {
+            document.getElementById('essay-answer').value = '';
+        }
+
         document.getElementById('essay-result').innerHTML = '';
         updateWordCount();
 
@@ -607,7 +669,8 @@ async function generateEssayQuestion() {
 }
 
 async function submitEssayAnswer() {
-    const answer = document.getElementById('essay-answer').value.trim();
+    // Get answer from EasyMDE editor or fallback to textarea
+    const answer = (essayEditor ? essayEditor.value() : document.getElementById('essay-answer').value).trim();
     const resultDiv = document.getElementById('essay-result');
 
     if (!answer) {
@@ -637,7 +700,7 @@ async function submitEssayAnswer() {
             body: JSON.stringify({
                 assessment_id: essayState.assessmentId,
                 course_id: COURSE_ID,
-                answer: answer
+                answer: answer  // This is now Markdown format
             })
         });
 
@@ -761,7 +824,7 @@ async function viewEssayAttempt(attemptId) {
                 <h3>Essay Attempt - ${attempt.grade}/10</h3>
                 <div class="attempt-details">
                     <h4>Your Answer:</h4>
-                    <div class="attempt-answer">${escapeHtml(attempt.answer)}</div>
+                    <div class="attempt-answer">${formatMarkdown(attempt.answer)}</div>
                     <h4>Feedback:</h4>
                     <div class="attempt-feedback">${formatMarkdown(attempt.feedback)}</div>
                 </div>
@@ -1373,6 +1436,26 @@ async function submitQuizResults() {
 
         // Update local stats
         updateLocalQuizStats();
+
+        // Log activity for gamification (don't block quiz submission if this fails)
+        try {
+            if (window.activityTracker) {
+                const totalQuestions = quizState.questions.length;
+                const percentage = (quizState.score / totalQuestions) * 100;
+
+                await window.activityTracker.logActivity('quiz_completed', {
+                    quiz_id: quizState.quizId,
+                    score: quizState.score,
+                    total_questions: totalQuestions,
+                    difficulty: quizState.difficulty || 'easy',
+                    time_taken_seconds: timeTaken,
+                    percentage: percentage
+                }, quizState.courseId);
+            }
+        } catch (gamificationError) {
+            console.error('Failed to log quiz activity for gamification:', gamificationError);
+            // Don't throw - gamification failure shouldn't block quiz submission
+        }
 
     } catch (error) {
         console.error('Error submitting quiz results:', error);
@@ -2320,3 +2403,17 @@ function updateFlashcardStats() {
     if (masteredEl) masteredEl.textContent = mastered;
     if (totalEl) totalEl.textContent = flashcards.length;
 }
+
+// ========== Cleanup on Page Unload ==========
+// Prevent memory leaks by cleaning up event listeners
+window.addEventListener('beforeunload', () => {
+    // Cleanup GamificationUI if it exists
+    if (window.gamificationUI && typeof window.gamificationUI.cleanup === 'function') {
+        window.gamificationUI.cleanup();
+    }
+
+    // Cleanup ActivityTracker if it exists
+    if (window.activityTracker && typeof window.activityTracker.cleanup === 'function') {
+        window.activityTracker.cleanup();
+    }
+});

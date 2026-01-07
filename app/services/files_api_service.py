@@ -26,8 +26,10 @@ from typing import Any, Dict, List, Optional, Tuple
 from anthropic import AsyncAnthropic, RateLimitError
 
 from app.models.course_models import CourseMaterial
+from app.models.usage_models import UserContext
 from app.services.gcp_service import get_anthropic_api_key, get_firestore_client
 from app.services.text_extractor import extract_text, detect_file_type, ExtractionResult
+from app.services.usage_tracking_service import track_llm_usage_from_response
 
 logger = logging.getLogger(__name__)
 
@@ -391,7 +393,8 @@ Return ONLY valid JSON:
         topic: str,
         num_questions: int = 10,
         difficulty: str = "medium",
-        week_number: Optional[int] = None
+        week_number: Optional[int] = None,
+        user_context: Optional[UserContext] = None,
     ) -> Dict:
         """Generate quiz using Firestore materials with text extraction.
 
@@ -404,6 +407,7 @@ Return ONLY valid JSON:
             num_questions: Number of questions to generate
             difficulty: 'easy', 'medium', or 'hard'
             week_number: Optional week filter
+            user_context: User context for usage tracking
 
         Returns:
             Dictionary with quiz questions
@@ -490,6 +494,20 @@ Return ONLY valid JSON:
             }]
         )
 
+        # Track usage if user context provided
+        await track_llm_usage_from_response(
+            response=response,
+            user_context=user_context,
+            operation_type="quiz",
+            model="claude-sonnet-4-20250514",
+            request_metadata={
+                "topic": topic,
+                "num_questions": num_questions,
+                "difficulty": difficulty,
+                "week_number": week_number,
+            },
+        )
+
         # Parse response
         text = response.content[0].text
         quiz_data = self._parse_json(text)
@@ -505,7 +523,8 @@ Return ONLY valid JSON:
         self,
         course_id: str,
         topic: str,
-        week_numbers: Optional[List[int]] = None
+        week_numbers: Optional[List[int]] = None,
+        user_context: Optional[UserContext] = None,
     ) -> str:
         """Generate comprehensive study guide using Firestore materials with text extraction.
 
@@ -516,6 +535,7 @@ Return ONLY valid JSON:
             course_id: Course ID
             topic: Topic description for the study guide
             week_numbers: Optional list of week numbers to filter by (e.g., [1, 2, 3])
+            user_context: User context for usage tracking
 
         Returns:
             Formatted study guide in Markdown
@@ -730,6 +750,19 @@ OUTPUT QUALITY:
         logger.info(
             "💰 Token usage - Input: %d, Output: %d, Cache read: %d, Cache created: %d",
             input_tokens, output_tokens, cache_read, cache_created
+        )
+
+        # Track usage if user context provided
+        await track_llm_usage_from_response(
+            response=response,
+            user_context=user_context,
+            operation_type="study_guide",
+            model="claude-sonnet-4-20250514",
+            request_metadata={
+                "topic": topic,
+                "week_numbers": week_numbers,
+                "materials_count": len(materials_with_text),
+            },
         )
 
         # With extended thinking, response has thinking blocks and text blocks
