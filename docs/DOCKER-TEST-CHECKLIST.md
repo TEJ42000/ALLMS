@@ -10,6 +10,8 @@ This checklist corresponds to Issue #8: 🐳 Test Docker build and local contain
 - [ ] Port 8080 available
 - [ ] Anthropic API key available (or test key for basic testing)
 
+> ⚠️ **Security Warning:** Never use production API keys for local testing. Use a dedicated test key with rate limits or a dummy key for basic endpoint testing. Real API keys should only be stored in Secret Manager for production deployments.
+
 ---
 
 ## Automated Testing (Recommended)

@@ -23,9 +23,24 @@ This guide provides comprehensive instructions for testing the Docker build and 
 
 ### Run Automated Tests
 
+**Option 1: Using the test script directly**
+
 ```bash
 # Run the automated test script
 ./scripts/test-docker.sh
+```
+
+**Option 2: Using pytest (recommended for CI/CD)**
+
+```bash
+# Run Docker tests through pytest
+pytest tests/test_docker_integration.py -v
+
+# Or using markers
+pytest -m docker -v
+
+# Skip Docker tests
+pytest -m "not docker"
 ```
 
 This script will:
@@ -76,7 +91,10 @@ ANTHROPIC_API_KEY=sk-ant-...  # Your Anthropic API key
 # Optional (defaults provided)
 AUTH_ENABLED=false            # Disable auth for testing
 ENV=development               # Set environment mode
+STARTUP_WAIT=5                # Seconds to wait for container startup
 ```
+
+> ⚠️ **Security Warning:** Never use production API keys for local testing. Use a dedicated test key with rate limits or a dummy key for basic endpoint testing. Real API keys should only be stored in Secret Manager for production deployments.
 
 ---
 

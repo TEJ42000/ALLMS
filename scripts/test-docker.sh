@@ -17,6 +17,7 @@ IMAGE_TAG="test"
 CONTAINER_NAME="lls-study-portal-test"
 PORT=8080
 TEST_ANTHROPIC_KEY="${ANTHROPIC_API_KEY:-sk-ant-test-key-placeholder}"
+STARTUP_WAIT="${STARTUP_WAIT:-5}"  # Configurable startup wait time in seconds
 
 # Function to print colored output
 print_header() {
@@ -46,11 +47,11 @@ cleanup() {
     print_header "Cleaning Up"
     
     # Stop and remove container if it exists
-    if docker ps -a | grep -q $CONTAINER_NAME; then
+    if docker ps -a | grep -q "$CONTAINER_NAME"; then
         print_info "Stopping container..."
-        docker stop $CONTAINER_NAME 2>/dev/null || true
+        docker stop "$CONTAINER_NAME" 2>/dev/null || true
         print_info "Removing container..."
-        docker rm $CONTAINER_NAME 2>/dev/null || true
+        docker rm "$CONTAINER_NAME" 2>/dev/null || true
         print_success "Container cleaned up"
     fi
     
@@ -72,26 +73,26 @@ wait_for_healthy() {
     print_info "Waiting for container to be healthy..."
     
     while [ $attempt -le $max_attempts ]; do
-        health_status=$(docker inspect --format='{{.State.Health.Status}}' $CONTAINER_NAME 2>/dev/null || echo "none")
-        
+        health_status=$(docker inspect --format='{{.State.Health.Status}}' "$CONTAINER_NAME" 2>/dev/null || echo "none")
+
         if [ "$health_status" = "healthy" ]; then
             print_success "Container is healthy!"
             return 0
         elif [ "$health_status" = "unhealthy" ]; then
             print_error "Container is unhealthy!"
-            docker logs $CONTAINER_NAME --tail 50
+            docker logs "$CONTAINER_NAME" --tail 50
             return 1
         fi
-        
+
         echo -n "."
         sleep 2
         attempt=$((attempt + 1))
     done
-    
+
     print_warning "Health check timeout - container may not have HEALTHCHECK configured"
     print_info "Checking if container is running..."
-    
-    if docker ps | grep -q $CONTAINER_NAME; then
+
+    if docker ps | grep -q "$CONTAINER_NAME"; then
         print_success "Container is running (health check not available)"
         return 0
     else
@@ -161,28 +162,29 @@ main() {
     print_info "Starting container with environment variables..."
     
     docker run -d \
-        --name $CONTAINER_NAME \
-        -p $PORT:8080 \
+        --name "$CONTAINER_NAME" \
+        -p "$PORT":8080 \
         -e ANTHROPIC_API_KEY="$TEST_ANTHROPIC_KEY" \
         -e AUTH_ENABLED=false \
         -e ENV=development \
-        $IMAGE_NAME:$IMAGE_TAG
-    
-    if docker ps | grep -q $CONTAINER_NAME; then
+        "$IMAGE_NAME:$IMAGE_TAG"
+
+    if docker ps | grep -q "$CONTAINER_NAME"; then
         print_success "Container started successfully"
     else
         print_error "Container failed to start"
-        docker logs $CONTAINER_NAME
+        docker logs "$CONTAINER_NAME"
         exit 1
     fi
     
     # Wait for container to be ready
     print_header "Step 3: Waiting for Application to Start"
-    sleep 5  # Give it a few seconds to start
+    print_info "Waiting ${STARTUP_WAIT}s for container to initialize..."
+    sleep "$STARTUP_WAIT"
     
     # Check container logs
     print_info "Container logs:"
-    docker logs $CONTAINER_NAME --tail 20
+    docker logs "$CONTAINER_NAME" --tail 20
     
     # Wait for health check
     if ! wait_for_healthy; then
@@ -234,18 +236,18 @@ main() {
     # Step 4: Check container logs for errors
     print_header "Step 5: Checking Container Logs"
     print_info "Checking for errors in logs..."
-    
-    if docker logs $CONTAINER_NAME 2>&1 | grep -i "error\|exception\|failed" | grep -v "ANTHROPIC_API_KEY"; then
+
+    if docker logs "$CONTAINER_NAME" 2>&1 | grep -iE "ERROR:|Exception:|Failed to" | grep -v "ANTHROPIC_API_KEY" | grep -v "0 errors"; then
         print_warning "Found some errors in logs (see above)"
     else
         print_success "No critical errors found in logs"
     fi
-    
+
     # Step 5: Test container stop
     print_header "Step 6: Testing Container Shutdown"
     print_info "Stopping container..."
-    
-    if docker stop $CONTAINER_NAME; then
+
+    if docker stop "$CONTAINER_NAME"; then
         print_success "Container stopped cleanly"
     else
         print_error "Container failed to stop cleanly"
