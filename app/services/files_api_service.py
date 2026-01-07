@@ -955,10 +955,15 @@ Use proper legal analysis method and cite articles.""" % (topic, case_facts)
 
         # Validate and sanitize topic to prevent prompt injection (same as course-aware method)
         if topic:
+            # Strip whitespace and validate non-empty
+            topic = topic.strip()
+            if not topic:
+                raise ValueError("topic cannot be empty or only whitespace")
             if len(topic) > MAX_TOPIC_LENGTH:
                 raise ValueError(f"topic must be less than {MAX_TOPIC_LENGTH} characters")
             # Sanitize topic by escaping special characters that could manipulate AI behavior
-            topic = topic.replace('"', '\\"').replace('\n', ' ').replace('\r', ' ')
+            # IMPORTANT: Escape backslashes FIRST to prevent bypass attacks (e.g., \")
+            topic = topic.replace('\\', '\\\\').replace('"', '\\"').replace('\n', ' ').replace('\r', ' ')
         else:
             topic = "Course Materials"
 
@@ -1042,10 +1047,15 @@ Include:
 
         # Validate and sanitize topic to prevent prompt injection
         if topic:
+            # Strip whitespace and validate non-empty
+            topic = topic.strip()
+            if not topic:
+                raise ValueError("topic cannot be empty or only whitespace")
             if len(topic) > MAX_TOPIC_LENGTH:
                 raise ValueError(f"topic must be less than {MAX_TOPIC_LENGTH} characters")
             # Sanitize topic by escaping special characters that could manipulate AI behavior
-            topic = topic.replace('"', '\\"').replace('\n', ' ').replace('\r', ' ')
+            # IMPORTANT: Escape backslashes FIRST to prevent bypass attacks (e.g., \")
+            topic = topic.replace('\\', '\\\\').replace('"', '\\"').replace('\n', ' ').replace('\r', ' ')
         else:
             topic = "Course Materials"
 

@@ -328,9 +328,11 @@ function formatMarkdownFallback(text) {
 // Format inline markdown (bold, italic, code, etc.)
 function formatInline(text) {
     text = escapeHtml(text);
-    text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-    text = text.replace(/\*(.*?)\*/g, '<em>$1</em>');
-    text = text.replace(/`(.*?)`/g, '<code>$1</code>');
+    // Use non-greedy matching with character class exclusions to prevent regex injection
+    // [^*] ensures we only match content between markers, not regex special chars
+    text = text.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    text = text.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+    text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
     return text;
 }
 
@@ -409,15 +411,15 @@ async function askTutor() {
         if (!response.ok) throw new Error(`API error: ${response.status}`);
 
         const data = await response.json();
-
-        // Hide typing indicator and show response
-        hideTypingIndicator();
         addMessage('assistant', data.content);
 
     } catch (error) {
         console.error('Error:', error);
-        hideTypingIndicator();
         addMessage('error', 'Sorry, there was an error processing your request.');
+    } finally {
+        // Always hide typing indicator, even if error occurs
+        // Using finally prevents race condition where indicator stays visible
+        hideTypingIndicator();
     }
 }
 

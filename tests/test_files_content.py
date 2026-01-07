@@ -476,7 +476,7 @@ class TestInputValidation:
 
     @pytest.mark.asyncio
     async def test_generate_flashcards_topic_sanitization(self):
-        """Test that topic with quotes and newlines is properly sanitized."""
+        """Test that topic with quotes, newlines, and backslashes is properly sanitized."""
         service = FilesAPIService()
 
         # Mock the Anthropic client to verify sanitized topic is used
@@ -487,7 +487,8 @@ class TestInputValidation:
             mock_client.return_value.messages.create = AsyncMock(return_value=mock_response)
 
             # Topic with special characters that should be sanitized
-            topic_with_special_chars = 'Test "topic"\nwith\rnewlines'
+            # Test backslash escape bypass attempt: \" should become \\" not \"
+            topic_with_special_chars = 'Test \\"topic"\nwith\rnewlines'
 
             await service.generate_flashcards(
                 topic=topic_with_special_chars,
@@ -495,8 +496,34 @@ class TestInputValidation:
                 num_cards=10
             )
 
-            # Verify the method was called (sanitization happens internally)
+            # Verify the method was called and check the actual sanitized value
             assert mock_client.return_value.messages.create.called
+
+            # Get the actual prompt sent to the API
+            call_args = mock_client.return_value.messages.create.call_args
+            messages = call_args.kwargs['messages']
+            prompt_text = messages[0]['content']
+
+            # Verify sanitization:
+            # 1. Backslashes are escaped first: \ -> \\
+            # 2. Then quotes are escaped: " -> \"
+            # 3. Newlines/carriage returns replaced with spaces
+            # Original: Test \"topic"\nwith\rnewlines
+            # Expected: Test \\\\"topic\\" with with newlines
+            assert 'Test \\\\\\"topic\\"' in prompt_text  # Backslash and quote properly escaped
+            assert '\n' not in prompt_text or 'with with' in prompt_text  # Newlines replaced with spaces
+
+    @pytest.mark.asyncio
+    async def test_generate_flashcards_topic_whitespace_only(self):
+        """Test that topic with only whitespace is rejected."""
+        service = FilesAPIService()
+
+        with pytest.raises(ValueError, match="topic cannot be empty or only whitespace"):
+            await service.generate_flashcards(
+                topic="   \n\t  ",  # Only whitespace
+                file_keys=["reader_criminal_law"],
+                num_cards=10
+            )
 
 
 class TestCourseAwareQuizEndpoint:
@@ -850,6 +877,18 @@ class TestCourseAwareFlashcardsEndpoint:
                 course_id="LLS-2025-2026",
                 num_cards=10,
                 topic=long_topic
+            )
+
+    @pytest.mark.asyncio
+    async def test_generate_flashcards_from_course_topic_whitespace(self):
+        """Test that whitespace-only topic is rejected in course-aware generation."""
+        service = FilesAPIService()
+
+        with pytest.raises(ValueError, match="topic cannot be empty or only whitespace"):
+            await service.generate_flashcards_from_course(
+                course_id="LLS-2025-2026",
+                num_cards=10,
+                topic="   \t\n   "  # Only whitespace
             )
 
 
