@@ -648,6 +648,16 @@ function updateWordCount() {
 
 async function generateEssayQuestion() {
     const topic = document.getElementById('essay-topic-select').value;
+
+    // Validate topic input (defense in depth - even though it comes from select)
+    if (topic) {
+        const validation = validateTopicInput(topic);
+        if (!validation.valid) {
+            alert(`Invalid topic: ${validation.error}`);
+            return;
+        }
+    }
+
     showLoading();
 
     try {
@@ -1188,6 +1198,15 @@ async function generateQuiz() {
             const optionText = selectedOption.text;
             const colonIndex = optionText.indexOf(': ');
             topic = colonIndex > 0 ? optionText.substring(colonIndex + 2) : topicValue;
+        }
+    }
+
+    // Validate topic input (defense in depth - even though it comes from select)
+    if (topic && topic !== 'all') {
+        const validation = validateTopicInput(topic);
+        if (!validation.valid) {
+            alert(`Invalid topic: ${validation.error}`);
+            return;
         }
     }
 
