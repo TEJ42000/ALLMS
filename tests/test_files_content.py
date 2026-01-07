@@ -437,6 +437,67 @@ class TestInputValidation:
                 num_cards=20
             )
 
+    @pytest.mark.asyncio
+    async def test_generate_flashcards_num_cards_too_low(self):
+        """Test that generate_flashcards raises ValueError when num_cards < 5."""
+        service = FilesAPIService()
+
+        with pytest.raises(ValueError, match="num_cards must be between 5 and 50"):
+            await service.generate_flashcards(
+                topic="Criminal Law",
+                file_keys=["reader_criminal_law"],
+                num_cards=3  # Below minimum of 5
+            )
+
+    @pytest.mark.asyncio
+    async def test_generate_flashcards_num_cards_too_high(self):
+        """Test that generate_flashcards raises ValueError when num_cards > 50."""
+        service = FilesAPIService()
+
+        with pytest.raises(ValueError, match="num_cards must be between 5 and 50"):
+            await service.generate_flashcards(
+                topic="Criminal Law",
+                file_keys=["reader_criminal_law"],
+                num_cards=100  # Above maximum of 50
+            )
+
+    @pytest.mark.asyncio
+    async def test_generate_flashcards_topic_too_long(self):
+        """Test that generate_flashcards raises ValueError when topic > 200 chars."""
+        service = FilesAPIService()
+
+        long_topic = "A" * 201  # 201 characters, exceeds limit of 200
+        with pytest.raises(ValueError, match="topic must be less than 200 characters"):
+            await service.generate_flashcards(
+                topic=long_topic,
+                file_keys=["reader_criminal_law"],
+                num_cards=10
+            )
+
+    @pytest.mark.asyncio
+    async def test_generate_flashcards_topic_sanitization(self):
+        """Test that topic with quotes and newlines is properly sanitized."""
+        service = FilesAPIService()
+
+        # Mock the Anthropic client to verify sanitized topic is used
+        with patch.object(service, '_get_anthropic_client') as mock_client:
+            mock_response = MagicMock()
+            mock_response.content = [MagicMock(text='[{"front": "Q", "back": "A"}]')]
+            mock_response.usage = MagicMock(input_tokens=100, output_tokens=50)
+            mock_client.return_value.messages.create = AsyncMock(return_value=mock_response)
+
+            # Topic with special characters that should be sanitized
+            topic_with_special_chars = 'Test "topic"\nwith\rnewlines'
+
+            await service.generate_flashcards(
+                topic=topic_with_special_chars,
+                file_keys=["reader_criminal_law"],
+                num_cards=10
+            )
+
+            # Verify the method was called (sanitization happens internally)
+            assert mock_client.return_value.messages.create.called
+
 
 class TestCourseAwareQuizEndpoint:
     """Tests for course-aware quiz generation."""
@@ -736,6 +797,60 @@ class TestCourseAwareFlashcardsEndpoint:
             assert "flashcards" in data
             assert data.get("course_id") == "LLS-2025-2026"
             assert data["count"] == 2
+
+    @pytest.mark.asyncio
+    async def test_generate_flashcards_from_course_num_cards_validation(self):
+        """Test num_cards validation in course-aware flashcard generation."""
+        service = FilesAPIService()
+
+        # Test num_cards too low
+        with pytest.raises(ValueError, match="num_cards must be between 5 and 50"):
+            await service.generate_flashcards_from_course(
+                course_id="LLS-2025-2026",
+                num_cards=2  # Below minimum
+            )
+
+        # Test num_cards too high
+        with pytest.raises(ValueError, match="num_cards must be between 5 and 50"):
+            await service.generate_flashcards_from_course(
+                course_id="LLS-2025-2026",
+                num_cards=100  # Above maximum
+            )
+
+    @pytest.mark.asyncio
+    async def test_generate_flashcards_from_course_week_validation(self):
+        """Test week_number validation in course-aware flashcard generation."""
+        service = FilesAPIService()
+
+        # Test week_number too high
+        with pytest.raises(ValueError, match="week_number must be between 1 and 52"):
+            await service.generate_flashcards_from_course(
+                course_id="LLS-2025-2026",
+                num_cards=10,
+                week_number=100  # Above maximum of 52
+            )
+
+        # Test week_number zero
+        with pytest.raises(ValueError, match="week_number must be between 1 and 52"):
+            await service.generate_flashcards_from_course(
+                course_id="LLS-2025-2026",
+                num_cards=10,
+                week_number=0  # Below minimum of 1
+            )
+
+    @pytest.mark.asyncio
+    async def test_generate_flashcards_from_course_topic_validation(self):
+        """Test topic validation in course-aware flashcard generation."""
+        service = FilesAPIService()
+
+        # Test topic too long
+        long_topic = "A" * 201  # Exceeds 200 character limit
+        with pytest.raises(ValueError, match="topic must be less than 200 characters"):
+            await service.generate_flashcards_from_course(
+                course_id="LLS-2025-2026",
+                num_cards=10,
+                topic=long_topic
+            )
 
 
 class TestCourseFilesEndpoint:

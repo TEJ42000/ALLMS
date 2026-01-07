@@ -39,6 +39,12 @@ MATERIALS_ROOT = Path("Materials")
 MAX_TEXT_LENGTH = 100000  # Maximum characters per document to avoid context overflow
 MAX_MATERIALS_PER_GENERATION = 10  # Limit materials to avoid context overflow in AI generation
 
+# Validation constants
+MIN_FLASHCARDS = 5  # Minimum number of flashcards to generate
+MAX_FLASHCARDS = 50  # Maximum number of flashcards to generate
+MAX_TOPIC_LENGTH = 200  # Maximum length for topic parameter (prevent prompt injection)
+MAX_WEEK_NUMBER = 52  # Maximum week number in academic year
+
 
 class FilesAPIService:
     """Service for generating content using course materials with text extraction.
@@ -944,13 +950,13 @@ Use proper legal analysis method and cite articles.""" % (topic, case_facts)
             raise TypeError("All file_keys must be strings")
 
         # Validate num_cards range (consistent with course-aware method)
-        if not 5 <= num_cards <= 50:
-            raise ValueError("num_cards must be between 5 and 50")
+        if not MIN_FLASHCARDS <= num_cards <= MAX_FLASHCARDS:
+            raise ValueError(f"num_cards must be between {MIN_FLASHCARDS} and {MAX_FLASHCARDS}")
 
         # Validate and sanitize topic to prevent prompt injection (same as course-aware method)
         if topic:
-            if len(topic) > 200:
-                raise ValueError("topic must be less than 200 characters")
+            if len(topic) > MAX_TOPIC_LENGTH:
+                raise ValueError(f"topic must be less than {MAX_TOPIC_LENGTH} characters")
             # Sanitize topic by escaping special characters that could manipulate AI behavior
             topic = topic.replace('"', '\\"').replace('\n', ' ').replace('\r', ' ')
         else:
@@ -1029,15 +1035,15 @@ Include:
         # Input validation
         if not course_id or not course_id.strip():
             raise ValueError("course_id is required and cannot be empty")
-        if not 5 <= num_cards <= 50:
-            raise ValueError("num_cards must be between 5 and 50")
-        if week_number is not None and not 1 <= week_number <= 52:
-            raise ValueError("week_number must be between 1 and 52")
+        if not MIN_FLASHCARDS <= num_cards <= MAX_FLASHCARDS:
+            raise ValueError(f"num_cards must be between {MIN_FLASHCARDS} and {MAX_FLASHCARDS}")
+        if week_number is not None and not 1 <= week_number <= MAX_WEEK_NUMBER:
+            raise ValueError(f"week_number must be between 1 and {MAX_WEEK_NUMBER}")
 
         # Validate and sanitize topic to prevent prompt injection
         if topic:
-            if len(topic) > 200:
-                raise ValueError("topic must be less than 200 characters")
+            if len(topic) > MAX_TOPIC_LENGTH:
+                raise ValueError(f"topic must be less than {MAX_TOPIC_LENGTH} characters")
             # Sanitize topic by escaping special characters that could manipulate AI behavior
             topic = topic.replace('"', '\\"').replace('\n', ' ').replace('\r', ' ')
         else:

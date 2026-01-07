@@ -1982,11 +1982,16 @@ function initDashboard() {
             courseInfoBanner.appendChild(badge);
 
             // Insert at the top of the dashboard section
+            // Try to insert after section title for better visual hierarchy
             const sectionTitle = dashboardSection.querySelector('.section-title');
             if (sectionTitle && sectionTitle.nextSibling) {
                 dashboardSection.insertBefore(courseInfoBanner, sectionTitle.nextSibling);
-            } else {
+            } else if (dashboardSection.firstChild) {
+                // Fallback: insert at the beginning of the section
                 dashboardSection.insertBefore(courseInfoBanner, dashboardSection.firstChild);
+            } else {
+                // Last resort: append to empty section
+                dashboardSection.appendChild(courseInfoBanner);
             }
         }
     }
