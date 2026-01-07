@@ -373,29 +373,43 @@ function validateTopicInput(topic) {
     const MAX_TOPIC_LENGTH = 200;
 
     if (!topic || !topic.trim()) {
-        return {valid: false, error: 'Topic cannot be empty'};
+        return {valid: false, error: 'topic cannot be empty or only whitespace'};
     }
 
     const trimmedTopic = topic.trim();
 
     if (trimmedTopic.length > MAX_TOPIC_LENGTH) {
-        return {valid: false, error: `Topic must be less than ${MAX_TOPIC_LENGTH} characters`};
+        return {valid: false, error: `topic must be less than ${MAX_TOPIC_LENGTH} characters`};
     }
 
-    // Check for suspicious prompt injection patterns
+    // Check for suspicious prompt injection patterns (aligned with backend)
+    // Normalize whitespace for pattern matching
+    const normalizedTopic = trimmedTopic.replace(/\s+/g, ' ');
+
     const suspiciousPatterns = [
-        /ignore\s+(previous|all|above)/i,
-        /system\s+prompt/i,
-        /you\s+are\s+now/i,
-        /act\s+as/i,
-        /pretend\s+to\s+be/i,
-        /disregard\s+(previous|all)/i,
-        /forget\s+(previous|all)/i,
+        // Instruction override attempts
+        /ignore\s+(previous|all|above|prior|earlier)/i,
+        /disregard\s+(previous|all|above|prior|earlier)/i,
+        /forget\s+(previous|all|above|prior|earlier|everything)/i,
+        /override\s+(previous|all|above|prior)/i,
+
+        // System manipulation attempts
+        /system\s+(prompt|message|instruction)/i,
+        /new\s+(instructions?|prompt|system)/i,
+
+        // Role manipulation attempts
+        /you\s+are\s+(now|a|an)/i,
+        /act\s+as\s+(a|an|if)/i,
+        /pretend\s+(to\s+be|you\s+are)/i,
+        /roleplay\s+as/i,
+
+        // Direct command attempts
+        /(^|\s)(execute|run|perform)\s+(this|the|following)/i,
     ];
 
     for (const pattern of suspiciousPatterns) {
-        if (pattern.test(trimmedTopic)) {
-            return {valid: false, error: 'Topic contains suspicious content. Please use a simple topic description.'};
+        if (pattern.test(normalizedTopic)) {
+            return {valid: false, error: 'topic contains suspicious content that may be a prompt injection attempt'};
         }
     }
 

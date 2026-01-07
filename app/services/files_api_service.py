@@ -47,14 +47,26 @@ MAX_WEEK_NUMBER = 52  # Maximum week number in academic year
 DEFAULT_TOPIC = "Course Materials"  # Default topic when none is provided
 
 # Compiled regex patterns for prompt injection detection (compiled once for performance)
+# These patterns detect common prompt injection attempts with flexible whitespace matching
 PROMPT_INJECTION_PATTERNS = [
-    re.compile(r'ignore\s+(previous|all|above)', re.IGNORECASE),
-    re.compile(r'system\s+prompt', re.IGNORECASE),
-    re.compile(r'you\s+are\s+now', re.IGNORECASE),
-    re.compile(r'act\s+as', re.IGNORECASE),
-    re.compile(r'pretend\s+to\s+be', re.IGNORECASE),
-    re.compile(r'disregard\s+(previous|all)', re.IGNORECASE),
-    re.compile(r'forget\s+(previous|all)', re.IGNORECASE),
+    # Instruction override attempts
+    re.compile(r'ignore\s+(previous|all|above|prior|earlier)', re.IGNORECASE),
+    re.compile(r'disregard\s+(previous|all|above|prior|earlier)', re.IGNORECASE),
+    re.compile(r'forget\s+(previous|all|above|prior|earlier|everything)', re.IGNORECASE),
+    re.compile(r'override\s+(previous|all|above|prior)', re.IGNORECASE),
+
+    # System manipulation attempts
+    re.compile(r'system\s+(prompt|message|instruction)', re.IGNORECASE),
+    re.compile(r'new\s+(instructions?|prompt|system)', re.IGNORECASE),
+
+    # Role manipulation attempts
+    re.compile(r'you\s+are\s+(now|a|an)', re.IGNORECASE),
+    re.compile(r'act\s+as\s+(a|an|if)', re.IGNORECASE),
+    re.compile(r'pretend\s+(to\s+be|you\s+are)', re.IGNORECASE),
+    re.compile(r'roleplay\s+as', re.IGNORECASE),
+
+    # Direct command attempts
+    re.compile(r'(^|\s)(execute|run|perform)\s+(this|the|following)', re.IGNORECASE),
 ]
 
 
@@ -959,9 +971,13 @@ Use proper legal analysis method and cite articles.""" % (topic, case_facts)
         if len(topic) > MAX_TOPIC_LENGTH:
             raise ValueError(f"topic must be less than {MAX_TOPIC_LENGTH} characters")
 
+        # Normalize topic for pattern matching to catch obfuscation attempts
+        # Remove excessive whitespace and normalize to single spaces
+        normalized_topic = re.sub(r'\s+', ' ', topic)
+
         # Check for suspicious prompt injection patterns using compiled regex (faster)
         for pattern in PROMPT_INJECTION_PATTERNS:
-            if pattern.search(topic):
+            if pattern.search(normalized_topic):
                 raise ValueError("topic contains suspicious content that may be a prompt injection attempt")
 
         # Sanitize topic by escaping special characters that could manipulate AI behavior
