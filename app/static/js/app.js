@@ -330,14 +330,24 @@ function formatMarkdownFallback(text) {
 }
 
 // Format inline markdown (bold, italic, code, etc.)
+//
+// ReDoS PROTECTION STRATEGY:
+// This function uses a defense-in-depth approach to prevent Regular Expression Denial of Service:
+// 1. INPUT LENGTH LIMIT: Text truncated to 10KB before any regex processing
+// 2. BOUNDED QUANTIFIERS: All quantifiers have strict upper bounds {1,500}
+// 3. CHARACTER CLASS EXCLUSION: [^*] and [^`] prevent nested/overlapping matches
+// 4. NO BACKTRACKING: Greedy quantifiers without alternation = O(n) time complexity
+// 5. NO NESTED QUANTIFIERS: Avoids exponential complexity
+//
+// This multi-layer approach ensures the function is safe even with malicious input.
 function formatInline(text) {
-    // Prevent ReDoS attacks by limiting text length before regex processing
+    // LAYER 1: Prevent ReDoS attacks by limiting text length before regex processing
     // Maximum length for inline formatting (10KB should be sufficient for any reasonable text)
     const MAX_INLINE_LENGTH = 10000;
 
     if (!text) return '';
 
-    // Truncate if too long to prevent ReDoS
+    // Truncate if too long to prevent ReDoS (CRITICAL: This is our first line of defense)
     if (text.length > MAX_INLINE_LENGTH) {
         console.warn(`formatInline: Text truncated from ${text.length} to ${MAX_INLINE_LENGTH} chars to prevent ReDoS`);
         text = text.substring(0, MAX_INLINE_LENGTH) + '...';
@@ -345,13 +355,18 @@ function formatInline(text) {
 
     text = escapeHtml(text);
 
-    // Use character class exclusions with strict quantifiers to prevent ReDoS
+    // LAYER 2: Use character class exclusions with strict quantifiers to prevent ReDoS
     // Pattern explanation:
     // - [^*] excludes asterisks, preventing nested/overlapping matches
     // - {1,500} strict quantifier with upper bound prevents catastrophic backtracking
     // - NO non-greedy quantifier (?) - character class exclusion already prevents overlapping
     // - No alternation or nested quantifiers to avoid exponential complexity
     // These patterns are O(n) time complexity, not vulnerable to ReDoS
+    //
+    // RELIANCE ON LENGTH LIMITS:
+    // - Input is pre-truncated to 10KB (see above)
+    // - Each pattern match is limited to 500 chars
+    // - Combined with character class exclusion, this guarantees linear time complexity
 
     // Bold: **text** (must have at least 1 char, max 500)
     // Removed non-greedy ? to prevent backtracking issues
@@ -491,6 +506,8 @@ async function askTutor() {
     document.getElementById('tutor-input').value = '';
 
     // Increment active request counter and show typing indicator
+    // Note: JavaScript is single-threaded, so this increment is atomic
+    // However, we add defensive checks in the finally block
     activeTutorRequests++;
     showTypingIndicator();
 
@@ -516,8 +533,9 @@ async function askTutor() {
         console.error('Error:', error);
         addMessage('error', 'Sorry, there was an error processing your request.');
     } finally {
-        // Decrement active request counter
-        activeTutorRequests--;
+        // Decrement active request counter with defensive check
+        // Ensure counter never goes negative (defensive programming)
+        activeTutorRequests = Math.max(0, activeTutorRequests - 1);
 
         // Only hide typing indicator if no other requests are active
         // This prevents race condition where multiple simultaneous requests
@@ -703,14 +721,8 @@ function updateWordCount() {
 async function generateEssayQuestion() {
     const topic = document.getElementById('essay-topic-select').value;
 
-    // Validate topic input (defense in depth - even though it comes from select)
-    if (topic) {
-        const validation = validateTopicInput(topic);
-        if (!validation.valid) {
-            alert(`Invalid topic: ${validation.error}`);
-            return;
-        }
-    }
+    // Note: Validation removed for select inputs as they contain predefined safe values
+    // Backend validation still applies as defense-in-depth
 
     showLoading();
 
@@ -1255,7 +1267,9 @@ async function generateQuiz() {
         }
     }
 
-    // Validate topic input (defense in depth - even though it comes from select)
+    // Validate topic input (defense in depth)
+    // Note: Topic is extracted from option text (line 1272), which could be dynamically generated
+    // Therefore validation is still needed, unlike essay-topic-select which uses predefined values
     if (topic && topic !== 'all') {
         const validation = validateTopicInput(topic);
         if (!validation.valid) {

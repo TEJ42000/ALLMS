@@ -171,10 +171,21 @@ class FilesAPIService:
 
         Returns:
             List of CourseMaterial objects
+
+        Raises:
+            TypeError: If week_number is not an integer
+            ValueError: If week_number is out of valid range
         """
         if not self.firestore:
             logger.warning("Firestore not available")
             return []
+
+        # Validate week_number type and range
+        if week_number is not None:
+            if not isinstance(week_number, int):
+                raise TypeError(f"week_number must be an integer, got {type(week_number).__name__}")
+            if week_number < 1 or week_number > MAX_WEEK_NUMBER:
+                raise ValueError(f"week_number must be between 1 and {MAX_WEEK_NUMBER}, got {week_number}")
 
         query = (
             self.firestore
@@ -984,13 +995,14 @@ Use proper legal analysis method and cite articles.""" % (topic, case_facts)
         if not topic:
             return default
 
-        # Validate length
+        # Validate length BEFORE normalization
         if len(topic) > MAX_TOPIC_LENGTH:
             raise ValueError(f"topic must not exceed {MAX_TOPIC_LENGTH} characters")
 
         # Unicode normalization to prevent homoglyph and zero-width character attacks
         # NFKC normalization converts visually similar characters to canonical form
         # Examples: ℀ -> a/c, ﬁ -> fi, zero-width spaces removed
+        # WARNING: NFKC can EXPAND character count (e.g., ℀ becomes 3 chars: a/c)
         topic = unicodedata.normalize('NFKC', topic)
 
         # Remove zero-width characters that could be used for obfuscation
@@ -1003,6 +1015,11 @@ Use proper legal analysis method and cite articles.""" % (topic, case_facts)
         ]
         for char in zero_width_chars:
             topic = topic.replace(char, '')
+
+        # Re-validate length AFTER normalization (CRITICAL: NFKC can expand character count)
+        # Example: A topic with 200 compatibility chars could expand beyond limit
+        if len(topic) > MAX_TOPIC_LENGTH:
+            raise ValueError(f"topic must not exceed {MAX_TOPIC_LENGTH} characters after normalization")
 
         # Normalize topic for pattern matching to catch obfuscation attempts
         # Remove excessive whitespace and normalize to single spaces
@@ -1019,6 +1036,13 @@ Use proper legal analysis method and cite articles.""" % (topic, case_facts)
 
         # Also escape other Unicode whitespace characters
         topic = topic.replace('\t', ' ').replace('\u2028', ' ').replace('\u2029', ' ')
+
+        # Final check: After all normalization and sanitization, ensure topic is not empty
+        # This catches edge cases where topic becomes empty after processing
+        # (e.g., topic was only zero-width chars, or only special chars that got replaced)
+        topic = topic.strip()
+        if not topic:
+            return default
 
         return topic
 
