@@ -20,8 +20,9 @@ import asyncio
 import json
 import logging
 import re
+import unicodedata
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from anthropic import AsyncAnthropic, RateLimitError
 
@@ -38,6 +39,50 @@ DEFAULT_FALLBACK_COUNT = 5  # Number of files to return when no specific files f
 MATERIALS_ROOT = Path("Materials")
 MAX_TEXT_LENGTH = 100000  # Maximum characters per document to avoid context overflow
 MAX_MATERIALS_PER_GENERATION = 10  # Limit materials to avoid context overflow in AI generation
+
+# Validation constants
+MIN_FLASHCARDS = 5  # Minimum number of flashcards to generate
+MAX_FLASHCARDS = 50  # Maximum number of flashcards to generate
+MAX_TOPIC_LENGTH = 200  # Maximum length for topic parameter (prevent prompt injection)
+MAX_WEEK_NUMBER = 52  # Maximum week number in academic year
+DEFAULT_TOPIC = "Course Materials"  # Default topic when none is provided
+
+# Text truncation constants
+SENTENCE_BOUNDARY_THRESHOLD = 0.9  # Prefer sentence boundaries in last 10% of text
+
+# Compiled regex patterns for prompt injection detection (compiled once for performance)
+# These patterns detect common prompt injection attempts while avoiding false positives
+# for legitimate legal education content (e.g., "act as a judge" is valid legal topic)
+# Patterns are tightened to require AI-specific context words to avoid blocking legal topics
+PROMPT_INJECTION_PATTERNS = [
+    # Instruction override attempts - target AI/system instructions specifically
+    # Requires context words like "instructions", "prompts", "rules", "commands"
+    re.compile(r'ignore\s+(previous|all|above|prior|earlier)\s+(instructions?|prompts?|rules?|commands?)', re.IGNORECASE),
+    re.compile(r'disregard\s+(previous|all|above|prior|earlier)\s+(instructions?|prompts?|rules?|commands?)', re.IGNORECASE),
+    re.compile(r'forget\s+(previous|all|above|prior|earlier)\s+(instructions?|prompts?|rules?|commands?)', re.IGNORECASE),
+    re.compile(r'override\s+(previous|all|above|prior)\s+(instructions?|prompts?|rules?|commands?)', re.IGNORECASE),
+
+    # System manipulation attempts - specific to AI system
+    # Tightened: requires "AI", "assistant", or "model" before "system" to avoid legal topics
+    # Allows: "legal system instruction", "justice system message"
+    # Blocks: "AI system prompt", "ignore system instruction"
+    re.compile(r'(ai|assistant|model|chatbot)\s+system\s+(prompt|message|instruction)', re.IGNORECASE),
+    re.compile(r'(ignore|bypass|override)\s+(the\s+)?system\s+(prompt|instruction|rules?)', re.IGNORECASE),
+    re.compile(r'new\s+(instructions?|prompt)\s+(for\s+)?(you|the\s+system|the\s+ai)', re.IGNORECASE),
+
+    # Role manipulation attempts - target AI role changes, not legal roles
+    # Requires AI-specific roles: unrestricted, jailbroken, developer, admin, root, DAN
+    re.compile(r'you\s+are\s+now\s+(an?\s+)?(unrestricted|jailbroken|developer|admin|root)', re.IGNORECASE),
+    re.compile(r'act\s+as\s+(an?\s+)?(unrestricted|jailbroken|developer|admin|root|dan)', re.IGNORECASE),
+    re.compile(r'pretend\s+(to\s+be|you\s+are)\s+(an?\s+)?(unrestricted|jailbroken|developer|admin)', re.IGNORECASE),
+
+    # Direct command attempts targeting AI behavior
+    # Requires "code", "command", or "script" to avoid blocking legal topics
+    re.compile(r'(^|\s)(execute|run|perform)\s+(this|the|following)\s+(code|command|script)', re.IGNORECASE),
+
+    # Explicit jailbreak attempts
+    re.compile(r'(jailbreak|dan\s+mode|developer\s+mode|god\s+mode)', re.IGNORECASE),
+]
 
 
 class FilesAPIService:
@@ -126,10 +171,21 @@ class FilesAPIService:
 
         Returns:
             List of CourseMaterial objects
+
+        Raises:
+            TypeError: If week_number is not an integer
+            ValueError: If week_number is out of valid range
         """
         if not self.firestore:
             logger.warning("Firestore not available")
             return []
+
+        # Validate week_number type and range
+        if week_number is not None:
+            if not isinstance(week_number, int):
+                raise TypeError(f"week_number must be an integer, got {type(week_number).__name__}")
+            if week_number < 1 or week_number > MAX_WEEK_NUMBER:
+                raise ValueError(f"week_number must be between 1 and {MAX_WEEK_NUMBER}, got {week_number}")
 
         query = (
             self.firestore
@@ -212,12 +268,13 @@ class FilesAPIService:
                 MAX_TEXT_LENGTH
             )
             # Try to truncate at last period within limit to avoid breaking mid-sentence
+            # rfind searches up to MAX_TEXT_LENGTH, returns -1 if no period found
             truncate_at = text.rfind('.', 0, MAX_TEXT_LENGTH)
-            # Only use sentence boundary if it's within 10% of the limit
-            if truncate_at > MAX_TEXT_LENGTH * 0.9:
+            # Only use sentence boundary if found AND within threshold (last 10% of limit)
+            if truncate_at != -1 and truncate_at > MAX_TEXT_LENGTH * SENTENCE_BOUNDARY_THRESHOLD:
                 text = text[:truncate_at + 1] + "\n\n[... content truncated ...]"
             else:
-                # Fall back to hard truncation if no good sentence boundary found
+                # Fall back to hard truncation if no good sentence boundary found (or truncate_at == -1)
                 text = text[:MAX_TEXT_LENGTH] + "\n\n[... content truncated ...]"
 
         logger.info(
@@ -915,6 +972,80 @@ Use proper legal analysis method and cite articles.""" % (topic, case_facts)
 
         return response.content[0].text
 
+    def _sanitize_topic(self, topic: str | None, default: str = DEFAULT_TOPIC) -> str:
+        """Sanitize and validate topic parameter to prevent prompt injection.
+
+        Args:
+            topic: The topic string to sanitize (can be None)
+            default: Default value if topic is None or empty (defaults to DEFAULT_TOPIC constant)
+
+        Returns:
+            Sanitized topic string
+
+        Raises:
+            ValueError: If topic is too long, only whitespace, or contains suspicious patterns
+        """
+        # Handle None or empty string consistently - return default
+        if topic is None or topic == '':
+            return default
+
+        # Strip whitespace and validate non-empty
+        # If topic becomes empty after stripping, return default (consistent behavior)
+        topic = topic.strip()
+        if not topic:
+            return default
+
+        # Validate length BEFORE normalization
+        if len(topic) > MAX_TOPIC_LENGTH:
+            raise ValueError(f"topic must not exceed {MAX_TOPIC_LENGTH} characters")
+
+        # Unicode normalization to prevent homoglyph and zero-width character attacks
+        # NFKC normalization converts visually similar characters to canonical form
+        # Examples: ℀ -> a/c, ﬁ -> fi, zero-width spaces removed
+        # WARNING: NFKC can EXPAND character count (e.g., ℀ becomes 3 chars: a/c)
+        topic = unicodedata.normalize('NFKC', topic)
+
+        # Remove zero-width characters that could be used for obfuscation
+        # Zero-width space (U+200B), zero-width joiner (U+200D), etc.
+        zero_width_chars = [
+            '\u200b',  # Zero-width space
+            '\u200c',  # Zero-width non-joiner
+            '\u200d',  # Zero-width joiner
+            '\ufeff',  # Zero-width no-break space (BOM)
+        ]
+        for char in zero_width_chars:
+            topic = topic.replace(char, '')
+
+        # Re-validate length AFTER normalization (CRITICAL: NFKC can expand character count)
+        # Example: A topic with 200 compatibility chars could expand beyond limit
+        if len(topic) > MAX_TOPIC_LENGTH:
+            raise ValueError(f"topic must not exceed {MAX_TOPIC_LENGTH} characters after normalization")
+
+        # Normalize topic for pattern matching to catch obfuscation attempts
+        # Remove excessive whitespace and normalize to single spaces
+        normalized_topic = re.sub(r'\s+', ' ', topic)
+
+        # Check for suspicious prompt injection patterns using compiled regex (faster)
+        for pattern in PROMPT_INJECTION_PATTERNS:
+            if pattern.search(normalized_topic):
+                raise ValueError("topic contains suspicious content that may be a prompt injection attempt")
+
+        # Sanitize topic by escaping special characters that could manipulate AI behavior
+        # IMPORTANT: Escape backslashes FIRST to prevent bypass attacks (e.g., \")
+        topic = topic.replace('\\', '\\\\').replace('"', '\\"').replace('\n', ' ').replace('\r', ' ')
+
+        # Also escape other Unicode whitespace characters
+        topic = topic.replace('\t', ' ').replace('\u2028', ' ').replace('\u2029', ' ')
+
+        # Final check: After all normalization and sanitization, ensure topic is not empty
+        # This catches edge cases where topic becomes empty after processing
+        # (e.g., topic was only zero-width chars, or only special chars that got replaced)
+        topic = topic.strip()
+        if not topic:
+            return default
+
+        return topic
+
     async def generate_flashcards(
         self,
         topic: str,
@@ -922,18 +1053,18 @@ Use proper legal analysis method and cite articles.""" % (topic, case_facts)
         num_cards: int = 20
     ) -> List[Dict]:
         """
-        Generate flashcards from files.
+        Generate flashcards from files (legacy method).
 
         Args:
             topic: Topic name
             file_keys: Files to use
-            num_cards: Number of flashcards to generate
+            num_cards: Number of flashcards to generate (5-50)
 
         Returns:
             List of flashcard dictionaries
 
         Raises:
-            ValueError: If file_keys is empty
+            ValueError: If file_keys is empty, topic is invalid, or num_cards out of range
             TypeError: If file_keys contains non-string values
         """
         # Input validation
@@ -941,6 +1072,13 @@ Use proper legal analysis method and cite articles.""" % (topic, case_facts)
             raise ValueError("file_keys cannot be empty")
         if not all(isinstance(k, str) for k in file_keys):
             raise TypeError("All file_keys must be strings")
+
+        # Validate num_cards range (consistent with course-aware method)
+        if not MIN_FLASHCARDS <= num_cards <= MAX_FLASHCARDS:
+            raise ValueError(f"num_cards must be between {MIN_FLASHCARDS} and {MAX_FLASHCARDS}")
+
+        # Sanitize topic using shared method
+        topic = self._sanitize_topic(topic)
 
         content_blocks = []
 
@@ -1015,14 +1153,17 @@ Include:
         # Input validation
         if not course_id or not course_id.strip():
             raise ValueError("course_id is required and cannot be empty")
-        if not 5 <= num_cards <= 50:
-            raise ValueError("num_cards must be between 5 and 50")
-        if week_number is not None and not 1 <= week_number <= 52:
-            raise ValueError("week_number must be between 1 and 52")
+        if not MIN_FLASHCARDS <= num_cards <= MAX_FLASHCARDS:
+            raise ValueError(f"num_cards must be between {MIN_FLASHCARDS} and {MAX_FLASHCARDS}")
+        if week_number is not None and not 1 <= week_number <= MAX_WEEK_NUMBER:
+            raise ValueError(f"week_number must be between 1 and {MAX_WEEK_NUMBER}")
+
+        # Sanitize topic using shared method
+        topic = self._sanitize_topic(topic)
 
         logger.info(
-            "Generating flashcards from course %s: %d cards, week=%s",
-            course_id, num_cards, week_number
+            "Generating flashcards from course %s: %d cards, week=%s, topic=%s",
+            course_id, num_cards, week_number, topic
         )
 
         # Get materials with their extracted text content
@@ -1033,7 +1174,9 @@ Include:
         )
 
         if not materials_with_text:
-            raise ValueError(f"No materials found for course {course_id}")
+            # Include week context in error message for better debugging
+            week_msg = f" for week {week_number}" if week_number else ""
+            raise ValueError(f"No materials found for course {course_id}{week_msg}")
 
         # Build content blocks using extracted text
         content_blocks = []

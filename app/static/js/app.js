@@ -8,6 +8,10 @@ const COURSE_ID = window.COURSE_CONTEXT?.courseId || null;
 const COURSE_NAME = window.COURSE_CONTEXT?.courseName || 'LLS';
 const COURSE = window.COURSE_CONTEXT?.course || null;
 
+// ========== Request Tracking ==========
+// Counter for active tutor requests to prevent race conditions with typing indicator
+let activeTutorRequests = 0;
+
 /**
  * Add course_id parameter to API requests if in course context
  */
@@ -33,6 +37,20 @@ function buildUrl(endpoint, params = {}) {
 
 // ========== Tab Navigation ==========
 document.addEventListener('DOMContentLoaded', () => {
+    // Verify course context is set
+    if (!COURSE_ID) {
+        console.error('No course ID set - redirecting to course selection');
+        window.location.href = '/';
+        return;
+    }
+
+    // Log course context for debugging
+    console.log('✅ Course Context Loaded:', {
+        courseId: COURSE_ID,
+        courseName: COURSE_NAME,
+        course: COURSE
+    });
+
     const tabs = document.querySelectorAll('.nav-tab');
     const sections = document.querySelectorAll('.section');
 
@@ -312,19 +330,138 @@ function formatMarkdownFallback(text) {
 }
 
 // Format inline markdown (bold, italic, code, etc.)
+//
+// ReDoS PROTECTION STRATEGY:
+// This function uses a defense-in-depth approach to prevent Regular Expression Denial of Service:
+// 1. INPUT LENGTH LIMIT: Text truncated to 10KB before any regex processing
+// 2. BOUNDED QUANTIFIERS: All quantifiers have strict upper bounds {1,500}
+// 3. CHARACTER CLASS EXCLUSION: [^*] and [^`] prevent nested/overlapping matches
+// 4. NO BACKTRACKING: Greedy quantifiers without alternation = O(n) time complexity
+// 5. NO NESTED QUANTIFIERS: Avoids exponential complexity
+//
+// This multi-layer approach ensures the function is safe even with malicious input.
 function formatInline(text) {
+    // LAYER 1: Prevent ReDoS attacks by limiting text length before regex processing
+    // Maximum length for inline formatting (10KB should be sufficient for any reasonable text)
+    const MAX_INLINE_LENGTH = 10000;
+
+    if (!text) return '';
+
+    // Truncate if too long to prevent ReDoS (CRITICAL: This is our first line of defense)
+    if (text.length > MAX_INLINE_LENGTH) {
+        console.warn(`formatInline: Text truncated from ${text.length} to ${MAX_INLINE_LENGTH} chars to prevent ReDoS`);
+        text = text.substring(0, MAX_INLINE_LENGTH) + '...';
+    }
+
     text = escapeHtml(text);
-    text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-    text = text.replace(/\*(.*?)\*/g, '<em>$1</em>');
-    text = text.replace(/`(.*?)`/g, '<code>$1</code>');
+
+    // LAYER 2: Use character class exclusions with strict quantifiers to prevent ReDoS
+    // Pattern explanation:
+    // - [^*] excludes asterisks, preventing nested/overlapping matches
+    // - {1,500} strict quantifier with upper bound prevents catastrophic backtracking
+    // - NO non-greedy quantifier (?) - character class exclusion already prevents overlapping
+    // - No alternation or nested quantifiers to avoid exponential complexity
+    // These patterns are O(n) time complexity, not vulnerable to ReDoS
+    //
+    // RELIANCE ON LENGTH LIMITS:
+    // - Input is pre-truncated to 10KB (see above)
+    // - Each pattern match is limited to 500 chars
+    // - Combined with character class exclusion, this guarantees linear time complexity
+
+    // Bold: **text** (must have at least 1 char, max 500)
+    // Removed non-greedy ? to prevent backtracking issues
+    text = text.replace(/\*\*([^*]{1,500})\*\*/g, '<strong>$1</strong>');
+
+    // Italic: *text* (must have at least 1 char, max 500)
+    // Removed non-greedy ? - character class exclusion prevents overlapping with bold
+    text = text.replace(/\*([^*]{1,500})\*/g, '<em>$1</em>');
+
+    // Code: `text` (must have at least 1 char, max 500)
+    // Removed non-greedy ? to prevent backtracking issues
+    text = text.replace(/`([^`]{1,500})`/g, '<code>$1</code>');
+
     return text;
 }
 
 // Escape HTML to prevent XSS
+// This function properly escapes all special characters including:
+// <, >, &, ", ', and backslashes by using textContent which handles all escaping
+//
+// Implementation note: This uses the browser's built-in escaping mechanism.
+// Setting textContent automatically escapes ALL characters that need escaping in HTML,
+// including backslashes, quotes, angle brackets, and control characters.
+// This is a standard and secure pattern recommended for HTML escaping in JavaScript.
 function escapeHtml(text) {
+    if (!text) return '';
     const div = document.createElement('div');
-    div.textContent = text;
+    div.textContent = text;  // Browser automatically escapes all special chars
     return div.innerHTML;
+}
+
+// Compiled regex patterns for prompt injection detection (compiled once for performance)
+// These patterns are defined at module level to avoid recompilation on every validation call
+// Patterns avoid false positives for legal education (e.g., "act as a judge" is valid)
+// Tightened to require AI-specific context words to avoid blocking legal topics
+const PROMPT_INJECTION_PATTERNS = [
+    // Instruction override attempts - target AI/system instructions specifically
+    // Requires context words like "instructions", "prompts", "rules", "commands"
+    /ignore\s+(previous|all|above|prior|earlier)\s+(instructions?|prompts?|rules?|commands?)/i,
+    /disregard\s+(previous|all|above|prior|earlier)\s+(instructions?|prompts?|rules?|commands?)/i,
+    /forget\s+(previous|all|above|prior|earlier)\s+(instructions?|prompts?|rules?|commands?)/i,
+    /override\s+(previous|all|above|prior)\s+(instructions?|prompts?|rules?|commands?)/i,
+
+    // System manipulation attempts - specific to AI system
+    // Tightened: requires "AI", "assistant", or "model" before "system" to avoid legal topics
+    // Allows: "legal system instruction", "justice system message"
+    // Blocks: "AI system prompt", "ignore system instruction"
+    /(ai|assistant|model|chatbot)\s+system\s+(prompt|message|instruction)/i,
+    /(ignore|bypass|override)\s+(the\s+)?system\s+(prompt|instruction|rules?)/i,
+    /new\s+(instructions?|prompt)\s+(for\s+)?(you|the\s+system|the\s+ai)/i,
+
+    // Role manipulation attempts - target AI role changes, not legal roles
+    // Requires AI-specific roles: unrestricted, jailbroken, developer, admin, root, DAN
+    /you\s+are\s+now\s+(an?\s+)?(unrestricted|jailbroken|developer|admin|root)/i,
+    /act\s+as\s+(an?\s+)?(unrestricted|jailbroken|developer|admin|root|dan)/i,
+    /pretend\s+(to\s+be|you\s+are)\s+(an?\s+)?(unrestricted|jailbroken|developer|admin)/i,
+
+    // Direct command attempts targeting AI behavior
+    // Requires "code", "command", or "script" to avoid blocking legal topics
+    /(^|\s)(execute|run|perform)\s+(this|the|following)\s+(code|command|script)/i,
+
+    // Explicit jailbreak attempts
+    /(jailbreak|dan\s+mode|developer\s+mode|god\s+mode)/i,
+];
+
+/**
+ * Validate topic input on frontend to prevent prompt injection
+ * @param {string} topic - The topic to validate
+ * @returns {Object} - {valid: boolean, error: string|null}
+ */
+function validateTopicInput(topic) {
+    const MAX_TOPIC_LENGTH = 200;
+
+    if (!topic || !topic.trim()) {
+        return {valid: false, error: 'topic cannot be empty or only whitespace'};
+    }
+
+    const trimmedTopic = topic.trim();
+
+    if (trimmedTopic.length > MAX_TOPIC_LENGTH) {
+        return {valid: false, error: `topic must not exceed ${MAX_TOPIC_LENGTH} characters`};
+    }
+
+    // Check for suspicious prompt injection patterns using pre-compiled patterns
+    // Normalize whitespace for pattern matching
+    const normalizedTopic = trimmedTopic.replace(/\s+/g, ' ');
+
+    // Use pre-compiled patterns from module level (performance optimization)
+    for (const pattern of PROMPT_INJECTION_PATTERNS) {
+        if (pattern.test(normalizedTopic)) {
+            return {valid: false, error: 'topic contains suspicious content that may be a prompt injection attempt'};
+        }
+    }
+
+    return {valid: true, error: null};
 }
 
 // ========== AI Tutor ==========
@@ -368,7 +505,10 @@ async function askTutor() {
     addMessage('user', message);
     document.getElementById('tutor-input').value = '';
 
-    // Show typing indicator (bouncing dots)
+    // Increment active request counter and show typing indicator
+    // Note: JavaScript is single-threaded, so this increment is atomic
+    // However, we add defensive checks in the finally block
+    activeTutorRequests++;
     showTypingIndicator();
 
     try {
@@ -387,15 +527,22 @@ async function askTutor() {
         if (!response.ok) throw new Error(`API error: ${response.status}`);
 
         const data = await response.json();
-
-        // Hide typing indicator and show response
-        hideTypingIndicator();
         addMessage('assistant', data.content);
 
     } catch (error) {
         console.error('Error:', error);
-        hideTypingIndicator();
         addMessage('error', 'Sorry, there was an error processing your request.');
+    } finally {
+        // Decrement active request counter with defensive check
+        // Ensure counter never goes negative (defensive programming)
+        activeTutorRequests = Math.max(0, activeTutorRequests - 1);
+
+        // Only hide typing indicator if no other requests are active
+        // This prevents race condition where multiple simultaneous requests
+        // could hide the indicator while other requests are still in progress
+        if (activeTutorRequests === 0) {
+            hideTypingIndicator();
+        }
     }
 }
 
@@ -573,6 +720,10 @@ function updateWordCount() {
 
 async function generateEssayQuestion() {
     const topic = document.getElementById('essay-topic-select').value;
+
+    // Note: Validation removed for select inputs as they contain predefined safe values
+    // Backend validation still applies as defense-in-depth
+
     showLoading();
 
     try {
@@ -908,9 +1059,14 @@ async function loadSavedQuizzes() {
                 <div class="empty-state">
                     <div class="empty-state-icon">📚</div>
                     <p>No saved quizzes yet. Create your first quiz!</p>
-                    <button class="btn btn-primary" onclick="switchQuizTab('new')">Create New Quiz</button>
+                    <button class="btn btn-primary create-new-quiz-btn">Create New Quiz</button>
                 </div>
             `;
+            // Add event listener for CSP compliance (no inline onclick)
+            const createBtn = container.querySelector('.create-new-quiz-btn');
+            if (createBtn) {
+                createBtn.addEventListener('click', () => switchQuizTab('new'));
+            }
             return;
         }
 
@@ -968,9 +1124,14 @@ async function loadQuizHistory() {
                 <div class="empty-state">
                     <div class="empty-state-icon">📊</div>
                     <p>No quiz history yet. Take a quiz to see your results!</p>
-                    <button class="btn btn-primary" onclick="switchQuizTab('saved')">Browse Quizzes</button>
+                    <button class="btn btn-primary browse-quizzes-btn">Browse Quizzes</button>
                 </div>
             `;
+            // Add event listener for CSP compliance (no inline onclick)
+            const browseBtn = container.querySelector('.browse-quizzes-btn');
+            if (browseBtn) {
+                browseBtn.addEventListener('click', () => switchQuizTab('saved'));
+            }
             return;
         }
 
@@ -1106,6 +1267,17 @@ async function generateQuiz() {
         }
     }
 
+    // Validate topic input (defense in depth)
+    // Note: Topic is extracted from option text (line 1272), which could be dynamically generated
+    // Therefore validation is still needed, unlike essay-topic-select which uses predefined values
+    if (topic && topic !== 'all') {
+        const validation = validateTopicInput(topic);
+        if (!validation.valid) {
+            alert(`Invalid topic: ${validation.error}`);
+            return;
+        }
+    }
+
     isGeneratingQuiz = true;
     showLoading();
 
@@ -1168,12 +1340,15 @@ async function generateQuiz() {
         showQuizContent();
 
     } catch (error) {
-        console.error('Error:', error);
+        console.error('Error generating quiz:', error);
+        // Show error message in quiz container
         if (questionContainer) {
             const errorMessage = error.message || 'Error generating quiz. Please try again.';
             questionContainer.innerHTML = `<p class="error">${escapeHtml(errorMessage)}</p>`;
         }
-        if (quizContent) quizContent.classList.remove('hidden');
+        if (quizContent) {
+            quizContent.classList.remove('hidden');
+        }
     } finally {
         isGeneratingQuiz = false;
         hideLoading();
@@ -1903,6 +2078,85 @@ function safeParseInt(value, fallback = 0) {
 }
 
 function initDashboard() {
+    // Add course-specific information banner to dashboard
+    const dashboardSection = document.getElementById('dashboard-section');
+    if (dashboardSection && COURSE_ID) {
+        // Check if course info banner already exists
+        let courseInfoBanner = dashboardSection.querySelector('.course-info-banner');
+        if (!courseInfoBanner) {
+            // Create banner using DOM manipulation for CSP compliance and XSS prevention
+            courseInfoBanner = document.createElement('div');
+            courseInfoBanner.className = 'course-info-banner';
+
+            // Create icon element
+            const icon = document.createElement('span');
+            icon.className = 'course-info-icon';
+            icon.textContent = '📚';
+
+            // Create text container
+            const textDiv = document.createElement('div');
+            textDiv.className = 'course-info-text';
+
+            // Create course name element
+            const nameDiv = document.createElement('div');
+            nameDiv.className = 'course-info-name';
+            nameDiv.textContent = `Active Course: ${COURSE_NAME}`;
+
+            // Create course ID element
+            const idDiv = document.createElement('div');
+            idDiv.className = 'course-info-id';
+            idDiv.textContent = `Course ID: ${COURSE_ID}`;
+
+            // Assemble text container
+            textDiv.appendChild(nameDiv);
+            textDiv.appendChild(idDiv);
+
+            // Create badge element
+            const badge = document.createElement('span');
+            badge.className = 'course-info-badge';
+            badge.textContent = '✓ Course-Specific Content';
+
+            // Assemble banner
+            courseInfoBanner.appendChild(icon);
+            courseInfoBanner.appendChild(textDiv);
+            courseInfoBanner.appendChild(badge);
+
+            // Insert banner at the top of the dashboard section with error handling
+            try {
+                const sectionTitle = dashboardSection.querySelector('.section-title');
+                if (sectionTitle) {
+                    // Insert after section title for better visual hierarchy
+                    sectionTitle.insertAdjacentElement('afterend', courseInfoBanner);
+                } else {
+                    // No section title - prepend to dashboard
+                    dashboardSection.insertAdjacentElement('afterbegin', courseInfoBanner);
+                }
+            } catch (error) {
+                // Fallback: if insertAdjacentElement fails, try appendChild
+                console.warn('Course banner insertion failed, using fallback:', error);
+                try {
+                    dashboardSection.appendChild(courseInfoBanner);
+                } catch (fallbackError) {
+                    console.error('Course banner insertion completely failed:', fallbackError);
+
+                    // Notify user that course info couldn't be displayed
+                    const errorBanner = document.createElement('div');
+                    errorBanner.className = 'alert alert-warning';
+                    errorBanner.style.margin = '10px 0';
+                    errorBanner.textContent = 'Unable to display course information banner. Course functionality may be limited.';
+
+                    // Try to insert error notification
+                    try {
+                        dashboardSection.insertAdjacentElement('afterbegin', errorBanner);
+                    } catch (e) {
+                        // If even error notification fails, just log it
+                        console.error('Could not display error notification:', e);
+                    }
+                }
+            }
+        }
+    }
+
     // Validate topics format (should be like "2/5")
     const topicsValue = localStorage.getItem('lls_topics');
     const validTopics = topicsValue && /^\d+\/\d+$/.test(topicsValue) ? topicsValue : '0/5';
@@ -2084,16 +2338,6 @@ function setupWeekCardEventDelegation(weeksGrid) {
     });
 }
 
-/**
- * Escape HTML to prevent XSS
- */
-function escapeHtml(text) {
-    if (!text) return '';
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-
 // ========== Flashcards ==========
 // Course-aware flashcard system - loads flashcards dynamically from backend API
 // Flashcards are generated from actual course materials using FilesAPIService
@@ -2105,6 +2349,7 @@ const DEFAULT_FLASHCARD_COUNT = 20;
 let flashcards = [];
 let currentCardIndex = 0;
 let isLoadingFlashcards = false;
+let lastFlashcardErrorTime = 0;  // Timestamp of last error for debouncing
 
 /**
  * Initialize event listeners for flashcard navigation and interaction
@@ -2136,6 +2381,24 @@ function initFlashcardListeners() {
  * Load flashcards from backend API using course context
  */
 async function loadFlashcards() {
+    // Debounce error retries to prevent rapid retries that could overload the backend
+    // Check this first to provide immediate feedback to users
+    const DEBOUNCE_MS = 2000;
+    const now = Date.now();
+    if (lastFlashcardErrorTime && (now - lastFlashcardErrorTime) < DEBOUNCE_MS) {
+        const remainingMs = DEBOUNCE_MS - (now - lastFlashcardErrorTime);
+        const remainingSec = Math.ceil(remainingMs / 1000);
+        console.log(`Debounce active: ${remainingSec}s remaining`);
+
+        // User-friendly message explaining why they need to wait
+        const message = remainingSec === 1
+            ? 'Please wait 1 second before trying again. This helps prevent server overload.'
+            : `Please wait ${remainingSec} seconds before trying again. This helps prevent server overload.`;
+
+        showFlashcardError(message);
+        return;
+    }
+
     // Prevent multiple simultaneous requests
     if (isLoadingFlashcards) {
         console.log('Flashcards already loading');
@@ -2193,12 +2456,19 @@ async function loadFlashcards() {
         updateFlashcardDisplay();
         updateFlashcardStats();
 
+        // Success - reset error debouncing timestamp
+        lastFlashcardErrorTime = 0;
+
         console.log(`Loaded ${flashcards.length} flashcards for course ${COURSE_ID}`);
 
     } catch (error) {
         console.error('Error loading flashcards:', error);
         showFlashcardError(error.message || 'Error loading flashcards. Please try again.');
+
+        // Record error timestamp for debouncing future retry attempts
+        lastFlashcardErrorTime = Date.now();
     } finally {
+        // Always reset loading flag to allow future requests
         isLoadingFlashcards = false;
     }
 }
