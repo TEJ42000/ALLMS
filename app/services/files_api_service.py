@@ -44,6 +44,7 @@ MIN_FLASHCARDS = 5  # Minimum number of flashcards to generate
 MAX_FLASHCARDS = 50  # Maximum number of flashcards to generate
 MAX_TOPIC_LENGTH = 200  # Maximum length for topic parameter (prevent prompt injection)
 MAX_WEEK_NUMBER = 52  # Maximum week number in academic year
+DEFAULT_TOPIC = "Course Materials"  # Default topic when none is provided
 
 
 class FilesAPIService:
@@ -922,12 +923,12 @@ Use proper legal analysis method and cite articles.""" % (topic, case_facts)
 
         return response.content[0].text
 
-    def _sanitize_topic(self, topic: str | None, default: str = "Course Materials") -> str:
+    def _sanitize_topic(self, topic: str | None, default: str = DEFAULT_TOPIC) -> str:
         """Sanitize and validate topic parameter to prevent prompt injection.
 
         Args:
             topic: The topic string to sanitize (can be None)
-            default: Default value if topic is None or empty
+            default: Default value if topic is None or empty (defaults to DEFAULT_TOPIC constant)
 
         Returns:
             Sanitized topic string

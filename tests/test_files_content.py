@@ -511,7 +511,9 @@ class TestInputValidation:
             # Original: Test \"topic"\nwith\rnewlines
             # Expected: Test \\\\"topic\\" with with newlines
             assert 'Test \\\\\\"topic\\"' in prompt_text  # Backslash and quote properly escaped
-            assert '\n' not in prompt_text or 'with with' in prompt_text  # Newlines replaced with spaces
+            # Newlines should be replaced with spaces (separate assertions for clarity)
+            assert '\n' not in prompt_text, "Newlines should be replaced"
+            assert 'with with' in prompt_text, "Newlines should be replaced with spaces"
 
     @pytest.mark.asyncio
     async def test_generate_flashcards_topic_whitespace_only(self):
@@ -932,7 +934,9 @@ class TestCourseAwareFlashcardsEndpoint:
                 # 2. Then quotes are escaped: " -> \"
                 # 3. Newlines/carriage returns replaced with spaces
                 assert 'Test \\\\\\"topic\\"' in prompt_text  # Backslash and quote properly escaped
-                assert '\n' not in prompt_text or 'with with' in prompt_text  # Newlines replaced
+                # Newlines should be replaced with spaces (separate assertions for clarity)
+                assert '\n' not in prompt_text, "Newlines should be replaced"
+                assert 'with with' in prompt_text, "Newlines should be replaced with spaces"
 
 
 class TestCourseFilesEndpoint:

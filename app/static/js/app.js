@@ -2002,9 +2002,11 @@ function initDashboard() {
                 dashboardSection.insertBefore(courseInfoBanner, sectionTitle.nextSibling);
             } else if (dashboardSection.firstChild) {
                 // Fallback: insert at the beginning of the section
+                console.warn('Course info banner: section title not found, inserting at beginning');
                 dashboardSection.insertBefore(courseInfoBanner, dashboardSection.firstChild);
             } else {
                 // Last resort: append to empty section
+                console.warn('Course info banner: section is empty, appending to section');
                 dashboardSection.appendChild(courseInfoBanner);
             }
         }
@@ -2241,7 +2243,7 @@ async function loadFlashcards() {
         return;
     }
 
-    // Debounce error retries to prevent rapid retries that could DDoS the backend
+    // Debounce error retries to prevent rapid retries that could overload the backend
     const DEBOUNCE_MS = 2000;
     const now = Date.now();
     if (lastFlashcardErrorTime && (now - lastFlashcardErrorTime) < DEBOUNCE_MS) {
@@ -2300,6 +2302,9 @@ async function loadFlashcards() {
         hideFlashcardLoading();
         updateFlashcardDisplay();
         updateFlashcardStats();
+
+        // Success - reset error debouncing timestamp
+        lastFlashcardErrorTime = 0;
 
         console.log(`Loaded ${flashcards.length} flashcards for course ${COURSE_ID}`);
 
