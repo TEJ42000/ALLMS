@@ -386,23 +386,31 @@ function escapeHtml(text) {
 // Compiled regex patterns for prompt injection detection (compiled once for performance)
 // These patterns are defined at module level to avoid recompilation on every validation call
 // Patterns avoid false positives for legal education (e.g., "act as a judge" is valid)
+// Tightened to require AI-specific context words to avoid blocking legal topics
 const PROMPT_INJECTION_PATTERNS = [
     // Instruction override attempts - target AI/system instructions specifically
+    // Requires context words like "instructions", "prompts", "rules", "commands"
     /ignore\s+(previous|all|above|prior|earlier)\s+(instructions?|prompts?|rules?|commands?)/i,
     /disregard\s+(previous|all|above|prior|earlier)\s+(instructions?|prompts?|rules?|commands?)/i,
     /forget\s+(previous|all|above|prior|earlier)\s+(instructions?|prompts?|rules?|commands?)/i,
     /override\s+(previous|all|above|prior)\s+(instructions?|prompts?|rules?|commands?)/i,
 
     // System manipulation attempts - specific to AI system
-    /system\s+(prompt|message|instruction)/i,
+    // Tightened: requires "AI", "assistant", or "model" before "system" to avoid legal topics
+    // Allows: "legal system instruction", "justice system message"
+    // Blocks: "AI system prompt", "ignore system instruction"
+    /(ai|assistant|model|chatbot)\s+system\s+(prompt|message|instruction)/i,
+    /(ignore|bypass|override)\s+(the\s+)?system\s+(prompt|instruction|rules?)/i,
     /new\s+(instructions?|prompt)\s+(for\s+)?(you|the\s+system|the\s+ai)/i,
 
     // Role manipulation attempts - target AI role changes, not legal roles
+    // Requires AI-specific roles: unrestricted, jailbroken, developer, admin, root, DAN
     /you\s+are\s+now\s+(an?\s+)?(unrestricted|jailbroken|developer|admin|root)/i,
     /act\s+as\s+(an?\s+)?(unrestricted|jailbroken|developer|admin|root|dan)/i,
     /pretend\s+(to\s+be|you\s+are)\s+(an?\s+)?(unrestricted|jailbroken|developer|admin)/i,
 
     // Direct command attempts targeting AI behavior
+    // Requires "code", "command", or "script" to avoid blocking legal topics
     /(^|\s)(execute|run|perform)\s+(this|the|following)\s+(code|command|script)/i,
 
     // Explicit jailbreak attempts

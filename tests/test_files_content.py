@@ -528,7 +528,7 @@ class TestInputValidation:
         service = FilesAPIService()
 
         long_topic = "A" * 201  # 201 characters, exceeds limit of 200
-        with pytest.raises(ValueError, match="topic must be less than 200 characters"):
+        with pytest.raises(ValueError, match="topic must not exceed 200 characters"):
             await service.generate_flashcards(
                 topic=long_topic,
                 file_keys=["reader_criminal_law"],
@@ -1097,7 +1097,7 @@ class TestCourseAwareFlashcardsEndpoint:
 
         # Test topic too long
         long_topic = "A" * 201  # Exceeds 200 character limit
-        with pytest.raises(ValueError, match="topic must be less than 200 characters"):
+        with pytest.raises(ValueError, match="topic must not exceed 200 characters"):
             await service.generate_flashcards_from_course(
                 course_id="LLS-2025-2026",
                 num_cards=10,
