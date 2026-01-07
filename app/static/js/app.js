@@ -327,6 +327,18 @@ function formatMarkdownFallback(text) {
 
 // Format inline markdown (bold, italic, code, etc.)
 function formatInline(text) {
+    // Prevent ReDoS attacks by limiting text length before regex processing
+    // Maximum length for inline formatting (10KB should be sufficient for any reasonable text)
+    const MAX_INLINE_LENGTH = 10000;
+
+    if (!text) return '';
+
+    // Truncate if too long to prevent ReDoS
+    if (text.length > MAX_INLINE_LENGTH) {
+        console.warn(`formatInline: Text truncated from ${text.length} to ${MAX_INLINE_LENGTH} chars to prevent ReDoS`);
+        text = text.substring(0, MAX_INLINE_LENGTH) + '...';
+    }
+
     text = escapeHtml(text);
     // Use non-greedy matching with character class exclusions to prevent regex injection
     // [^*] ensures we only match content between markers, not regex special chars
@@ -2190,6 +2202,7 @@ const DEFAULT_FLASHCARD_COUNT = 20;
 let flashcards = [];
 let currentCardIndex = 0;
 let isLoadingFlashcards = false;
+let lastFlashcardErrorTime = 0;  // Timestamp of last error for debouncing
 
 /**
  * Initialize event listeners for flashcard navigation and interaction
@@ -2225,6 +2238,16 @@ async function loadFlashcards() {
     if (isLoadingFlashcards) {
         console.log('Flashcards already loading');
         showFlashcardError('Flashcards are already loading. Please wait...');
+        return;
+    }
+
+    // Debounce error retries to prevent rapid retries that could DDoS the backend
+    const DEBOUNCE_MS = 2000;
+    const now = Date.now();
+    if (lastFlashcardErrorTime && (now - lastFlashcardErrorTime) < DEBOUNCE_MS) {
+        const remainingMs = DEBOUNCE_MS - (now - lastFlashcardErrorTime);
+        console.log(`Please wait ${Math.ceil(remainingMs / 1000)}s before retrying`);
+        showFlashcardError(`Please wait ${Math.ceil(remainingMs / 1000)} seconds before retrying...`);
         return;
     }
 
@@ -2283,16 +2306,16 @@ async function loadFlashcards() {
     } catch (error) {
         console.error('Error loading flashcards:', error);
         showFlashcardError(error.message || 'Error loading flashcards. Please try again.');
-        // Add debounce on error to prevent rapid retries that could DDoS the backend
-        // Wait 2 seconds before allowing retry
-        setTimeout(() => {
-            isLoadingFlashcards = false;
-        }, 2000);
-        return; // Exit early - don't reset flag immediately
-    }
 
-    // Success - reset flag immediately (only reached if no error thrown)
-    isLoadingFlashcards = false;
+        // Record error timestamp for debouncing (prevents race condition with setTimeout)
+        lastFlashcardErrorTime = Date.now();
+
+        // Reset loading flag immediately - debouncing is now handled by timestamp check
+        isLoadingFlashcards = false;
+    } finally {
+        // Always reset loading flag (redundant with catch block but ensures cleanup)
+        isLoadingFlashcards = false;
+    }
 }
 
 /**

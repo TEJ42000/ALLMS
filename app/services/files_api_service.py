@@ -922,6 +922,37 @@ Use proper legal analysis method and cite articles.""" % (topic, case_facts)
 
         return response.content[0].text
 
+    def _sanitize_topic(self, topic: str | None, default: str = "Course Materials") -> str:
+        """Sanitize and validate topic parameter to prevent prompt injection.
+
+        Args:
+            topic: The topic string to sanitize (can be None)
+            default: Default value if topic is None or empty
+
+        Returns:
+            Sanitized topic string
+
+        Raises:
+            ValueError: If topic is too long or only whitespace
+        """
+        if not topic:
+            return default
+
+        # Strip whitespace and validate non-empty
+        topic = topic.strip()
+        if not topic:
+            raise ValueError("topic cannot be empty or only whitespace")
+
+        # Validate length
+        if len(topic) > MAX_TOPIC_LENGTH:
+            raise ValueError(f"topic must be less than {MAX_TOPIC_LENGTH} characters")
+
+        # Sanitize topic by escaping special characters that could manipulate AI behavior
+        # IMPORTANT: Escape backslashes FIRST to prevent bypass attacks (e.g., \")
+        topic = topic.replace('\\', '\\\\').replace('"', '\\"').replace('\n', ' ').replace('\r', ' ')
+
+        return topic
+
     async def generate_flashcards(
         self,
         topic: str,
@@ -953,19 +984,8 @@ Use proper legal analysis method and cite articles.""" % (topic, case_facts)
         if not MIN_FLASHCARDS <= num_cards <= MAX_FLASHCARDS:
             raise ValueError(f"num_cards must be between {MIN_FLASHCARDS} and {MAX_FLASHCARDS}")
 
-        # Validate and sanitize topic to prevent prompt injection (same as course-aware method)
-        if topic:
-            # Strip whitespace and validate non-empty
-            topic = topic.strip()
-            if not topic:
-                raise ValueError("topic cannot be empty or only whitespace")
-            if len(topic) > MAX_TOPIC_LENGTH:
-                raise ValueError(f"topic must be less than {MAX_TOPIC_LENGTH} characters")
-            # Sanitize topic by escaping special characters that could manipulate AI behavior
-            # IMPORTANT: Escape backslashes FIRST to prevent bypass attacks (e.g., \")
-            topic = topic.replace('\\', '\\\\').replace('"', '\\"').replace('\n', ' ').replace('\r', ' ')
-        else:
-            topic = "Course Materials"
+        # Sanitize topic using shared method
+        topic = self._sanitize_topic(topic)
 
         content_blocks = []
 
@@ -1045,19 +1065,8 @@ Include:
         if week_number is not None and not 1 <= week_number <= MAX_WEEK_NUMBER:
             raise ValueError(f"week_number must be between 1 and {MAX_WEEK_NUMBER}")
 
-        # Validate and sanitize topic to prevent prompt injection
-        if topic:
-            # Strip whitespace and validate non-empty
-            topic = topic.strip()
-            if not topic:
-                raise ValueError("topic cannot be empty or only whitespace")
-            if len(topic) > MAX_TOPIC_LENGTH:
-                raise ValueError(f"topic must be less than {MAX_TOPIC_LENGTH} characters")
-            # Sanitize topic by escaping special characters that could manipulate AI behavior
-            # IMPORTANT: Escape backslashes FIRST to prevent bypass attacks (e.g., \")
-            topic = topic.replace('\\', '\\\\').replace('"', '\\"').replace('\n', ' ').replace('\r', ' ')
-        else:
-            topic = "Course Materials"
+        # Sanitize topic using shared method
+        topic = self._sanitize_topic(topic)
 
         logger.info(
             "Generating flashcards from course %s: %d cards, week=%s, topic=%s",

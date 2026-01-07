@@ -891,6 +891,49 @@ class TestCourseAwareFlashcardsEndpoint:
                 topic="   \t\n   "  # Only whitespace
             )
 
+    @pytest.mark.asyncio
+    async def test_generate_flashcards_from_course_topic_sanitization(self):
+        """Test that topic with special characters is properly sanitized in course-aware method."""
+        service = FilesAPIService()
+
+        # Mock the Anthropic client to verify sanitized topic is used
+        with patch.object(service, '_get_anthropic_client') as mock_client:
+            mock_response = MagicMock()
+            mock_response.content = [MagicMock(text='[{"front": "Q", "back": "A"}]')]
+            mock_response.usage = MagicMock(input_tokens=100, output_tokens=50)
+            mock_client.return_value.messages.create = AsyncMock(return_value=mock_response)
+
+            # Mock get_course_materials_with_text to return test materials
+            with patch.object(service, 'get_course_materials_with_text') as mock_materials:
+                mock_materials.return_value = [
+                    {"file_key": "test_file", "text": "Test content", "filename": "test.pdf"}
+                ]
+
+                # Topic with special characters that should be sanitized
+                # Test backslash escape bypass attempt
+                topic_with_special_chars = 'Test \\"topic"\nwith\rnewlines'
+
+                await service.generate_flashcards_from_course(
+                    course_id="LLS-2025-2026",
+                    topic=topic_with_special_chars,
+                    num_cards=10
+                )
+
+                # Verify the method was called and check the actual sanitized value
+                assert mock_client.return_value.messages.create.called
+
+                # Get the actual prompt sent to the API
+                call_args = mock_client.return_value.messages.create.call_args
+                messages = call_args.kwargs['messages']
+                prompt_text = messages[0]['content'][0]['text']
+
+                # Verify sanitization:
+                # 1. Backslashes are escaped first: \ -> \\
+                # 2. Then quotes are escaped: " -> \"
+                # 3. Newlines/carriage returns replaced with spaces
+                assert 'Test \\\\\\"topic\\"' in prompt_text  # Backslash and quote properly escaped
+                assert '\n' not in prompt_text or 'with with' in prompt_text  # Newlines replaced
+
 
 class TestCourseFilesEndpoint:
     """Tests for /api/files-content/course-files/{course_id} endpoint."""
