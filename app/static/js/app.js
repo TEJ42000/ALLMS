@@ -342,9 +342,10 @@ function formatInline(text) {
     text = escapeHtml(text);
     // Use non-greedy matching with character class exclusions to prevent regex injection
     // [^*] ensures we only match content between markers, not regex special chars
-    text = text.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-    text = text.replace(/\*([^*]+)\*/g, '<em>$1</em>');
-    text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
+    // Limit match length to prevent catastrophic backtracking
+    text = text.replace(/\*\*([^*]{1,500})\*\*/g, '<strong>$1</strong>');
+    text = text.replace(/\*([^*]{1,500})\*/g, '<em>$1</em>');
+    text = text.replace(/`([^`]{1,500})`/g, '<code>$1</code>');
     return text;
 }
 
@@ -361,6 +362,44 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;  // Browser automatically escapes all special chars
     return div.innerHTML;
+}
+
+/**
+ * Validate topic input on frontend to prevent prompt injection
+ * @param {string} topic - The topic to validate
+ * @returns {Object} - {valid: boolean, error: string|null}
+ */
+function validateTopicInput(topic) {
+    const MAX_TOPIC_LENGTH = 200;
+
+    if (!topic || !topic.trim()) {
+        return {valid: false, error: 'Topic cannot be empty'};
+    }
+
+    const trimmedTopic = topic.trim();
+
+    if (trimmedTopic.length > MAX_TOPIC_LENGTH) {
+        return {valid: false, error: `Topic must be less than ${MAX_TOPIC_LENGTH} characters`};
+    }
+
+    // Check for suspicious prompt injection patterns
+    const suspiciousPatterns = [
+        /ignore\s+(previous|all|above)/i,
+        /system\s+prompt/i,
+        /you\s+are\s+now/i,
+        /act\s+as/i,
+        /pretend\s+to\s+be/i,
+        /disregard\s+(previous|all)/i,
+        /forget\s+(previous|all)/i,
+    ];
+
+    for (const pattern of suspiciousPatterns) {
+        if (pattern.test(trimmedTopic)) {
+            return {valid: false, error: 'Topic contains suspicious content. Please use a simple topic description.'};
+        }
+    }
+
+    return {valid: true, error: null};
 }
 
 // ========== AI Tutor ==========
@@ -1995,18 +2034,17 @@ function initDashboard() {
             courseInfoBanner.appendChild(textDiv);
             courseInfoBanner.appendChild(badge);
 
-            // Insert at the top of the dashboard section
-            // Try to insert after section title for better visual hierarchy
+            // Insert banner at the top of the dashboard section
+            // Simplified logic: try after section title, otherwise prepend
             const sectionTitle = dashboardSection.querySelector('.section-title');
-            if (sectionTitle && sectionTitle.nextSibling) {
-                dashboardSection.insertBefore(courseInfoBanner, sectionTitle.nextSibling);
-            } else if (dashboardSection.firstChild) {
-                // Fallback: insert at the beginning of the section
-                console.warn('Course info banner: section title not found, inserting at beginning');
-                dashboardSection.insertBefore(courseInfoBanner, dashboardSection.firstChild);
+            const insertionPoint = (sectionTitle && sectionTitle.nextSibling)
+                ? sectionTitle.nextSibling
+                : dashboardSection.firstChild;
+
+            if (insertionPoint) {
+                dashboardSection.insertBefore(courseInfoBanner, insertionPoint);
             } else {
-                // Last resort: append to empty section
-                console.warn('Course info banner: section is empty, appending to section');
+                // Empty section - just append
                 dashboardSection.appendChild(courseInfoBanner);
             }
         }

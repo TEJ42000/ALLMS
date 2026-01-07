@@ -934,7 +934,7 @@ Use proper legal analysis method and cite articles.""" % (topic, case_facts)
             Sanitized topic string
 
         Raises:
-            ValueError: If topic is too long or only whitespace
+            ValueError: If topic is too long, only whitespace, or contains suspicious patterns
         """
         if not topic:
             return default
@@ -948,9 +948,29 @@ Use proper legal analysis method and cite articles.""" % (topic, case_facts)
         if len(topic) > MAX_TOPIC_LENGTH:
             raise ValueError(f"topic must be less than {MAX_TOPIC_LENGTH} characters")
 
+        # Check for suspicious prompt injection patterns (case-insensitive)
+        import re
+        suspicious_patterns = [
+            r'ignore\s+(previous|all|above)',
+            r'system\s+prompt',
+            r'you\s+are\s+now',
+            r'act\s+as',
+            r'pretend\s+to\s+be',
+            r'disregard\s+(previous|all)',
+            r'forget\s+(previous|all)',
+        ]
+
+        topic_lower = topic.lower()
+        for pattern in suspicious_patterns:
+            if re.search(pattern, topic_lower):
+                raise ValueError("topic contains suspicious content that may be a prompt injection attempt")
+
         # Sanitize topic by escaping special characters that could manipulate AI behavior
         # IMPORTANT: Escape backslashes FIRST to prevent bypass attacks (e.g., \")
         topic = topic.replace('\\', '\\\\').replace('"', '\\"').replace('\n', ' ').replace('\r', ' ')
+
+        # Also escape other Unicode whitespace characters
+        topic = topic.replace('\t', ' ').replace('\u2028', ' ').replace('\u2029', ' ')
 
         return topic
 
