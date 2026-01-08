@@ -11,20 +11,70 @@
 
 class FlashcardViewer {
     constructor(containerId, flashcards = []) {
+        // HIGH: Validate containerId
+        if (!containerId || typeof containerId !== 'string') {
+            console.error('[FlashcardViewer] Invalid containerId:', containerId);
+            throw new Error('FlashcardViewer requires a valid containerId string');
+        }
+
         this.container = document.getElementById(containerId);
-        this.flashcards = flashcards;
+        if (!this.container) {
+            console.error('[FlashcardViewer] Container element not found:', containerId);
+            throw new Error(`Container element with id "${containerId}" not found`);
+        }
+
+        // HIGH: Validate and filter flashcards
+        if (!Array.isArray(flashcards)) {
+            console.error('[FlashcardViewer] flashcards must be an array');
+            throw new Error('flashcards parameter must be an array');
+        }
+
+        // Filter out invalid cards
+        this.flashcards = flashcards.filter(card => {
+            if (!card || typeof card !== 'object') {
+                console.warn('[FlashcardViewer] Skipping invalid card:', card);
+                return false;
+            }
+
+            // Card must have either question/answer OR term/definition
+            const hasQuestionAnswer = card.question && card.answer;
+            const hasTermDefinition = card.term && card.definition;
+
+            if (!hasQuestionAnswer && !hasTermDefinition) {
+                console.warn('[FlashcardViewer] Skipping card without valid content:', card);
+                return false;
+            }
+
+            return true;
+        });
+
+        if (this.flashcards.length === 0) {
+            console.warn('[FlashcardViewer] No valid flashcards provided');
+            this.showEmptyState();
+            return;
+        }
+
+        console.log(`[FlashcardViewer] Initialized with ${this.flashcards.length} valid cards`);
+
         this.currentIndex = 0;
         this.isFlipped = false;
         this.reviewedCards = new Set();
         this.knownCards = new Set();
         this.starredCards = new Set();
-        
+
+        // Store original flashcards for restoration after filtering
+        this.originalFlashcards = [...this.flashcards];
+
         // Event listeners for cleanup
         this.eventListeners = [];
-        
-        if (this.container && this.flashcards.length > 0) {
-            this.init();
-        }
+
+        // CRITICAL FIX: Store beforeunload handler as instance property
+        this.beforeUnloadHandler = () => {
+            this.cleanup();
+        };
+        window.addEventListener('beforeunload', this.beforeUnloadHandler);
+
+        this.init();
     }
 
     /**
@@ -40,38 +90,61 @@ class FlashcardViewer {
 
     /**
      * Render the flashcard viewer UI
+     * MEDIUM FIX: Add error handling
      */
     render() {
-        const currentCard = this.flashcards[this.currentIndex];
-        const progress = ((this.currentIndex + 1) / this.flashcards.length) * 100;
+        try {
+            // MEDIUM: Validate current index
+            if (this.currentIndex < 0 || this.currentIndex >= this.flashcards.length) {
+                console.error('[FlashcardViewer] Invalid currentIndex:', this.currentIndex);
+                this.currentIndex = 0;
+            }
+
+            const currentCard = this.flashcards[this.currentIndex];
+            if (!currentCard) {
+                console.error('[FlashcardViewer] No card at index:', this.currentIndex);
+                this.showError('Unable to load flashcard');
+                return;
+            }
+
+            const progress = ((this.currentIndex + 1) / this.flashcards.length) * 100;
         
         this.container.innerHTML = `
             <div class="flashcard-viewer">
                 <!-- Progress Bar -->
                 <div class="flashcard-progress">
-                    <div class="progress-bar">
+                    <div class="progress-bar" role="progressbar"
+                         aria-valuenow="${this.currentIndex + 1}"
+                         aria-valuemin="1"
+                         aria-valuemax="${this.flashcards.length}"
+                         aria-label="Flashcard progress">
                         <div class="progress-fill" style="width: ${progress}%"></div>
                     </div>
-                    <div class="progress-text">
+                    <div class="progress-text" aria-live="polite" aria-atomic="true">
                         Card ${this.currentIndex + 1} of ${this.flashcards.length}
                     </div>
                 </div>
 
                 <!-- Flashcard Container -->
                 <div class="flashcard-container">
-                    <div class="flashcard ${this.isFlipped ? 'flipped' : ''}" id="flashcard">
+                    <div class="flashcard ${this.isFlipped ? 'flipped' : ''}"
+                         id="flashcard"
+                         role="button"
+                         tabindex="0"
+                         aria-label="Flashcard ${this.currentIndex + 1} of ${this.flashcards.length}. Click or press Enter to flip."
+                         aria-pressed="${this.isFlipped}">
                         <div class="flashcard-inner">
                             <!-- Front of Card -->
-                            <div class="flashcard-front">
+                            <div class="flashcard-front" aria-hidden="${this.isFlipped}">
                                 <div class="card-label">Question</div>
                                 <div class="card-content">
                                     ${this.escapeHtml(currentCard.question || currentCard.term || '')}
                                 </div>
                                 <div class="card-hint">Click to flip</div>
                             </div>
-                            
+
                             <!-- Back of Card -->
-                            <div class="flashcard-back">
+                            <div class="flashcard-back" aria-hidden="${!this.isFlipped}">
                                 <div class="card-label">Answer</div>
                                 <div class="card-content">
                                     ${this.escapeHtml(currentCard.answer || currentCard.definition || '')}
@@ -82,42 +155,60 @@ class FlashcardViewer {
                 </div>
 
                 <!-- Navigation Controls -->
-                <div class="flashcard-controls">
-                    <button class="btn-control" id="btn-previous" ${this.currentIndex === 0 ? 'disabled' : ''}>
-                        <span class="icon">←</span>
+                <div class="flashcard-controls" role="navigation" aria-label="Flashcard navigation">
+                    <button class="btn-control"
+                            id="btn-previous"
+                            ${this.currentIndex === 0 ? 'disabled' : ''}
+                            aria-label="Go to previous flashcard">
+                        <span class="icon" aria-hidden="true">←</span>
                         <span class="label">Previous</span>
                     </button>
-                    
-                    <button class="btn-control btn-flip" id="btn-flip">
-                        <span class="icon">↻</span>
+
+                    <button class="btn-control btn-flip"
+                            id="btn-flip"
+                            aria-label="Flip flashcard to see ${this.isFlipped ? 'question' : 'answer'}">
+                        <span class="icon" aria-hidden="true">↻</span>
                         <span class="label">Flip</span>
                     </button>
-                    
-                    <button class="btn-control" id="btn-next" ${this.currentIndex === this.flashcards.length - 1 ? 'disabled' : ''}>
+
+                    <button class="btn-control"
+                            id="btn-next"
+                            ${this.currentIndex === this.flashcards.length - 1 ? 'disabled' : ''}
+                            aria-label="Go to next flashcard">
                         <span class="label">Next</span>
-                        <span class="icon">→</span>
+                        <span class="icon" aria-hidden="true">→</span>
                     </button>
                 </div>
 
                 <!-- Card Actions -->
-                <div class="flashcard-actions">
-                    <button class="btn-action ${this.starredCards.has(this.currentIndex) ? 'active' : ''}" id="btn-star" title="Star this card">
-                        <span class="icon">⭐</span>
+                <div class="flashcard-actions" role="toolbar" aria-label="Flashcard actions">
+                    <button class="btn-action ${this.starredCards.has(this.currentIndex) ? 'active' : ''}"
+                            id="btn-star"
+                            aria-label="${this.starredCards.has(this.currentIndex) ? 'Unstar' : 'Star'} this card for later review"
+                            aria-pressed="${this.starredCards.has(this.currentIndex)}">
+                        <span class="icon" aria-hidden="true">⭐</span>
                         <span class="label">Star</span>
                     </button>
-                    
-                    <button class="btn-action ${this.knownCards.has(this.currentIndex) ? 'active' : ''}" id="btn-know" title="Mark as known">
-                        <span class="icon">✓</span>
+
+                    <button class="btn-action ${this.knownCards.has(this.currentIndex) ? 'active' : ''}"
+                            id="btn-know"
+                            aria-label="${this.knownCards.has(this.currentIndex) ? 'Unmark' : 'Mark'} as known"
+                            aria-pressed="${this.knownCards.has(this.currentIndex)}">
+                        <span class="icon" aria-hidden="true">✓</span>
                         <span class="label">Know</span>
                     </button>
-                    
-                    <button class="btn-action" id="btn-shuffle" title="Shuffle cards">
-                        <span class="icon">🔀</span>
+
+                    <button class="btn-action"
+                            id="btn-shuffle"
+                            aria-label="Shuffle all flashcards">
+                        <span class="icon" aria-hidden="true">🔀</span>
                         <span class="label">Shuffle</span>
                     </button>
-                    
-                    <button class="btn-action" id="btn-restart" title="Restart from beginning">
-                        <span class="icon">↺</span>
+
+                    <button class="btn-action"
+                            id="btn-restart"
+                            aria-label="Restart from the beginning">
+                        <span class="icon" aria-hidden="true">↺</span>
                         <span class="label">Restart</span>
                     </button>
                 </div>
@@ -143,10 +234,16 @@ class FlashcardViewer {
                 </div>
             </div>
         `;
+        } catch (error) {
+            // MEDIUM FIX: Catch and handle rendering errors
+            console.error('[FlashcardViewer] Error rendering:', error);
+            this.showError('An error occurred while displaying the flashcard');
+        }
     }
 
     /**
      * Setup event listeners for controls
+     * MEDIUM FIX: Add keyboard handler for flashcard div
      */
     setupEventListeners() {
         // Flip card on click
@@ -155,6 +252,16 @@ class FlashcardViewer {
             const flipHandler = () => this.flipCard();
             flashcard.addEventListener('click', flipHandler);
             this.eventListeners.push({ element: flashcard, event: 'click', handler: flipHandler });
+
+            // MEDIUM FIX: Add keyboard handler for Enter/Space on flashcard
+            const keyHandler = (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    this.flipCard();
+                }
+            };
+            flashcard.addEventListener('keydown', keyHandler);
+            this.eventListeners.push({ element: flashcard, event: 'keydown', handler: keyHandler });
         }
 
         // Navigation buttons
@@ -211,9 +318,11 @@ class FlashcardViewer {
 
     /**
      * Setup keyboard shortcuts
+     * CRITICAL FIX: Store handler as instance property for proper cleanup
      */
     setupKeyboardShortcuts() {
-        const keyHandler = (e) => {
+        // Store as instance property for cleanup
+        this.keyHandler = (e) => {
             // Ignore if user is typing in an input
             if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
                 return;
@@ -244,26 +353,30 @@ class FlashcardViewer {
             }
         };
 
-        document.addEventListener('keydown', keyHandler);
-        this.eventListeners.push({ element: document, event: 'keydown', handler: keyHandler });
+        document.addEventListener('keydown', this.keyHandler);
+        this.eventListeners.push({ element: document, event: 'keydown', handler: this.keyHandler });
     }
 
     /**
      * Setup touch gestures for mobile
+     * CRITICAL FIX: Use instance properties instead of local variables
      */
     setupTouchGestures() {
         const flashcard = document.getElementById('flashcard');
         if (!flashcard) return;
 
-        let touchStartX = 0;
-        let touchEndX = 0;
+        // CRITICAL FIX: Initialize instance properties (not local variables)
+        this.touchStartX = 0;
+        this.touchEndX = 0;
 
         const touchStartHandler = (e) => {
-            touchStartX = e.changedTouches[0].screenX;
+            // CRITICAL FIX: Set instance property, not local variable
+            this.touchStartX = e.changedTouches[0].screenX;
         };
 
         const touchEndHandler = (e) => {
-            touchEndX = e.changedTouches[0].screenX;
+            // CRITICAL FIX: Set instance property, not local variable
+            this.touchEndX = e.changedTouches[0].screenX;
             this.handleSwipe();
         };
 
@@ -272,9 +385,6 @@ class FlashcardViewer {
 
         this.eventListeners.push({ element: flashcard, event: 'touchstart', handler: touchStartHandler });
         this.eventListeners.push({ element: flashcard, event: 'touchend', handler: touchEndHandler });
-
-        this.touchStartX = 0;
-        this.touchEndX = 0;
     }
 
     /**
@@ -366,13 +476,29 @@ class FlashcardViewer {
 
     /**
      * Shuffle the flashcards
+     * HIGH FIX: Clear tracking sets since indices will be invalid after shuffle
      */
     shuffleCards() {
+        // HIGH FIX: Warn user that progress will be reset
+        if (this.reviewedCards.size > 0 || this.knownCards.size > 0 || this.starredCards.size > 0) {
+            const confirmed = confirm(
+                'Shuffling will reset your progress (reviewed, known, and starred cards). Continue?'
+            );
+            if (!confirmed) {
+                return;
+            }
+        }
+
         // Fisher-Yates shuffle
         for (let i = this.flashcards.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
             [this.flashcards[i], this.flashcards[j]] = [this.flashcards[j], this.flashcards[i]];
         }
+
+        // HIGH FIX: Clear all tracking sets since indices are now invalid
+        this.reviewedCards.clear();
+        this.knownCards.clear();
+        this.starredCards.clear();
 
         this.currentIndex = 0;
         this.isFlipped = false;
@@ -426,6 +552,11 @@ class FlashcardViewer {
                     <button class="btn-secondary" id="btn-review-starred">
                         Review Starred (${this.starredCards.size})
                     </button>
+                    ${this.isFilteredView ? `
+                        <button class="btn-secondary" id="btn-back-to-full">
+                            Back to Full Deck
+                        </button>
+                    ` : ''}
                 </div>
             </div>
         `;
@@ -440,10 +571,16 @@ class FlashcardViewer {
         if (btnReviewStarred) {
             btnReviewStarred.addEventListener('click', () => this.reviewStarredCards());
         }
+
+        const btnBackToFull = document.getElementById('btn-back-to-full');
+        if (btnBackToFull) {
+            btnBackToFull.addEventListener('click', () => this.restoreFullDeck());
+        }
     }
 
     /**
      * Review only starred cards
+     * HIGH FIX: Don't lose original flashcards - store them for restoration
      */
     reviewStarredCards() {
         if (this.starredCards.size === 0) {
@@ -451,10 +588,19 @@ class FlashcardViewer {
             return;
         }
 
+        // HIGH FIX: Store original flashcards if not already stored
+        if (!this.isFilteredView) {
+            this.originalFlashcards = [...this.flashcards];
+            this.originalReviewedCards = new Set(this.reviewedCards);
+            this.originalKnownCards = new Set(this.knownCards);
+            this.originalStarredCards = new Set(this.starredCards);
+        }
+
         // Filter to only starred cards
         const starredIndices = Array.from(this.starredCards);
-        this.flashcards = starredIndices.map(index => this.flashcards[index]);
+        this.flashcards = starredIndices.map(index => this.originalFlashcards[index]);
 
+        this.isFilteredView = true;
         this.currentIndex = 0;
         this.isFlipped = false;
         this.reviewedCards.clear();
@@ -463,6 +609,64 @@ class FlashcardViewer {
 
         this.render();
         this.setupEventListeners();
+    }
+
+    /**
+     * Restore full deck from filtered view
+     * HIGH FIX: Allow users to return to full deck
+     */
+    restoreFullDeck() {
+        if (!this.isFilteredView || !this.originalFlashcards) {
+            return;
+        }
+
+        this.flashcards = [...this.originalFlashcards];
+        this.reviewedCards = new Set(this.originalReviewedCards);
+        this.knownCards = new Set(this.originalKnownCards);
+        this.starredCards = new Set(this.originalStarredCards);
+
+        this.isFilteredView = false;
+        this.currentIndex = 0;
+        this.isFlipped = false;
+
+        this.render();
+        this.setupEventListeners();
+    }
+
+    /**
+     * Show empty state when no valid flashcards
+     * HIGH: Handle empty flashcard arrays gracefully
+     */
+    showEmptyState() {
+        if (!this.container) return;
+
+        this.container.innerHTML = `
+            <div class="flashcard-empty-state" role="alert">
+                <div class="empty-icon" aria-hidden="true">📭</div>
+                <h2>No Flashcards Available</h2>
+                <p>There are no valid flashcards to display.</p>
+                <p class="empty-hint">Please check that your flashcards have either question/answer or term/definition fields.</p>
+            </div>
+        `;
+    }
+
+    /**
+     * Show error message
+     * MEDIUM FIX: User-friendly error handling
+     */
+    showError(message) {
+        if (!this.container) return;
+
+        this.container.innerHTML = `
+            <div class="flashcard-error" role="alert">
+                <div class="error-icon" aria-hidden="true">⚠️</div>
+                <h2>Oops! Something went wrong</h2>
+                <p>${this.escapeHtml(message)}</p>
+                <button class="btn-primary" onclick="location.reload()">
+                    Reload Page
+                </button>
+            </div>
+        `;
     }
 
     /**
@@ -476,6 +680,7 @@ class FlashcardViewer {
 
     /**
      * Cleanup event listeners
+     * CRITICAL FIX: Also remove beforeunload handler
      */
     cleanup() {
         console.log('[FlashcardViewer] Cleaning up event listeners...');
@@ -483,15 +688,17 @@ class FlashcardViewer {
             element.removeEventListener(event, handler);
         });
         this.eventListeners = [];
+
+        // CRITICAL FIX: Remove beforeunload handler
+        if (this.beforeUnloadHandler) {
+            window.removeEventListener('beforeunload', this.beforeUnloadHandler);
+            this.beforeUnloadHandler = null;
+        }
     }
 }
 
-// Auto-cleanup on page unload
-window.addEventListener('beforeunload', () => {
-    if (window.flashcardViewer && typeof window.flashcardViewer.cleanup === 'function') {
-        window.flashcardViewer.cleanup();
-    }
-});
+// CRITICAL FIX: Store beforeunload handler for proper cleanup
+// This is now handled in the FlashcardViewer constructor and cleanup method
 
 // Export for use in other scripts
 if (typeof module !== 'undefined' && module.exports) {

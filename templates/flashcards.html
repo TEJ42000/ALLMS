@@ -139,11 +139,19 @@
                 <div class="set-meta">
                     <span class="card-count">${set.cardCount} cards</span>
                 </div>
-                <button class="btn-study" onclick="startFlashcards(${set.id})">
+                <button class="btn-study" data-set-id="${set.id}">
                     Start Studying
                 </button>
             </div>
         `).join('');
+
+        // HIGH FIX: Use event delegation instead of inline onclick
+        setsContainer.addEventListener('click', function(e) {
+            if (e.target.classList.contains('btn-study')) {
+                const setId = parseInt(e.target.getAttribute('data-set-id'));
+                startFlashcards(setId);
+            }
+        });
     }
 
     /**
