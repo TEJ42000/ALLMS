@@ -696,7 +696,9 @@ class TestResponseFormatting:
             assert "content" in data
             assert "timestamp" in data
             assert data["status"] == "success"
-            assert isinstance(data["content"], list)
+            # Content should be a string (the AI response text)
+            assert isinstance(data["content"], str)
+            assert len(data["content"]) > 0
 
     def test_topics_response_structure(self, client):
         """Test topics response structure."""

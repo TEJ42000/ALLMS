@@ -611,8 +611,11 @@ def run_streak_maintenance(
         return result
 
     except Exception as e:
-        logger.error(f"Error running streak maintenance: {e}")
-        raise HTTPException(500, detail=str(e)) from e
+        # CRITICAL SECURITY: Don't expose internal error details to client
+        # Log the full error server-side for debugging
+        logger.error(f"Error running streak maintenance: {e}", exc_info=True)
+        # Return generic error message to client
+        raise HTTPException(500, detail="Failed to run streak maintenance. Please try again later.") from e
 
 
 # =============================================================================
