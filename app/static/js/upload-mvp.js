@@ -73,7 +73,10 @@ class UploadManager {
         if (quizBtn) quizBtn.addEventListener('click', () => this.generateQuiz());
         if (flashcardsBtn) flashcardsBtn.addEventListener('click', () => this.generateFlashcards());
         if (anotherBtn) anotherBtn.addEventListener('click', () => this.reset());
-        
+
+        // Load recent uploads
+        this.loadRecentUploads();
+
         console.log('[UploadManager] Initialization complete');
     }
     
@@ -280,17 +283,89 @@ class UploadManager {
     
     reset() {
         console.log('[UploadManager] Resetting upload form');
-        
+
         this.currentMaterialId = null;
         this.currentAnalysis = null;
         this.currentFilename = null;
-        
+
         this.dropzone.style.display = 'block';
         this.progressDiv.style.display = 'none';
         this.resultsDiv.style.display = 'none';
         this.fileInput.value = '';
+
+        // Reload recent uploads
+        this.loadRecentUploads();
     }
-    
+
+    async loadRecentUploads() {
+        console.log('[UploadManager] Loading recent uploads');
+
+        const recentUploadsList = document.getElementById('recent-uploads-list');
+        if (!recentUploadsList) return;
+
+        const courseId = window.COURSE_CONTEXT?.courseId || 'LLS-2025-2026';
+
+        try {
+            const response = await fetch(`/api/upload/course/${courseId}?limit=5`);
+
+            if (!response.ok) {
+                throw new Error(`Failed to load uploads: ${response.statusText}`);
+            }
+
+            const data = await response.json();
+
+            if (!data.materials || data.materials.length === 0) {
+                recentUploadsList.innerHTML = '<p class="no-uploads">No uploads yet. Upload your first file above!</p>';
+                return;
+            }
+
+            // File type icons
+            const icons = {
+                'pdf': '📕',
+                'docx': '📘',
+                'pptx': '📙',
+                'txt': '📝',
+                'md': '📝',
+                'html': '🌐'
+            };
+
+            // Build HTML for recent uploads
+            const uploadsHtml = data.materials.map(material => {
+                const icon = icons[material.fileType] || '📄';
+                const hasAnalysis = material.textExtracted && material.summaryGenerated;
+                const statusIcon = hasAnalysis ? '✅' : '⏳';
+                const statusText = hasAnalysis ? 'Analyzed' : 'Pending';
+
+                // Format date
+                let dateText = 'Recently';
+                if (material.createdAt) {
+                    const date = new Date(material.createdAt);
+                    dateText = date.toLocaleDateString();
+                }
+
+                return `
+                    <div class="recent-upload-item">
+                        <div class="upload-item-info">
+                            <span class="upload-item-icon">${icon}</span>
+                            <div class="upload-item-details">
+                                <div class="upload-item-name">${this.escapeHtml(material.filename)}</div>
+                                <div class="upload-item-meta">${statusIcon} ${statusText} • ${dateText}</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            recentUploadsList.innerHTML = uploadsHtml;
+
+            console.log(`[UploadManager] Loaded ${data.materials.length} recent uploads`);
+
+        } catch (error) {
+            console.error('[UploadManager] Failed to load recent uploads:', error);
+            recentUploadsList.innerHTML = '<p class="error-text">Failed to load recent uploads</p>';
+        }
+    }
+
     escapeHtml(text) {
         const div = document.createElement('div');
         div.textContent = text;

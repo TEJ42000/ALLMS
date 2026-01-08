@@ -24,16 +24,21 @@ import secrets
 import hashlib
 import time
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from app.services.text_extractor import extract_text
 from app.services.files_api_service import get_files_api_service
+from app.services.course_materials_service import CourseMaterialsService, generate_material_id
+from app.models.course_models import CourseMaterial
 
 # Configure logging
 logger = logging.getLogger(__name__)
 
 # Router configuration
 router = APIRouter(prefix="/api/upload", tags=["Upload"])
+
+# Initialize materials service
+materials_service = CourseMaterialsService()
 
 # Upload configuration
 UPLOAD_DIR = Path("Materials/uploads")
@@ -353,11 +358,47 @@ async def upload_file(
                 f"File content does not match extension .{ext}. The file may be corrupted or mislabeled."
             )
 
+        # FIRESTORE: Store material metadata
+        storage_path = f"uploads/{course_id}/{safe_filename}"
+        now = datetime.now(timezone.utc)
+
+        material = CourseMaterial(
+            id=material_id,
+            filename=file.filename,
+            storagePath=storage_path,
+            fileSize=size,
+            fileType=ext,
+            tier="user_uploaded",
+            category="upload",
+            source="uploaded",
+            uploadedBy=user_id,
+            textExtracted=False,
+            extractedText=None,
+            textLength=0,
+            extractionError=None,
+            summary=None,
+            summaryGenerated=False,
+            weekNumber=week_number,
+            title=file.filename,
+            description=None,
+            mimeType=None,
+            createdAt=now,
+            updatedAt=now
+        )
+
+        try:
+            materials_service.upsert_material(course_id, material)
+            logger.info(f"Stored material metadata in Firestore: {material_id}")
+        except Exception as e:
+            logger.error(f"Failed to store material metadata: {e}")
+            # Don't fail the upload if Firestore fails
+            # File is already saved locally
+
         return {
             "status": "success",
             "material_id": material_id,
             "filename": file.filename,
-            "storage_path": str(file_path.relative_to("Materials")),
+            "storage_path": storage_path,
             "size_bytes": size,
             "message": f"File uploaded successfully. Use /api/upload/{material_id}/analyze to process."
         }
@@ -525,7 +566,33 @@ Return JSON with this exact structure:
     except Exception as e:
         logger.error(f"Analysis error: {str(e)}")
         raise HTTPException(500, f"AI analysis failed: {str(e)}")
-    
+
+    # FIRESTORE: Update material with extraction and analysis results
+    try:
+        # Update text extraction
+        materials_service.update_text_extraction(
+            course_id=course_id,
+            material_id=material_id,
+            extracted_text=result.text,
+            text_length=len(result.text),
+            error=None
+        )
+
+        # Update summary if available
+        if analysis.get("summary"):
+            materials_service.update_summary(
+                course_id=course_id,
+                material_id=material_id,
+                summary=analysis["summary"],
+                error=None
+            )
+
+        logger.info(f"Updated Firestore with analysis results for {material_id}")
+
+    except Exception as e:
+        logger.error(f"Failed to update Firestore: {e}")
+        # Don't fail the analysis if Firestore update fails
+
     # Return comprehensive response
     return {
         "status": "success",
@@ -539,4 +606,61 @@ Return JSON with this exact structure:
         },
         "analysis": analysis
     }
+
+@router.get("/course/{course_id}")
+async def list_uploads(
+    course_id: str,
+    limit: int = Query(20, ge=1, le=100, description="Maximum number of uploads to return"),
+    origin: Optional[str] = Header(None),
+    referer: Optional[str] = Header(None),
+    authorization: Optional[str] = Header(None)
+) -> Dict[str, Any]:
+    """
+    List uploaded materials for a course.
+
+    Returns recent uploads with their metadata and analysis status.
+
+    Args:
+        course_id: Course identifier
+        limit: Maximum number of materials to return (1-100)
+
+    Returns:
+        JSON with list of materials and count
+
+    Raises:
+        HTTPException: If course_id is invalid
+    """
+    # CRITICAL FIX: CSRF protection
+    validate_csrf(origin, referer)
+
+    # HIGH FIX: Authentication
+    user_id = validate_user_authentication(authorization)
+
+    # CRITICAL FIX: Sanitize course_id
+    course_id = sanitize_course_id(course_id)
+
+    try:
+        # Get uploaded materials from Firestore
+        materials = materials_service.list_materials(
+            course_id=course_id,
+            tier="user_uploaded",
+            limit=limit
+        )
+
+        # Convert to dict for JSON response
+        materials_data = [m.model_dump(mode="json") for m in materials]
+
+        logger.info(f"Retrieved {len(materials)} uploads for course {course_id}")
+
+        return {
+            "status": "success",
+            "course_id": course_id,
+            "materials": materials_data,
+            "count": len(materials_data)
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to list uploads: {e}")
+        raise HTTPException(500, f"Failed to retrieve uploads: {str(e)}")
+
 
