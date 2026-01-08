@@ -1543,11 +1543,31 @@ class FlashcardViewer {
 
     /**
      * Escape HTML to prevent XSS
+     * MEDIUM FIX: Enhanced XSS prevention with additional sanitization
      */
     escapeHtml(text) {
+        if (text === null || text === undefined) {
+            return '';
+        }
+
+        // Convert to string
+        text = String(text);
+
+        // MEDIUM FIX: Additional sanitization for common XSS vectors
         const div = document.createElement('div');
         div.textContent = text;
-        return div.innerHTML;
+        let escaped = div.innerHTML;
+
+        // MEDIUM FIX: Extra protection against attribute-based XSS
+        escaped = escaped
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#x27;')
+            .replace(/\//g, '&#x2F;');
+
+        return escaped;
     }
 
     // =========================================================================
@@ -1609,16 +1629,22 @@ class FlashcardViewer {
 
     /**
      * End gamification session and award XP
+     * MEDIUM FIX: Standardized async/await pattern with proper error handling
      */
     async endGamificationSession() {
-        if (!this.gamificationEnabled || !this.sessionId) return;
+        if (!this.gamificationEnabled || !this.sessionId) {
+            console.log('[FlashcardViewer] No active session to end');
+            return;
+        }
 
         try {
             // Calculate session duration
             const sessionDuration = Math.floor((Date.now() - this.sessionStartTime) / 1000);
 
-            // End session
-            await fetch('/api/gamification/session/end', {
+            console.log('[FlashcardViewer] Ending session:', this.sessionId, 'Duration:', sessionDuration);
+
+            // MEDIUM FIX: Standardized async/await with response validation
+            const response = await fetch('/api/gamification/session/end', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -1630,9 +1656,18 @@ class FlashcardViewer {
                 })
             });
 
-            console.log('[FlashcardViewer] Gamification session ended');
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('[FlashcardViewer] Failed to end session:', response.status, errorText);
+                return;
+            }
+
+            const data = await response.json();
+            console.log('[FlashcardViewer] Gamification session ended successfully:', data);
+
         } catch (error) {
             console.error('[FlashcardViewer] Failed to end gamification session:', error);
+            // Don't throw - this is cleanup, should not break the app
         }
     }
 
@@ -1729,13 +1764,26 @@ class FlashcardViewer {
 
     /**
      * Start time tracker to update session time display
+     * MEDIUM FIX: Prevent timer drift by using actual elapsed time
      */
     startTimeTracker() {
+        // MEDIUM FIX: Store start time for accurate calculation
+        const startTime = this.sessionStartTime;
+
         // Update time display every second
         this.timeTrackerInterval = setInterval(() => {
             const timeElement = document.getElementById('session-time');
             if (timeElement) {
-                timeElement.textContent = this.getFormattedTimeSpent();
+                // MEDIUM FIX: Calculate from actual elapsed time, not accumulated intervals
+                const elapsed = Math.floor((Date.now() - startTime) / 1000);
+                const minutes = Math.floor(elapsed / 60);
+                const seconds = elapsed % 60;
+
+                if (minutes > 0) {
+                    timeElement.textContent = `${minutes}m ${seconds}s`;
+                } else {
+                    timeElement.textContent = `${seconds}s`;
+                }
             }
         }, 1000);
     }

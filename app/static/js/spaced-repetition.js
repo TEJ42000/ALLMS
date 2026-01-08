@@ -21,7 +21,8 @@ class SpacedRepetitionService {
 
     /**
      * Calculate next review date using SM-2 algorithm
-     * 
+     * MEDIUM FIX: Added input validation
+     *
      * @param {number} quality - Quality of recall (0-5)
      *   5 - Perfect response
      *   4 - Correct response after hesitation
@@ -29,11 +30,20 @@ class SpacedRepetitionService {
      *   2 - Incorrect response; correct answer seemed easy to recall
      *   1 - Incorrect response; correct answer seemed familiar
      *   0 - Complete blackout
-     * 
+     *
      * @param {Object} cardState - Current state of the card
      * @returns {Object} Updated card state with next review date
      */
     calculateNextReview(quality, cardState = null) {
+        // MEDIUM FIX: Validate quality input
+        if (typeof quality !== 'number' || quality < 0 || quality > 5) {
+            console.error('[SpacedRepetition] Invalid quality:', quality);
+            throw new Error('Quality must be a number between 0 and 5');
+        }
+
+        // Round quality to nearest integer
+        quality = Math.round(quality);
+
         // Initialize card state if not provided
         if (!cardState) {
             cardState = {
@@ -43,6 +53,12 @@ class SpacedRepetitionService {
                 lastReviewed: null,
                 nextReview: new Date()
             };
+        }
+
+        // MEDIUM FIX: Validate card state
+        if (typeof cardState !== 'object') {
+            console.error('[SpacedRepetition] Invalid cardState:', cardState);
+            throw new Error('cardState must be an object');
         }
 
         // Clone the state to avoid mutations
@@ -280,13 +296,53 @@ class SpacedRepetitionService {
 
     /**
      * Save card data to localStorage
+     * MEDIUM FIX: Handle quota exceeded errors
      */
     saveCardData() {
         try {
             localStorage.setItem(this.STORAGE_KEY, JSON.stringify(this.cardData));
         } catch (error) {
-            console.error('[SpacedRepetition] Failed to save card data:', error);
+            // MEDIUM FIX: Handle quota exceeded error
+            if (error.name === 'QuotaExceededError' || error.code === 22) {
+                console.error('[SpacedRepetition] localStorage quota exceeded');
+
+                // Try to free up space by removing oldest entries
+                this.cleanupOldData();
+
+                // Try again
+                try {
+                    localStorage.setItem(this.STORAGE_KEY, JSON.stringify(this.cardData));
+                    console.log('[SpacedRepetition] Saved after cleanup');
+                } catch (retryError) {
+                    console.error('[SpacedRepetition] Still failed after cleanup:', retryError);
+                    alert('Storage quota exceeded. Some progress may not be saved. Consider exporting your data.');
+                }
+            } else {
+                console.error('[SpacedRepetition] Failed to save card data:', error);
+            }
         }
+    }
+
+    /**
+     * MEDIUM FIX: Cleanup old data to free up space
+     * Removes cards that haven't been reviewed in 90+ days
+     */
+    cleanupOldData() {
+        const ninetyDaysAgo = new Date();
+        ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+
+        let removedCount = 0;
+        for (const [cardId, state] of Object.entries(this.cardData)) {
+            if (state.lastReviewed) {
+                const lastReviewed = new Date(state.lastReviewed);
+                if (lastReviewed < ninetyDaysAgo) {
+                    delete this.cardData[cardId];
+                    removedCount++;
+                }
+            }
+        }
+
+        console.log(`[SpacedRepetition] Cleaned up ${removedCount} old cards`);
     }
 
     /**
