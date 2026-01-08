@@ -78,37 +78,36 @@ class WeekContentManager {
         const card = document.createElement('div');
         card.className = 'week-card';
         card.dataset.weekNumber = week.weekNumber;
-        
+
         const progress = week.progress || 0;
         const topics = week.topics || week.keyTopics || [];
         const description = week.description || week.summary || this.generateDescription(week);
-        
+
+        // Make entire card clickable
+        card.style.cursor = 'pointer';
+        card.onclick = () => this.openWeekStudyNotes(week.weekNumber, week.title || `Week ${week.weekNumber}`);
+
         card.innerHTML = `
             <span class="week-label">Week ${week.weekNumber}</span>
             <h3>${this.escapeHtml(week.title || `Week ${week.weekNumber}`)}</h3>
             <p class="week-description">${this.escapeHtml(description)}</p>
-            
+
             ${topics.length > 0 ? `
                 <div class="week-topics">
                     ${topics.slice(0, 4).map(t => `<span class="topic-tag">${this.escapeHtml(typeof t === 'string' ? t : t.name || t)}</span>`).join('')}
                     ${topics.length > 4 ? `<span class="topic-tag">+${topics.length - 4} more</span>` : ''}
                 </div>
             ` : ''}
-            
+
             <div class="week-progress-bar">
                 <div class="week-progress-fill" style="width: ${progress}%"></div>
             </div>
-            
-            <div class="week-card-actions">
-                <button class="btn-study" onclick="weekContentManager.openWeekContent(${week.weekNumber}, '${this.escapeHtml(week.title || '')}')">
-                    📖 Study
-                </button>
-                <button class="btn-ask-ai" onclick="weekContentManager.openAITutor(${week.weekNumber}, '${this.escapeHtml(week.title || '')}')">
-                    🤖 Ask AI
-                </button>
+
+            <div class="week-card-footer">
+                <span class="week-card-hint">📖 Click to view study notes</span>
             </div>
         `;
-        
+
         return card;
     }
     
@@ -120,113 +119,291 @@ class WeekContentManager {
         return 'Study materials and resources for this week.';
     }
     
-    async openWeekContent(weekNumber, weekTitle) {
+    async openWeekStudyNotes(weekNumber, weekTitle) {
         this.currentWeek = weekNumber;
         this.currentWeekTitle = weekTitle || `Week ${weekNumber}`;
-        
+
         if (!this.modal) {
             console.error('[WeekContentManager] Modal element not found');
             return;
         }
-        
+
         // Update modal title
         const modalTitle = document.getElementById('week-modal-title');
         if (modalTitle) {
-            modalTitle.textContent = this.currentWeekTitle;
+            modalTitle.innerHTML = `
+                <div class="week-notes-header">
+                    <span class="week-notes-number">Week ${weekNumber}</span>
+                    <span class="week-notes-title">${this.escapeHtml(weekTitle)}</span>
+                </div>
+            `;
         }
-        
+
         // Show loading state
         const modalBody = document.getElementById('week-modal-body');
         if (modalBody) {
-            modalBody.innerHTML = '<div class="loading-placeholder">Loading content...</div>';
+            modalBody.innerHTML = '<div class="loading-placeholder">📚 Loading study notes...</div>';
         }
-        
+
         // Show modal
         this.modal.classList.add('show');
-        
+
+        // Show floating AI tutor button
+        this.showFloatingAIButton();
+
         try {
             // Fetch week details from admin API
             const response = await fetch(`/api/admin/courses/${this.courseId}/weeks/${weekNumber}`);
-            
+
             if (response.ok) {
                 const weekData = await response.json();
-                modalBody.innerHTML = this.formatWeekContent(weekData);
+                modalBody.innerHTML = this.formatStudyNotes(weekData);
             } else {
                 // Fallback: show basic info
-                modalBody.innerHTML = this.getPlaceholderContent(weekNumber, weekTitle);
+                modalBody.innerHTML = this.getPlaceholderStudyNotes(weekNumber, weekTitle);
             }
         } catch (error) {
             console.error('[WeekContentManager] Error loading week content:', error);
-            modalBody.innerHTML = this.getPlaceholderContent(weekNumber, weekTitle);
+            modalBody.innerHTML = this.getPlaceholderStudyNotes(weekNumber, weekTitle);
         }
     }
     
-    formatWeekContent(data) {
-        let html = '';
-        
-        if (data.title) {
-            html += `<h3>📋 ${this.escapeHtml(data.title)}</h3>`;
-        }
-        
+    formatStudyNotes(data) {
+        let html = '<div class="study-notes-content">';
+
+        // Overview section with icon
         if (data.description) {
-            html += `<p>${this.escapeHtml(data.description)}</p>`;
+            html += `
+                <div class="notes-section notes-overview">
+                    <div class="notes-section-header">
+                        <span class="notes-icon">📋</span>
+                        <h3>Overview</h3>
+                    </div>
+                    <div class="notes-section-content">
+                        <p class="notes-description">${this.escapeHtml(data.description)}</p>
+                    </div>
+                </div>
+            `;
         }
-        
+
+        // Learning Objectives with checkboxes
         if (data.learningObjectives?.length) {
-            html += `<h3>🎯 Learning Objectives</h3><ul>`;
-            data.learningObjectives.forEach(obj => {
-                html += `<li>${this.escapeHtml(obj)}</li>`;
+            html += `
+                <div class="notes-section notes-objectives">
+                    <div class="notes-section-header">
+                        <span class="notes-icon">🎯</span>
+                        <h3>Learning Objectives</h3>
+                    </div>
+                    <div class="notes-section-content">
+                        <ul class="objectives-list">
+            `;
+            data.learningObjectives.forEach((obj, idx) => {
+                html += `
+                    <li class="objective-item">
+                        <span class="objective-number">${idx + 1}</span>
+                        <span class="objective-text">${this.escapeHtml(obj)}</span>
+                    </li>
+                `;
             });
-            html += `</ul>`;
+            html += `
+                        </ul>
+                    </div>
+                </div>
+            `;
         }
-        
+
+        // Key Topics with visual cards
         if (data.topics?.length) {
-            html += `<h3>📚 Key Topics</h3><ul>`;
+            html += `
+                <div class="notes-section notes-topics">
+                    <div class="notes-section-header">
+                        <span class="notes-icon">📚</span>
+                        <h3>Key Topics</h3>
+                    </div>
+                    <div class="notes-section-content">
+                        <div class="topics-grid">
+            `;
             data.topics.forEach(topic => {
                 const topicText = typeof topic === 'string' ? topic : (topic.name || topic);
-                html += `<li><strong>${this.escapeHtml(topicText)}</strong></li>`;
+                const topicDesc = typeof topic === 'object' ? topic.description : '';
+                html += `
+                    <div class="topic-card-note">
+                        <div class="topic-card-title">${this.escapeHtml(topicText)}</div>
+                        ${topicDesc ? `<div class="topic-card-desc">${this.escapeHtml(topicDesc)}</div>` : ''}
+                    </div>
+                `;
             });
-            html += `</ul>`;
+            html += `
+                        </div>
+                    </div>
+                </div>
+            `;
         }
-        
+
+        // Key Concepts with highlight boxes
         if (data.keyConcepts?.length) {
-            html += `<h3>💡 Key Concepts</h3>`;
-            data.keyConcepts.forEach(concept => {
+            html += `
+                <div class="notes-section notes-concepts">
+                    <div class="notes-section-header">
+                        <span class="notes-icon">💡</span>
+                        <h3>Key Concepts</h3>
+                    </div>
+                    <div class="notes-section-content">
+            `;
+            data.keyConcepts.forEach((concept, idx) => {
                 const conceptText = typeof concept === 'string' ? concept : (concept.name || concept);
-                html += `<div class="key-concept"><p>${this.escapeHtml(conceptText)}</p></div>`;
+                const conceptDesc = typeof concept === 'object' ? concept.description : '';
+                html += `
+                    <div class="concept-box">
+                        <div class="concept-header">
+                            <span class="concept-badge">Concept ${idx + 1}</span>
+                            <span class="concept-title">${this.escapeHtml(conceptText)}</span>
+                        </div>
+                        ${conceptDesc ? `<div class="concept-description">${this.escapeHtml(conceptDesc)}</div>` : ''}
+                    </div>
+                `;
             });
+            html += `
+                    </div>
+                </div>
+            `;
         }
-        
+
+        // Materials with file icons
         if (data.materials?.length) {
-            html += `<h3>📄 Materials</h3><ul>`;
+            html += `
+                <div class="notes-section notes-materials">
+                    <div class="notes-section-header">
+                        <span class="notes-icon">📄</span>
+                        <h3>Study Materials</h3>
+                    </div>
+                    <div class="notes-section-content">
+                        <ul class="materials-list">
+            `;
             data.materials.forEach(mat => {
                 const matTitle = typeof mat === 'string' ? mat : (mat.title || mat.filename || mat);
-                html += `<li>${this.escapeHtml(matTitle)}</li>`;
+                const matType = this.getFileIcon(matTitle);
+                html += `
+                    <li class="material-item">
+                        <span class="material-icon">${matType}</span>
+                        <span class="material-name">${this.escapeHtml(matTitle)}</span>
+                    </li>
+                `;
             });
-            html += `</ul>`;
+            html += `
+                        </ul>
+                    </div>
+                </div>
+            `;
         }
-        
+
+        // Exam Tips with special styling
         if (data.examTips) {
-            html += `<h3>💡 Exam Tips</h3><div class="key-concept">${this.escapeHtml(data.examTips)}</div>`;
+            html += `
+                <div class="notes-section notes-tips">
+                    <div class="notes-section-header">
+                        <span class="notes-icon">⭐</span>
+                        <h3>Exam Tips</h3>
+                    </div>
+                    <div class="notes-section-content">
+                        <div class="exam-tips-box">
+                            ${this.escapeHtml(data.examTips)}
+                        </div>
+                    </div>
+                </div>
+            `;
         }
-        
-        return html || this.getPlaceholderContent(data.weekNumber || this.currentWeek, data.title || this.currentWeekTitle);
+
+        html += '</div>';
+
+        return html || this.getPlaceholderStudyNotes(data.weekNumber || this.currentWeek, data.title || this.currentWeekTitle);
+    }
+
+    getFileIcon(filename) {
+        const ext = filename.split('.').pop().toLowerCase();
+        const icons = {
+            'pdf': '📕',
+            'docx': '📘',
+            'doc': '📘',
+            'pptx': '📊',
+            'ppt': '📊',
+            'txt': '📝',
+            'md': '📝',
+            'html': '🌐'
+        };
+        return icons[ext] || '📄';
     }
     
-    getPlaceholderContent(weekNumber, weekTitle) {
+    getPlaceholderStudyNotes(weekNumber, weekTitle) {
         return `
-            <h3>📚 ${this.escapeHtml(weekTitle || `Week ${weekNumber}`)}</h3>
-            <p>Content for this week is being prepared. In the meantime, you can:</p>
-            <ul>
-                <li>Ask the AI Tutor questions about this week's topics</li>
-                <li>Generate a quiz to test your knowledge</li>
-                <li>Create flashcards for key concepts</li>
-                <li>Upload your own materials for analysis</li>
-            </ul>
-            <div class="key-concept">
-                <p>💡 <strong>Tip:</strong> Click "Ask AI About This" below to start a tutoring session focused on this week's material.</p>
+            <div class="study-notes-content">
+                <div class="notes-section notes-overview">
+                    <div class="notes-section-header">
+                        <span class="notes-icon">📚</span>
+                        <h3>${this.escapeHtml(weekTitle || `Week ${weekNumber}`)}</h3>
+                    </div>
+                    <div class="notes-section-content">
+                        <p class="notes-description">Study notes for this week are being prepared.</p>
+                        <div class="placeholder-actions">
+                            <p>In the meantime, you can:</p>
+                            <ul class="objectives-list">
+                                <li class="objective-item">
+                                    <span class="objective-number">1</span>
+                                    <span class="objective-text">Ask the AI Tutor questions about this week's topics</span>
+                                </li>
+                                <li class="objective-item">
+                                    <span class="objective-number">2</span>
+                                    <span class="objective-text">Generate a quiz to test your knowledge</span>
+                                </li>
+                                <li class="objective-item">
+                                    <span class="objective-number">3</span>
+                                    <span class="objective-text">Create flashcards for key concepts</span>
+                                </li>
+                                <li class="objective-item">
+                                    <span class="objective-number">4</span>
+                                    <span class="objective-text">Upload your own materials for analysis</span>
+                                </li>
+                            </ul>
+                        </div>
+                        <div class="exam-tips-box">
+                            💡 <strong>Tip:</strong> Click the floating professor button to ask the AI Tutor about this week's material.
+                        </div>
+                    </div>
+                </div>
             </div>
         `;
+    }
+
+    showFloatingAIButton() {
+        // Remove existing button if any
+        const existing = document.getElementById('floating-ai-tutor');
+        if (existing) existing.remove();
+
+        // Create floating button
+        const button = document.createElement('button');
+        button.id = 'floating-ai-tutor';
+        button.className = 'floating-ai-button';
+        button.innerHTML = '👨‍🏫';
+        button.title = 'Ask AI Tutor about this week';
+        button.onclick = () => this.openAITutorFromNotes();
+
+        // Add to modal
+        if (this.modal) {
+            this.modal.appendChild(button);
+        }
+    }
+
+    hideFloatingAIButton() {
+        const button = document.getElementById('floating-ai-tutor');
+        if (button) button.remove();
+    }
+
+    openAITutorFromNotes() {
+        // Close modal
+        this.closeModal();
+
+        // Navigate to AI tutor
+        this.openAITutor(this.currentWeek, this.currentWeekTitle);
     }
     
     openAITutor(weekNumber, weekTitle) {
@@ -254,6 +431,7 @@ class WeekContentManager {
         if (this.modal) {
             this.modal.classList.remove('show');
         }
+        this.hideFloatingAIButton();
     }
     
     escapeHtml(str) {
@@ -268,15 +446,6 @@ class WeekContentManager {
 function closeWeekModal() {
     if (window.weekContentManager) {
         window.weekContentManager.closeModal();
-    }
-}
-
-function openAITutorFromModal() {
-    if (window.weekContentManager && window.weekContentManager.currentWeek) {
-        window.weekContentManager.openAITutor(
-            window.weekContentManager.currentWeek,
-            window.weekContentManager.currentWeekTitle
-        );
     }
 }
 

@@ -143,42 +143,111 @@ body { font-family: Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-ser
     transition: width 0.5s ease;
 }
 
-.week-card-actions {
-    display: flex;
-    gap: 10px;
+.week-card-footer {
     margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    text-align: center;
 }
 
-.week-card-actions button {
-    flex: 1;
-    padding: 12px;
-    border: none;
+.week-card-hint {
+    color: #a0aec0;
+    font-size: 0.85em;
+    font-style: italic;
+}
+
+/* Materials List */
+.materials-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.material-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 15px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 8px;
-    font-weight: 600;
-    cursor: pointer;
     transition: all 0.3s;
-    font-size: 0.9em;
 }
 
-.btn-study {
-    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-    color: white;
+.material-item:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: #3b82f6;
+    transform: translateX(5px);
 }
 
-.btn-study:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 5px 15px rgba(59, 130, 246, 0.4);
+.material-icon {
+    font-size: 1.5em;
+    line-height: 1;
 }
 
-.btn-ask-ai {
-    background: rgba(255, 255, 255, 0.1);
+.material-name {
+    flex: 1;
     color: #e0e6ed;
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    font-size: 0.95em;
 }
 
-.btn-ask-ai:hover {
-    background: rgba(255, 255, 255, 0.15);
-    transform: translateY(-2px);
+/* Exam Tips Box */
+.exam-tips-box {
+    background: linear-gradient(135deg, rgba(212, 175, 55, 0.15) 0%, rgba(212, 175, 55, 0.05) 100%);
+    border: 1px solid rgba(212, 175, 55, 0.3);
+    border-left: 4px solid var(--gold);
+    border-radius: 8px;
+    padding: 18px;
+    color: #e0e6ed;
+    line-height: 1.7;
+}
+
+.exam-tips-box strong {
+    color: var(--gold);
+}
+
+/* ========== Floating AI Tutor Button ========== */
+.floating-ai-button {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+    border: 3px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 8px 25px rgba(59, 130, 246, 0.4);
+    cursor: pointer;
+    font-size: 2.2em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    z-index: 1001;
+    animation: floatPulse 3s ease-in-out infinite;
+}
+
+.floating-ai-button:hover {
+    transform: scale(1.1) rotate(10deg);
+    box-shadow: 0 12px 35px rgba(59, 130, 246, 0.6);
+}
+
+.floating-ai-button:active {
+    transform: scale(0.95);
+}
+
+@keyframes floatPulse {
+    0%, 100% {
+        transform: translateY(0);
+        box-shadow: 0 8px 25px rgba(59, 130, 246, 0.4);
+    }
+    50% {
+        transform: translateY(-10px);
+        box-shadow: 0 15px 35px rgba(59, 130, 246, 0.6);
+    }
 }
 
 /* Week card specific styles (legacy) */
@@ -299,9 +368,181 @@ body { font-family: Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-ser
 #week-content-modal .modal-footer {
     padding: 20px 30px;
     border-top: 1px solid rgba(255, 255, 255, 0.1);
+    display: none; /* Hide footer, use floating button instead */
+}
+
+/* ========== Beautiful Study Notes Styles ========== */
+.week-notes-header {
     display: flex;
-    gap: 10px;
-    justify-content: flex-end;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.week-notes-number {
+    font-size: 0.9em;
+    opacity: 0.9;
+    font-weight: 500;
+}
+
+.week-notes-title {
+    font-size: 1.3em;
+    font-weight: 700;
+}
+
+.study-notes-content {
+    padding: 0;
+}
+
+.notes-section {
+    margin-bottom: 30px;
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 12px;
+    padding: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.notes-section-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid rgba(59, 130, 246, 0.3);
+}
+
+.notes-icon {
+    font-size: 1.8em;
+    line-height: 1;
+}
+
+.notes-section-header h3 {
+    margin: 0;
+    color: #3b82f6;
+    font-size: 1.3em;
+}
+
+.notes-description {
+    font-size: 1.05em;
+    line-height: 1.7;
+    color: #e0e6ed;
+    margin-bottom: 15px;
+}
+
+/* Learning Objectives */
+.objectives-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.objective-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 15px;
+    padding: 15px;
+    background: rgba(59, 130, 246, 0.05);
+    border-left: 3px solid #3b82f6;
+    border-radius: 0 8px 8px 0;
+    transition: all 0.3s;
+}
+
+.objective-item:hover {
+    background: rgba(59, 130, 246, 0.1);
+    transform: translateX(5px);
+}
+
+.objective-number {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    color: white;
+    border-radius: 50%;
+    font-weight: 700;
+    font-size: 0.95em;
+    flex-shrink: 0;
+}
+
+.objective-text {
+    flex: 1;
+    color: #e0e6ed;
+    line-height: 1.6;
+}
+
+/* Topics Grid */
+.topics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+}
+
+.topic-card-note {
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(59, 130, 246, 0.1) 100%);
+    border: 1px solid rgba(139, 92, 246, 0.3);
+    border-radius: 10px;
+    padding: 20px;
+    transition: all 0.3s;
+}
+
+.topic-card-note:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 5px 20px rgba(139, 92, 246, 0.2);
+    border-color: #8b5cf6;
+}
+
+.topic-card-title {
+    font-weight: 700;
+    font-size: 1.05em;
+    color: #a78bfa;
+    margin-bottom: 8px;
+}
+
+.topic-card-desc {
+    font-size: 0.9em;
+    color: #a0aec0;
+    line-height: 1.5;
+}
+
+/* Key Concepts */
+.concept-box {
+    background: rgba(139, 92, 246, 0.08);
+    border: 1px solid rgba(139, 92, 246, 0.2);
+    border-radius: 10px;
+    padding: 18px;
+    margin-bottom: 15px;
+}
+
+.concept-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px;
+}
+
+.concept-badge {
+    background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+    color: white;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.8em;
+    font-weight: 600;
+}
+
+.concept-title {
+    font-weight: 700;
+    color: #a78bfa;
+    font-size: 1.05em;
+}
+
+.concept-description {
+    color: #e0e6ed;
+    line-height: 1.6;
+    margin-top: 10px;
 }
 
 /* Modern Chatbot Interface */
