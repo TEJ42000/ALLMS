@@ -1,9 +1,9 @@
 /**
  * Unit Tests for Quiz Answer Options Enhancements - Phase 2
- * 
+ *
  * Test Framework: Jest
  * Coverage Target: 80%+
- * 
+ *
  * Tests:
  * - Enhanced answer option creation
  * - Answer options container
@@ -11,6 +11,11 @@
  * - Answer feedback display
  * - Ripple effects
  */
+
+// Polyfill for TextEncoder/TextDecoder (required by jsdom)
+const { TextEncoder, TextDecoder } = require('util');
+global.TextEncoder = TextEncoder;
+global.TextDecoder = TextDecoder;
 
 // Mock DOM environment
 const { JSDOM } = require('jsdom');
