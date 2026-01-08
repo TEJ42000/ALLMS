@@ -773,27 +773,60 @@ class GamificationService:
                 # Already completed this category this week
                 return False, False
 
-            # Mark category as completed
-            consistency_updated = True
+            # Use transaction to prevent race conditions when updating consistency
+            # CRITICAL: Prevents duplicate bonus activation
+            if self.db:
+                from google.cloud import firestore
 
-            # Check if all 4 categories are now complete
-            updated_consistency = stats.streak.weekly_consistency.copy()
-            updated_consistency[category] = True
+                doc_ref = self.db.collection(USER_STATS_COLLECTION).document(user_id)
 
-            all_complete = all(updated_consistency.values())
-            bonus_earned = all_complete and not getattr(stats.streak, 'bonus_active', False)
+                @firestore.transactional
+                def update_consistency_transaction(transaction):
+                    """Transaction to safely update weekly consistency."""
+                    snapshot = doc_ref.get(transaction=transaction)
 
-            if bonus_earned:
-                # Activate bonus for next week
-                if self.db:
-                    doc_ref = self.db.collection(USER_STATS_COLLECTION).document(user_id)
-                    doc_ref.update({
-                        "streak.bonus_active": True,
-                        "streak.bonus_multiplier": 1.5  # 50% XP bonus
-                    })
-                logger.info(f"Weekly consistency bonus earned for {user_id}")
+                    if not snapshot.exists:
+                        return False, False
 
-            return consistency_updated, bonus_earned
+                    data = snapshot.to_dict()
+                    current_consistency = data.get("streak", {}).get("weekly_consistency", {})
+
+                    # Double-check category not already completed (race condition check)
+                    if current_consistency.get(category, False):
+                        return False, False
+
+                    # Update category
+                    updated_consistency = current_consistency.copy()
+                    updated_consistency[category] = True
+
+                    # Check if all 4 categories complete
+                    all_complete = all(updated_consistency.values())
+                    bonus_active = data.get("streak", {}).get("bonus_active", False)
+                    bonus_earned = all_complete and not bonus_active
+
+                    # Build update dict
+                    updates = {
+                        f"streak.weekly_consistency.{category}": True
+                    }
+
+                    if bonus_earned:
+                        updates["streak.bonus_active"] = True
+                        updates["streak.bonus_multiplier"] = 1.5
+
+                    transaction.update(doc_ref, updates)
+
+                    return True, bonus_earned
+
+                # Execute transaction
+                transaction = self.db.transaction()
+                consistency_updated, bonus_earned = update_consistency_transaction(transaction)
+
+                if bonus_earned:
+                    logger.info(f"Weekly consistency bonus earned for {user_id}")
+
+                return consistency_updated, bonus_earned
+
+            return False, False
 
         except Exception as e:
             logger.error(f"Error updating weekly consistency for {user_id}: {e}", exc_info=True)

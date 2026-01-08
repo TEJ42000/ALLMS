@@ -68,12 +68,14 @@ class StreakMaintenanceService:
                 if not docs:
                     break
 
+                batch_size = len(docs)
+
                 # Process each user
                 for doc in docs:
                     try:
                         user_stats = UserStats(**doc.to_dict())
                         result = self._check_user_streak(user_stats)
-                        
+
                         users_processed += 1
                         if result.get("streak_broken"):
                             streaks_broken += 1
@@ -86,10 +88,14 @@ class StreakMaintenanceService:
                         logger.error(f"Error processing user {doc.id}: {e}", exc_info=True)
                         errors += 1
 
+                # Store only the last doc for pagination
                 last_doc = docs[-1]
 
+                # Clear docs list to free memory (CRITICAL: prevents memory leak)
+                del docs
+
                 # Break if we got fewer docs than batch size (last batch)
-                if len(docs) < BATCH_SIZE:
+                if batch_size < BATCH_SIZE:
                     break
 
             end_time = datetime.now(timezone.utc)

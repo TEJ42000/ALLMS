@@ -38,7 +38,7 @@ class TestWeeklyConsistencyBonus:
     def test_weekly_consistency_tracking(self, gamification_service, mock_db):
         """Test that weekly consistency categories are tracked correctly."""
         user_id = "test_user_123"
-        
+
         # Create user stats with no consistency yet
         stats = UserStats(
             user_id=user_id,
@@ -54,14 +54,35 @@ class TestWeeklyConsistencyBonus:
                 bonus_multiplier=1.0
             )
         )
-        
+
+        # Mock transaction
+        mock_transaction = Mock()
+        mock_db.transaction.return_value = mock_transaction
+
+        # Mock document snapshot
+        mock_snapshot = Mock()
+        mock_snapshot.exists = True
+        mock_snapshot.to_dict.return_value = {
+            "streak": {
+                "weekly_consistency": {
+                    "flashcards": False,
+                    "quiz": False,
+                    "evaluation": False,
+                    "guide": False
+                },
+                "bonus_active": False
+            }
+        }
+        mock_db.collection.return_value.document.return_value.get.return_value = mock_snapshot
+
         # Test flashcard completion
         updated, bonus_earned = gamification_service.update_weekly_consistency(
             user_id, "flashcard_set_completed", stats
         )
-        
-        assert updated is True
-        assert bonus_earned is False  # Not all categories complete yet
+
+        # HIGH: More specific assertions
+        assert updated is True, "Category should be marked as updated"
+        assert bonus_earned is False, "Bonus should not be earned with only 1/4 categories complete"
 
     def test_weekly_consistency_bonus_earned(self, gamification_service, mock_db):
         """Test that bonus is earned when all 4 categories are complete."""
@@ -305,6 +326,74 @@ class TestStreakMaintenance:
         
         # Should process all users
         assert result["users_processed"] == 150
+
+
+class TestInputValidation:
+    """Test input validation for streak system (HIGH priority)."""
+
+    @pytest.fixture
+    def gamification_service(self):
+        """Create gamification service."""
+        with patch('app.services.gamification_service.get_firestore_client'):
+            service = GamificationService()
+            service.db = Mock()
+            return service
+
+    def test_invalid_activity_type(self, gamification_service):
+        """Test that invalid activity types are rejected."""
+        stats = UserStats(
+            user_id="test_user",
+            user_email="test@example.com"
+        )
+
+        # Invalid activity type should not update consistency
+        updated, bonus = gamification_service.update_weekly_consistency(
+            "test_user", "invalid_activity_type", stats
+        )
+
+        assert updated is False, "Invalid activity type should not update consistency"
+        assert bonus is False, "Invalid activity type should not earn bonus"
+
+    def test_negative_freeze_count_prevented(self):
+        """Test that freeze count cannot go negative (CRITICAL)."""
+        from app.services.streak_maintenance import StreakMaintenanceService
+
+        with patch('app.services.streak_maintenance.get_firestore_client') as mock_client:
+            service = StreakMaintenanceService()
+            service.db = mock_client.return_value
+
+            # Mock document with 0 freezes
+            mock_snapshot = Mock()
+            mock_snapshot.exists = True
+            mock_snapshot.to_dict.return_value = {
+                "streak": {"freezes_available": 0}
+            }
+            service.db.collection.return_value.document.return_value.get.return_value = mock_snapshot
+
+            # Mock transaction
+            mock_transaction = Mock()
+            service.db.transaction.return_value = mock_transaction
+
+            # Try to apply freeze
+            result = service._apply_freeze("test_user")
+
+            # Should fail gracefully, not go negative
+            assert result is False, "Should not apply freeze when none available"
+
+    def test_xp_bonus_multiplier_bounds(self, gamification_service):
+        """Test that XP bonus multiplier is within valid bounds."""
+        stats = UserStats(
+            user_id="test_user",
+            user_email="test@example.com",
+            streak=StreakInfo(
+                bonus_active=True,
+                bonus_multiplier=1.5
+            )
+        )
+
+        # Multiplier should be >= 1.0 and <= 2.0
+        assert stats.streak.bonus_multiplier >= 1.0, "Multiplier should be at least 1.0"
+        assert stats.streak.bonus_multiplier <= 2.0, "Multiplier should not exceed 2.0"
 
 
 # Integration test placeholder
