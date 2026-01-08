@@ -95,6 +95,9 @@ class FlashcardViewer {
         // HIGH FIX: Prevent keyboard shortcut race conditions
         this.isNavigating = false;
 
+        // CRITICAL FIX: Prevent touch gesture race conditions
+        this.isSwiping = false;
+
         // CRITICAL FIX: Store beforeunload handler as instance property
         this.beforeUnloadHandler = () => {
             this.cleanup();
@@ -428,12 +431,21 @@ class FlashcardViewer {
 
     /**
      * Handle swipe gesture
+     * CRITICAL FIX: Prevent race conditions with swipe lock
+     * MEDIUM FIX: Use constant instead of magic number
      */
     handleSwipe() {
-        const swipeThreshold = 50;
+        // CRITICAL FIX: Prevent overlapping swipes
+        if (this.isSwiping) {
+            return;
+        }
+
+        // MEDIUM FIX: Use constant instead of magic number
         const diff = this.touchStartX - this.touchEndX;
 
-        if (Math.abs(diff) > swipeThreshold) {
+        if (Math.abs(diff) > FLASHCARD_CONSTANTS.SWIPE_THRESHOLD_PX) {
+            this.isSwiping = true;
+
             if (diff > 0) {
                 // Swipe left - next card
                 this.nextCard();
@@ -441,6 +453,11 @@ class FlashcardViewer {
                 // Swipe right - previous card
                 this.previousCard();
             }
+
+            // Release lock after navigation completes
+            setTimeout(() => {
+                this.isSwiping = false;
+            }, FLASHCARD_CONSTANTS.NAVIGATION_LOCK_MS);
         }
     }
 
@@ -550,11 +567,13 @@ class FlashcardViewer {
     /**
      * Shuffle the flashcards
      * HIGH FIX: Clear tracking sets since indices will be invalid after shuffle
+     * MEDIUM FIX: Use styled confirm dialog instead of native confirm()
      */
-    shuffleCards() {
+    async shuffleCards() {
         // HIGH FIX: Warn user that progress will be reset
+        // MEDIUM FIX: Use styled confirm dialog
         if (this.reviewedCards.size > 0 || this.knownCards.size > 0 || this.starredCards.size > 0) {
-            const confirmed = confirm(
+            const confirmed = await this.showConfirm(
                 'Shuffling will reset your progress (reviewed, known, and starred cards). Continue?'
             );
             if (!confirmed) {
@@ -583,12 +602,13 @@ class FlashcardViewer {
     /**
      * Restart from the beginning
      * CRITICAL FIX: Remove old listeners before re-rendering
-     * MEDIUM FIX: Add confirmation dialog
+     * MEDIUM FIX: Add confirmation dialog with styled modal
      */
-    restart() {
+    async restart() {
         // MEDIUM FIX: Confirm restart if user has progress
+        // MEDIUM FIX: Use styled confirm dialog
         if (this.reviewedCards.size > 0 || this.knownCards.size > 0 || this.starredCards.size > 0) {
-            const confirmed = confirm(
+            const confirmed = await this.showConfirm(
                 'Restarting will reset all your progress (reviewed, known, and starred cards). Continue?'
             );
             if (!confirmed) {
@@ -791,6 +811,63 @@ class FlashcardViewer {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+
+    /**
+     * Show confirmation dialog
+     * MEDIUM FIX: Replace native confirm() with styled modal
+     * @param {string} message - The confirmation message
+     * @returns {Promise<boolean>} - True if confirmed, false if cancelled
+     */
+    showConfirm(message) {
+        return new Promise((resolve) => {
+            // Create confirmation overlay
+            const overlay = document.createElement('div');
+            overlay.className = 'error-overlay'; // Reuse error overlay styles
+            overlay.innerHTML = `
+                <div class="error-dialog" role="alertdialog" aria-labelledby="confirm-title" aria-describedby="confirm-message">
+                    <div class="error-icon" aria-hidden="true">⚠️</div>
+                    <h2 id="confirm-title">Confirm Action</h2>
+                    <p id="confirm-message">${this.escapeHtml(message)}</p>
+                    <div class="confirm-buttons">
+                        <button class="btn-secondary" id="btn-cancel-confirm">Cancel</button>
+                        <button class="btn-primary" id="btn-confirm-confirm" autofocus>Continue</button>
+                    </div>
+                </div>
+            `;
+
+            document.body.appendChild(overlay);
+
+            // CRITICAL FIX: Shared cleanup function
+            const closeDialog = (result) => {
+                if (document.body.contains(overlay)) {
+                    document.body.removeChild(overlay);
+                }
+                document.removeEventListener('keydown', escHandler);
+                resolve(result);
+            };
+
+            // Handle button clicks
+            const btnCancel = document.getElementById('btn-cancel-confirm');
+            const btnConfirm = document.getElementById('btn-confirm-confirm');
+
+            if (btnCancel) {
+                btnCancel.addEventListener('click', () => closeDialog(false));
+            }
+
+            if (btnConfirm) {
+                btnConfirm.addEventListener('click', () => closeDialog(true));
+                btnConfirm.focus();
+            }
+
+            // Handle ESC key (cancel)
+            const escHandler = (e) => {
+                if (e.key === 'Escape') {
+                    closeDialog(false);
+                }
+            };
+            document.addEventListener('keydown', escHandler);
+        });
     }
 
     /**

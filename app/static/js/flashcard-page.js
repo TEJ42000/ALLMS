@@ -28,6 +28,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 /**
  * Load flashcard data from JSON file
  * MEDIUM FIX: Separate data from code
+ * MEDIUM FIX: Add JSON response validation
  */
 async function loadFlashcardData() {
     try {
@@ -35,7 +36,38 @@ async function loadFlashcardData() {
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
-        flashcardSets = await response.json();
+        const data = await response.json();
+
+        // MEDIUM FIX: Validate JSON structure
+        if (!Array.isArray(data)) {
+            throw new Error('Invalid data format: expected array');
+        }
+
+        // MEDIUM FIX: Validate each flashcard set
+        const validSets = data.filter((set, index) => {
+            if (!set || typeof set !== 'object') {
+                console.warn(`[FlashcardPage] Skipping invalid set at index ${index}`);
+                return false;
+            }
+
+            if (!set.id || !set.title || !Array.isArray(set.cards)) {
+                console.warn(`[FlashcardPage] Skipping incomplete set at index ${index}:`, set);
+                return false;
+            }
+
+            if (set.cards.length === 0) {
+                console.warn(`[FlashcardPage] Skipping empty set at index ${index}:`, set.title);
+                return false;
+            }
+
+            return true;
+        });
+
+        if (validSets.length === 0) {
+            throw new Error('No valid flashcard sets found');
+        }
+
+        flashcardSets = validSets;
         console.log('[FlashcardPage] Loaded', flashcardSets.length, 'flashcard sets');
     } catch (error) {
         console.error('[FlashcardPage] Error loading flashcard data:', error);
@@ -63,9 +95,9 @@ function loadFlashcardSets() {
         <div class="flashcard-set-card" data-set-id="${set.id}">
             <div class="set-icon" aria-hidden="true">📚</div>
             <h3>${escapeHtml(set.title)}</h3>
-            <p>${escapeHtml(set.description)}</p>
+            <p>${escapeHtml(set.description || '')}</p>
             <div class="set-meta">
-                <span class="card-count">${set.cardCount} cards</span>
+                <span class="card-count">${set.cards.length} cards</span>
             </div>
             <button class="btn-study" data-set-id="${set.id}" aria-label="Start studying ${escapeHtml(set.title)}">
                 Start Studying
@@ -174,6 +206,7 @@ function escapeHtml(text) {
 /**
  * Show error message with better UI
  * MEDIUM FIX: Replace generic alert with styled error message
+ * CRITICAL FIX: Prevent memory leak in ESC handler
  */
 function showError(message) {
     // Create error overlay
@@ -190,20 +223,26 @@ function showError(message) {
 
     document.body.appendChild(overlay);
 
+    // CRITICAL FIX: Shared cleanup function to prevent memory leak
+    const closeDialog = () => {
+        if (document.body.contains(overlay)) {
+            document.body.removeChild(overlay);
+        }
+        // CRITICAL FIX: Always remove ESC handler
+        document.removeEventListener('keydown', escHandler);
+    };
+
     // Close on button click
     const btnClose = document.getElementById('btn-close-error');
     if (btnClose) {
-        btnClose.addEventListener('click', () => {
-            document.body.removeChild(overlay);
-        });
+        btnClose.addEventListener('click', closeDialog);
         btnClose.focus();
     }
 
     // Close on ESC key
     const escHandler = (e) => {
         if (e.key === 'Escape') {
-            document.body.removeChild(overlay);
-            document.removeEventListener('keydown', escHandler);
+            closeDialog();
         }
     };
     document.addEventListener('keydown', escHandler);

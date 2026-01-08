@@ -187,7 +187,14 @@ async def badges_page(request: Request):
 
 @router.get("/flashcards", response_class=HTMLResponse)
 async def flashcards_page(request: Request):
-    """Serve the flashcards study page."""
+    """
+    Serve the flashcards study page.
+
+    CRITICAL: Authentication is OPTIONAL for this route.
+    - Allows public access to study materials (Phase 1)
+    - User context is passed but not required
+    - Future Phase 2 will add user-specific features (progress tracking, etc.)
+    """
     user = get_user_from_request(request)
     return templates.TemplateResponse(
         "flashcards.html",
