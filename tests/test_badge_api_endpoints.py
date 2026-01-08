@@ -346,20 +346,168 @@ class TestFieldNameConsistency:
             user_id="test",
             user_email="test@example.com"
         )
-        
+
         # Should have 'activities'
         assert hasattr(user_stats, 'activities')
-        
+
         # Should NOT have 'activity_counters'
         assert not hasattr(user_stats, 'activity_counters')
 
     def test_no_flashcard_sets_completed_field(self):
         """Verify ActivityCounters does NOT have flashcard_sets_completed field."""
         counters = ActivityCounters()
-        
+
         # Should have 'flashcards_reviewed'
         assert hasattr(counters, 'flashcards_reviewed')
-        
+
         # Should NOT have 'flashcard_sets_completed'
         assert not hasattr(counters, 'flashcard_sets_completed')
+
+    def test_complete_field_name_mapping(self):
+        """Test complete field name mapping from badge criteria to ActivityCounters.
+
+        CRITICAL: Verifies all badge criteria map to correct ActivityCounters fields
+        """
+        from app.services.badge_service import BadgeService
+
+        service = BadgeService()
+        service.db = Mock()
+
+        # Create ActivityCounters with all fields
+        counters = ActivityCounters(
+            flashcards_reviewed=100,
+            quizzes_completed=75,
+            quizzes_passed=50,
+            evaluations_submitted=25,
+            guides_completed=15,
+            total_study_time_minutes=300
+        )
+
+        # Test all mappings
+        test_cases = [
+            # (badge_criteria_key, expected_field_name, counter_value, criteria_value, should_pass)
+            ("flashcard_sets", "flashcards_reviewed", 100, 100, True),
+            ("flashcard_sets", "flashcards_reviewed", 100, 150, False),
+            ("quizzes_passed", "quizzes_passed", 50, 50, True),
+            ("quizzes_passed", "quizzes_passed", 50, 75, False),
+            ("evaluations", "evaluations_submitted", 25, 25, True),
+            ("evaluations", "evaluations_submitted", 25, 30, False),
+            ("study_guides", "guides_completed", 15, 15, True),
+            ("study_guides", "guides_completed", 15, 20, False),
+        ]
+
+        for criteria_key, field_name, counter_value, criteria_value, should_pass in test_cases:
+            # Verify field exists in ActivityCounters
+            assert hasattr(counters, field_name), f"ActivityCounters missing field: {field_name}"
+
+            # Verify field value matches expected
+            actual_value = getattr(counters, field_name)
+            assert actual_value == counter_value, f"Field {field_name} has wrong value: {actual_value} != {counter_value}"
+
+            # Test badge criteria checking
+            criteria = {criteria_key: criteria_value}
+            result = service._check_activity_criteria(criteria, counters)
+
+            if should_pass:
+                assert result == True, f"Criteria {criteria_key}={criteria_value} should pass with {field_name}={counter_value}"
+            else:
+                assert result == False, f"Criteria {criteria_key}={criteria_value} should fail with {field_name}={counter_value}"
+
+    def test_field_mapping_with_zero_values(self):
+        """Test field mapping works correctly with zero values.
+
+        Ensures zero values don't cause false positives.
+        """
+        from app.services.badge_service import BadgeService
+
+        service = BadgeService()
+        service.db = Mock()
+
+        # Create ActivityCounters with all zeros
+        counters = ActivityCounters(
+            flashcards_reviewed=0,
+            quizzes_passed=0,
+            evaluations_submitted=0,
+            guides_completed=0
+        )
+
+        # All criteria should fail with zero values
+        test_cases = [
+            {"flashcard_sets": 1},
+            {"quizzes_passed": 1},
+            {"evaluations": 1},
+            {"study_guides": 1},
+        ]
+
+        for criteria in test_cases:
+            result = service._check_activity_criteria(criteria, counters)
+            assert result == False, f"Criteria {criteria} should fail with zero values"
+
+    def test_field_mapping_with_exact_match(self):
+        """Test field mapping with exact criteria match.
+
+        Verifies >= comparison works correctly.
+        """
+        from app.services.badge_service import BadgeService
+
+        service = BadgeService()
+        service.db = Mock()
+
+        # Create ActivityCounters with specific values
+        counters = ActivityCounters(
+            flashcards_reviewed=100,
+            quizzes_passed=50,
+            evaluations_submitted=25,
+            guides_completed=10
+        )
+
+        # Test exact matches (should all pass)
+        test_cases = [
+            {"flashcard_sets": 100},  # Exact match
+            {"quizzes_passed": 50},   # Exact match
+            {"evaluations": 25},      # Exact match
+            {"study_guides": 10},     # Exact match
+        ]
+
+        for criteria in test_cases:
+            result = service._check_activity_criteria(criteria, counters)
+            assert result == True, f"Criteria {criteria} should pass with exact match"
+
+    def test_field_mapping_with_multiple_criteria(self):
+        """Test field mapping with multiple criteria (AND logic).
+
+        Verifies all criteria must be met.
+        """
+        from app.services.badge_service import BadgeService
+
+        service = BadgeService()
+        service.db = Mock()
+
+        # Create ActivityCounters
+        counters = ActivityCounters(
+            flashcards_reviewed=100,
+            quizzes_passed=50,
+            evaluations_submitted=25,
+            guides_completed=10
+        )
+
+        # Test multiple criteria - all met
+        criteria_all_met = {
+            "flashcard_sets": 100,
+            "quizzes_passed": 50,
+            "evaluations": 25,
+            "study_guides": 10
+        }
+        result = service._check_activity_criteria(criteria_all_met, counters)
+        assert result == True, "All criteria met should pass"
+
+        # Test multiple criteria - one not met
+        criteria_one_not_met = {
+            "flashcard_sets": 100,
+            "quizzes_passed": 50,
+            "evaluations": 25,
+            "study_guides": 20  # Not met (only have 10)
+        }
+        result = service._check_activity_criteria(criteria_one_not_met, counters)
+        assert result == False, "One criterion not met should fail"
 
