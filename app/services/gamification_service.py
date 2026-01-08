@@ -583,6 +583,27 @@ class GamificationService:
 
             logger.info(f"Logged activity {activity_type} for {user_id}, awarded {xp_awarded} XP, streak: {new_streak_count}")
 
+            # Phase 4: Check for newly earned badges
+            try:
+                from app.services.badge_service import get_badge_service
+
+                # Get updated user stats for badge checking
+                updated_stats = self.get_user_stats(user_id)
+                if updated_stats:
+                    badge_service = get_badge_service()
+                    newly_unlocked = badge_service.check_and_unlock_badges(
+                        user_id=user_id,
+                        user_stats=updated_stats,
+                        trigger_type="activity"
+                    )
+
+                    if newly_unlocked:
+                        badges_earned = [badge.badge_id for badge in newly_unlocked]
+                        logger.info(f"Badges unlocked for {user_id}: {badges_earned}")
+            except Exception as e:
+                logger.error(f"Error checking badges for {user_id}: {e}")
+                # Don't fail the activity logging if badge checking fails
+
             return ActivityLogResponse(
                 activity_id=activity_id,
                 xp_awarded=xp_awarded,

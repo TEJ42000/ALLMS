@@ -161,3 +161,25 @@ async def cookie_policy(request: Request):
             "user": user
         }
     )
+
+
+@router.get("/badges", response_class=HTMLResponse)
+async def badges_page(request: Request):
+    """
+    Serve the badges showcase page.
+
+    CRITICAL: Added to fix missing HTML template issue
+    """
+    user = get_user_from_request(request)
+
+    if not user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    return templates.TemplateResponse(
+        "badges.html",
+        {
+            "request": request,
+            "title": "My Badges - ALLMS",
+            "user": user
+        }
+    )

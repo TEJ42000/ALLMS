@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Badges - ALLMS</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/styles.css') }}">
+    <style>
+        /* Badge Showcase Styles */
+        .badge-showcase-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .page-header {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+
+        .page-header h1 {
+            font-size: 2.5rem;
+            color: #333;
+            margin-bottom: 0.5rem;
+        }
+
+        .page-header p {
+            font-size: 1.1rem;
+            color: #666;
+        }
+
+        /* Badge Error Message */
+        .badge-error-message {
+            background: #fee;
+            border: 2px solid #fcc;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 2rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .badge-error-message .error-icon {
+            font-size: 2rem;
+        }
+
+        .badge-error-message .error-text {
+            flex: 1;
+            color: #c33;
+        }
+
+        .badge-error-message .error-dismiss {
+            background: #c33;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .badge-error-message .error-dismiss:hover {
+            background: #a22;
+        }
+
+        /* Badge Showcase Header */
+        .badge-showcase-header {
+            background: white;
+            border-radius: 12px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .badge-stats {
+            display: flex;
+            gap: 2rem;
+            justify-content: center;
+            margin-bottom: 2rem;
+        }
+
+        .badge-stat {
+            text-align: center;
+        }
+
+        .badge-stat .stat-icon {
+            font-size: 2rem;
+            display: block;
+            margin-bottom: 0.5rem;
+        }
+
+        .badge-stat .stat-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #333;
+            display: block;
+        }
+
+        .badge-stat .stat-label {
+            font-size: 0.9rem;
+            color: #666;
+            display: block;
+        }
+
+        .badge-controls {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .badge-filter {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .filter-btn {
+            padding: 0.5rem 1rem;
+            border: 2px solid #ddd;
+            background: white;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .filter-btn:hover {
+            border-color: #4CAF50;
+        }
+
+        .filter-btn.active {
+            background: #4CAF50;
+            color: white;
+            border-color: #4CAF50;
+        }
+
+        .sort-select {
+            padding: 0.5rem 1rem;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            background: white;
+            cursor: pointer;
+        }
+
+        /* Badge Grid */
+        .badge-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .badge-card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .badge-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+        }
+
+        .badge-card.locked {
+            opacity: 0.6;
+        }
+
+        .badge-icon {
+            font-size: 3rem;
+            text-align: center;
+            margin-bottom: 1rem;
+        }
+
+        .badge-icon.grayscale {
+            filter: grayscale(100%);
+        }
+
+        .badge-info {
+            text-align: center;
+        }
+
+        .badge-name {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 0.5rem;
+        }
+
+        .badge-description {
+            font-size: 0.9rem;
+            color: #666;
+            margin-bottom: 0.5rem;
+        }
+
+        .badge-category {
+            font-size: 0.8rem;
+            color: #888;
+            margin-bottom: 0.5rem;
+        }
+
+        .badge-rarity {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .badge-rarity.rarity-common {
+            background: #e0e0e0;
+            color: #666;
+        }
+
+        .badge-rarity.rarity-uncommon {
+            background: #c8e6c9;
+            color: #2e7d32;
+        }
+
+        .badge-rarity.rarity-rare {
+            background: #bbdefb;
+            color: #1565c0;
+        }
+
+        .badge-rarity.rarity-epic {
+            background: #e1bee7;
+            color: #6a1b9a;
+        }
+
+        .badge-rarity.rarity-legendary {
+            background: #ffe082;
+            color: #f57f17;
+        }
+
+        .badge-earned-info {
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid #eee;
+        }
+
+        .earned-date {
+            font-size: 0.8rem;
+            color: #888;
+        }
+
+        .badge-locked {
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid #eee;
+            text-align: center;
+            color: #999;
+        }
+
+        .lock-icon {
+            font-size: 1.5rem;
+            display: block;
+            margin-bottom: 0.5rem;
+        }
+
+        .no-badges-message {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 3rem;
+            color: #666;
+        }
+
+        /* Badge Notification */
+        .badge-notification {
+            position: fixed;
+            top: 20px;
+            right: -400px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+            transition: right 0.3s ease-out;
+            z-index: 1000;
+            max-width: 350px;
+        }
+
+        .badge-notification.show {
+            right: 20px;
+        }
+
+        .badge-notification-content {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .notification-icon {
+            font-size: 3rem;
+        }
+
+        .notification-text h3 {
+            margin: 0 0 0.5rem 0;
+            font-size: 1.2rem;
+        }
+
+        .notification-text p {
+            margin: 0;
+            font-size: 1rem;
+        }
+
+        @media (max-width: 768px) {
+            .badge-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .badge-stats {
+                flex-direction: column;
+                gap: 1rem;
+            }
+
+            .badge-controls {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    {% include 'partials/user_header.html' %}
+
+    <div class="badge-showcase-container">
+        <div class="page-header">
+            <h1>🏆 My Badges</h1>
+            <p>Collect badges by completing activities and achieving milestones</p>
+        </div>
+
+        <!-- Badge showcase will be rendered here by JavaScript -->
+        <div id="badge-showcase"></div>
+    </div>
+
+    <!-- Load badge showcase JavaScript -->
+    <script src="{{ url_for('static', path='/js/badge-showcase.js') }}"></script>
+</body>
+</html>
+
