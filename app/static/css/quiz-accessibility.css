@@ -1,0 +1,367 @@
+/**
+ * Quiz Accessibility Styles - Phase 5
+ * 
+ * Features:
+ * - Screen reader only content
+ * - Visible focus indicators
+ * - Skip links
+ * - High contrast mode support
+ * - Focus trap styling
+ * 
+ * Standards: WCAG 2.1 AA compliant
+ */
+
+/* Screen Reader Only Content */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+}
+
+/* Screen reader only but focusable */
+.sr-only-focusable:focus,
+.sr-only-focusable:active {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip: auto;
+    white-space: normal;
+}
+
+/* Skip Links */
+.skip-links {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 10000;
+}
+
+.skip-link {
+    position: absolute;
+    top: -40px;
+    left: 0;
+    background: var(--primary, #2196f3);
+    color: white;
+    padding: 0.75rem 1.5rem;
+    text-decoration: none;
+    font-weight: 600;
+    border-radius: 0 0 4px 0;
+    transition: top 0.3s ease;
+    z-index: 10001;
+}
+
+.skip-link:focus {
+    top: 0;
+    outline: 3px solid var(--focus-color, #ff9800);
+    outline-offset: 2px;
+}
+
+/* Focus Indicators */
+.focus-visible-enabled *:focus {
+    outline: 2px solid var(--focus-color, #2196f3);
+    outline-offset: 2px;
+}
+
+/* Enhanced focus for interactive elements */
+button:focus,
+a:focus,
+input:focus,
+select:focus,
+textarea:focus,
+[tabindex]:focus {
+    outline: 2px solid var(--focus-color, #2196f3);
+    outline-offset: 2px;
+}
+
+/* Focus within containers */
+.quiz-option-enhanced:focus {
+    outline: 3px solid var(--focus-color, #2196f3);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 4px rgba(33, 150, 243, 0.2);
+}
+
+.question-nav-btn:focus {
+    outline: 3px solid var(--focus-color, #2196f3);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 4px rgba(33, 150, 243, 0.2);
+}
+
+.flag-button:focus {
+    outline: 3px solid var(--focus-color, #2196f3);
+    outline-offset: 2px;
+}
+
+/* Focus trap indicator */
+.focus-trap-active {
+    position: relative;
+}
+
+.focus-trap-active::before {
+    content: '';
+    position: absolute;
+    top: -4px;
+    left: -4px;
+    right: -4px;
+    bottom: -4px;
+    border: 2px solid var(--focus-color, #2196f3);
+    border-radius: inherit;
+    pointer-events: none;
+}
+
+/* High Contrast Mode Support */
+@media (prefers-contrast: high) {
+    .skip-link:focus,
+    button:focus,
+    a:focus,
+    input:focus,
+    select:focus,
+    textarea:focus,
+    [tabindex]:focus {
+        outline-width: 4px;
+        outline-offset: 3px;
+    }
+    
+    .quiz-option-enhanced:focus,
+    .question-nav-btn:focus {
+        outline-width: 4px;
+        box-shadow: 0 0 0 6px rgba(33, 150, 243, 0.3);
+    }
+    
+    /* Increase contrast for text */
+    .quiz-option-enhanced,
+    .question-nav-btn,
+    .stat-card,
+    .review-question-card {
+        border-width: 3px;
+    }
+}
+
+/* Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+    .skip-link {
+        transition: none;
+    }
+    
+    *:focus {
+        transition: none;
+    }
+}
+
+/* Keyboard Navigation Hints */
+.keyboard-hint {
+    font-size: 0.875rem;
+    color: var(--text-secondary, #666);
+    margin-top: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.keyboard-hint kbd {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    background: var(--bg-secondary, #f5f5f5);
+    border: 1px solid var(--border-color, #e0e0e0);
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 0.75rem;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+/* Focus visible polyfill */
+.js-focus-visible :focus:not(.focus-visible) {
+    outline: none;
+}
+
+.js-focus-visible .focus-visible {
+    outline: 2px solid var(--focus-color, #2196f3);
+    outline-offset: 2px;
+}
+
+/* Live Region Styling (for debugging) */
+#quiz-sr-announcements {
+    /* Normally hidden, but can be shown for debugging */
+    /* Remove .sr-only class to see announcements */
+}
+
+/* Modal Focus Trap */
+.modal-overlay[aria-modal="true"] {
+    /* Ensure modal is on top */
+    z-index: 9999;
+}
+
+/* Focus within modal */
+.modal-overlay[aria-modal="true"] *:focus {
+    outline: 3px solid var(--focus-color, #2196f3);
+    outline-offset: 2px;
+}
+
+/* Accessible Tooltips */
+.accessible-tooltip {
+    position: relative;
+}
+
+.accessible-tooltip[aria-describedby]::after {
+    content: attr(aria-label);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.9);
+    color: white;
+    padding: 0.5rem 0.75rem;
+    border-radius: 4px;
+    font-size: 0.875rem;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+    z-index: 1000;
+}
+
+.accessible-tooltip:hover::after,
+.accessible-tooltip:focus::after {
+    opacity: 1;
+}
+
+/* ARIA Live Region Priorities */
+[aria-live="polite"] {
+    /* Announced at next opportunity */
+}
+
+[aria-live="assertive"] {
+    /* Announced immediately */
+}
+
+/* ARIA Busy State */
+[aria-busy="true"] {
+    opacity: 0.6;
+    pointer-events: none;
+    cursor: wait;
+}
+
+/* ARIA Disabled State */
+[aria-disabled="true"] {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+/* ARIA Selected State */
+[aria-selected="true"] {
+    background: var(--primary-light, #e3f2fd);
+    border-color: var(--primary, #2196f3);
+}
+
+/* ARIA Expanded State */
+[aria-expanded="false"] .expandable-content {
+    display: none;
+}
+
+[aria-expanded="true"] .expandable-content {
+    display: block;
+}
+
+/* Dark Mode Focus Indicators */
+@media (prefers-color-scheme: dark) {
+    .skip-link {
+        background: var(--primary-dark, #1976d2);
+    }
+    
+    button:focus,
+    a:focus,
+    input:focus,
+    select:focus,
+    textarea:focus,
+    [tabindex]:focus {
+        outline-color: var(--focus-color-dark, #64b5f6);
+    }
+    
+    .quiz-option-enhanced:focus,
+    .question-nav-btn:focus {
+        outline-color: var(--focus-color-dark, #64b5f6);
+        box-shadow: 0 0 0 4px rgba(100, 181, 246, 0.2);
+    }
+    
+    .keyboard-hint kbd {
+        background: var(--bg-secondary-dark, #2a2a2a);
+        border-color: var(--border-color-dark, #424242);
+        color: var(--text-primary-dark, #ffffff);
+    }
+}
+
+/* Print Styles */
+@media print {
+    .skip-links,
+    .keyboard-hint,
+    #quiz-sr-announcements {
+        display: none;
+    }
+    
+    /* Ensure focus indicators are visible in print */
+    *:focus {
+        outline: 2px solid black;
+    }
+}
+
+/* Touch Device Adjustments */
+@media (hover: none) and (pointer: coarse) {
+    /* Larger focus indicators for touch devices */
+    button:focus,
+    a:focus,
+    [tabindex]:focus {
+        outline-width: 3px;
+        outline-offset: 3px;
+    }
+    
+    .quiz-option-enhanced:focus,
+    .question-nav-btn:focus {
+        outline-width: 4px;
+        box-shadow: 0 0 0 6px rgba(33, 150, 243, 0.2);
+    }
+}
+
+/* Windows High Contrast Mode */
+@media (prefers-contrast: high) and (prefers-color-scheme: dark) {
+    .skip-link,
+    button,
+    a,
+    input,
+    select,
+    textarea {
+        border: 2px solid currentColor;
+    }
+    
+    *:focus {
+        outline: 4px solid currentColor;
+        outline-offset: 4px;
+    }
+}
+
+/* Forced Colors Mode (Windows High Contrast) */
+@media (forced-colors: active) {
+    .skip-link:focus,
+    button:focus,
+    a:focus,
+    input:focus,
+    select:focus,
+    textarea:focus,
+    [tabindex]:focus {
+        outline: 3px solid;
+        outline-offset: 3px;
+    }
+    
+    .quiz-option-enhanced:focus,
+    .question-nav-btn:focus {
+        outline: 4px solid;
+        box-shadow: none;
+    }
+}
+
