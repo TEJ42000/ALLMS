@@ -36,7 +36,7 @@ from app.services.text_extractor import extract_text
 from app.services.files_api_service import get_files_api_service
 from app.services.course_materials_service import CourseMaterialsService, generate_material_id
 from app.services.rate_limiter import check_upload_rate_limit
-from app.services.storage_service import get_storage_backend
+from app.services.storage_service import get_storage_backend, LocalStorageBackend
 from app.services.background_tasks import enqueue_text_extraction, is_background_processing_enabled
 from app.services.upload_metrics import get_upload_metrics, UploadStatus, ExtractionStatus
 from app.models.course_models import CourseMaterial
@@ -209,12 +209,19 @@ def validate_path_within_base(file_path: Path, base_dir: Path) -> Path:
 
         # Additional check: ensure the string representation starts with base
         # This provides defense in depth
-        if not str(resolved_path).startswith(str(resolved_base) + os.sep):
-            # Also check for exact match (file at base directory root)
-            if str(resolved_path) != str(resolved_base):
-                raise HTTPException(400, "Invalid file path: path traversal detected")
+        base_str = str(resolved_base)
+        path_str = str(resolved_path)
 
-        return resolved_path
+        # Check if path is within base directory or is the base directory itself
+        if path_str == base_str:
+            # Exact match - file is the base directory itself (edge case)
+            return resolved_path
+        elif path_str.startswith(base_str + os.sep):
+            # Path is within base directory
+            return resolved_path
+        else:
+            # Path escapes base directory
+            raise HTTPException(400, "Invalid file path: path traversal detected")
 
     except HTTPException:
         raise
@@ -431,8 +438,10 @@ async def upload_file(
         file_path = storage.get_file_path(storage_path)
 
         # For local storage, validate the path is within Materials/
-        if isinstance(storage, type(storage)) and hasattr(storage, 'base_dir'):
-            # Local storage - validate path
+        # Note: LocalStorageBackend already validates paths in get_file_path()
+        # but we add an additional check here for defense in depth
+        if isinstance(storage, LocalStorageBackend):
+            # Local storage - validate path is within Materials/
             materials_base = Path("Materials").resolve()
             file_path = validate_path_within_base(file_path, materials_base)
 
