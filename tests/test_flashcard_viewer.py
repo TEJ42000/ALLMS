@@ -351,16 +351,68 @@ class TestStatistics:
         stats = self.driver.find_elements(By.CLASS_NAME, 'stat')
         known_stat = stats[1]
         initial_count = int(known_stat.find_element(By.CLASS_NAME, 'stat-value').text)
-        
+
         # Mark as known
         btn_know = self.driver.find_element(By.ID, 'btn-know')
         btn_know.click()
         time.sleep(0.3)
-        
+
         # Check known count increased
         stats = self.driver.find_elements(By.CLASS_NAME, 'stat')
         known_stat = stats[1]
         new_count = int(known_stat.find_element(By.CLASS_NAME, 'stat-value').text)
-        
+
         assert new_count == initial_count + 1
+
+
+class TestNumericValidation:
+    """Test numeric value validation."""
+
+    @pytest.fixture(autouse=True)
+    def setup_viewer(self, flashcard_page):
+        """Start a flashcard set before each test."""
+        btn_study = flashcard_page.find_element(By.CLASS_NAME, 'btn-study')
+        btn_study.click()
+
+        wait = WebDriverWait(flashcard_page, 10)
+        wait.until(EC.presence_of_element_located((By.CLASS_NAME, 'flashcard')))
+
+        self.driver = flashcard_page
+
+    def test_progress_percentage_valid(self):
+        """Test that progress percentage is between 0 and 100."""
+        progress_fill = self.driver.find_element(By.CLASS_NAME, 'progress-fill')
+        width = progress_fill.value_of_css_property('width')
+
+        # Extract numeric value
+        parent_width = self.driver.find_element(By.CLASS_NAME, 'progress-bar').size['width']
+        fill_width = progress_fill.size['width']
+        percentage = (fill_width / parent_width) * 100 if parent_width > 0 else 0
+
+        assert 0 <= percentage <= 100, f"Progress percentage {percentage} out of range"
+
+    def test_stat_values_non_negative(self):
+        """Test that all stat values are non-negative."""
+        stats = self.driver.find_elements(By.CLASS_NAME, 'stat-value')
+
+        for stat in stats:
+            value = int(stat.text.replace('%', ''))
+            assert value >= 0, f"Stat value {value} is negative"
+
+    def test_card_counter_valid(self):
+        """Test that card counter shows valid numbers."""
+        progress_text = self.driver.find_element(By.CLASS_NAME, 'progress-text')
+        text = progress_text.text
+
+        # Extract numbers from "Card X of Y"
+        import re
+        match = re.search(r'Card (\d+) of (\d+)', text)
+        assert match, "Card counter format invalid"
+
+        current = int(match.group(1))
+        total = int(match.group(2))
+
+        assert current >= 1, "Current card number should be at least 1"
+        assert current <= total, "Current card number should not exceed total"
+        assert total >= 1, "Total cards should be at least 1"
 

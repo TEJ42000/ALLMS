@@ -107,21 +107,25 @@ class FlashcardViewer {
                 return;
             }
 
-            const progress = ((this.currentIndex + 1) / this.flashcards.length) * 100;
+            // MEDIUM FIX: Validate numeric values before interpolation
+            const currentIndex = Math.max(0, Math.min(this.currentIndex, this.flashcards.length - 1));
+            const totalCards = Math.max(1, this.flashcards.length);
+            const cardNumber = currentIndex + 1;
+            const progress = Math.min(100, Math.max(0, (cardNumber / totalCards) * 100));
         
         this.container.innerHTML = `
             <div class="flashcard-viewer">
                 <!-- Progress Bar -->
                 <div class="flashcard-progress">
                     <div class="progress-bar" role="progressbar"
-                         aria-valuenow="${this.currentIndex + 1}"
+                         aria-valuenow="${cardNumber}"
                          aria-valuemin="1"
-                         aria-valuemax="${this.flashcards.length}"
+                         aria-valuemax="${totalCards}"
                          aria-label="Flashcard progress">
-                        <div class="progress-fill" style="width: ${progress}%"></div>
+                        <div class="progress-fill" style="width: ${progress.toFixed(2)}%"></div>
                     </div>
                     <div class="progress-text" aria-live="polite" aria-atomic="true">
-                        Card ${this.currentIndex + 1} of ${this.flashcards.length}
+                        Card ${cardNumber} of ${totalCards}
                     </div>
                 </div>
 
@@ -131,7 +135,7 @@ class FlashcardViewer {
                          id="flashcard"
                          role="button"
                          tabindex="0"
-                         aria-label="Flashcard ${this.currentIndex + 1} of ${this.flashcards.length}. Click or press Enter to flip."
+                         aria-label="Flashcard ${cardNumber} of ${totalCards}. Click or press Enter to flip."
                          aria-pressed="${this.isFlipped}">
                         <div class="flashcard-inner">
                             <!-- Front of Card -->
@@ -217,19 +221,19 @@ class FlashcardViewer {
                 <div class="flashcard-stats">
                     <div class="stat">
                         <span class="stat-label">Reviewed:</span>
-                        <span class="stat-value">${this.reviewedCards.size}</span>
+                        <span class="stat-value">${Math.max(0, this.reviewedCards.size)}</span>
                     </div>
                     <div class="stat">
                         <span class="stat-label">Known:</span>
-                        <span class="stat-value">${this.knownCards.size}</span>
+                        <span class="stat-value">${Math.max(0, this.knownCards.size)}</span>
                     </div>
                     <div class="stat">
                         <span class="stat-label">Starred:</span>
-                        <span class="stat-value">${this.starredCards.size}</span>
+                        <span class="stat-value">${Math.max(0, this.starredCards.size)}</span>
                     </div>
                     <div class="stat">
                         <span class="stat-label">Remaining:</span>
-                        <span class="stat-value">${this.flashcards.length - this.reviewedCards.size}</span>
+                        <span class="stat-value">${Math.max(0, totalCards - this.reviewedCards.size)}</span>
                     </div>
                 </div>
             </div>
@@ -520,27 +524,33 @@ class FlashcardViewer {
 
     /**
      * Show completion message
+     * MEDIUM FIX: Validate numeric values
      */
     showCompletionMessage() {
-        const accuracy = this.knownCards.size / this.flashcards.length * 100;
+        // MEDIUM FIX: Validate and sanitize numeric values
+        const totalCards = Math.max(1, this.flashcards.length);
+        const reviewedCount = Math.max(0, this.reviewedCards.size);
+        const knownCount = Math.max(0, this.knownCards.size);
+        const starredCount = Math.max(0, this.starredCards.size);
+        const accuracy = Math.min(100, Math.max(0, (knownCount / totalCards) * 100));
 
         this.container.innerHTML = `
             <div class="flashcard-completion">
-                <div class="completion-icon">🎉</div>
+                <div class="completion-icon" aria-hidden="true">🎉</div>
                 <h2>Great Job!</h2>
-                <p>You've completed all ${this.flashcards.length} flashcards!</p>
+                <p>You've completed all ${totalCards} flashcards!</p>
 
                 <div class="completion-stats">
                     <div class="stat-large">
-                        <div class="stat-value">${this.reviewedCards.size}</div>
+                        <div class="stat-value">${reviewedCount}</div>
                         <div class="stat-label">Cards Reviewed</div>
                     </div>
                     <div class="stat-large">
-                        <div class="stat-value">${this.knownCards.size}</div>
+                        <div class="stat-value">${knownCount}</div>
                         <div class="stat-label">Marked as Known</div>
                     </div>
                     <div class="stat-large">
-                        <div class="stat-value">${Math.round(accuracy)}%</div>
+                        <div class="stat-value">${accuracy.toFixed(0)}%</div>
                         <div class="stat-label">Accuracy</div>
                     </div>
                 </div>
@@ -550,7 +560,7 @@ class FlashcardViewer {
                         Study Again
                     </button>
                     <button class="btn-secondary" id="btn-review-starred">
-                        Review Starred (${this.starredCards.size})
+                        Review Starred (${starredCount})
                     </button>
                     ${this.isFilteredView ? `
                         <button class="btn-secondary" id="btn-back-to-full">
