@@ -101,11 +101,24 @@ class FlashcardViewer {
         // HIGH FIX: beforeUnloadHandler is now set up only when needed (when user has progress)
         this.beforeUnloadHandler = null;
 
+        // PHASE 2A: Gamification integration
+        this.sessionStartTime = Date.now();
+        this.totalTimeSpent = 0;
+        this.xpEarned = 0;
+        this.sessionId = null;
+        this.gamificationEnabled = false;
+        this.userStats = null;
+        this.timeTrackerInterval = null;
+
+        // Check if user is authenticated for gamification
+        this.checkGamificationStatus();
+
         this.init();
     }
 
     /**
      * Initialize the flashcard viewer
+     * PHASE 2A: Start time tracking timer
      */
     init() {
         console.log('[FlashcardViewer] Initializing with', this.flashcards.length, 'cards');
@@ -113,6 +126,11 @@ class FlashcardViewer {
         this.setupEventListeners();
         this.setupKeyboardShortcuts();
         this.setupTouchGestures();
+
+        // PHASE 2A: Start timer to update session time display
+        if (this.gamificationEnabled) {
+            this.startTimeTracker();
+        }
     }
 
     /**
@@ -142,6 +160,26 @@ class FlashcardViewer {
         
         this.container.innerHTML = `
             <div class="flashcard-viewer">
+                ${this.gamificationEnabled && this.userStats ? `
+                    <!-- PHASE 2A: Gamification Header -->
+                    <div class="gamification-header">
+                        <div class="streak-display">
+                            <span class="streak-icon">🔥</span>
+                            <span class="streak-count">${this.userStats.streak?.current_count || 0}</span>
+                            <span class="streak-label">day streak</span>
+                        </div>
+                        <div class="xp-display">
+                            <span class="xp-icon">⭐</span>
+                            <span class="xp-count">${this.userStats.total_xp || 0}</span>
+                            <span class="xp-label">XP</span>
+                        </div>
+                        <div class="time-display">
+                            <span class="time-icon">⏱️</span>
+                            <span class="time-count" id="session-time">0s</span>
+                        </div>
+                    </div>
+                ` : ''}
+
                 <!-- Progress Bar -->
                 <div class="flashcard-progress">
                     <div class="progress-bar" role="progressbar"
@@ -634,14 +672,19 @@ class FlashcardViewer {
     /**
      * Show completion message
      * MEDIUM FIX: Validate numeric values
+     * PHASE 2A: Add XP and time tracking to completion
      */
-    showCompletionMessage() {
+    async showCompletionMessage() {
         // MEDIUM FIX: Validate and sanitize numeric values
         const totalCards = Math.max(1, this.flashcards.length);
         const reviewedCount = Math.max(0, this.reviewedCards.size);
         const knownCount = Math.max(0, this.knownCards.size);
         const starredCount = Math.max(0, this.starredCards.size);
         const accuracy = Math.min(100, Math.max(0, (knownCount / totalCards) * 100));
+
+        // PHASE 2A: Award XP for completion
+        const xpAwarded = await this.awardFlashcardXP();
+        const timeSpent = this.getFormattedTimeSpent();
 
         this.container.innerHTML = `
             <div class="flashcard-completion">
@@ -663,6 +706,19 @@ class FlashcardViewer {
                         <div class="stat-label">Accuracy</div>
                     </div>
                 </div>
+
+                ${this.gamificationEnabled && xpAwarded > 0 ? `
+                    <div class="gamification-rewards">
+                        <div class="xp-reward">
+                            <span class="xp-icon">⭐</span>
+                            <span class="xp-amount">+${xpAwarded} XP</span>
+                        </div>
+                        <div class="time-spent">
+                            <span class="time-icon">⏱️</span>
+                            <span class="time-amount">Time: ${timeSpent}</span>
+                        </div>
+                    </div>
+                ` : ''}
 
                 <div class="completion-actions">
                     <button class="btn-primary" id="btn-restart-completion">
@@ -920,9 +976,21 @@ class FlashcardViewer {
     /**
      * Cleanup all resources including beforeunload handler
      * CRITICAL FIX: Full cleanup when destroying viewer
+     * PHASE 2A: End gamification session on cleanup
      */
     cleanup() {
         console.log('[FlashcardViewer] Cleaning up all resources...');
+
+        // PHASE 2A: Stop time tracker
+        if (this.timeTrackerInterval) {
+            clearInterval(this.timeTrackerInterval);
+            this.timeTrackerInterval = null;
+        }
+
+        // PHASE 2A: End gamification session
+        if (this.gamificationEnabled && this.sessionId) {
+            this.endGamificationSession();
+        }
 
         // Remove DOM event listeners
         this.cleanupEventListeners();
@@ -932,6 +1000,167 @@ class FlashcardViewer {
             window.removeEventListener('beforeunload', this.beforeUnloadHandler);
             this.beforeUnloadHandler = null;
         }
+    }
+
+    // =========================================================================
+    // PHASE 2A: Gamification Methods
+    // =========================================================================
+
+    /**
+     * Check if gamification is available (user is authenticated)
+     */
+    async checkGamificationStatus() {
+        try {
+            const response = await fetch('/api/gamification/stats', {
+                credentials: 'include'
+            });
+
+            if (response.ok) {
+                this.userStats = await response.json();
+                this.gamificationEnabled = true;
+                console.log('[FlashcardViewer] Gamification enabled for user');
+
+                // Start gamification session
+                await this.startGamificationSession();
+            } else {
+                console.log('[FlashcardViewer] Gamification not available (user not authenticated)');
+            }
+        } catch (error) {
+            console.log('[FlashcardViewer] Gamification check failed:', error);
+            this.gamificationEnabled = false;
+        }
+    }
+
+    /**
+     * Start a gamification session
+     */
+    async startGamificationSession() {
+        if (!this.gamificationEnabled) return;
+
+        try {
+            const response = await fetch('/api/gamification/session/start', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                credentials: 'include',
+                body: JSON.stringify({
+                    course_id: null // Flashcards can be cross-course
+                })
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                this.sessionId = data.session_id;
+                console.log('[FlashcardViewer] Gamification session started:', this.sessionId);
+            }
+        } catch (error) {
+            console.error('[FlashcardViewer] Failed to start gamification session:', error);
+        }
+    }
+
+    /**
+     * End gamification session and award XP
+     */
+    async endGamificationSession() {
+        if (!this.gamificationEnabled || !this.sessionId) return;
+
+        try {
+            // Calculate session duration
+            const sessionDuration = Math.floor((Date.now() - this.sessionStartTime) / 1000);
+
+            // End session
+            await fetch('/api/gamification/session/end', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                credentials: 'include',
+                body: JSON.stringify({
+                    session_id: this.sessionId,
+                    duration_seconds: sessionDuration
+                })
+            });
+
+            console.log('[FlashcardViewer] Gamification session ended');
+        } catch (error) {
+            console.error('[FlashcardViewer] Failed to end gamification session:', error);
+        }
+    }
+
+    /**
+     * Award XP for completing flashcard set
+     */
+    async awardFlashcardXP() {
+        if (!this.gamificationEnabled) return 0;
+
+        try {
+            const cardsReviewed = this.reviewedCards.size;
+            const cardsKnown = this.knownCards.size;
+            const accuracy = cardsReviewed > 0 ? (cardsKnown / cardsReviewed) * 100 : 0;
+
+            // Award XP based on cards reviewed correctly
+            // XP is awarded per 10 cards reviewed correctly
+            const setsCompleted = Math.floor(cardsKnown / 10);
+
+            if (setsCompleted > 0) {
+                const response = await fetch('/api/gamification/activity', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        activity_type: 'flashcard_set_completed',
+                        activity_data: {
+                            cards_reviewed: cardsReviewed,
+                            cards_known: cardsKnown,
+                            accuracy: accuracy,
+                            sets_completed: setsCompleted,
+                            session_id: this.sessionId
+                        }
+                    })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    this.xpEarned = data.xp_awarded || 0;
+                    console.log('[FlashcardViewer] XP awarded:', this.xpEarned);
+                    return this.xpEarned;
+                }
+            }
+        } catch (error) {
+            console.error('[FlashcardViewer] Failed to award XP:', error);
+        }
+
+        return 0;
+    }
+
+    /**
+     * Get current time spent in session (formatted)
+     */
+    getFormattedTimeSpent() {
+        const seconds = Math.floor((Date.now() - this.sessionStartTime) / 1000);
+        const minutes = Math.floor(seconds / 60);
+        const remainingSeconds = seconds % 60;
+
+        if (minutes > 0) {
+            return `${minutes}m ${remainingSeconds}s`;
+        }
+        return `${seconds}s`;
+    }
+
+    /**
+     * Start time tracker to update session time display
+     */
+    startTimeTracker() {
+        // Update time display every second
+        this.timeTrackerInterval = setInterval(() => {
+            const timeElement = document.getElementById('session-time');
+            if (timeElement) {
+                timeElement.textContent = this.getFormattedTimeSpent();
+            }
+        }, 1000);
     }
 }
 

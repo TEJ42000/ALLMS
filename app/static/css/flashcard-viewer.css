@@ -20,6 +20,90 @@
 }
 
 /* ============================================================================
+   PHASE 2A: Gamification Header
+   ============================================================================ */
+
+.gamification-header {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 12px;
+    padding: 15px 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.streak-display,
+.xp-display,
+.time-display {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: white;
+}
+
+.streak-icon,
+.xp-icon,
+.time-icon {
+    font-size: 24px;
+}
+
+.streak-count,
+.xp-count,
+.time-count {
+    font-size: 20px;
+    font-weight: bold;
+}
+
+.streak-label,
+.xp-label {
+    font-size: 12px;
+    opacity: 0.9;
+}
+
+/* Gamification Rewards (Completion Screen) */
+.gamification-rewards {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 12px;
+    padding: 20px;
+    margin: 20px 0;
+    display: flex;
+    justify-content: center;
+    gap: 30px;
+    flex-wrap: wrap;
+}
+
+.xp-reward,
+.time-spent {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: white;
+    font-size: 18px;
+    font-weight: bold;
+}
+
+.xp-icon,
+.time-icon {
+    font-size: 28px;
+}
+
+.xp-amount {
+    font-size: 24px;
+    animation: xpPulse 0.5s ease-in-out;
+}
+
+@keyframes xpPulse {
+    0%, 100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.2);
+    }
+}
+
+/* ============================================================================
    Progress Bar
    ============================================================================ */
 
@@ -452,6 +536,26 @@
 
     .card-content {
         font-size: 20px;
+    }
+
+    /* PHASE 2A: Mobile gamification header */
+    .gamification-header {
+        flex-direction: column;
+        gap: 10px;
+        padding: 12px 15px;
+    }
+
+    .streak-display,
+    .xp-display,
+    .time-display {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .gamification-rewards {
+        flex-direction: column;
+        gap: 15px;
+        padding: 15px;
     }
 
     .flashcard-controls {
