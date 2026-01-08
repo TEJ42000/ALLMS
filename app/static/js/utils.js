@@ -28,8 +28,69 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-// Export for use in other scripts
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { escapeHtml };
+/**
+ * CRITICAL FIX: Show styled notification instead of alert()
+ *
+ * Displays a styled toast notification with auto-dismiss.
+ * Replaces browser alert() for better UX.
+ *
+ * @param {string} message - Message to display
+ * @param {string} type - Notification type: 'info', 'warning', 'error', 'success'
+ * @param {number} duration - Duration in milliseconds (0 = manual close only)
+ *
+ * @example
+ * showNotification('Data saved successfully!', 'success', 3000);
+ * showNotification('Storage quota exceeded', 'error', 0);
+ */
+function showNotification(message, type = 'info', duration = 5000) {
+    // Remove existing notification if any
+    const existing = document.querySelector('.notification-toast');
+    if (existing) {
+        existing.remove();
+    }
+
+    // Create notification element
+    const notification = document.createElement('div');
+    notification.className = `notification-toast notification-${type}`;
+
+    // Icon based on type
+    const icons = {
+        info: 'ℹ️',
+        warning: '⚠️',
+        error: '❌',
+        success: '✅'
+    };
+
+    notification.innerHTML = `
+        <div class="notification-content">
+            <span class="notification-icon">${icons[type] || icons.info}</span>
+            <span class="notification-message">${escapeHtml(message)}</span>
+            <button class="notification-close" aria-label="Close notification">×</button>
+        </div>
+    `;
+
+    document.body.appendChild(notification);
+
+    // Animate in
+    setTimeout(() => notification.classList.add('show'), 10);
+
+    // Close button
+    const closeBtn = notification.querySelector('.notification-close');
+    closeBtn.addEventListener('click', () => {
+        notification.classList.remove('show');
+        setTimeout(() => notification.remove(), 300);
+    });
+
+    // Auto-close after duration
+    if (duration > 0) {
+        setTimeout(() => {
+            notification.classList.remove('show');
+            setTimeout(() => notification.remove(), 300);
+        }, duration);
+    }
 }
 
+// Export for use in other scripts
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { escapeHtml, showNotification };
+}
