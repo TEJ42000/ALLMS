@@ -387,8 +387,14 @@
     <footer class="footer">
         <p>&copy; 2026 LLS Study Portal | University of Groningen | v{{ version }}</p>
     </footer>
-    <script src="/static/js/activity-tracker.js"></script>
-    <script src="/static/js/gamification-ui.js"></script>
-    <script src="/static/js/app.js"></script>
+    <!-- Load scripts in correct order: dependencies first, then features, then app -->
+    <script src="/static/js/activity-tracker.js" defer></script>
+    <script src="/static/js/gamification-ui.js" defer></script>
+    <script src="/static/js/gamification-animations.js" defer></script>
+    <script src="/static/js/progress-visualizations.js" defer></script>
+    <script src="/static/js/shareable-graphics.js" defer></script>
+    <script src="/static/js/sound-control.js" defer></script>
+    <script src="/static/js/onboarding-tour.js" defer></script>
+    <script src="/static/js/app.js" defer></script>
 </body>
 </html>

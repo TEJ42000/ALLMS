@@ -33,7 +33,9 @@ body { font-family: Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-ser
 .exam-info { color: var(--text-secondary); }
 .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 30px; }
 .stat-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 15px; padding: 25px; text-align: center; transition: all 0.3s; }
-.stat-card:hover { transform: translateY(-5px); border-color: var(--gold); box-shadow: 0 10px 30px rgba(212, 175, 55, 0.2); }
+.stat-card:hover { transform: translateY(-8px) scale(1.02); border-color: var(--gold); box-shadow: 0 10px 30px rgba(212, 175, 55, 0.2); }
+.stat-card:active { transform: scale(0.98); }
+.stat-card.enhanced { cursor: pointer; }
 .stat-icon { font-size: 2em; margin-bottom: 10px; }
 .stat-value { font-size: 2.5em; font-weight: bold; color: var(--gold); }
 .stat-label { color: var(--text-secondary); font-size: 0.9em; margin-top: 5px; }
@@ -2065,4 +2067,710 @@ textarea { resize: vertical; font-family: inherit; }
 @keyframes fadeOut {
     from { opacity: 1; }
     to { opacity: 0; }
+}
+
+/* =============================================================================
+   GAMIFICATION UI POLISH - ANIMATIONS & EFFECTS
+   ============================================================================= */
+
+/* Level Up Modal */
+.level-up-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.level-up-modal.show {
+    opacity: 1;
+}
+
+.level-up-content {
+    background: linear-gradient(135deg, var(--navy-dark) 0%, var(--navy-medium) 100%);
+    border: 3px solid var(--gold);
+    border-radius: 20px;
+    padding: 50px;
+    text-align: center;
+    max-width: 500px;
+    transform: scale(0.8);
+    transition: transform 0.3s ease;
+    box-shadow: 0 20px 60px rgba(212, 175, 55, 0.4);
+}
+
+.level-up-modal.show .level-up-content {
+    transform: scale(1);
+    animation: levelUpBounce 0.6s ease;
+}
+
+@keyframes levelUpBounce {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+}
+
+.level-up-icon {
+    font-size: 80px;
+    margin-bottom: 20px;
+    animation: levelUpIconSpin 1s ease;
+}
+
+@keyframes levelUpIconSpin {
+    0% { transform: rotate(0deg) scale(0); }
+    50% { transform: rotate(180deg) scale(1.2); }
+    100% { transform: rotate(360deg) scale(1); }
+}
+
+.level-up-title {
+    font-size: 48px;
+    color: var(--gold);
+    margin-bottom: 20px;
+    font-weight: bold;
+}
+
+.level-up-level {
+    font-size: 72px;
+    color: var(--text-primary);
+    font-weight: bold;
+    margin-bottom: 10px;
+}
+
+.level-up-rank {
+    font-size: 32px;
+    color: var(--gold-light);
+    margin-bottom: 20px;
+}
+
+.level-up-message {
+    font-size: 18px;
+    color: var(--text-secondary);
+    margin-bottom: 30px;
+}
+
+.level-up-close {
+    background: var(--gold);
+    color: var(--navy-dark);
+    border: none;
+    padding: 15px 40px;
+    border-radius: 10px;
+    font-size: 18px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.level-up-close:hover {
+    background: var(--gold-light);
+    transform: scale(1.05);
+}
+
+/* XP Gain Indicator */
+.xp-gain-indicator {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 9999;
+    opacity: 0;
+    transition: all 0.5s ease;
+}
+
+.xp-gain-indicator.show {
+    opacity: 1;
+    animation: xpGainFloat 2s ease;
+}
+
+@keyframes xpGainFloat {
+    0% {
+        transform: translate(-50%, -50%) scale(0.5);
+        opacity: 0;
+    }
+    50% {
+        transform: translate(-50%, -100px) scale(1.2);
+        opacity: 1;
+    }
+    100% {
+        transform: translate(-50%, -200px) scale(1);
+        opacity: 0;
+    }
+}
+
+.xp-gain-content {
+    background: linear-gradient(135deg, var(--gold) 0%, var(--gold-light) 100%);
+    color: var(--navy-dark);
+    padding: 20px 40px;
+    border-radius: 50px;
+    font-size: 24px;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    box-shadow: 0 10px 30px rgba(212, 175, 55, 0.5);
+}
+
+.xp-gain-icon {
+    font-size: 32px;
+}
+
+/* Progress Bar Pulse Animation */
+.progress-pulse {
+    animation: progressPulse 0.6s ease;
+}
+
+@keyframes progressPulse {
+    0%, 100% { transform: scaleY(1); }
+    50% { transform: scaleY(1.2); }
+}
+
+/* Badge Earned Modal */
+.badge-earned-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.85);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.badge-earned-modal.show {
+    opacity: 1;
+}
+
+.badge-earned-content {
+    background: linear-gradient(135deg, var(--navy-dark) 0%, var(--navy-medium) 100%);
+    border: 3px solid var(--gold);
+    border-radius: 20px;
+    padding: 50px;
+    text-align: center;
+    max-width: 500px;
+    transform: scale(0.8);
+    transition: transform 0.3s ease;
+}
+
+.badge-earned-modal.show .badge-earned-content {
+    transform: scale(1);
+    animation: badgeEarnedBounce 0.6s ease;
+}
+
+@keyframes badgeEarnedBounce {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+}
+
+.badge-earned-icon {
+    font-size: 100px;
+    margin-bottom: 20px;
+    animation: badgeIconRotate 1s ease;
+}
+
+@keyframes badgeIconRotate {
+    0% { transform: rotate(0deg) scale(0); }
+    50% { transform: rotate(180deg) scale(1.3); }
+    100% { transform: rotate(360deg) scale(1); }
+}
+
+.badge-earned-title {
+    font-size: 42px;
+    color: var(--gold);
+    margin-bottom: 20px;
+    font-weight: bold;
+}
+
+.badge-earned-name {
+    font-size: 36px;
+    color: var(--text-primary);
+    margin-bottom: 15px;
+    font-weight: bold;
+}
+
+.badge-earned-tier {
+    display: inline-block;
+    padding: 8px 20px;
+    border-radius: 20px;
+    font-size: 18px;
+    font-weight: bold;
+    margin-bottom: 20px;
+    text-transform: uppercase;
+}
+
+.badge-earned-tier.bronze {
+    background: linear-gradient(135deg, #cd7f32 0%, #b87333 100%);
+    color: white;
+}
+
+.badge-earned-tier.silver {
+    background: linear-gradient(135deg, #c0c0c0 0%, #a8a8a8 100%);
+    color: var(--navy-dark);
+}
+
+.badge-earned-tier.gold {
+    background: linear-gradient(135deg, #ffd700 0%, #d4af37 100%);
+    color: var(--navy-dark);
+}
+
+.badge-earned-description {
+    font-size: 16px;
+    color: var(--text-secondary);
+    margin-bottom: 30px;
+    line-height: 1.6;
+}
+
+.badge-earned-share,
+.badge-earned-close {
+    background: var(--gold);
+    color: var(--navy-dark);
+    border: none;
+    padding: 12px 30px;
+    border-radius: 10px;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s;
+    margin: 5px;
+}
+
+.badge-earned-share:hover,
+.badge-earned-close:hover {
+    background: var(--gold-light);
+    transform: scale(1.05);
+}
+
+/* Streak Milestone Notification */
+.streak-milestone-notification {
+    position: fixed;
+    top: 100px;
+    right: 30px;
+    background: linear-gradient(135deg, #ff4500 0%, #ff6347 100%);
+    border-radius: 15px;
+    padding: 20px 30px;
+    box-shadow: 0 10px 30px rgba(255, 69, 0, 0.4);
+    z-index: 9999;
+    opacity: 0;
+    transform: translateX(400px);
+    transition: all 0.3s ease;
+}
+
+.streak-milestone-notification.show {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+.streak-milestone-content {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.streak-milestone-icon {
+    font-size: 48px;
+    animation: streakFlame 1s ease infinite;
+}
+
+@keyframes streakFlame {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.2); }
+}
+
+.streak-milestone-title {
+    font-size: 24px;
+    font-weight: bold;
+    color: white;
+    margin-bottom: 5px;
+}
+
+.streak-milestone-message {
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+/* Circular Progress Indicators */
+.circular-progress-container {
+    position: relative;
+    display: inline-block;
+    margin-right: 15px;
+}
+
+.circular-progress {
+    transform: rotate(-90deg);
+}
+
+.circular-progress-bg {
+    fill: none;
+    stroke: rgba(255, 255, 255, 0.1);
+    stroke-width: 4;
+}
+
+.circular-progress-fill {
+    fill: none;
+    stroke: var(--gold);
+    stroke-width: 4;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 1s ease, stroke 0.5s ease;
+}
+
+.circular-progress-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+}
+
+.circular-progress-level {
+    font-size: 20px;
+    font-weight: bold;
+    color: var(--gold);
+}
+
+/* Exam Readiness Circle */
+.exam-readiness-card {
+    grid-column: span 2;
+}
+
+.exam-readiness-circle-container {
+    position: relative;
+    display: inline-block;
+    margin: 20px 0;
+}
+
+.exam-readiness-circle {
+    transform: rotate(-90deg);
+}
+
+.exam-circle-bg {
+    fill: none;
+    stroke: rgba(255, 255, 255, 0.1);
+    stroke-width: 8;
+}
+
+.exam-circle-fill {
+    fill: none;
+    stroke: var(--success);
+    stroke-width: 8;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 1.5s ease, stroke 0.5s ease;
+}
+
+.exam-readiness-percentage {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+}
+
+.exam-percentage-value {
+    font-size: 48px;
+    font-weight: bold;
+    color: var(--gold);
+}
+
+.exam-readiness-label {
+    color: var(--text-secondary);
+    font-size: 14px;
+    margin-top: 10px;
+}
+
+/* Shareable Graphics Section */
+.share-section {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 15px;
+    padding: 30px;
+    margin-top: 30px;
+}
+
+.share-section h3 {
+    color: var(--gold);
+    margin-bottom: 20px;
+    font-size: 24px;
+}
+
+.share-buttons {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+}
+
+.share-btn {
+    background: linear-gradient(135deg, var(--gold) 0%, var(--gold-light) 100%);
+    color: var(--navy-dark);
+    border: none;
+    padding: 15px 25px;
+    border-radius: 10px;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+.share-btn:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 20px rgba(212, 175, 55, 0.3);
+}
+
+.share-btn:active {
+    transform: translateY(-1px);
+}
+
+.share-btn:disabled,
+.share-btn.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+    pointer-events: none;
+}
+
+.share-btn:disabled:hover,
+.share-btn.disabled:hover {
+    transform: none;
+    box-shadow: none;
+}
+
+/* Download Notification */
+.download-notification {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    background: var(--success);
+    color: white;
+    padding: 15px 25px;
+    border-radius: 10px;
+    box-shadow: 0 10px 30px rgba(72, 187, 120, 0.4);
+    z-index: 9999;
+    opacity: 0;
+    transform: translateY(100px);
+    transition: all 0.3s ease;
+}
+
+.download-notification.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.download-notification-content {
+    font-size: 16px;
+    font-weight: bold;
+}
+
+/* Stat Card Trends */
+.stat-trend {
+    margin-top: 10px;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+.stat-trend.positive {
+    color: var(--success);
+}
+
+.stat-trend.negative {
+    color: var(--error);
+}
+
+.stat-trend.neutral {
+    color: var(--text-secondary);
+}
+
+/* Accessibility: Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+
+    .level-up-icon,
+    .badge-earned-icon,
+    .streak-milestone-icon {
+        animation: none !important;
+    }
+
+    .xp-gain-indicator {
+        animation: none !important;
+    }
+}
+
+/* Sound Control Button */
+.sound-control {
+    position: fixed;
+    bottom: 30px;
+    left: 30px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s;
+    z-index: 9998;
+}
+
+.sound-control:hover {
+    background: var(--gold);
+    border-color: var(--gold);
+    transform: scale(1.1);
+}
+
+.sound-control-icon {
+    font-size: 24px;
+}
+
+/* Onboarding Tour */
+.onboarding-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 10001;
+    display: none;
+}
+
+.onboarding-overlay.active {
+    display: block;
+}
+
+.onboarding-tooltip {
+    position: absolute;
+    background: linear-gradient(135deg, var(--navy-dark) 0%, var(--navy-medium) 100%);
+    border: 2px solid var(--gold);
+    border-radius: 15px;
+    padding: 25px;
+    max-width: 350px;
+    box-shadow: 0 10px 40px rgba(212, 175, 55, 0.3);
+    z-index: 10002;
+}
+
+.onboarding-tooltip-title {
+    font-size: 20px;
+    font-weight: bold;
+    color: var(--gold);
+    margin-bottom: 10px;
+}
+
+.onboarding-tooltip-content {
+    font-size: 16px;
+    color: var(--text-primary);
+    line-height: 1.6;
+    margin-bottom: 20px;
+}
+
+.onboarding-tooltip-buttons {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+}
+
+.onboarding-btn {
+    background: var(--gold);
+    color: var(--navy-dark);
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.onboarding-btn:hover {
+    background: var(--gold-light);
+    transform: scale(1.05);
+}
+
+.onboarding-btn-skip {
+    background: transparent;
+    color: var(--text-secondary);
+    border: 1px solid var(--border-color);
+}
+
+.onboarding-btn-skip:hover {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-primary);
+}
+
+.onboarding-progress {
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 12px;
+    margin-top: 15px;
+}
+
+/* Responsive Enhancements */
+@media (max-width: 768px) {
+    .level-up-content,
+    .badge-earned-content {
+        padding: 30px 20px;
+        max-width: 90%;
+    }
+
+    .level-up-title {
+        font-size: 36px;
+    }
+
+    .level-up-level {
+        font-size: 56px;
+    }
+
+    .level-up-rank {
+        font-size: 24px;
+    }
+
+    .badge-earned-title {
+        font-size: 32px;
+    }
+
+    .badge-earned-name {
+        font-size: 28px;
+    }
+
+    .streak-milestone-notification {
+        right: 10px;
+        left: 10px;
+        top: 80px;
+    }
+
+    .share-buttons {
+        grid-template-columns: 1fr;
+    }
+
+    .exam-readiness-card {
+        grid-column: span 1;
+    }
+
+    .sound-control {
+        bottom: 20px;
+        left: 20px;
+        width: 45px;
+        height: 45px;
+    }
+
+    .download-notification {
+        bottom: 20px;
+        right: 20px;
+        left: 20px;
+    }
 }
