@@ -617,20 +617,54 @@ def run_streak_maintenance(
 
 @router.get("/badges")
 def get_all_badges(
-    user: User = Depends(get_current_user)
+    user: User = Depends(get_current_user),
+    include_inactive: bool = False
 ):
     """Get all badge definitions.
 
+    MEDIUM: Added input validation and clarity
+    MEDIUM: Only returns active badges by default
+
+    Args:
+        include_inactive: Include inactive badges (admin only, default: False)
+
     Returns:
-        List of all available badges
+        {
+            "badges": List of badge definitions,
+            "total": Total count,
+            "active_count": Count of active badges,
+            "inactive_count": Count of inactive badges
+        }
     """
     try:
         from app.services.badge_definitions import get_all_badge_definitions
 
-        badges = get_all_badge_definitions()
+        # Get all badge definitions
+        all_badges = get_all_badge_definitions()
+
+        # MEDIUM: Filter to only active badges unless admin requests inactive
+        if not include_inactive:
+            badges = [b for b in all_badges if b.active]
+        else:
+            # Check if user is admin for inactive badges
+            admin_emails = os.getenv("ADMIN_EMAILS", "").split(",")
+            admin_emails = [email.strip() for email in admin_emails if email.strip()]
+
+            if user.email not in admin_emails:
+                # Non-admin users only see active badges
+                badges = [b for b in all_badges if b.active]
+            else:
+                badges = all_badges
+
+        # Calculate counts
+        active_count = sum(1 for b in all_badges if b.active)
+        inactive_count = len(all_badges) - active_count
+
         return {
             "badges": [badge.model_dump(mode='json') for badge in badges],
-            "total": len(badges)
+            "total": len(badges),
+            "active_count": active_count,
+            "inactive_count": inactive_count
         }
 
     except Exception as e:
@@ -670,15 +704,38 @@ def get_badge_details(
 ):
     """Get details for a specific badge.
 
+    MEDIUM: Added input validation
+
     Args:
-        badge_id: Badge identifier
+        badge_id: Badge identifier (alphanumeric and underscores only)
 
     Returns:
-        Badge definition and user's progress
+        {
+            "badge": Badge definition,
+            "earned": Whether user has earned this badge,
+            "earned_at": When badge was earned (if earned),
+            "progress": Progress toward badge (if not earned)
+        }
+
+    Raises:
+        400: Invalid badge_id format
+        404: Badge not found
     """
     try:
         from app.services.badge_definitions import get_all_badge_definitions
         from app.services.badge_service import get_badge_service
+
+        # MEDIUM: Input validation - badge_id should be alphanumeric with underscores
+        import re
+        if not re.match(r'^[a-z0-9_]+$', badge_id):
+            raise HTTPException(
+                400,
+                detail="Invalid badge_id format. Must be lowercase alphanumeric with underscores."
+            )
+
+        # MEDIUM: Limit badge_id length to prevent abuse
+        if len(badge_id) > 50:
+            raise HTTPException(400, detail="badge_id too long (max 50 characters)")
 
         # Find badge definition
         all_badges = get_all_badge_definitions()
@@ -687,10 +744,22 @@ def get_badge_details(
         if not badge_def:
             raise HTTPException(404, detail=f"Badge {badge_id} not found")
 
+        # MEDIUM: Don't show inactive badges to non-admin users
+        if not badge_def.active:
+            admin_emails = os.getenv("ADMIN_EMAILS", "").split(",")
+            admin_emails = [email.strip() for email in admin_emails if email.strip()]
+
+            if user.email not in admin_emails:
+                raise HTTPException(404, detail=f"Badge {badge_id} not found")
+
         # Check if user has earned it
         badge_service = get_badge_service()
         earned_badges = badge_service.get_user_badges(user.user_id)
-        earned = any(b.badge_id == badge_id for b in earned_badges)
+
+        # MEDIUM: Find the specific earned badge to get earned_at timestamp
+        earned_badge = next((b for b in earned_badges if b.badge_id == badge_id), None)
+        earned = earned_badge is not None
+        earned_at = earned_badge.earned_at.isoformat() if earned_badge else None
 
         # Get progress if not earned
         progress = None
@@ -704,6 +773,7 @@ def get_badge_details(
         return {
             "badge": badge_def.model_dump(mode='json'),
             "earned": earned,
+            "earned_at": earned_at,  # MEDIUM: Added earned_at timestamp
             "progress": progress
         }
 
