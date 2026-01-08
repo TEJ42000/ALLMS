@@ -68,6 +68,10 @@ class Week7QuestService:
 
             stats = UserStats(**doc.to_dict())
 
+            # HIGH: Validate course_id matches current course
+            if stats.course_id and stats.course_id != course_id:
+                return False, f"Quest must be activated for current course (expected: {course_id}, got: {stats.course_id})"
+
             # Check if quest is already active
             if stats.week7_quest.active:
                 return False, "Quest already active"
@@ -82,6 +86,7 @@ class Week7QuestService:
                 "week7_quest.exam_readiness_percent": 0,
                 "week7_quest.boss_battle_completed": False,
                 "week7_quest.double_xp_earned": 0,
+                "week7_quest.course_id": course_id,  # HIGH: Store course_id with quest
                 "updated_at": datetime.now(timezone.utc)
             })
 
