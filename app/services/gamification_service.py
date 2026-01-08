@@ -32,7 +32,6 @@ from app.models.gamification_models import (
     ActivityCounters,
     Week7Quest,
     PageView,
-    XPConfig,
 )
 from app.services.gcp_service import get_firestore_client
 
@@ -79,6 +78,11 @@ STREAK_FREEZE_XP_REQUIREMENT = 500
 
 # 4AM reset hour
 STREAK_RESET_HOUR = 4
+
+# Bonus multiplier validation (HIGH: Validate bonus_multiplier range)
+BONUS_MULTIPLIER_MIN = 1.0
+BONUS_MULTIPLIER_MAX = 2.0
+WEEKLY_CONSISTENCY_BONUS_MULTIPLIER = 1.5  # 50% XP bonus
 
 
 class GamificationService:
@@ -429,6 +433,12 @@ class GamificationService:
             consistency_bonus = 0
             if xp_awarded > 0 and getattr(stats.streak, 'bonus_active', False):
                 bonus_multiplier = getattr(stats.streak, 'bonus_multiplier', 1.0)
+
+                # HIGH: Validate bonus_multiplier range
+                if not (BONUS_MULTIPLIER_MIN <= bonus_multiplier <= BONUS_MULTIPLIER_MAX):
+                    logger.warning(f"Invalid bonus multiplier {bonus_multiplier} for user {user_id}, clamping to valid range")
+                    bonus_multiplier = max(BONUS_MULTIPLIER_MIN, min(bonus_multiplier, BONUS_MULTIPLIER_MAX))
+
                 if bonus_multiplier > 1.0:
                     original_xp = xp_awarded
                     xp_awarded = int(xp_awarded * bonus_multiplier)
@@ -851,8 +861,14 @@ class GamificationService:
                     }
 
                     if bonus_earned:
+                        # HIGH: Validate bonus_multiplier range
+                        multiplier = WEEKLY_CONSISTENCY_BONUS_MULTIPLIER
+                        if not (BONUS_MULTIPLIER_MIN <= multiplier <= BONUS_MULTIPLIER_MAX):
+                            logger.error(f"Invalid bonus multiplier {multiplier}, using default 1.5")
+                            multiplier = 1.5
+
                         updates["streak.bonus_active"] = True
-                        updates["streak.bonus_multiplier"] = 1.5
+                        updates["streak.bonus_multiplier"] = multiplier
 
                     transaction.update(doc_ref, updates)
 

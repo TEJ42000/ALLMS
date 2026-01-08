@@ -316,26 +316,65 @@ def update_xp_config(
 
     Returns:
         Success status
+
+    Raises:
+        HTTPException 403: If user is not an admin
+        HTTPException 400: If no updates provided or invalid values
     """
-    # TODO: Add admin role check
-    # For now, any authenticated user can update (will add proper admin check in Phase 7)
+    # HIGH: Add admin config validation
+    admin_emails = os.getenv("ADMIN_EMAILS", "").split(",")
+    admin_emails = [email.strip() for email in admin_emails if email.strip()]
+
+    # Explicit check: if ADMIN_EMAILS is not configured, deny all access
+    if not admin_emails:
+        logger.error("ADMIN_EMAILS environment variable not configured, denying XP config update")
+        raise HTTPException(
+            status_code=403,
+            detail="Admin configuration required. ADMIN_EMAILS environment variable must be set."
+        )
+
+    if user.email not in admin_emails:
+        logger.warning(f"Non-admin user {user.email} attempted to update XP config")
+        raise HTTPException(
+            status_code=403,
+            detail="Admin access required. This endpoint is restricted to administrators."
+        )
 
     try:
         service = get_gamification_service()
 
-        # Build updates dict from request
+        # Build updates dict from request with validation
         updates = {}
+
+        # Validate all XP values are positive
         if request.flashcard_set_completed is not None:
+            if request.flashcard_set_completed < 0:
+                raise HTTPException(400, detail="flashcard_set_completed must be non-negative")
             updates["flashcard_set_completed"] = request.flashcard_set_completed
+
         if request.study_guide_completed is not None:
+            if request.study_guide_completed < 0:
+                raise HTTPException(400, detail="study_guide_completed must be non-negative")
             updates["study_guide_completed"] = request.study_guide_completed
+
         if request.quiz_easy_passed is not None:
+            if request.quiz_easy_passed < 0:
+                raise HTTPException(400, detail="quiz_easy_passed must be non-negative")
             updates["quiz_easy_passed"] = request.quiz_easy_passed
+
         if request.quiz_hard_passed is not None:
+            if request.quiz_hard_passed < 0:
+                raise HTTPException(400, detail="quiz_hard_passed must be non-negative")
             updates["quiz_hard_passed"] = request.quiz_hard_passed
+
         if request.evaluation_low is not None:
+            if request.evaluation_low < 0:
+                raise HTTPException(400, detail="evaluation_low must be non-negative")
             updates["evaluation_low"] = request.evaluation_low
+
         if request.evaluation_high is not None:
+            if request.evaluation_high < 0:
+                raise HTTPException(400, detail="evaluation_high must be non-negative")
             updates["evaluation_high"] = request.evaluation_high
 
         if not updates:
@@ -346,6 +385,7 @@ def update_xp_config(
         if not success:
             raise HTTPException(500, detail="Failed to update XP config")
 
+        logger.info(f"XP configuration updated successfully by admin {user.email}")
         return {"status": "ok", "message": "XP configuration updated successfully"}
 
     except HTTPException:

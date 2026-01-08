@@ -395,6 +395,36 @@ class TestInputValidation:
         assert stats.streak.bonus_multiplier >= 1.0, "Multiplier should be at least 1.0"
         assert stats.streak.bonus_multiplier <= 2.0, "Multiplier should not exceed 2.0"
 
+    def test_bonus_multiplier_validation_on_creation(self):
+        """Test that bonus_multiplier is validated on model creation (HIGH #7)."""
+        from pydantic import ValidationError
+
+        # Valid multiplier should work
+        stats = UserStats(
+            user_id="test_user",
+            user_email="test@example.com",
+            streak=StreakInfo(bonus_multiplier=1.5)
+        )
+        assert stats.streak.bonus_multiplier == 1.5
+
+        # Multiplier below 1.0 should fail
+        with pytest.raises(ValidationError) as exc_info:
+            UserStats(
+                user_id="test_user",
+                user_email="test@example.com",
+                streak=StreakInfo(bonus_multiplier=0.5)
+            )
+        assert "greater than or equal to 1.0" in str(exc_info.value).lower()
+
+        # Multiplier above 2.0 should fail
+        with pytest.raises(ValidationError) as exc_info:
+            UserStats(
+                user_id="test_user",
+                user_email="test@example.com",
+                streak=StreakInfo(bonus_multiplier=3.0)
+            )
+        assert "less than or equal to 2.0" in str(exc_info.value).lower()
+
 
 class TestSecurityFixes:
     """Test security fixes for streak system (CRITICAL)."""

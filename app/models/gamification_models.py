@@ -57,7 +57,9 @@ class StreakInfo(BaseModel):
     )
     bonus_multiplier: float = Field(
         default=1.0,
-        description="XP multiplier when bonus is active"
+        ge=1.0,  # Must be >= 1.0
+        le=2.0,  # Must be <= 2.0 (max 100% bonus)
+        description="XP multiplier when bonus is active (1.0-2.0)"
     )
 
 
