@@ -62,6 +62,7 @@
             <div class="nav-tabs">
                 <button class="nav-tab active" data-tab="dashboard">📊 Dashboard</button>
                 <button class="nav-tab" data-tab="badges">🏆 Badges</button>
+                <button class="nav-tab" data-tab="upload">📤 Upload</button>
                 <button class="nav-tab" data-tab="tutor">🤖 AI Tutor</button>
                 <button class="nav-tab" data-tab="assessment">📝 Assessment</button>
                 <button class="nav-tab" data-tab="quiz">🎯 Quiz</button>
@@ -128,6 +129,45 @@
                     </div>
                 </div>
             </section>
+
+            <!-- Upload Section - MVP Feature -->
+            <section id="upload-section" class="section">
+                <h2 class="section-title">📤 Upload Course Materials</h2>
+                <p class="section-description">Upload your lecture slides, notes, or textbook chapters for AI analysis</p>
+
+                <div id="upload-container">
+                    <!-- Upload Dropzone -->
+                    <div id="upload-dropzone" class="upload-dropzone">
+                        <div class="dropzone-content">
+                            <span class="dropzone-icon">📁</span>
+                            <p class="dropzone-text">Drag & drop files here</p>
+                            <p class="dropzone-hint">or click to browse</p>
+                            <p class="dropzone-formats">Supported: PDF, DOCX, PPTX, TXT, MD, HTML (max 25MB)</p>
+                        </div>
+                        <input type="file" id="file-input" hidden accept=".pdf,.docx,.pptx,.txt,.md,.html">
+                    </div>
+
+                    <!-- Upload Progress -->
+                    <div id="upload-progress" class="upload-progress" style="display: none;">
+                        <div class="progress-item">
+                            <span class="progress-filename"></span>
+                            <span class="progress-status">Uploading...</span>
+                        </div>
+                    </div>
+
+                    <!-- Upload Results -->
+                    <div id="upload-results" class="upload-results" style="display: none;">
+                        <h3 class="results-title">📊 Analysis Results</h3>
+                        <div id="analysis-content"></div>
+                        <div class="upload-actions">
+                            <button id="generate-quiz-btn" class="btn btn-primary">🎯 Generate Quiz</button>
+                            <button id="generate-flashcards-btn" class="btn btn-secondary">🗂️ Generate Flashcards</button>
+                            <button id="upload-another-btn" class="btn btn-secondary">📤 Upload Another</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
             <section id="tutor-section" class="section">
                 <h2 class="section-title">🤖 AI Tutor</h2>
                 <p class="section-description">Ask questions about any LLS topic and get detailed explanations</p>
@@ -410,6 +450,7 @@
     <script src="/static/js/quiz-results-display.js" defer></script>
     <script src="/static/js/quiz-accessibility.js" defer></script>
     <script src="/static/js/quiz-mobile.js" defer></script>
+    <script src="/static/js/upload-mvp.js" defer></script>
     <script src="/static/js/app.js" defer></script>
 </body>
 </html>
