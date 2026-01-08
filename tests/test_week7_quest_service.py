@@ -273,10 +273,17 @@ class TestWeek7QuestService:
 
     def test_predict_stats_after_quiz(self, quest_service, base_stats):
         """Test stats prediction after quiz activity."""
+        # Test quiz_completed - should increment completed but NOT passed (conservative)
         predicted = quest_service._predict_stats_after_activity(base_stats, "quiz_completed")
-        
+
         assert predicted.activities.quizzes_completed == base_stats.activities.quizzes_completed + 1
-        assert predicted.activities.quizzes_passed == base_stats.activities.quizzes_passed + 1
+        assert predicted.activities.quizzes_passed == base_stats.activities.quizzes_passed  # No increment
+
+        # Test quiz_passed - should increment both
+        predicted_passed = quest_service._predict_stats_after_activity(base_stats, "quiz_passed")
+
+        assert predicted_passed.activities.quizzes_completed == base_stats.activities.quizzes_completed + 1
+        assert predicted_passed.activities.quizzes_passed == base_stats.activities.quizzes_passed + 1
 
     def test_predict_stats_after_flashcard(self, quest_service, base_stats):
         """Test stats prediction after flashcard activity."""

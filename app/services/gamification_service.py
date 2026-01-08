@@ -471,8 +471,12 @@ class GamificationService:
             week7_bonus = 0
             week7_quest_updates = {}
             if stats.week7_quest.active and xp_awarded > 0:
-                week7_bonus = xp_awarded  # Double the XP
-                xp_awarded = xp_awarded * 2
+                # MEDIUM: week7_bonus represents the XP value that gets doubled
+                # This includes any bonuses applied before Week 7 (e.g., consistency bonus)
+                # Example: 100 base XP + 50 consistency = 150, then doubled to 300
+                # week7_bonus = 150 (the value that was doubled, not the base XP)
+                week7_bonus = xp_awarded  # XP value before doubling (includes consistency)
+                xp_awarded = xp_awarded * 2  # Double the current XP
                 logger.info(f"Week 7 quest active - doubled XP from {xp_awarded//2} to {xp_awarded}")
 
                 # HIGH: Calculate quest updates NOW to avoid race condition
