@@ -4,14 +4,35 @@
 
 This test suite validates the defensive checks implemented in the FlashcardViewer component for `reviewStarredCards()` and `restoreFullDeck()` methods.
 
+## ⚠️ IMPORTANT: Unit Test Strategy Decision
+
+**Decision:** Unit tests are **SPECIFICATION TESTS**, not implementation tests.
+
+**Rationale:**
+- Unit tests validate the **defensive logic patterns** used in the code
+- They do NOT test the actual FlashcardViewer class implementation
+- They serve as **executable specifications** for the defensive checks
+- They are fast, isolated, and provide quick feedback during development
+
+**Why not test the actual implementation in unit tests?**
+- FlashcardViewer requires DOM and browser APIs
+- Mocking the entire DOM would be complex and brittle
+- E2E tests already test the actual implementation in real browsers
+- Unit tests focus on logic patterns, E2E tests focus on integration
+
+**If you need to test the actual implementation:**
+- Use the E2E tests (Playwright) which run in real browsers
+- E2E tests call actual FlashcardViewer methods programmatically
+- E2E tests verify real behavior, not mocked behavior
+
 ## Test Strategy
 
 ### Two-Tier Testing Approach
 
 We use a **two-tier testing strategy** to provide comprehensive coverage:
 
-1. **Unit Tests (Jest)** - Test defensive logic patterns in isolation
-2. **E2E Tests (Playwright)** - Test actual implementation in real browsers
+1. **Unit Tests (Jest)** - Test defensive logic patterns (SPECIFICATION TESTS)
+2. **E2E Tests (Playwright)** - Test actual implementation in real browsers (INTEGRATION TESTS)
 
 ---
 

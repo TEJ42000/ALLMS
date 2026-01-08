@@ -961,6 +961,34 @@ class FlashcardViewer {
     }
 
     /**
+     * Safely show notification with fallback chain
+     *
+     * HIGH FIX: Simplified notification fallback logic
+     *
+     * Fallback chain:
+     * 1. Try showNotification() (styled toast)
+     * 2. If unavailable or fails, use console.warn()
+     *
+     * @param {string} message - Message to display
+     * @param {string} type - Notification type ('info', 'warning', 'error', 'success')
+     * @returns {void}
+     */
+    safeNotify(message, type = 'info') {
+        try {
+            if (typeof showNotification === 'function') {
+                showNotification(message, type, 5000);
+            } else {
+                // Fallback to console if showNotification not available
+                console.warn(`[FlashcardViewer] ${message}`);
+            }
+        } catch (error) {
+            // Final fallback to console if showNotification throws
+            console.warn(`[FlashcardViewer] ${message}`);
+            console.error('[FlashcardViewer] Notification error:', error);
+        }
+    }
+
+    /**
      * Review only starred cards
      *
      * Error Handling Strategy (CONSISTENT):
@@ -980,7 +1008,8 @@ class FlashcardViewer {
         // CRITICAL ERROR: No starred cards (fail fast)
         if (this.starredCards.size === 0) {
             console.warn('[FlashcardViewer] No starred cards to review');
-            this.showError('No starred cards to review!');
+            // HIGH FIX: More specific error message
+            this.showError('No starred cards to review. Star some cards first by clicking the star icon.');
             return;
         }
 
@@ -1008,14 +1037,16 @@ class FlashcardViewer {
         // CRITICAL ERROR: originalFlashcards is null/undefined (fail fast)
         if (!this.originalFlashcards || !Array.isArray(this.originalFlashcards)) {
             console.error('[FlashcardViewer] CRITICAL: originalFlashcards is not properly initialized:', this.originalFlashcards);
-            this.showError('Unable to review starred cards. Please refresh the page.');
+            // HIGH FIX: More specific error message
+            this.showError('Data corruption detected. Please refresh the page to reload flashcards.');
             return;
         }
 
         // CRITICAL ERROR: originalFlashcards is empty (fail fast)
         if (this.originalFlashcards.length === 0) {
             console.error('[FlashcardViewer] CRITICAL: originalFlashcards is empty');
-            this.showError('No flashcards available to review. Please refresh the page.');
+            // HIGH FIX: More specific error message
+            this.showError('No flashcards found. Please refresh the page or select a different deck.');
             return;
         }
 
@@ -1023,21 +1054,33 @@ class FlashcardViewer {
         const starredIndices = Array.from(this.starredCards);
 
         // ISSUE #168: Validate index types and bounds (filter out invalid, don't fail)
+        // HIGH FIX: Batch logging to avoid performance issues with large datasets
+        const invalidIndices = [];
+        const outOfBoundsIndices = [];
+
         const validIndices = starredIndices.filter(index => {
             // CRITICAL FIX: Check if index is an integer (not just a number)
             if (!Number.isInteger(index)) {
-                console.warn('[FlashcardViewer] RECOVERY: Invalid index type (not an integer):', typeof index, index);
+                invalidIndices.push({ type: typeof index, value: index });
                 return false;
             }
 
             // Check if index is within bounds
             if (index < 0 || index >= this.originalFlashcards.length) {
-                console.warn('[FlashcardViewer] RECOVERY: Index out of bounds:', index, 'length:', this.originalFlashcards.length);
+                outOfBoundsIndices.push(index);
                 return false;
             }
 
             return true;
         });
+
+        // HIGH FIX: Log once with summary instead of per-index
+        if (invalidIndices.length > 0) {
+            console.warn(`[FlashcardViewer] RECOVERY: ${invalidIndices.length} invalid index type(s) filtered out:`, invalidIndices.slice(0, 5));
+        }
+        if (outOfBoundsIndices.length > 0) {
+            console.warn(`[FlashcardViewer] RECOVERY: ${outOfBoundsIndices.length} out-of-bounds index/indices filtered out (length: ${this.originalFlashcards.length}):`, outOfBoundsIndices.slice(0, 5));
+        }
 
         // CRITICAL ERROR: No valid indices after filtering (fail fast)
         if (validIndices.length === 0) {
@@ -1060,29 +1103,11 @@ class FlashcardViewer {
         // HIGH FIX: Warn user if cards were filtered out (silent card loss)
         const filteredCount = starredIndices.length - validCards.length;
         if (filteredCount > 0) {
-            console.warn(`[FlashcardViewer] ${filteredCount} starred cards were filtered out (invalid or null)`);
+            const message = `${filteredCount} starred card${filteredCount > 1 ? 's were' : ' was'} filtered out due to invalid data. Showing ${validCards.length} valid card${validCards.length > 1 ? 's' : ''}.`;
+            console.warn(`[FlashcardViewer] ${message}`);
 
-            // CRITICAL FIX: Check if showNotification exists before calling
-            try {
-                if (typeof showNotification === 'function') {
-                    showNotification(
-                        `${filteredCount} starred card${filteredCount > 1 ? 's were' : ' was'} filtered out due to invalid data. Showing ${validCards.length} valid card${validCards.length > 1 ? 's' : ''}.`,
-                        'warning',
-                        5000
-                    );
-                } else {
-                    // Fallback to showError if showNotification is not available
-                    this.showError(`${filteredCount} card${filteredCount > 1 ? 's were' : ' was'} filtered out. Showing ${validCards.length} valid card${validCards.length > 1 ? 's' : ''}.`);
-                }
-            } catch (notificationError) {
-                // MEDIUM FIX: Catch any errors in notification to prevent crashes
-                console.error('[FlashcardViewer] Error showing notification:', notificationError);
-
-                // MEDIUM FIX: Fallback to console.warn if all else fails
-                console.warn(`[FlashcardViewer] ${filteredCount} starred card${filteredCount > 1 ? 's were' : ' was'} filtered out. Showing ${validCards.length} valid card${validCards.length > 1 ? 's' : ''}.`);
-
-                // Continue execution even if notification fails
-            }
+            // HIGH FIX: Simplified notification fallback logic
+            this.safeNotify(message, 'warning');
         }
 
         this.flashcards = validCards;
