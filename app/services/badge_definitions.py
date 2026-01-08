@@ -235,7 +235,11 @@ def get_activity_badges() -> List[BadgeDefinition]:
 
 
 def get_consistency_badges() -> List[BadgeDefinition]:
-    """Get consistency badge definitions (4 badges)."""
+    """Get consistency badge definitions (4 badges).
+
+    CRITICAL: These badges are currently INACTIVE (not yet implemented)
+    Requires tracking consecutive weeks with bonus
+    """
     return [
         BadgeDefinition(
             badge_id="consistent_learner",
@@ -245,7 +249,8 @@ def get_consistency_badges() -> List[BadgeDefinition]:
             icon="🏆",
             rarity="uncommon",
             criteria={"consecutive_weeks_bonus": 4},
-            points=50
+            points=50,
+            active=False  # CRITICAL: Disabled until implemented
         ),
         BadgeDefinition(
             badge_id="dedication",
@@ -255,7 +260,8 @@ def get_consistency_badges() -> List[BadgeDefinition]:
             icon="🏆",
             rarity="rare",
             criteria={"consecutive_weeks_bonus": 8},
-            points=100
+            points=100,
+            active=False  # CRITICAL: Disabled until implemented
         ),
         BadgeDefinition(
             badge_id="commitment",
@@ -265,7 +271,8 @@ def get_consistency_badges() -> List[BadgeDefinition]:
             icon="🏆",
             rarity="epic",
             criteria={"consecutive_weeks_bonus": 12},
-            points=200
+            points=200,
+            active=False  # CRITICAL: Disabled until implemented
         ),
         BadgeDefinition(
             badge_id="unstoppable",
@@ -275,13 +282,17 @@ def get_consistency_badges() -> List[BadgeDefinition]:
             icon="🏆",
             rarity="legendary",
             criteria={"consecutive_weeks_bonus": 26},
-            points=500
+            points=500,
+            active=False  # CRITICAL: Disabled until implemented
         ),
     ]
 
 
 def get_special_badges() -> List[BadgeDefinition]:
-    """Get special badge definitions (8+ badges)."""
+    """Get special badge definitions (8+ badges).
+
+    CRITICAL: Some badges are INACTIVE (not yet implemented)
+    """
     return [
         BadgeDefinition(
             badge_id="early_adopter",
@@ -291,7 +302,8 @@ def get_special_badges() -> List[BadgeDefinition]:
             icon="🌟",
             rarity="rare",
             criteria={"joined_before": "2026-03-01T00:00:00+00:00"},
-            points=100
+            points=100,
+            active=True  # ACTIVE: Implemented
         ),
         BadgeDefinition(
             badge_id="perfect_week",
@@ -301,7 +313,8 @@ def get_special_badges() -> List[BadgeDefinition]:
             icon="🌟",
             rarity="epic",
             criteria={"perfect_week": True},
-            points=200
+            points=200,
+            active=False  # CRITICAL: Disabled until implemented
         ),
         BadgeDefinition(
             badge_id="night_owl",
@@ -311,7 +324,8 @@ def get_special_badges() -> List[BadgeDefinition]:
             icon="🦉",
             rarity="uncommon",
             criteria={"night_activities": 10},
-            points=50
+            points=50,
+            active=False  # CRITICAL: Disabled until implemented
         ),
         BadgeDefinition(
             badge_id="early_bird",
@@ -321,7 +335,8 @@ def get_special_badges() -> List[BadgeDefinition]:
             icon="☀️",
             rarity="uncommon",
             criteria={"early_activities": 10},
-            points=50
+            points=50,
+            active=False  # CRITICAL: Disabled until implemented
         ),
         BadgeDefinition(
             badge_id="weekend_warrior",
@@ -331,7 +346,8 @@ def get_special_badges() -> List[BadgeDefinition]:
             icon="🌟",
             rarity="rare",
             criteria={"weekend_streaks": 10},
-            points=100
+            points=100,
+            active=False  # CRITICAL: Disabled until implemented
         ),
         BadgeDefinition(
             badge_id="combo_king",
@@ -341,7 +357,8 @@ def get_special_badges() -> List[BadgeDefinition]:
             icon="👑",
             rarity="rare",
             criteria={"flashcard_combo": 20},
-            points=100
+            points=100,
+            active=False  # CRITICAL: Disabled until implemented
         ),
         BadgeDefinition(
             badge_id="deep_diver",
@@ -351,7 +368,8 @@ def get_special_badges() -> List[BadgeDefinition]:
             icon="🤿",
             rarity="uncommon",
             criteria={"flashcards_one_session": 50},
-            points=75
+            points=75,
+            active=False  # CRITICAL: Disabled until implemented
         ),
         BadgeDefinition(
             badge_id="hat_trick",
@@ -361,7 +379,8 @@ def get_special_badges() -> List[BadgeDefinition]:
             icon="🎩",
             rarity="epic",
             criteria={"hard_quiz_streak": 3, "min_score": 90},
-            points=150
+            points=150,
+            active=False  # CRITICAL: Disabled until implemented
         ),
         BadgeDefinition(
             badge_id="legal_scholar",
@@ -371,7 +390,8 @@ def get_special_badges() -> List[BadgeDefinition]:
             icon="⚖️",
             rarity="epic",
             criteria={"high_complexity_evaluations": 5},
-            points=150
+            points=150,
+            active=False  # CRITICAL: Disabled until implemented
         ),
     ]
 

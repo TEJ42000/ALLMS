@@ -87,15 +87,20 @@ class BadgeService:
     def _get_badge_definitions(self) -> List[BadgeDefinition]:
         """Get all badge definitions from Firestore.
 
+        CRITICAL: Only returns ACTIVE badges
+
         Returns:
-            List of BadgeDefinition objects
+            List of BadgeDefinition objects (active only)
         """
         try:
             docs = self.db.collection(BADGE_DEFINITIONS_COLLECTION).stream()
             badges = []
             for doc in docs:
                 try:
-                    badges.append(BadgeDefinition(**doc.to_dict()))
+                    badge = BadgeDefinition(**doc.to_dict())
+                    # CRITICAL: Only include active badges
+                    if badge.active:
+                        badges.append(badge)
                 except Exception as e:
                     logger.warning(f"Error parsing badge definition {doc.id}: {e}")
             return badges
