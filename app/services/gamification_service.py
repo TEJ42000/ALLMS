@@ -90,6 +90,11 @@ BONUS_MULTIPLIER_MIN = 1.0
 BONUS_MULTIPLIER_MAX = 2.0
 WEEKLY_CONSISTENCY_BONUS_MULTIPLIER = 1.5  # 50% XP bonus
 
+# XP validation (CRITICAL: Prevent negative or excessive XP)
+MIN_XP_PER_ACTIVITY = 0
+MAX_XP_PER_ACTIVITY = 1000  # Maximum XP for a single activity
+MAX_TOTAL_XP = 1000000  # Maximum total XP (prevents overflow)
+
 
 class GamificationService:
     """Service for managing gamification features."""
@@ -352,13 +357,24 @@ class GamificationService:
         elif activity_type == "evaluation_completed":
             grade = activity_data.get("grade", 0)
             if grade >= 7:
-                return xp_config["evaluation_high"]
+                xp_awarded = xp_config["evaluation_high"]
             elif grade >= 1:
-                return xp_config["evaluation_low"]
-            return 0
+                xp_awarded = xp_config["evaluation_low"]
+            else:
+                xp_awarded = 0
+        else:
+            # Default: no XP
+            xp_awarded = 0
 
-        # Default: no XP
-        return 0
+        # CRITICAL: Validate XP is within acceptable range
+        if xp_awarded < MIN_XP_PER_ACTIVITY:
+            logger.warning(f"Negative XP calculated ({xp_awarded}) for {activity_type}, clamping to 0")
+            xp_awarded = MIN_XP_PER_ACTIVITY
+        elif xp_awarded > MAX_XP_PER_ACTIVITY:
+            logger.warning(f"Excessive XP calculated ({xp_awarded}) for {activity_type}, clamping to {MAX_XP_PER_ACTIVITY}")
+            xp_awarded = MAX_XP_PER_ACTIVITY
+
+        return xp_awarded
 
     def calculate_level_from_xp(self, total_xp: int) -> tuple[int, str, int]:
         """Calculate level, title, and XP to next level from total XP.

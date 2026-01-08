@@ -919,8 +919,9 @@ def activate_week7_quest(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error activating Week 7 quest: {e}", exc_info=True)
-        raise HTTPException(500, detail=str(e)) from e
+        # CRITICAL: Don't expose internal error details to client
+        logger.error(f"Error activating Week 7 quest for user {user.user_id[:8]}...: {e}", exc_info=True)
+        raise HTTPException(500, detail="Failed to activate quest. Please try again later.") from e
 
 
 @router.get("/quest/week7/progress")
@@ -964,8 +965,9 @@ def get_week7_quest_progress(
     except HTTPException:
         raise
     except Exception as e:
+        # CRITICAL: Don't expose internal error details to client
         logger.error(f"Error getting Week 7 quest progress: {e}", exc_info=True)
-        raise HTTPException(500, detail=str(e)) from e
+        raise HTTPException(500, detail="Failed to retrieve quest progress. Please try again later.") from e
 
 
 @router.get("/quest/week7/requirements")
@@ -984,5 +986,6 @@ def get_week7_quest_requirements():
         return quest_service.get_quest_requirements()
 
     except Exception as e:
+        # CRITICAL: Don't expose internal error details to client
         logger.error(f"Error getting Week 7 quest requirements: {e}", exc_info=True)
-        raise HTTPException(500, detail=str(e)) from e
+        raise HTTPException(500, detail="Failed to retrieve quest requirements. Please try again later.") from e

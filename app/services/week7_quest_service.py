@@ -110,21 +110,22 @@ class Week7QuestService:
             Exam readiness percentage (0-100)
         """
         try:
+            # CRITICAL: Use correct field names from ActivityCounters model
             # Calculate progress for each category
             flashcard_progress = min(
-                (stats.activities.flashcard_set_completed / EXAM_READINESS_THRESHOLDS["flashcards"]) * 100,
+                (stats.activities.flashcards_reviewed / EXAM_READINESS_THRESHOLDS["flashcards"]) * 100,
                 100
             )
             quiz_progress = min(
-                ((stats.activities.quiz_easy_passed + stats.activities.quiz_hard_passed) / EXAM_READINESS_THRESHOLDS["quizzes"]) * 100,
+                (stats.activities.quizzes_passed / EXAM_READINESS_THRESHOLDS["quizzes"]) * 100,
                 100
             )
             evaluation_progress = min(
-                ((stats.activities.evaluation_low + stats.activities.evaluation_high) / EXAM_READINESS_THRESHOLDS["evaluations"]) * 100,
+                (stats.activities.evaluations_submitted / EXAM_READINESS_THRESHOLDS["evaluations"]) * 100,
                 100
             )
             guide_progress = min(
-                (stats.activities.study_guide_completed / EXAM_READINESS_THRESHOLDS["guides"]) * 100,
+                (stats.activities.guides_completed / EXAM_READINESS_THRESHOLDS["guides"]) * 100,
                 100
             )
 
@@ -356,11 +357,12 @@ class Week7QuestService:
             Detailed progress information
         """
         try:
+            # CRITICAL: Use correct field names from ActivityCounters model
             # Calculate progress for each category
-            flashcard_count = stats.activities.flashcard_set_completed
-            quiz_count = stats.activities.quiz_easy_passed + stats.activities.quiz_hard_passed
-            evaluation_count = stats.activities.evaluation_low + stats.activities.evaluation_high
-            guide_count = stats.activities.study_guide_completed
+            flashcard_count = stats.activities.flashcards_reviewed
+            quiz_count = stats.activities.quizzes_passed
+            evaluation_count = stats.activities.evaluations_submitted
+            guide_count = stats.activities.guides_completed
 
             return {
                 "active": stats.week7_quest.active,
