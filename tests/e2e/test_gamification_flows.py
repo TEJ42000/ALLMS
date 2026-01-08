@@ -10,13 +10,16 @@ Tests critical user flows including:
 """
 
 import pytest
+import time
+
+# Guard selenium imports - skip tests if selenium not available
+selenium = pytest.importorskip("selenium")
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.keys import Keys
 from selenium.common.exceptions import TimeoutException
-import time
 
 
 class TestGamificationE2E:
