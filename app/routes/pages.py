@@ -1,11 +1,14 @@
 """Page Rendering Routes for the LLS Study Portal."""
 
 import logging
+from typing import Optional
 
-from fastapi import APIRouter, Request, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
+from app.models.auth_models import User
+from app.models.schemas import HealthCheckResponse
 from app.services.course_service import get_course_service
 
 logger = logging.getLogger(__name__)
@@ -16,14 +19,28 @@ router = APIRouter(tags=["Pages"])
 templates = Jinja2Templates(directory="templates")
 
 
-def get_user_from_request(request: Request):
-    """Extract user from request state (set by auth middleware)."""
+def get_user_from_request(request: Request) -> Optional[User]:
+    """Extract user from request state (set by auth middleware).
+
+    Args:
+        request: The incoming HTTP request
+
+    Returns:
+        User object if authenticated, None otherwise
+    """
     return getattr(request.state, 'user', None)
 
 
 @router.get("/", response_class=HTMLResponse)
-async def landing_page(request: Request):
-    """Serve the course selection landing page."""
+async def landing_page(request: Request) -> HTMLResponse:
+    """Serve the course selection landing page.
+
+    Args:
+        request: The incoming HTTP request
+
+    Returns:
+        HTMLResponse with course selection page
+    """
     user = get_user_from_request(request)
     return templates.TemplateResponse(
         "course_selection.html",
@@ -37,12 +54,19 @@ async def landing_page(request: Request):
 
 
 @router.get("/courses/{course_id}/study-portal", response_class=HTMLResponse)
-async def course_study_portal(request: Request, course_id: str):
+async def course_study_portal(request: Request, course_id: str) -> HTMLResponse:
     """
     Serve the study portal for a specific course.
 
     Args:
+        request: The incoming HTTP request
         course_id: The unique identifier for the course
+
+    Returns:
+        HTMLResponse with study portal page
+
+    Raises:
+        HTTPException: If course not found (404), invalid course ID (400), or server error (500)
     """
     try:
         # Load course with weeks to get topics
@@ -88,14 +112,18 @@ async def course_study_portal(request: Request, course_id: str):
         raise HTTPException(status_code=500, detail="Failed to load course")
 
 
-@router.get("/health")
-async def health_check():
-    """Health check endpoint for Cloud Run."""
-    return {
-        "status": "healthy",
-        "service": "lls-study-portal",
-        "version": "2.0.0"
-    }
+@router.get("/health", response_model=HealthCheckResponse)
+async def health_check() -> HealthCheckResponse:
+    """Health check endpoint for Cloud Run.
+
+    Returns:
+        HealthCheckResponse with service status information
+    """
+    return HealthCheckResponse(
+        status="healthy",
+        service="lls-study-portal",
+        version="2.0.0"
+    )
 
 
 # =============================================================================
@@ -103,8 +131,15 @@ async def health_check():
 # =============================================================================
 
 @router.get("/privacy-policy", response_class=HTMLResponse)
-async def privacy_policy(request: Request):
-    """Serve the privacy policy page."""
+async def privacy_policy(request: Request) -> HTMLResponse:
+    """Serve the privacy policy page.
+
+    Args:
+        request: The incoming HTTP request
+
+    Returns:
+        HTMLResponse with privacy policy page
+    """
     user = get_user_from_request(request)
     return templates.TemplateResponse(
         "privacy_policy.html",
@@ -117,8 +152,18 @@ async def privacy_policy(request: Request):
 
 
 @router.get("/privacy-dashboard", response_class=HTMLResponse)
-async def privacy_dashboard(request: Request):
-    """Serve the privacy dashboard page."""
+async def privacy_dashboard(request: Request) -> HTMLResponse:
+    """Serve the privacy dashboard page.
+
+    Args:
+        request: The incoming HTTP request
+
+    Returns:
+        HTMLResponse with privacy dashboard page
+
+    Raises:
+        HTTPException: If user is not authenticated (401)
+    """
     user = get_user_from_request(request)
 
     # Require authentication for privacy dashboard
@@ -136,8 +181,15 @@ async def privacy_dashboard(request: Request):
 
 
 @router.get("/terms-of-service", response_class=HTMLResponse)
-async def terms_of_service(request: Request):
-    """Serve the terms of service page."""
+async def terms_of_service(request: Request) -> HTMLResponse:
+    """Serve the terms of service page.
+
+    Args:
+        request: The incoming HTTP request
+
+    Returns:
+        HTMLResponse with terms of service page
+    """
     user = get_user_from_request(request)
     return templates.TemplateResponse(
         "terms_of_service.html",
@@ -150,8 +202,15 @@ async def terms_of_service(request: Request):
 
 
 @router.get("/cookie-policy", response_class=HTMLResponse)
-async def cookie_policy(request: Request):
-    """Serve the cookie policy page."""
+async def cookie_policy(request: Request) -> HTMLResponse:
+    """Serve the cookie policy page.
+
+    Args:
+        request: The incoming HTTP request
+
+    Returns:
+        HTMLResponse with cookie policy page
+    """
     user = get_user_from_request(request)
     return templates.TemplateResponse(
         "cookie_policy.html",
@@ -164,11 +223,20 @@ async def cookie_policy(request: Request):
 
 
 @router.get("/badges", response_class=HTMLResponse)
-async def badges_page(request: Request):
+async def badges_page(request: Request) -> HTMLResponse:
     """
     Serve the badges showcase page.
 
     CRITICAL: Added to fix missing HTML template issue
+
+    Args:
+        request: The incoming HTTP request
+
+    Returns:
+        HTMLResponse with badges showcase page
+
+    Raises:
+        HTTPException: If user is not authenticated (401)
     """
     user = get_user_from_request(request)
 
@@ -186,7 +254,7 @@ async def badges_page(request: Request):
 
 
 @router.get("/flashcards", response_class=HTMLResponse)
-async def flashcards_page(request: Request):
+async def flashcards_page(request: Request) -> HTMLResponse:
     """
     Serve the flashcards study page.
 
@@ -196,15 +264,24 @@ async def flashcards_page(request: Request):
     - Future Phase 2 will add user-specific features (progress tracking, etc.)
 
     HIGH FIX: Adds strict CSP headers for security.
+
+    Args:
+        request: The incoming HTTP request
+
+    Returns:
+        HTMLResponse with flashcards page and security headers
     """
     user = get_user_from_request(request)
+
+    context = {
+        "request": request,
+        "title": "Flashcards - ECHR Learning",
+        "user": user
+    }
+
     response = templates.TemplateResponse(
         "flashcards.html",
-        {
-            "request": request,
-            "title": "Flashcards - ECHR Learning",
-            "user": user
-        }
+        context
     )
 
     # HIGH FIX: Add strict Content Security Policy headers

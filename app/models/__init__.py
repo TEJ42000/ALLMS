@@ -5,7 +5,8 @@ from .schemas import (
     ChatResponse,
     AssessmentRequest,
     AssessmentResponse,
-    ConversationMessage
+    ConversationMessage,
+    HealthCheckResponse
 )
 
 __all__ = [
@@ -13,5 +14,6 @@ __all__ = [
     "ChatResponse",
     "AssessmentRequest",
     "AssessmentResponse",
-    "ConversationMessage"
+    "ConversationMessage",
+    "HealthCheckResponse"
 ]
