@@ -1,0 +1,196 @@
+# Google Cloud Monitoring Alert Policies for Streak Maintenance Job
+# Deploy with: gcloud alpha monitoring policies create --policy-from-file=streak_maintenance_alerts.yaml
+
+displayName: "Streak Maintenance Job Failure"
+documentation:
+  content: |
+    ## Streak Maintenance Job Failure Alert
+    
+    This alert fires when the daily streak maintenance job fails or encounters errors.
+    
+    ### Severity: CRITICAL
+    
+    ### Impact:
+    - User streaks may not be updated correctly
+    - Freezes may not be applied
+    - Broken streaks may not be reset
+    
+    ### Troubleshooting:
+    1. Check Cloud Scheduler logs: `gcloud scheduler jobs describe streak-maintenance-job`
+    2. Check Cloud Functions/Run logs for errors
+    3. Verify Firestore connectivity
+    4. Check for transaction conflicts
+    5. Review error rate in last 24 hours
+    
+    ### Escalation:
+    - Page on-call engineer if failure persists > 1 hour
+    - Notify #gamification-alerts Slack channel
+  mimeType: text/markdown
+
+conditions:
+  - displayName: "Maintenance Job Failed"
+    conditionThreshold:
+      filter: |
+        resource.type="cloud_function"
+        AND resource.labels.function_name="streak-maintenance"
+        AND severity>=ERROR
+      comparison: COMPARISON_GT
+      thresholdValue: 0
+      duration: 300s  # 5 minutes
+      aggregations:
+        - alignmentPeriod: 60s
+          perSeriesAligner: ALIGN_RATE
+          crossSeriesReducer: REDUCE_SUM
+
+  - displayName: "High Error Rate in Maintenance Job"
+    conditionThreshold:
+      filter: |
+        resource.type="cloud_function"
+        AND resource.labels.function_name="streak-maintenance"
+        AND jsonPayload.errors>10
+      comparison: COMPARISON_GT
+      thresholdValue: 10
+      duration: 60s
+      aggregations:
+        - alignmentPeriod: 60s
+          perSeriesAligner: ALIGN_MAX
+
+  - displayName: "Maintenance Job Duration Exceeded"
+    conditionThreshold:
+      filter: |
+        resource.type="cloud_function"
+        AND resource.labels.function_name="streak-maintenance"
+        AND jsonPayload.duration_seconds>300
+      comparison: COMPARISON_GT
+      thresholdValue: 300  # 5 minutes
+      duration: 60s
+      aggregations:
+        - alignmentPeriod: 60s
+          perSeriesAligner: ALIGN_MAX
+
+combiner: OR
+
+enabled: true
+
+notificationChannels:
+  - projects/PROJECT_ID/notificationChannels/SLACK_CHANNEL_ID
+  - projects/PROJECT_ID/notificationChannels/EMAIL_CHANNEL_ID
+  - projects/PROJECT_ID/notificationChannels/PAGERDUTY_CHANNEL_ID
+
+alertStrategy:
+  autoClose: 86400s  # 24 hours
+  notificationRateLimit:
+    period: 3600s  # 1 hour
+
+---
+
+displayName: "Streak Maintenance Job - Memory Leak Warning"
+documentation:
+  content: |
+    ## Memory Leak Warning
+    
+    Memory usage is increasing during maintenance job execution.
+    
+    ### Severity: HIGH
+    
+    ### Action Required:
+    - Review batch processing logic
+    - Check for unreleased resources
+    - Verify docs list is being cleared
+  mimeType: text/markdown
+
+conditions:
+  - displayName: "Memory Usage Increasing"
+    conditionThreshold:
+      filter: |
+        resource.type="cloud_function"
+        AND resource.labels.function_name="streak-maintenance"
+        AND metric.type="cloudfunctions.googleapis.com/function/user_memory_bytes"
+      comparison: COMPARISON_GT
+      thresholdValue: 536870912  # 512 MB
+      duration: 300s
+      aggregations:
+        - alignmentPeriod: 60s
+          perSeriesAligner: ALIGN_MAX
+
+combiner: OR
+enabled: true
+
+notificationChannels:
+  - projects/PROJECT_ID/notificationChannels/SLACK_CHANNEL_ID
+
+---
+
+displayName: "Streak Maintenance Job - Race Condition Detected"
+documentation:
+  content: |
+    ## Race Condition Detected
+    
+    Multiple transaction retries detected, indicating potential race conditions.
+    
+    ### Severity: HIGH
+    
+    ### Action Required:
+    - Review transaction logic
+    - Check for concurrent job executions
+    - Verify Cloud Scheduler is not running multiple instances
+  mimeType: text/markdown
+
+conditions:
+  - displayName: "High Transaction Retry Rate"
+    conditionThreshold:
+      filter: |
+        resource.type="cloud_function"
+        AND resource.labels.function_name="streak-maintenance"
+        AND textPayload=~"transaction.*retry"
+      comparison: COMPARISON_GT
+      thresholdValue: 50
+      duration: 300s
+      aggregations:
+        - alignmentPeriod: 60s
+          perSeriesAligner: ALIGN_RATE
+          crossSeriesReducer: REDUCE_SUM
+
+combiner: OR
+enabled: true
+
+notificationChannels:
+  - projects/PROJECT_ID/notificationChannels/SLACK_CHANNEL_ID
+
+---
+
+displayName: "Streak Maintenance Job - Success Rate Low"
+documentation:
+  content: |
+    ## Low Success Rate
+    
+    Maintenance job success rate has dropped below 95%.
+    
+    ### Severity: MEDIUM
+    
+    ### Action Required:
+    - Review error logs
+    - Check Firestore health
+    - Verify user data integrity
+  mimeType: text/markdown
+
+conditions:
+  - displayName: "Success Rate Below 95%"
+    conditionThreshold:
+      filter: |
+        resource.type="cloud_function"
+        AND resource.labels.function_name="streak-maintenance"
+        AND jsonPayload.status="success"
+      comparison: COMPARISON_LT
+      thresholdValue: 0.95
+      duration: 600s
+      aggregations:
+        - alignmentPeriod: 300s
+          perSeriesAligner: ALIGN_FRACTION_TRUE
+
+combiner: OR
+enabled: true
+
+notificationChannels:
+  - projects/PROJECT_ID/notificationChannels/SLACK_CHANNEL_ID
+

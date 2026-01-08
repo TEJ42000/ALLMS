@@ -32,7 +32,6 @@ from app.models.gamification_models import (
     ActivityCounters,
     Week7Quest,
     PageView,
-    XPConfig,
 )
 from app.services.gcp_service import get_firestore_client
 
@@ -79,6 +78,11 @@ STREAK_FREEZE_XP_REQUIREMENT = 500
 
 # 4AM reset hour
 STREAK_RESET_HOUR = 4
+
+# Bonus multiplier validation (HIGH: Validate bonus_multiplier range)
+BONUS_MULTIPLIER_MIN = 1.0
+BONUS_MULTIPLIER_MAX = 2.0
+WEEKLY_CONSISTENCY_BONUS_MULTIPLIER = 1.5  # 50% XP bonus
 
 
 class GamificationService:
@@ -425,6 +429,22 @@ class GamificationService:
             # Calculate XP
             xp_awarded = self.calculate_xp_for_activity(activity_type, activity_data)
 
+            # Apply weekly consistency bonus if active
+            consistency_bonus = 0
+            if xp_awarded > 0 and getattr(stats.streak, 'bonus_active', False):
+                bonus_multiplier = getattr(stats.streak, 'bonus_multiplier', 1.0)
+
+                # HIGH: Validate bonus_multiplier range
+                if not (BONUS_MULTIPLIER_MIN <= bonus_multiplier <= BONUS_MULTIPLIER_MAX):
+                    logger.warning(f"Invalid bonus multiplier {bonus_multiplier} for user {user_id}, clamping to valid range")
+                    bonus_multiplier = max(BONUS_MULTIPLIER_MIN, min(bonus_multiplier, BONUS_MULTIPLIER_MAX))
+
+                if bonus_multiplier > 1.0:
+                    original_xp = xp_awarded
+                    xp_awarded = int(xp_awarded * bonus_multiplier)
+                    consistency_bonus = xp_awarded - original_xp
+                    logger.info(f"Weekly consistency bonus applied: {original_xp} XP -> {xp_awarded} XP (multiplier: {bonus_multiplier})")
+
             if xp_awarded == 0:
                 logger.info(f"No XP awarded for {activity_type} (did not meet criteria)")
                 # Still log the activity but don't update stats
@@ -472,6 +492,11 @@ class GamificationService:
                 user_id, current_time
             )
 
+            # Update weekly consistency tracking
+            consistency_updated, bonus_earned = self.update_weekly_consistency(
+                user_id, activity_type, stats
+            )
+
             # Check for badge earning
             badges_earned = self.check_and_award_badges(
                 user_id, user_email, activity_type, activity_data, course_id
@@ -493,6 +518,7 @@ class GamificationService:
                 metadata={
                     "time_of_day": self._get_time_of_day(),
                     "freeze_used": freeze_used,
+                    "consistency_bonus": consistency_bonus if consistency_bonus > 0 else None,
                 }
             )
 
@@ -526,6 +552,18 @@ class GamificationService:
             # Apply freeze change if non-zero
             if freeze_delta != 0:
                 updates["streak.freezes_available"] = Increment(freeze_delta)
+
+            # Update weekly consistency if changed
+            if consistency_updated:
+                category_map = {
+                    "flashcard_set_completed": "flashcards",
+                    "quiz_completed": "quiz",
+                    "evaluation_completed": "evaluation",
+                    "study_guide_completed": "guide"
+                }
+                category = category_map.get(activity_type)
+                if category:
+                    updates[f"streak.weekly_consistency.{category}"] = True
 
             # Update activity counters with atomic increments
             if activity_type == "quiz_completed":
@@ -678,6 +716,201 @@ class GamificationService:
             logger.error(f"Unexpected error checking streak status for {user_id}: {e}", exc_info=True)
             raise HTTPException(status_code=500, detail="Error checking streak status")
 
+    def update_weekly_consistency(
+        self,
+        user_id: str,
+        activity_type: str,
+        stats: UserStats
+    ) -> tuple[bool, bool]:
+        """Update weekly consistency tracking and check for bonus.
+
+        Args:
+            user_id: User's IAP user ID
+            activity_type: Type of activity completed
+            stats: Current user stats
+
+        Returns:
+            Tuple of (consistency_updated, bonus_earned)
+        """
+        try:
+            # Map activity types to consistency categories
+            category_map = {
+                "flashcard_set_completed": "flashcards",
+                "quiz_completed": "quiz",
+                "evaluation_completed": "evaluation",
+                "study_guide_completed": "guide"
+            }
+
+            category = category_map.get(activity_type)
+            if not category:
+                # Activity doesn't count toward consistency
+                return False, False
+
+            # Check if we need to reset weekly consistency (new week)
+            current_time = datetime.now(timezone.utc)
+            week_start = self._get_week_start(current_time)
+
+            # Get stored week start from stats
+            stored_week_start = getattr(stats.streak, 'week_start', None)
+            if stored_week_start:
+                if isinstance(stored_week_start, str):
+                    stored_week_start = datetime.fromisoformat(stored_week_start)
+                elif not isinstance(stored_week_start, datetime):
+                    stored_week_start = None
+
+            # Reset if new week - use transaction to prevent data loss
+            if not stored_week_start or week_start > stored_week_start:
+                # New week - reset all categories atomically
+                if not self.db:
+                    return False, False
+
+                from google.cloud import firestore
+
+                doc_ref = self.db.collection(USER_STATS_COLLECTION).document(user_id)
+
+                @firestore.transactional
+                def reset_week_transaction(transaction):
+                    """Transaction to safely reset weekly consistency.
+
+                    CRITICAL: Prevents data loss from concurrent resets.
+                    """
+                    snapshot = doc_ref.get(transaction=transaction)
+
+                    if not snapshot.exists:
+                        return False
+
+                    data = snapshot.to_dict()
+                    current_week_start = data.get("streak", {}).get("week_start")
+
+                    # Parse stored week start
+                    if current_week_start:
+                        if isinstance(current_week_start, str):
+                            current_week_start = datetime.fromisoformat(current_week_start)
+
+                    # Double-check we still need to reset (race condition check)
+                    if current_week_start and week_start <= current_week_start:
+                        # Another thread already reset, skip
+                        return False
+
+                    # Perform atomic reset
+                    transaction.update(doc_ref, {
+                        "streak.weekly_consistency.flashcards": False,
+                        "streak.weekly_consistency.quiz": False,
+                        "streak.weekly_consistency.evaluation": False,
+                        "streak.weekly_consistency.guide": False,
+                        "streak.week_start": week_start.isoformat(),
+                        "streak.bonus_active": False,
+                        "updated_at": datetime.now(timezone.utc)
+                    })
+
+                    logger.info(f"Weekly consistency reset for {user_id} (new week: {week_start.isoformat()})")
+                    return True
+
+                # Execute transaction
+                transaction = self.db.transaction()
+                reset_performed = reset_week_transaction(transaction)
+
+                if not reset_performed:
+                    # Another thread already reset, continue with current stats
+                    logger.debug(f"Weekly reset skipped for {user_id} (already reset by another thread)")
+
+                # Refresh stats after reset
+                stats = self.get_or_create_user_stats(user_id, stats.user_email)
+                if not stats:
+                    return False, False
+
+            # Check if category already completed this week
+            if stats.streak.weekly_consistency.get(category, False):
+                # Already completed this category this week
+                return False, False
+
+            # Use transaction to prevent race conditions when updating consistency
+            # CRITICAL: Prevents duplicate bonus activation
+            if self.db:
+                from google.cloud import firestore
+
+                doc_ref = self.db.collection(USER_STATS_COLLECTION).document(user_id)
+
+                @firestore.transactional
+                def update_consistency_transaction(transaction):
+                    """Transaction to safely update weekly consistency."""
+                    snapshot = doc_ref.get(transaction=transaction)
+
+                    if not snapshot.exists:
+                        return False, False
+
+                    data = snapshot.to_dict()
+                    current_consistency = data.get("streak", {}).get("weekly_consistency", {})
+
+                    # Double-check category not already completed (race condition check)
+                    if current_consistency.get(category, False):
+                        return False, False
+
+                    # Update category
+                    updated_consistency = current_consistency.copy()
+                    updated_consistency[category] = True
+
+                    # Check if all 4 categories complete
+                    all_complete = all(updated_consistency.values())
+                    bonus_active = data.get("streak", {}).get("bonus_active", False)
+                    bonus_earned = all_complete and not bonus_active
+
+                    # Build update dict
+                    updates = {
+                        f"streak.weekly_consistency.{category}": True
+                    }
+
+                    if bonus_earned:
+                        # HIGH: Validate bonus_multiplier range
+                        multiplier = WEEKLY_CONSISTENCY_BONUS_MULTIPLIER
+                        if not (BONUS_MULTIPLIER_MIN <= multiplier <= BONUS_MULTIPLIER_MAX):
+                            logger.error(f"Invalid bonus multiplier {multiplier}, using default 1.5")
+                            multiplier = 1.5
+
+                        updates["streak.bonus_active"] = True
+                        updates["streak.bonus_multiplier"] = multiplier
+
+                    transaction.update(doc_ref, updates)
+
+                    return True, bonus_earned
+
+                # Execute transaction
+                transaction = self.db.transaction()
+                consistency_updated, bonus_earned = update_consistency_transaction(transaction)
+
+                if bonus_earned:
+                    logger.info(f"Weekly consistency bonus earned for {user_id}")
+
+                return consistency_updated, bonus_earned
+
+            return False, False
+
+        except Exception as e:
+            logger.error(f"Error updating weekly consistency for {user_id}: {e}", exc_info=True)
+            return False, False
+
+    def _get_week_start(self, dt: datetime) -> datetime:
+        """Get the start of the week (Monday at 4:00 AM) for a given datetime.
+
+        Args:
+            dt: Datetime to get week start for
+
+        Returns:
+            Datetime representing Monday at 4:00 AM of the week
+        """
+        # Get the Monday of the current week
+        days_since_monday = dt.weekday()  # 0 = Monday, 6 = Sunday
+        monday = dt - timedelta(days=days_since_monday)
+
+        # Set to 4:00 AM (streak reset time)
+        week_start = monday.replace(hour=STREAK_RESET_HOUR, minute=0, second=0, microsecond=0)
+
+        # If current time is before Monday 4 AM, use previous week's Monday
+        if dt < week_start:
+            week_start = week_start - timedelta(days=7)
+
+        return week_start
+
     def update_streak(
         self,
         user_id: str,
@@ -734,15 +967,21 @@ class GamificationService:
         user_id: str,
         limit: int = DEFAULT_QUERY_LIMIT,
         activity_type: Optional[str] = None,
-        start_after_id: Optional[str] = None
+        start_after_id: Optional[str] = None,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None
     ) -> tuple[List[UserActivity], Optional[str]]:
         """Get user's recent activities with pagination support.
+
+        CRITICAL: Added start_date/end_date support (BLOCKS MERGE - feature was broken)
 
         Args:
             user_id: User's IAP user ID
             limit: Maximum number of activities to return
             activity_type: Optional filter by activity type
             start_after_id: Optional activity ID to start after (for pagination)
+            start_date: Optional start date filter (inclusive)
+            end_date: Optional end date filter (inclusive)
 
         Returns:
             Tuple of (List of UserActivity objects, next_cursor for pagination)
@@ -755,6 +994,13 @@ class GamificationService:
             query = self.db.collection(USER_ACTIVITIES_COLLECTION).where(
                 filter=FieldFilter("user_id", "==", user_id)
             ).order_by("timestamp", direction="DESCENDING").limit(min(limit, MAX_QUERY_LIMIT))
+
+            # CRITICAL: Add date range filtering
+            if start_date:
+                query = query.where(filter=FieldFilter("timestamp", ">=", start_date))
+
+            if end_date:
+                query = query.where(filter=FieldFilter("timestamp", "<=", end_date))
 
             if activity_type:
                 query = query.where(filter=FieldFilter("activity_type", "==", activity_type))
