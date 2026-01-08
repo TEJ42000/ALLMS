@@ -1398,6 +1398,9 @@ function displayQuiz(quizContent, questionContainer) {
     // Update progress
     updateQuizProgress();
 
+    // Phase 5: Initialize accessibility features
+    initializeQuizAccessibility(questionContainer);
+
     // Display current question
     displayCurrentQuestion(questionContainer);
 }
@@ -1424,6 +1427,15 @@ function displayCurrentQuestion(container) {
     if (!question || !Array.isArray(question.options) || typeof question.correct_index !== 'number') {
         container.innerHTML = '<p class="error">Invalid question data. Please try generating a new quiz.</p>';
         return;
+    }
+
+    // Phase 5: Announce question change to screen readers
+    if (typeof announceQuestionChange === 'function') {
+        announceQuestionChange(
+            quizState.currentQuestionIndex + 1,
+            quizState.questions.length,
+            question.question
+        );
     }
 
     const questionNum = quizState.currentQuestionIndex + 1;
@@ -1631,6 +1643,60 @@ function updateNavigationSidebar() {
     });
 }
 
+// ========== Phase 5: Accessibility Integration ==========
+
+// Store cleanup function for keyboard navigation
+let keyboardNavigationCleanup = null;
+
+/**
+ * Initialize accessibility features for quiz
+ * @param {HTMLElement} container - Quiz container element
+ */
+function initializeQuizAccessibility(container) {
+    if (!container) return;
+
+    // Prevent race condition: clean up existing initialization first
+    if (keyboardNavigationCleanup) {
+        keyboardNavigationCleanup();
+        keyboardNavigationCleanup = null;
+    }
+
+    // Check if accessibility functions are available
+    if (typeof initializeKeyboardNavigation !== 'function') {
+        console.warn('Quiz accessibility functions not loaded');
+        keyboardNavigationCleanup = () => {}; // Set dummy cleanup to prevent re-initialization
+        return;
+    }
+
+    // Add skip links to page (only once)
+    if (!document.querySelector('.skip-links') && typeof createSkipLinks === 'function') {
+        const skipLinks = createSkipLinks();
+        document.body.insertBefore(skipLinks, document.body.firstChild);
+    }
+
+    // Initialize keyboard navigation
+    keyboardNavigationCleanup = initializeKeyboardNavigation(
+        container,
+        quizState,
+        (newIndex) => {
+            // Navigate to question via keyboard
+            quizState.currentQuestionIndex = newIndex;
+            displayCurrentQuestion(container);
+            updateNavigationSidebar();
+        }
+    );
+
+    // Ensure visible focus indicators
+    if (typeof ensureVisibleFocus === 'function') {
+        ensureVisibleFocus(container);
+    }
+
+    // Create screen reader region
+    if (typeof createScreenReaderRegion === 'function') {
+        createScreenReaderRegion();
+    }
+}
+
 /**
  * Event delegation handler for quiz container clicks.
  * Handles all button clicks within the quiz question container.
@@ -1679,6 +1745,13 @@ function selectAnswer(answerIndex) {
     // Update score if correct
     if (answerIndex === question.correct_index) {
         quizState.score++;
+    }
+
+    // Phase 5: Announce answer selection to screen readers
+    if (typeof announceAnswerSelection === 'function') {
+        const optionText = question.options[answerIndex];
+        const optionLetter = String.fromCharCode(65 + answerIndex); // A, B, C, D
+        announceAnswerSelection(optionText, optionLetter);
     }
 
     // Always update progress display after answering
@@ -1898,6 +1971,12 @@ function restartQuiz() {
     if (phase2Cleanup && typeof phase2Cleanup === 'function') {
         phase2Cleanup();
         phase2Cleanup = null;
+    }
+
+    // Phase 5: Cleanup keyboard navigation
+    if (keyboardNavigationCleanup && typeof keyboardNavigationCleanup === 'function') {
+        keyboardNavigationCleanup();
+        keyboardNavigationCleanup = null;
     }
 
     // Reset state
