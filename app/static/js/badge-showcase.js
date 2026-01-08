@@ -10,6 +10,8 @@ class BadgeShowcase {
         this.badgeDefinitions = [];
         this.currentFilter = 'all';
         this.currentSort = 'recent';
+        // FIX: Track event listeners for cleanup
+        this.eventListeners = [];
         this.init();
     }
 
@@ -36,10 +38,16 @@ class BadgeShowcase {
 
     async init() {
         console.log('[BadgeShowcase] Initializing...');
-        await this.loadBadgeData();
-        this.renderBadgeShowcase();
-        this.setupEventListeners();
-        console.log('[BadgeShowcase] Initialized');
+        // FIX: Add error handling to init()
+        try {
+            await this.loadBadgeData();
+            this.renderBadgeShowcase();
+            this.setupEventListeners();
+            console.log('[BadgeShowcase] Initialized');
+        } catch (error) {
+            console.error('[BadgeShowcase] Initialization error:', error);
+            this.showError('Failed to initialize badge showcase. Please refresh the page.');
+        }
     }
 
     /**
@@ -194,10 +202,13 @@ class BadgeShowcase {
                     if (!a.earned && !b.earned) return 0;
                     if (!a.earned) return 1;
                     if (!b.earned) return -1;
-                    // CRITICAL: Validate earned_at exists
+                    // FIX: Improved invalid date handling
                     const aDate = a.userBadge?.earned_at ? new Date(a.userBadge.earned_at) : new Date(0);
                     const bDate = b.userBadge?.earned_at ? new Date(b.userBadge.earned_at) : new Date(0);
-                    return bDate - aDate;
+                    // FIX: Check for invalid dates
+                    const aTime = isNaN(aDate.getTime()) ? 0 : aDate.getTime();
+                    const bTime = isNaN(bDate.getTime()) ? 0 : bDate.getTime();
+                    return bTime - aTime;
 
                 case 'name':
                     // CRITICAL: Validate name exists
@@ -323,30 +334,53 @@ class BadgeShowcase {
 
     /**
      * Setup event listeners
+     * FIX: Track event listeners for cleanup to prevent memory leaks
      */
     setupEventListeners() {
         // Filter buttons
-        document.querySelectorAll('.filter-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
+        const filterButtons = document.querySelectorAll('.filter-btn');
+        filterButtons.forEach(btn => {
+            const handler = (e) => {
                 this.currentFilter = e.target.dataset.filter;
                 this.renderBadgeShowcase();
-            });
+            };
+            btn.addEventListener('click', handler);
+            // FIX: Track for cleanup
+            this.eventListeners.push({ element: btn, event: 'click', handler });
         });
 
         // Sort select
         const sortSelect = document.getElementById('badge-sort');
         if (sortSelect) {
-            sortSelect.addEventListener('change', (e) => {
+            const handler = (e) => {
                 this.currentSort = e.target.value;
                 this.renderBadgeShowcase();
-            });
+            };
+            sortSelect.addEventListener('change', handler);
+            // FIX: Track for cleanup
+            this.eventListeners.push({ element: sortSelect, event: 'change', handler });
         }
 
         // Listen for badge earned events
-        document.addEventListener('gamification:badgeearned', (e) => {
+        const badgeEarnedHandler = (e) => {
             this.showBadgeNotification(e.detail);
             this.refresh();
+        };
+        document.addEventListener('gamification:badgeearned', badgeEarnedHandler);
+        // FIX: Track for cleanup
+        this.eventListeners.push({ element: document, event: 'gamification:badgeearned', handler: badgeEarnedHandler });
+    }
+
+    /**
+     * Cleanup method to remove event listeners
+     * FIX: Prevent memory leaks by removing all tracked event listeners
+     */
+    cleanup() {
+        console.log('[BadgeShowcase] Cleaning up event listeners...');
+        this.eventListeners.forEach(({ element, event, handler }) => {
+            element.removeEventListener(event, handler);
         });
+        this.eventListeners = [];
     }
 
     /**
@@ -476,4 +510,11 @@ if (document.readyState === 'loading') {
 } else {
     window.badgeShowcase = new BadgeShowcase();
 }
+
+// FIX: Cleanup on page unload to prevent memory leaks
+window.addEventListener('beforeunload', () => {
+    if (window.badgeShowcase && typeof window.badgeShowcase.cleanup === 'function') {
+        window.badgeShowcase.cleanup();
+    }
+});
 
