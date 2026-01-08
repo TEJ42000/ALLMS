@@ -21,6 +21,32 @@
  * @returns {HTMLElement} - Enhanced answer option element
  */
 function createEnhancedAnswerOption(optionText, optionIndex, isSelected = false, isDisabled = false, isCorrect = null) {
+    // MEDIUM: Input validation for consistency with other functions
+    if (typeof optionText !== 'string') {
+        console.error('createEnhancedAnswerOption: optionText must be a string');
+        optionText = String(optionText || '');
+    }
+
+    if (typeof optionIndex !== 'number' || !Number.isInteger(optionIndex) || optionIndex < 0) {
+        console.error('createEnhancedAnswerOption: optionIndex must be a non-negative integer');
+        optionIndex = 0;
+    }
+
+    if (typeof isSelected !== 'boolean') {
+        console.error('createEnhancedAnswerOption: isSelected must be a boolean');
+        isSelected = false;
+    }
+
+    if (typeof isDisabled !== 'boolean') {
+        console.error('createEnhancedAnswerOption: isDisabled must be a boolean');
+        isDisabled = false;
+    }
+
+    if (isCorrect !== null && typeof isCorrect !== 'boolean') {
+        console.error('createEnhancedAnswerOption: isCorrect must be null or boolean');
+        isCorrect = null;
+    }
+
     const option = document.createElement('button');
     option.className = 'quiz-option-enhanced';
     option.setAttribute('type', 'button');

@@ -90,10 +90,63 @@ describe('Quiz Answer Options Enhancements - Phase 2', () => {
         
         test('creates incorrect answer with feedback', () => {
             const option = createEnhancedAnswerOption('Test', 0, true, false, false);
-            
+
             expect(option.classList.contains('incorrect')).toBeTruthy();
             expect(option.querySelector('.option-feedback-icon')).toBeTruthy();
             expect(option.querySelector('.option-feedback-icon').textContent).toBe('✗');
+        });
+
+        test('validates optionText parameter', () => {
+            // Should convert non-string to string
+            const option1 = createEnhancedAnswerOption(123, 0);
+            expect(option1.querySelector('.option-text').textContent).toBe('123');
+
+            const option2 = createEnhancedAnswerOption(null, 0);
+            expect(option2.querySelector('.option-text').textContent).toBe('');
+
+            const option3 = createEnhancedAnswerOption(undefined, 0);
+            expect(option3.querySelector('.option-text').textContent).toBe('');
+        });
+
+        test('validates optionIndex parameter', () => {
+            // Should default to 0 for invalid index
+            const option1 = createEnhancedAnswerOption('Test', -1);
+            expect(option1.getAttribute('data-option-index')).toBe('0');
+
+            const option2 = createEnhancedAnswerOption('Test', 'invalid');
+            expect(option2.getAttribute('data-option-index')).toBe('0');
+
+            const option3 = createEnhancedAnswerOption('Test', 1.5);
+            expect(option3.getAttribute('data-option-index')).toBe('0');
+        });
+
+        test('validates isSelected parameter', () => {
+            // Should default to false for non-boolean
+            const option1 = createEnhancedAnswerOption('Test', 0, 'true');
+            expect(option1.classList.contains('selected')).toBeFalsy();
+
+            const option2 = createEnhancedAnswerOption('Test', 0, 1);
+            expect(option2.classList.contains('selected')).toBeFalsy();
+        });
+
+        test('validates isDisabled parameter', () => {
+            // Should default to false for non-boolean
+            const option1 = createEnhancedAnswerOption('Test', 0, false, 'true');
+            expect(option1.classList.contains('disabled')).toBeFalsy();
+
+            const option2 = createEnhancedAnswerOption('Test', 0, false, 1);
+            expect(option2.classList.contains('disabled')).toBeFalsy();
+        });
+
+        test('validates isCorrect parameter', () => {
+            // Should default to null for non-boolean/non-null
+            const option1 = createEnhancedAnswerOption('Test', 0, false, false, 'true');
+            expect(option1.classList.contains('correct')).toBeFalsy();
+            expect(option1.classList.contains('incorrect')).toBeFalsy();
+
+            const option2 = createEnhancedAnswerOption('Test', 0, false, false, 1);
+            expect(option2.classList.contains('correct')).toBeFalsy();
+            expect(option2.classList.contains('incorrect')).toBeFalsy();
         });
     });
     

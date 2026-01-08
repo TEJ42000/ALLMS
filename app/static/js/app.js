@@ -1489,7 +1489,22 @@ function displayCurrentQuestion(container) {
     container.innerHTML = html;
 
     // CRITICAL FIX: Remove old event listeners before adding new ones
-    // Clone and replace to remove all event listeners
+    // MEDIUM: Document container cloning behavior
+    //
+    // We clone and replace the container to remove ALL event listeners.
+    // This is more reliable than tracking individual listeners.
+    //
+    // IMPORTANT: After this operation, any external references to the old
+    // container will be stale. The container variable is reassigned to the
+    // new cloned element. This is safe because:
+    // 1. We're in the displayCurrentQuestion function scope
+    // 2. The container is re-queried on each question change
+    // 3. Event listeners are re-attached to the new container below
+    //
+    // Alternative approaches considered:
+    // - removeEventListener: Requires tracking all listener references
+    // - AbortController: Not supported in older browsers
+    // - Clone/replace: Simple, reliable, works everywhere
     const oldContainer = container;
     const newContainer = container.cloneNode(true);
     container.parentNode.replaceChild(newContainer, container);
