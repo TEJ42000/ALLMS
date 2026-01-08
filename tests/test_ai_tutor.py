@@ -463,25 +463,41 @@ class TestErrorHandling:
         data = response.json()
         assert "detail" in data
 
-    @pytest.mark.parametrize("length,expected_status", [
-        (1, 200),       # Minimum valid length
-        (100, 200),     # Normal length
-        (4999, 200),    # Just under max
-        (5000, 200),    # Exactly max
+    @pytest.mark.parametrize("length,expected_status,description", [
+        (1, 200, "Minimum valid length"),
+        (100, 200, "Normal length"),
+        (4999, 200, "Just under max"),
+        (5000, 200, "Exactly at max"),
+        (5001, 422, "Just over max (should reject)"),
+        (10000, 422, "Far over max (should reject)"),
     ])
-    def test_chat_message_boundary_cases(self, client, mock_tutor_response, length, expected_status):
-        """Test chat with various message length boundaries."""
-        with patch('app.services.anthropic_client.client') as mock_client:
-            mock_client.messages.create = AsyncMock(return_value=mock_tutor_response)
+    def test_chat_message_boundary_cases(self, client, mock_tutor_response, length, expected_status, description):
+        """Test chat with various message length boundaries including rejection cases."""
+        # Only mock API for valid requests
+        if expected_status == 200:
+            with patch('app.services.anthropic_client.client') as mock_client:
+                mock_client.messages.create = AsyncMock(return_value=mock_tutor_response)
 
+                message = "A" * length
+                response = client.post("/api/tutor/chat", json={
+                    "message": message,
+                    "context": "Private Law"
+                })
+        else:
+            # Don't mock for invalid requests (should fail validation before API call)
             message = "A" * length
             response = client.post("/api/tutor/chat", json={
                 "message": message,
                 "context": "Private Law"
             })
 
-            assert response.status_code == expected_status, \
-                f"Expected {expected_status} for length {length}, got {response.status_code}"
+        assert response.status_code == expected_status, \
+            f"{description}: Expected {expected_status} for length {length}, got {response.status_code}"
+
+        # For rejection cases, verify error detail
+        if expected_status == 422:
+            data = response.json()
+            assert "detail" in data, f"{description}: Error response should include detail field"
 
     def test_chat_with_special_characters(self, client, mock_tutor_response):
         """Test chat with special characters in message."""
@@ -555,19 +571,19 @@ class TestConversationHistory:
 
             assert response.status_code == 200
 
-    def test_chat_with_invalid_history_format(self, client, mock_tutor_response):
-        """Test chat with invalid conversation history format."""
-        with patch('app.services.anthropic_client.client') as mock_client:
-            mock_client.messages.create = AsyncMock(return_value=mock_tutor_response)
+    def test_chat_with_invalid_history_format(self, client):
+        """Test chat with invalid conversation history format (should reject)."""
+        response = client.post("/api/tutor/chat", json={
+            "message": "Test question",
+            "context": "Private Law",
+            "conversation_history": "invalid format"  # Should be array, not string
+        })
 
-            response = client.post("/api/tutor/chat", json={
-                "message": "Test question",
-                "context": "Private Law",
-                "conversation_history": "invalid format"  # Should be array
-            })
-
-            # Should handle gracefully
-            assert response.status_code in [200, 422]
+        # Should reject with validation error (deterministic)
+        assert response.status_code == 422, \
+            f"Expected 422 for invalid history format, got {response.status_code}"
+        data = response.json()
+        assert "detail" in data, "Error response should include detail field"
 
     def test_chat_with_empty_history(self, client, mock_tutor_response):
         """Test chat with empty conversation history."""
@@ -697,28 +713,30 @@ class TestConcurrentRequests:
         """Test handling multiple concurrent chat requests using threading.
 
         Note: This test uses threading to simulate actual concurrent requests,
-        not just sequential requests in a loop.
+        not just sequential requests in a loop. Uses thread-safe data structures.
         """
         import threading
+        from queue import Queue
 
         with patch('app.services.anthropic_client.client') as mock_client:
             mock_client.messages.create = AsyncMock(return_value=mock_tutor_response)
 
-            # Store results from threads
-            results = []
-            errors = []
+            # Use thread-safe queues for results and errors
+            results_queue = Queue()
+            errors_queue = Queue()
 
             def make_request(request_data, index):
-                """Make a request in a thread."""
+                """Make a request in a thread (thread-safe)."""
                 try:
                     response = client.post("/api/tutor/chat", json=request_data)
-                    results.append((index, response))
+                    results_queue.put((index, response))
                 except Exception as e:
-                    errors.append((index, e))
+                    errors_queue.put((index, e))
 
             # Create threads for concurrent requests
             threads = []
-            for i in range(5):
+            num_requests = 5
+            for i in range(num_requests):
                 request_data = {"message": f"Question {i}", "context": "Private Law"}
                 thread = threading.Thread(target=make_request, args=(request_data, i))
                 threads.append(thread)
@@ -730,11 +748,24 @@ class TestConcurrentRequests:
             # Wait for all threads to complete
             for thread in threads:
                 thread.join(timeout=5.0)
+                assert not thread.is_alive(), f"Thread {thread.name} timed out"
+
+            # Collect results from queues
+            results = []
+            while not results_queue.empty():
+                results.append(results_queue.get())
+
+            errors = []
+            while not errors_queue.empty():
+                errors.append(errors_queue.get())
 
             # Verify no errors occurred
             assert len(errors) == 0, f"Errors in concurrent requests: {errors}"
 
             # All requests should succeed
-            assert len(results) == 5
+            assert len(results) == num_requests, \
+                f"Expected {num_requests} results, got {len(results)}"
+
             for index, response in results:
-                assert response.status_code == 200, f"Request {index} failed"
+                assert response.status_code == 200, \
+                    f"Request {index} failed with status {response.status_code}"

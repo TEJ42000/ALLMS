@@ -42,7 +42,10 @@ class ChatResponse(BaseModel):
 
     content: str = Field(..., description="AI-generated response")
     status: str = Field(default="success", description="Response status")
-    timestamp: datetime = Field(default_factory=datetime.now, description="Response timestamp")
+    timestamp: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        description="Response timestamp (UTC, timezone-aware)"
+    )
     course_id: Optional[str] = Field(None, description="Course ID if course-aware mode was used")
 
 
@@ -98,7 +101,8 @@ class AssessmentResponse(BaseModel):
     grade: Optional[int] = Field(default=None, ge=0, le=10, description="Grade out of 10")
     status: str = Field(default="success", description="Response status")
     timestamp: datetime = Field(
-        default_factory=datetime.now, description="Response timestamp"
+        default_factory=lambda: datetime.now(timezone.utc),
+        description="Response timestamp (UTC, timezone-aware)"
     )
 
 
@@ -459,7 +463,8 @@ class UserProgress(BaseModel):
     average_score: Optional[float] = Field(default=None, description="Average quiz score")
     topics_studied: List[str] = Field(default_factory=list, description="Topics studied")
     last_active: datetime = Field(
-        default_factory=datetime.now, description="Last activity timestamp"
+        default_factory=lambda: datetime.now(timezone.utc),
+        description="Last activity timestamp (UTC, timezone-aware)"
     )
 
 
@@ -494,7 +499,8 @@ class ErrorResponse(BaseModel):
     detail: str = Field(..., description="Error message")
     status: str = Field(default="error", description="Error status")
     timestamp: datetime = Field(
-        default_factory=datetime.now, description="Error timestamp"
+        default_factory=lambda: datetime.now(timezone.utc),
+        description="Error timestamp (UTC, timezone-aware)"
     )
 
 
