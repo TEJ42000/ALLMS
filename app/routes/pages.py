@@ -96,3 +96,68 @@ async def health_check():
         "service": "lls-study-portal",
         "version": "2.0.0"
     }
+
+
+# =============================================================================
+# GDPR Compliance Pages
+# =============================================================================
+
+@router.get("/privacy-policy", response_class=HTMLResponse)
+async def privacy_policy(request: Request):
+    """Serve the privacy policy page."""
+    user = get_user_from_request(request)
+    return templates.TemplateResponse(
+        "privacy_policy.html",
+        {
+            "request": request,
+            "title": "Privacy Policy - ALLMS",
+            "user": user
+        }
+    )
+
+
+@router.get("/privacy-dashboard", response_class=HTMLResponse)
+async def privacy_dashboard(request: Request):
+    """Serve the privacy dashboard page."""
+    user = get_user_from_request(request)
+
+    # Require authentication for privacy dashboard
+    if not user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    return templates.TemplateResponse(
+        "privacy_dashboard.html",
+        {
+            "request": request,
+            "title": "Privacy Dashboard - ALLMS",
+            "user": user
+        }
+    )
+
+
+@router.get("/terms-of-service", response_class=HTMLResponse)
+async def terms_of_service(request: Request):
+    """Serve the terms of service page."""
+    user = get_user_from_request(request)
+    return templates.TemplateResponse(
+        "terms_of_service.html",
+        {
+            "request": request,
+            "title": "Terms of Service - ALLMS",
+            "user": user
+        }
+    )
+
+
+@router.get("/cookie-policy", response_class=HTMLResponse)
+async def cookie_policy(request: Request):
+    """Serve the cookie policy page."""
+    user = get_user_from_request(request)
+    return templates.TemplateResponse(
+        "cookie_policy.html",
+        {
+            "request": request,
+            "title": "Cookie Policy - ALLMS",
+            "user": user
+        }
+    )
