@@ -1452,18 +1452,7 @@ function displayCurrentQuestion(container) {
                     <strong>Related Articles:</strong> ${question.articles.map(a => escapeHtml(a)).join(', ')}
                 </div>
             ` : ''}
-            <div class="quiz-options">
-                ${question.options.map((option, index) => `
-                    <button
-                        class="quiz-option ${userAnswer === index ? 'selected' : ''}"
-                        data-answer-index="${index}"
-                        ${userAnswer !== null ? 'disabled' : ''}
-                    >
-                        <span class="option-letter">${String.fromCharCode(65 + index)}</span>
-                        <span class="option-text">${escapeHtml(option)}</span>
-                    </button>
-                `).join('')}
-            </div>
+            <div id="quiz-options-placeholder"></div>
             ${userAnswer !== null ? `
                 <div class="answer-feedback ${userAnswer === question.correct_index ? 'correct' : 'incorrect'}">
                     <strong>${userAnswer === question.correct_index ? '✓ Correct!' : '✗ Incorrect'}</strong>
@@ -1490,6 +1479,23 @@ function displayCurrentQuestion(container) {
 
     container.innerHTML = html;
 
+    // Phase 2: Create enhanced answer options if available
+    const optionsPlaceholder = container.querySelector('#quiz-options-placeholder');
+    if (optionsPlaceholder && typeof createAnswerOptionsContainer === 'function') {
+        const optionsContainer = createAnswerOptionsContainer(
+            question.options,
+            userAnswer,
+            userAnswer !== null,
+            userAnswer !== null ? question.correct_index : null
+        );
+        optionsPlaceholder.replaceWith(optionsContainer);
+
+        // Initialize Phase 2 event handlers
+        if (typeof initializePhase2Enhancements === 'function') {
+            initializePhase2Enhancements(container, selectAnswer);
+        }
+    }
+
     // Use event delegation on the container to avoid memory leaks from per-element listeners
     container.addEventListener('click', handleQuizContainerClick);
 }
@@ -1501,12 +1507,14 @@ function displayCurrentQuestion(container) {
 function handleQuizContainerClick(event) {
     const target = event.target;
 
-    // Handle quiz option selection
-    const optionBtn = target.closest('.quiz-option');
+    // Handle quiz option selection (both old and Phase 2 enhanced options)
+    const optionBtn = target.closest('.quiz-option') || target.closest('.quiz-option-enhanced');
     if (optionBtn && !optionBtn.disabled) {
-        const index = parseInt(optionBtn.dataset.answerIndex, 10);
-        selectAnswer(index);
-        return;
+        const index = parseInt(optionBtn.dataset.answerIndex || optionBtn.dataset.optionIndex, 10);
+        if (!isNaN(index)) {
+            selectAnswer(index);
+            return;
+        }
     }
 
     // Handle previous button
