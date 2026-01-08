@@ -1,6 +1,7 @@
 """Page Rendering Routes for the LLS Study Portal."""
 
 import logging
+from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import HTMLResponse
@@ -16,8 +17,15 @@ router = APIRouter(tags=["Pages"])
 templates = Jinja2Templates(directory="templates")
 
 
-def get_user_from_request(request: Request):
-    """Extract user from request state (set by auth middleware)."""
+def get_user_from_request(request: Request) -> Optional[Any]:
+    """Extract user from request state (set by auth middleware).
+
+    Args:
+        request: The incoming HTTP request
+
+    Returns:
+        User object if authenticated, None otherwise
+    """
     return getattr(request.state, 'user', None)
 
 
@@ -186,7 +194,7 @@ async def badges_page(request: Request):
 
 
 @router.get("/flashcards", response_class=HTMLResponse)
-async def flashcards_page(request: Request):
+async def flashcards_page(request: Request) -> HTMLResponse:
     """
     Serve the flashcards study page.
 
@@ -196,15 +204,27 @@ async def flashcards_page(request: Request):
     - Future Phase 2 will add user-specific features (progress tracking, etc.)
 
     HIGH FIX: Adds strict CSP headers for security.
+
+    Args:
+        request: The incoming HTTP request
+
+    Returns:
+        HTMLResponse with flashcards page and security headers
+
+    Raises:
+        HTTPException: If template rendering fails (unlikely)
     """
-    user = get_user_from_request(request)
-    response = templates.TemplateResponse(
+    user: Optional[Any] = get_user_from_request(request)
+
+    context: Dict[str, Any] = {
+        "request": request,
+        "title": "Flashcards - ECHR Learning",
+        "user": user
+    }
+
+    response: HTMLResponse = templates.TemplateResponse(
         "flashcards.html",
-        {
-            "request": request,
-            "title": "Flashcards - ECHR Learning",
-            "user": user
-        }
+        context
     )
 
     # HIGH FIX: Add strict Content Security Policy headers
