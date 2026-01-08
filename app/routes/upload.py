@@ -9,7 +9,7 @@ This module provides endpoints for:
 MVP Implementation - Issue #200
 """
 
-from fastapi import APIRouter, UploadFile, Form, HTTPException, Query
+from fastapi import APIRouter, UploadFile, Form, HTTPException, Query, Header, Request
 from pathlib import Path
 import uuid
 import shutil
@@ -19,6 +19,12 @@ import json
 import re
 import asyncio
 from anthropic import RateLimitError
+from urllib.parse import quote
+import secrets
+import hashlib
+import time
+from collections import defaultdict
+from datetime import datetime, timedelta
 
 from app.services.text_extractor import extract_text
 from app.services.files_api_service import get_files_api_service
@@ -44,6 +50,167 @@ FILE_SIGNATURES = {
     "md": [],   # Markdown files don't have magic numbers
     "html": [b"<!DOCTYPE", b"<html", b"<HTML"],
 }
+
+# CRITICAL: CSRF protection configuration
+# In production, use a proper session-based CSRF token system
+ALLOWED_ORIGINS = [
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+    "https://allms.app",  # Production domain
+    # Add your production domains here
+]
+
+# HIGH: Rate limiting configuration
+# In production, use Redis or similar for distributed rate limiting
+RATE_LIMIT_UPLOADS = 10  # Max uploads per user per minute
+RATE_LIMIT_WINDOW = 60  # Window in seconds
+rate_limit_store: Dict[str, List[float]] = defaultdict(list)
+
+
+def validate_csrf(origin: Optional[str] = None, referer: Optional[str] = None) -> None:
+    """
+    Validate CSRF protection using Origin/Referer headers.
+
+    CRITICAL SECURITY: Prevents Cross-Site Request Forgery attacks.
+
+    Args:
+        origin: Origin header from request
+        referer: Referer header from request
+
+    Raises:
+        HTTPException: If CSRF validation fails
+    """
+    # Check Origin header first (more reliable)
+    if origin:
+        if not any(origin.startswith(allowed) for allowed in ALLOWED_ORIGINS):
+            logger.warning(f"CSRF: Rejected origin: {origin}")
+            raise HTTPException(403, "Invalid origin")
+        return
+
+    # Fallback to Referer header
+    if referer:
+        if not any(referer.startswith(allowed) for allowed in ALLOWED_ORIGINS):
+            logger.warning(f"CSRF: Rejected referer: {referer}")
+            raise HTTPException(403, "Invalid referer")
+        return
+
+    # No Origin or Referer header - reject for safety
+    logger.warning("CSRF: No Origin or Referer header")
+    raise HTTPException(403, "Missing CSRF headers")
+
+
+def validate_user_authentication(authorization: Optional[str] = None) -> str:
+    """
+    Validate user authentication.
+
+    HIGH SECURITY: Ensures only authenticated users can upload files.
+
+    TODO: Integrate with existing authentication system
+    Currently returns a placeholder user_id.
+
+    Args:
+        authorization: Authorization header (Bearer token)
+
+    Returns:
+        user_id: Authenticated user identifier
+
+    Raises:
+        HTTPException: If authentication fails
+    """
+    # TODO: Replace with actual authentication
+    # For now, we'll allow unauthenticated access for MVP
+    # In production, this MUST be replaced with proper auth
+
+    # Placeholder implementation
+    if authorization and authorization.startswith("Bearer "):
+        # TODO: Validate JWT token
+        # TODO: Extract user_id from token
+        return "authenticated_user"
+
+    # For MVP, allow anonymous uploads
+    # TODO: Remove this in production
+    logger.warning("Upload without authentication (MVP only)")
+    return "anonymous_user"
+
+
+def check_rate_limit(user_id: str, client_ip: str) -> None:
+    """
+    Check rate limit for uploads.
+
+    HIGH SECURITY: Prevents abuse and DoS attacks.
+
+    Args:
+        user_id: User identifier
+        client_ip: Client IP address
+
+    Raises:
+        HTTPException: If rate limit exceeded
+    """
+    # Use combination of user_id and IP for rate limiting
+    key = f"{user_id}:{client_ip}"
+    now = time.time()
+
+    # Clean up old entries
+    rate_limit_store[key] = [
+        timestamp for timestamp in rate_limit_store[key]
+        if now - timestamp < RATE_LIMIT_WINDOW
+    ]
+
+    # Check if limit exceeded
+    if len(rate_limit_store[key]) >= RATE_LIMIT_UPLOADS:
+        logger.warning(f"Rate limit exceeded for {key}")
+        raise HTTPException(
+            429,
+            f"Rate limit exceeded. Maximum {RATE_LIMIT_UPLOADS} uploads per {RATE_LIMIT_WINDOW} seconds."
+        )
+
+    # Add current request
+    rate_limit_store[key].append(now)
+
+
+def sanitize_course_id(course_id: str) -> str:
+    """
+    Sanitize course_id to prevent path traversal attacks.
+
+    CRITICAL SECURITY: course_id is user-controlled and used in file paths.
+    Must prevent directory traversal (../, ..\, etc.)
+
+    Args:
+        course_id: User-provided course identifier
+
+    Returns:
+        Sanitized course_id safe for use in file paths
+
+    Raises:
+        HTTPException: If course_id is invalid or contains malicious patterns
+    """
+    if not course_id:
+        raise HTTPException(400, "course_id is required")
+
+    # Remove whitespace
+    course_id = course_id.strip()
+
+    # Check length (prevent extremely long IDs)
+    if len(course_id) > 100:
+        raise HTTPException(400, "course_id too long (max 100 characters)")
+
+    # CRITICAL: Check for path traversal patterns
+    dangerous_patterns = [
+        "..", "/", "\\", "\x00",  # Path traversal and null bytes
+        "~", "$", "`", "|", ";", "&",  # Shell injection
+        "<", ">", "\"", "'",  # XSS/injection
+    ]
+
+    for pattern in dangerous_patterns:
+        if pattern in course_id:
+            logger.warning(f"Rejected course_id with dangerous pattern: {pattern}")
+            raise HTTPException(400, f"course_id contains invalid characters")
+
+    # Only allow alphanumeric, hyphens, underscores
+    if not re.match(r'^[a-zA-Z0-9_-]+$', course_id):
+        raise HTTPException(400, "course_id must contain only letters, numbers, hyphens, and underscores")
+
+    return course_id
 
 
 def validate_file_content(file_path: Path, expected_ext: str) -> bool:
@@ -86,9 +253,13 @@ def validate_file_content(file_path: Path, expected_ext: str) -> bool:
 
 @router.post("")
 async def upload_file(
+    request: Request,
     file: UploadFile,
     course_id: str = Form(...),
-    week_number: Optional[int] = Form(None)
+    week_number: Optional[int] = Form(None),
+    origin: Optional[str] = Header(None),
+    referer: Optional[str] = Header(None),
+    authorization: Optional[str] = Header(None)
 ) -> Dict[str, Any]:
     """
     Upload a course material file.
@@ -104,6 +275,19 @@ async def upload_file(
     Raises:
         HTTPException: If file type not allowed or upload fails
     """
+    # CRITICAL FIX: CSRF protection
+    validate_csrf(origin, referer)
+
+    # HIGH FIX: Authentication
+    user_id = validate_user_authentication(authorization)
+
+    # HIGH FIX: Rate limiting
+    client_ip = request.client.host if request.client else "unknown"
+    check_rate_limit(user_id, client_ip)
+
+    # CRITICAL FIX: Sanitize course_id to prevent path traversal
+    course_id = sanitize_course_id(course_id)
+
     logger.info(f"Upload request: {file.filename} for course {course_id}")
 
     # MEDIUM FIX: Validate week_number if provided
@@ -193,7 +377,10 @@ async def upload_file(
 @router.post("/{material_id}/analyze")
 async def analyze_uploaded_file(
     material_id: str,
-    course_id: str = Query(..., description="Course identifier")
+    course_id: str = Query(..., description="Course identifier"),
+    origin: Optional[str] = Header(None),
+    referer: Optional[str] = Header(None),
+    authorization: Optional[str] = Header(None)
 ) -> Dict[str, Any]:
     """
     Extract text and analyze uploaded file with Claude AI.
@@ -208,8 +395,17 @@ async def analyze_uploaded_file(
     Raises:
         HTTPException: If file not found or analysis fails
     """
+    # CRITICAL FIX: CSRF protection
+    validate_csrf(origin, referer)
+
+    # HIGH FIX: Authentication
+    user_id = validate_user_authentication(authorization)
+
+    # CRITICAL FIX: Sanitize course_id to prevent path traversal
+    course_id = sanitize_course_id(course_id)
+
     logger.info(f"Analysis request: {material_id} for course {course_id}")
-    
+
     # HIGH FIX: Find the file with proper error handling for race conditions
     course_dir = UPLOAD_DIR / course_id
     if not course_dir.exists():
