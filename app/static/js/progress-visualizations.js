@@ -10,6 +10,7 @@
 
 class ProgressVisualizations {
     constructor() {
+        this.observers = []; // Track MutationObservers for cleanup
         this.init();
     }
 
@@ -19,6 +20,29 @@ class ProgressVisualizations {
         this.createCircularIndicators();
         this.enhanceStatCards();
         this.setupRealTimeUpdates();
+    }
+
+    /**
+     * Cleanup method to disconnect all observers and clear timers
+     */
+    cleanup() {
+        console.log('[ProgressVisualizations] Cleaning up observers and timers...');
+
+        // Disconnect MutationObservers
+        this.observers.forEach(observer => {
+            if (observer && typeof observer.disconnect === 'function') {
+                observer.disconnect();
+            }
+        });
+        this.observers = [];
+
+        // Clear animation timers
+        if (this.animationTimers) {
+            this.animationTimers.forEach(timer => {
+                if (timer) clearInterval(timer);
+            });
+            this.animationTimers = [];
+        }
     }
 
     /**
@@ -43,23 +67,77 @@ class ProgressVisualizations {
     }
 
     /**
+     * Validate API endpoint
+     */
+    validateEndpoint(endpoint) {
+        const validEndpoints = [
+            '/api/gamification/stats',
+            '/api/gamification/badges',
+            '/api/gamification/leaderboard'
+        ];
+
+        if (!validEndpoints.includes(endpoint)) {
+            throw new Error(`Invalid API endpoint: ${endpoint}`);
+        }
+
+        return endpoint;
+    }
+
+    /**
+     * Safe fetch with validation
+     */
+    async safeFetch(endpoint, options = {}) {
+        try {
+            // Validate endpoint
+            this.validateEndpoint(endpoint);
+
+            // Fetch with timeout
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+
+            const response = await fetch(endpoint, {
+                ...options,
+                signal: controller.signal
+            });
+
+            clearTimeout(timeoutId);
+
+            // Validate response status
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            return response;
+
+        } catch (error) {
+            if (error.name === 'AbortError') {
+                throw new Error('Request timeout');
+            }
+            throw error;
+        }
+    }
+
+    /**
      * Enhance progress bars with color transitions
      */
     enhanceProgressBars() {
         const progressBars = document.querySelectorAll('.progress-bar, .level-progress-fill');
-        
+
         progressBars.forEach(bar => {
             this.updateProgressBarColor(bar);
-            
-            // Watch for changes
+
+            // Watch for changes with cleanup tracking
             const observer = new MutationObserver(() => {
                 this.updateProgressBarColor(bar);
             });
-            
+
             observer.observe(bar, {
                 attributes: true,
                 attributeFilter: ['style']
             });
+
+            // Track observer for cleanup
+            this.observers.push(observer);
         });
     }
 
@@ -155,13 +233,7 @@ class ProgressVisualizations {
      */
     async updateHeaderCircularProgress() {
         try {
-            const response = await fetch('/api/gamification/stats');
-
-            // Validate response status
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
+            const response = await this.safeFetch('/api/gamification/stats');
             const data = await response.json();
 
             // Validate data structure
@@ -235,13 +307,7 @@ class ProgressVisualizations {
      */
     async updateExamReadiness() {
         try {
-            const response = await fetch('/api/gamification/stats');
-
-            // Validate response status
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
+            const response = await this.safeFetch('/api/gamification/stats');
             const data = await response.json();
 
             // Validate data structure
@@ -302,21 +368,51 @@ class ProgressVisualizations {
     }
 
     /**
-     * Animate number counter
+     * Animate number counter with safety checks
      */
     animateNumber(element, start, end, duration) {
-        const range = end - start;
-        const increment = range / (duration / 16);
-        let current = start;
-        
+        // Safety checks
+        if (!element) {
+            console.warn('[ProgressVisualizations] animateNumber: element is null');
+            return;
+        }
+
+        // Sanitize inputs
+        const safeStart = this.sanitizeNumber(start, 0);
+        const safeEnd = this.sanitizeNumber(end, 0);
+        const safeDuration = this.sanitizeNumber(duration, 1000);
+
+        // Validate duration
+        if (safeDuration <= 0) {
+            console.warn('[ProgressVisualizations] animateNumber: invalid duration');
+            element.textContent = Math.round(safeEnd);
+            return;
+        }
+
+        const range = safeEnd - safeStart;
+        const increment = range / (safeDuration / 16);
+        let current = safeStart;
+
         const timer = setInterval(() => {
+            // Check if element still exists in DOM
+            if (!element.isConnected) {
+                clearInterval(timer);
+                return;
+            }
+
             current += increment;
-            if ((increment > 0 && current >= end) || (increment < 0 && current <= end)) {
-                current = end;
+            if ((increment > 0 && current >= safeEnd) || (increment < 0 && current <= safeEnd)) {
+                current = safeEnd;
                 clearInterval(timer);
             }
             element.textContent = Math.round(current);
         }, 16);
+
+        // Store timer for potential cleanup
+        if (!this.animationTimers) {
+            this.animationTimers = [];
+        }
+        this.animationTimers.push(timer);
     }
 
     /**
@@ -398,4 +494,11 @@ if (document.readyState === 'loading') {
 } else {
     window.progressVisualizations = new ProgressVisualizations();
 }
+
+// Cleanup on page unload to prevent memory leaks
+window.addEventListener('beforeunload', () => {
+    if (window.progressVisualizations && typeof window.progressVisualizations.cleanup === 'function') {
+        window.progressVisualizations.cleanup();
+    }
+});
 

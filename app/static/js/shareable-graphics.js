@@ -43,6 +43,57 @@ class ShareableGraphics {
     }
 
     /**
+     * Validate API endpoint
+     */
+    validateEndpoint(endpoint) {
+        const validEndpoints = [
+            '/api/gamification/stats',
+            '/api/gamification/badges',
+            '/api/gamification/leaderboard'
+        ];
+
+        if (!validEndpoints.includes(endpoint)) {
+            throw new Error(`Invalid API endpoint: ${endpoint}`);
+        }
+
+        return endpoint;
+    }
+
+    /**
+     * Safe fetch with validation
+     */
+    async safeFetch(endpoint, options = {}) {
+        try {
+            // Validate endpoint
+            this.validateEndpoint(endpoint);
+
+            // Fetch with timeout
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+
+            const response = await fetch(endpoint, {
+                ...options,
+                signal: controller.signal
+            });
+
+            clearTimeout(timeoutId);
+
+            // Validate response status
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            return response;
+
+        } catch (error) {
+            if (error.name === 'AbortError') {
+                throw new Error('Request timeout');
+            }
+            throw error;
+        }
+    }
+
+    /**
      * Setup canvas for graphics generation
      */
     setupCanvas() {
@@ -123,17 +174,9 @@ class ShareableGraphics {
     async fetchUserStats() {
         try {
             const [statsRes, badgesRes] = await Promise.all([
-                fetch('/api/gamification/stats'),
-                fetch('/api/gamification/badges')
+                this.safeFetch('/api/gamification/stats'),
+                this.safeFetch('/api/gamification/badges')
             ]);
-
-            // Validate response status codes
-            if (!statsRes.ok) {
-                throw new Error(`Stats API error! status: ${statsRes.status}`);
-            }
-            if (!badgesRes.ok) {
-                throw new Error(`Badges API error! status: ${badgesRes.status}`);
-            }
 
             const stats = await statsRes.json();
             const badges = await badgesRes.json();

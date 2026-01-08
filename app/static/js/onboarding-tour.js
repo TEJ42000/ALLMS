@@ -12,31 +12,36 @@ class OnboardingTour {
                 target: '.level-info',
                 title: '⭐ XP & Levels',
                 content: 'Earn XP by completing quizzes, study guides, and evaluations. Level up to unlock new titles and show your progress!',
-                position: 'bottom'
+                position: 'bottom',
+                fallback: '.header-content' // Fallback selector if primary not found
             },
             {
                 target: '.streak-info',
                 title: '🔥 Streaks',
                 content: 'Build your study streak by earning XP every day. Use streak freezes to protect your streak when you need a break!',
-                position: 'bottom'
+                position: 'bottom',
+                fallback: '.header-content'
             },
             {
                 target: '.tab-button[data-tab="badges"]',
                 title: '🏆 Badges',
                 content: 'Earn badges by completing special achievements. Collect Bronze, Silver, and Gold tiers for each badge!',
-                position: 'bottom'
+                position: 'bottom',
+                fallback: '.nav-tabs'
             },
             {
                 target: '.gamification-dashboard',
                 title: '📊 Your Dashboard',
                 content: 'Track all your stats, activities, and progress here. See how close you are to your next level!',
-                position: 'top'
+                position: 'top',
+                fallback: 'main'
             },
             {
                 target: '.share-section',
                 title: '📤 Share Your Progress',
                 content: 'Create beautiful graphics to share your achievements on social media or download for your records!',
-                position: 'top'
+                position: 'top',
+                fallback: '.gamification-dashboard'
             }
         ];
 
@@ -89,7 +94,27 @@ class OnboardingTour {
     }
 
     /**
-     * Show a specific step
+     * Validate and sanitize CSS selector
+     */
+    validateSelector(selector) {
+        if (!selector || typeof selector !== 'string') {
+            return null;
+        }
+
+        // Remove potentially dangerous characters
+        const sanitized = selector.trim();
+
+        // Basic validation - must start with . or # or be an element name
+        if (!/^[.#]?[\w-[\]="]+$/.test(sanitized)) {
+            console.warn('[OnboardingTour] Invalid selector:', selector);
+            return null;
+        }
+
+        return sanitized;
+    }
+
+    /**
+     * Show a specific step with selector validation
      */
     showStep(stepIndex) {
         if (stepIndex < 0 || stepIndex >= this.steps.length) {
@@ -98,10 +123,23 @@ class OnboardingTour {
         }
 
         const step = this.steps[stepIndex];
-        const target = document.querySelector(step.target);
+
+        // Validate and try primary selector
+        const validatedSelector = this.validateSelector(step.target);
+        let target = validatedSelector ? document.querySelector(validatedSelector) : null;
+
+        // Try fallback selector if primary fails
+        if (!target && step.fallback) {
+            const validatedFallback = this.validateSelector(step.fallback);
+            target = validatedFallback ? document.querySelector(validatedFallback) : null;
+
+            if (target) {
+                console.log('[OnboardingTour] Using fallback selector:', step.fallback);
+            }
+        }
 
         if (!target) {
-            console.warn('[OnboardingTour] Target not found:', step.target);
+            console.warn('[OnboardingTour] Target not found:', step.target, 'fallback:', step.fallback);
             this.next();
             return;
         }

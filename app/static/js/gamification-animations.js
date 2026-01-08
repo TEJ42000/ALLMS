@@ -24,35 +24,85 @@ class GamificationAnimations {
     }
 
     /**
-     * Load sound effects (optional)
+     * Load sound effects (optional) with lazy loading and error handling
      */
     loadSounds() {
-        this.sounds = {
-            levelUp: new Audio('/static/sounds/level-up.mp3'),
-            badgeEarned: new Audio('/static/sounds/badge-earned.mp3'),
-            xpGain: new Audio('/static/sounds/xp-gain.mp3'),
-            streakMilestone: new Audio('/static/sounds/streak-milestone.mp3')
+        this.sounds = {};
+        this.soundsLoaded = {};
+
+        // Sound file paths
+        this.soundPaths = {
+            levelUp: '/static/sounds/level-up.mp3',
+            badgeEarned: '/static/sounds/badge-earned.mp3',
+            xpGain: '/static/sounds/xp-gain.mp3',
+            streakMilestone: '/static/sounds/streak-milestone.mp3'
         };
 
-        // Set volume
-        Object.values(this.sounds).forEach(sound => {
-            sound.volume = 0.3;
-        });
+        // Don't preload - will lazy load on first use
+        console.log('[GamificationAnimations] Sound system initialized (lazy loading enabled)');
     }
 
     /**
-     * Play sound effect
+     * Lazy load a sound file
      */
-    playSound(soundName) {
-        if (!this.soundEnabled || !this.sounds[soundName]) return;
-        
+    async lazyLoadSound(soundName) {
+        // Return if already loaded
+        if (this.sounds[soundName]) {
+            return this.sounds[soundName];
+        }
+
+        // Return null if already failed to load
+        if (this.soundsLoaded[soundName] === false) {
+            return null;
+        }
+
         try {
-            this.sounds[soundName].currentTime = 0;
-            this.sounds[soundName].play().catch(e => {
-                console.log('[GamificationAnimations] Sound play failed:', e);
+            const audio = new Audio(this.soundPaths[soundName]);
+            audio.volume = 0.3;
+
+            // Wait for audio to be loadable
+            await new Promise((resolve, reject) => {
+                audio.addEventListener('canplaythrough', resolve, { once: true });
+                audio.addEventListener('error', reject, { once: true });
+
+                // Timeout after 3 seconds
+                setTimeout(() => reject(new Error('Sound load timeout')), 3000);
+            });
+
+            this.sounds[soundName] = audio;
+            this.soundsLoaded[soundName] = true;
+            console.log(`[GamificationAnimations] Loaded sound: ${soundName}`);
+            return audio;
+
+        } catch (error) {
+            console.warn(`[GamificationAnimations] Failed to load sound ${soundName}:`, error.message);
+            this.soundsLoaded[soundName] = false;
+            return null;
+        }
+    }
+
+    /**
+     * Play sound effect with lazy loading
+     */
+    async playSound(soundName) {
+        if (!this.soundEnabled) return;
+
+        try {
+            // Lazy load sound if not already loaded
+            const audio = await this.lazyLoadSound(soundName);
+
+            if (!audio) {
+                console.log(`[GamificationAnimations] Sound ${soundName} not available`);
+                return;
+            }
+
+            // Reset and play
+            audio.currentTime = 0;
+            await audio.play().catch(e => {
+                console.log('[GamificationAnimations] Sound play failed:', e.message);
             });
         } catch (e) {
-            console.log('[GamificationAnimations] Sound error:', e);
+            console.log('[GamificationAnimations] Sound error:', e.message);
         }
     }
 
@@ -410,15 +460,67 @@ class GamificationAnimations {
     }
 
     /**
-     * Create shareable graphic
+     * Create shareable graphic for badge achievement
      */
     async createShareableGraphic(data) {
-        // This will be implemented in the shareable graphics component
-        // For now, return a placeholder
-        const canvas = document.createElement('canvas');
-        canvas.width = 1200;
-        canvas.height = 630;
-        return canvas;
+        try {
+            const canvas = document.createElement('canvas');
+            canvas.width = 1200;
+            canvas.height = 630;
+            const ctx = canvas.getContext('2d');
+
+            if (!ctx) {
+                console.error('[GamificationAnimations] Failed to get canvas context');
+                return null;
+            }
+
+            // Sanitize data
+            const safeName = this.escapeHtml(data.badgeName || 'Achievement');
+            const safeIcon = this.escapeHtml(data.badgeIcon || '🏆');
+            const safeTier = this.escapeHtml(data.badgeTier || 'Bronze');
+
+            // Background gradient
+            const gradient = ctx.createLinearGradient(0, 0, 0, 630);
+            gradient.addColorStop(0, '#1a1f35');
+            gradient.addColorStop(1, '#2d3561');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, 1200, 630);
+
+            // Title
+            ctx.fillStyle = '#d4af37';
+            ctx.font = 'bold 48px Arial, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('🏆 Badge Unlocked!', 600, 100);
+
+            // Badge icon (large)
+            ctx.font = '120px Arial, sans-serif';
+            ctx.fillText(safeIcon, 600, 280);
+
+            // Badge name
+            ctx.fillStyle = '#e0e6ed';
+            ctx.font = 'bold 42px Arial, sans-serif';
+            ctx.fillText(safeName, 600, 380);
+
+            // Tier
+            const tierColors = {
+                'bronze': '#cd7f32',
+                'silver': '#c0c0c0',
+                'gold': '#ffd700'
+            };
+            ctx.fillStyle = tierColors[safeTier.toLowerCase()] || '#d4af37';
+            ctx.font = 'bold 32px Arial, sans-serif';
+            ctx.fillText(safeTier.toUpperCase(), 600, 430);
+
+            // Footer
+            ctx.fillStyle = '#d4af37';
+            ctx.font = 'bold 28px Arial, sans-serif';
+            ctx.fillText('⚖️ LLS Study Portal', 600, 570);
+
+            return canvas;
+        } catch (error) {
+            console.error('[GamificationAnimations] Error creating shareable graphic:', error);
+            return null;
+        }
     }
 
     /**
