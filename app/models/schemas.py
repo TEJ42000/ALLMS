@@ -473,6 +473,18 @@ class ProgressUpdate(BaseModel):
 
 
 # ============================================================================
+# Health Check Models
+# ============================================================================
+
+class HealthCheckResponse(BaseModel):
+    """Health check response model."""
+
+    status: str = Field(..., description="Service health status (e.g., 'healthy', 'degraded')")
+    service: str = Field(..., description="Service name")
+    version: str = Field(..., description="Service version")
+
+
+# ============================================================================
 # Error Models
 # ============================================================================
 

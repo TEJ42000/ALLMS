@@ -1,13 +1,14 @@
 """Page Rendering Routes for the LLS Study Portal."""
 
 import logging
-from typing import Dict, Optional
+from typing import Optional
 
-from fastapi import APIRouter, Request, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from app.models.auth_models import User
+from app.models.schemas import HealthCheckResponse
 from app.services.course_service import get_course_service
 
 logger = logging.getLogger(__name__)
@@ -111,18 +112,18 @@ async def course_study_portal(request: Request, course_id: str) -> HTMLResponse:
         raise HTTPException(status_code=500, detail="Failed to load course")
 
 
-@router.get("/health")
-async def health_check() -> Dict[str, str]:
+@router.get("/health", response_model=HealthCheckResponse)
+async def health_check() -> HealthCheckResponse:
     """Health check endpoint for Cloud Run.
 
     Returns:
-        Dictionary with service status information
+        HealthCheckResponse with service status information
     """
-    return {
-        "status": "healthy",
-        "service": "lls-study-portal",
-        "version": "2.0.0"
-    }
+    return HealthCheckResponse(
+        status="healthy",
+        service="lls-study-portal",
+        version="2.0.0"
+    )
 
 
 # =============================================================================

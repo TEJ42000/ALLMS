@@ -12,7 +12,7 @@ from fastapi.testclient import TestClient
 from unittest.mock import Mock, patch
 
 from app.main import app
-from app.models.auth_models import User, MockUser
+from app.models.auth_models import User
 
 
 @pytest.fixture
@@ -66,13 +66,11 @@ class TestGetUserFromRequest:
     def test_returns_none_when_not_authenticated(self, client):
         """Test that get_user_from_request returns None when not authenticated."""
         from app.routes.pages import get_user_from_request
-        from fastapi import Request
+        from types import SimpleNamespace
 
-        # Create a mock request without user in state
-        request = Mock(spec=Request)
-        request.state = Mock(spec=['__dict__'])
-        # Use spec_set to prevent auto-creation of attributes
-        delattr(request.state, 'user') if hasattr(request.state, 'user') else None
+        # Create a mock request with state that has no user attribute
+        request = Mock()
+        request.state = SimpleNamespace()  # Empty namespace, no user attribute
 
         result = get_user_from_request(request)
 
@@ -159,26 +157,30 @@ class TestCourseStudyPortal:
 class TestHealthCheck:
     """Test the health check endpoint."""
 
-    def test_health_check_returns_dict(self, client):
-        """Test that health check returns a dictionary."""
+    def test_health_check_returns_valid_response(self, client):
+        """Test that health check returns a valid HealthCheckResponse."""
         response = client.get("/health")
-        
+
         assert response.status_code == 200
         data = response.json()
         assert isinstance(data, dict)
         assert "status" in data
         assert data["status"] == "healthy"
+        assert "service" in data
+        assert data["service"] == "lls-study-portal"
+        assert "version" in data
+        assert data["version"] == "2.0.0"
 
     def test_health_check_return_type(self):
         """Test that health_check has correct return type annotation."""
         from app.routes.pages import health_check
-        from typing import Dict
-        
+        from app.models.schemas import HealthCheckResponse
+
         annotations = health_check.__annotations__
         assert 'return' in annotations
-        # Should be Dict[str, str]
+        # Should be HealthCheckResponse
         return_type = annotations['return']
-        assert hasattr(return_type, '__origin__')
+        assert return_type == HealthCheckResponse
 
 
 class TestPrivacyDashboard:
