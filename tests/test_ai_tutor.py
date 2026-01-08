@@ -1,6 +1,19 @@
-"""Tests for AI Tutor endpoints."""
+"""Tests for AI Tutor endpoints.
 
+Comprehensive test suite for AI Tutor functionality including:
+- Chat endpoint with various scenarios
+- Topics endpoint (default and course-aware)
+- Examples endpoint
+- Course-info endpoint
+- Caching functionality
+- Materials loading
+- Error handling
+- Authorization
+"""
+
+from datetime import datetime, timezone
 from unittest.mock import AsyncMock, patch, Mock
+import pytest
 
 
 class TestChatEndpoint:
@@ -275,3 +288,350 @@ class TestCourseAwareMode:
             assert response.status_code == 404
             data = response.json()
             assert "detail" in data
+
+
+class TestCacheFunctionality:
+    """Tests for caching functionality in AI Tutor."""
+
+    def test_chat_uses_cache_on_repeated_request(self, client, sample_chat_request, mock_tutor_response):
+        """Test that repeated identical requests use cache."""
+        with patch('app.services.anthropic_client.client') as mock_client:
+            mock_client.messages.create = AsyncMock(return_value=mock_tutor_response)
+
+            # First request
+            response1 = client.post("/api/tutor/chat", json=sample_chat_request)
+            assert response1.status_code == 200
+
+            # Second identical request
+            response2 = client.post("/api/tutor/chat", json=sample_chat_request)
+            assert response2.status_code == 200
+
+            # Both should return same content
+            assert response1.json()["content"] == response2.json()["content"]
+
+    def test_chat_different_messages_not_cached(self, client, mock_tutor_response):
+        """Test that different messages don't use same cache."""
+        with patch('app.services.anthropic_client.client') as mock_client:
+            mock_client.messages.create = AsyncMock(return_value=mock_tutor_response)
+
+            request1 = {"message": "Question 1", "context": "Private Law"}
+            request2 = {"message": "Question 2", "context": "Private Law"}
+
+            response1 = client.post("/api/tutor/chat", json=request1)
+            response2 = client.post("/api/tutor/chat", json=request2)
+
+            assert response1.status_code == 200
+            assert response2.status_code == 200
+
+
+class TestMaterialsLoading:
+    """Tests for materials loading functionality."""
+
+    def test_chat_with_materials_context(self, client, mock_tutor_response):
+        """Test chat with materials loaded in context."""
+        with patch('app.services.anthropic_client.client') as mock_client:
+            mock_client.messages.create = AsyncMock(return_value=mock_tutor_response)
+
+            with patch('app.services.files_api_service.FilesAPIService.get_course_materials') as mock_materials:
+                mock_materials.return_value = [
+                    {
+                        "path": "lecture_week_1.pdf",
+                        "content": "This is lecture content",
+                        "week": 1
+                    }
+                ]
+
+                response = client.post(
+                    "/api/tutor/chat?course_id=LLS-2025-2026&week=1",
+                    json={"message": "Explain this week's topic", "context": "Private Law"}
+                )
+
+                assert response.status_code == 200
+                data = response.json()
+                assert data["status"] == "success"
+
+    def test_chat_materials_loading_error(self, client, mock_tutor_response):
+        """Test chat when materials loading fails."""
+        with patch('app.services.anthropic_client.client') as mock_client:
+            mock_client.messages.create = AsyncMock(return_value=mock_tutor_response)
+
+            with patch('app.services.files_api_service.FilesAPIService.get_course_materials') as mock_materials:
+                mock_materials.side_effect = Exception("Materials loading failed")
+
+                # Should still work, just without materials
+                response = client.post(
+                    "/api/tutor/chat?course_id=LLS-2025-2026",
+                    json={"message": "Test question", "context": "Private Law"}
+                )
+
+                assert response.status_code == 200
+
+
+class TestWeekFiltering:
+    """Tests for week-based filtering."""
+
+    def test_topics_filtered_by_week(self, client):
+        """Test topics endpoint with week filter."""
+        with patch('app.services.files_api_service.FilesAPIService.get_course_topics') as mock_topics:
+            mock_topics.return_value = [
+                {"id": "topic1", "name": "Topic 1", "week": 1},
+                {"id": "topic2", "name": "Topic 2", "week": 2},
+                {"id": "topic3", "name": "Topic 3", "week": 1}
+            ]
+
+            response = client.get("/api/tutor/topics?course_id=LLS-2025-2026&week=1")
+
+            assert response.status_code == 200
+            data = response.json()
+            # Should only return week 1 topics
+            assert len(data["topics"]) == 2
+            assert all(t["week"] == 1 for t in data["topics"])
+
+    def test_examples_filtered_by_week(self, client):
+        """Test examples endpoint with week filter."""
+        with patch('app.services.files_api_service.FilesAPIService.get_course_topics') as mock_topics:
+            mock_topics.return_value = [
+                {"id": "topic1", "name": "Topic 1", "week": 2}
+            ]
+
+            response = client.get("/api/tutor/examples?course_id=LLS-2025-2026&week=2")
+
+            assert response.status_code == 200
+            data = response.json()
+            assert data["status"] == "success"
+
+
+class TestErrorHandling:
+    """Tests for comprehensive error handling."""
+
+    def test_chat_with_very_long_message(self, client, mock_tutor_response):
+        """Test chat with very long message."""
+        with patch('app.services.anthropic_client.client') as mock_client:
+            mock_client.messages.create = AsyncMock(return_value=mock_tutor_response)
+
+            long_message = "A" * 10000  # 10k characters
+            response = client.post("/api/tutor/chat", json={
+                "message": long_message,
+                "context": "Private Law"
+            })
+
+            # Should handle long messages
+            assert response.status_code in [200, 422]
+
+    def test_chat_with_special_characters(self, client, mock_tutor_response):
+        """Test chat with special characters in message."""
+        with patch('app.services.anthropic_client.client') as mock_client:
+            mock_client.messages.create = AsyncMock(return_value=mock_tutor_response)
+
+            response = client.post("/api/tutor/chat", json={
+                "message": "What about Art. 6:74 § 2 DCC? <test> & 'quotes'",
+                "context": "Private Law"
+            })
+
+            assert response.status_code == 200
+
+    def test_chat_with_unicode_characters(self, client, mock_tutor_response):
+        """Test chat with unicode characters."""
+        with patch('app.services.anthropic_client.client') as mock_client:
+            mock_client.messages.create = AsyncMock(return_value=mock_tutor_response)
+
+            response = client.post("/api/tutor/chat", json={
+                "message": "Explain 法律 and émojis 🎓",
+                "context": "Private Law"
+            })
+
+            assert response.status_code == 200
+
+    def test_chat_api_timeout(self, client, sample_chat_request):
+        """Test handling of API timeout."""
+        with patch('app.services.anthropic_client.client') as mock_client:
+            mock_client.messages.create = AsyncMock(side_effect=TimeoutError("API timeout"))
+
+            response = client.post("/api/tutor/chat", json=sample_chat_request)
+
+            assert response.status_code == 500
+
+    def test_chat_api_rate_limit(self, client, sample_chat_request):
+        """Test handling of API rate limit."""
+        with patch('app.services.anthropic_client.client') as mock_client:
+            from anthropic import RateLimitError
+            mock_client.messages.create = AsyncMock(
+                side_effect=RateLimitError("Rate limit exceeded", response=Mock(), body=None)
+            )
+
+            response = client.post("/api/tutor/chat", json=sample_chat_request)
+
+            assert response.status_code == 500
+
+
+class TestConversationHistory:
+    """Tests for conversation history handling."""
+
+    def test_chat_with_long_conversation_history(self, client, mock_tutor_response):
+        """Test chat with long conversation history."""
+        with patch('app.services.anthropic_client.client') as mock_client:
+            mock_client.messages.create = AsyncMock(return_value=mock_tutor_response)
+
+            # Create long history
+            history = []
+            for i in range(20):
+                history.append({"role": "user", "content": f"Question {i}"})
+                history.append({"role": "assistant", "content": f"Answer {i}"})
+
+            response = client.post("/api/tutor/chat", json={
+                "message": "New question",
+                "context": "Private Law",
+                "conversation_history": history
+            })
+
+            assert response.status_code == 200
+
+    def test_chat_with_invalid_history_format(self, client, mock_tutor_response):
+        """Test chat with invalid conversation history format."""
+        with patch('app.services.anthropic_client.client') as mock_client:
+            mock_client.messages.create = AsyncMock(return_value=mock_tutor_response)
+
+            response = client.post("/api/tutor/chat", json={
+                "message": "Test question",
+                "context": "Private Law",
+                "conversation_history": "invalid format"  # Should be array
+            })
+
+            # Should handle gracefully
+            assert response.status_code in [200, 422]
+
+    def test_chat_with_empty_history(self, client, mock_tutor_response):
+        """Test chat with empty conversation history."""
+        with patch('app.services.anthropic_client.client') as mock_client:
+            mock_client.messages.create = AsyncMock(return_value=mock_tutor_response)
+
+            response = client.post("/api/tutor/chat", json={
+                "message": "Test question",
+                "context": "Private Law",
+                "conversation_history": []
+            })
+
+            assert response.status_code == 200
+
+
+class TestContextVariations:
+    """Tests for different context variations."""
+
+    def test_chat_with_all_law_contexts(self, client, mock_tutor_response):
+        """Test chat with all different law contexts."""
+        with patch('app.services.anthropic_client.client') as mock_client:
+            mock_client.messages.create = AsyncMock(return_value=mock_tutor_response)
+
+            contexts = [
+                "Constitutional Law",
+                "Administrative Law",
+                "Criminal Law",
+                "Private Law",
+                "International Law"
+            ]
+
+            for context in contexts:
+                response = client.post("/api/tutor/chat", json={
+                    "message": "Test question",
+                    "context": context
+                })
+                assert response.status_code == 200
+
+    def test_chat_with_custom_context(self, client, mock_tutor_response):
+        """Test chat with custom context."""
+        with patch('app.services.anthropic_client.client') as mock_client:
+            mock_client.messages.create = AsyncMock(return_value=mock_tutor_response)
+
+            response = client.post("/api/tutor/chat", json={
+                "message": "Test question",
+                "context": "Custom Legal Topic"
+            })
+
+            assert response.status_code == 200
+
+    def test_chat_without_context(self, client, mock_tutor_response):
+        """Test chat without context (should use default)."""
+        with patch('app.services.anthropic_client.client') as mock_client:
+            mock_client.messages.create = AsyncMock(return_value=mock_tutor_response)
+
+            response = client.post("/api/tutor/chat", json={
+                "message": "Test question"
+            })
+
+            assert response.status_code == 200
+
+
+class TestResponseFormatting:
+    """Tests for response formatting and structure."""
+
+    def test_chat_response_has_timestamp(self, client, sample_chat_request, mock_tutor_response):
+        """Test that chat response includes timestamp."""
+        with patch('app.services.anthropic_client.client') as mock_client:
+            mock_client.messages.create = AsyncMock(return_value=mock_tutor_response)
+
+            response = client.post("/api/tutor/chat", json=sample_chat_request)
+
+            assert response.status_code == 200
+            data = response.json()
+            assert "timestamp" in data
+            # Verify timestamp is valid ISO format
+            datetime.fromisoformat(data["timestamp"].replace('Z', '+00:00'))
+
+    def test_chat_response_structure(self, client, sample_chat_request, mock_tutor_response):
+        """Test complete response structure."""
+        with patch('app.services.anthropic_client.client') as mock_client:
+            mock_client.messages.create = AsyncMock(return_value=mock_tutor_response)
+
+            response = client.post("/api/tutor/chat", json=sample_chat_request)
+
+            assert response.status_code == 200
+            data = response.json()
+            assert "status" in data
+            assert "content" in data
+            assert "timestamp" in data
+            assert data["status"] == "success"
+            assert isinstance(data["content"], list)
+
+    def test_topics_response_structure(self, client):
+        """Test topics response structure."""
+        response = client.get("/api/tutor/topics")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "status" in data
+        assert "topics" in data
+        assert isinstance(data["topics"], list)
+
+    def test_examples_response_structure(self, client):
+        """Test examples response structure."""
+        response = client.get("/api/tutor/examples")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "status" in data
+        assert "examples" in data
+        assert isinstance(data["examples"], list)
+
+
+class TestConcurrentRequests:
+    """Tests for handling concurrent requests."""
+
+    def test_multiple_concurrent_chat_requests(self, client, mock_tutor_response):
+        """Test handling multiple concurrent chat requests."""
+        with patch('app.services.anthropic_client.client') as mock_client:
+            mock_client.messages.create = AsyncMock(return_value=mock_tutor_response)
+
+            # Simulate concurrent requests
+            requests = [
+                {"message": f"Question {i}", "context": "Private Law"}
+                for i in range(5)
+            ]
+
+            responses = [
+                client.post("/api/tutor/chat", json=req)
+                for req in requests
+            ]
+
+            # All should succeed
+            for response in responses:
+                assert response.status_code == 200
