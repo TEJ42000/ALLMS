@@ -392,16 +392,19 @@ class ActivityTracker {
 
     /**
      * Show badge earned notification
+     * CRITICAL: Fixed API endpoint URL
      */
     async showBadgeEarnedNotification(badgeId, activityData) {
         console.log(`[ActivityTracker] Badge earned: ${badgeId}`);
 
         // Fetch badge details to get name and icon
         try {
-            const response = await fetch('/api/gamification/badges/definitions');
+            // CRITICAL: Fixed endpoint from /badges/definitions to /badges
+            const response = await fetch('/api/gamification/badges');
             if (response.ok) {
                 const data = await response.json();
-                const badges = data.badge_definitions || [];
+                // CRITICAL: Fixed property name from badge_definitions to badges
+                const badges = data.badges || [];
                 const badge = badges.find(b => b.badge_id === badgeId);
 
                 if (badge) {

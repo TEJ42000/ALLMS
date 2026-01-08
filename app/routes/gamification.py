@@ -6,6 +6,7 @@ sessions, and badges.
 
 import logging
 import os
+from datetime import datetime, timezone, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -26,6 +27,7 @@ from app.models.gamification_models import (
     UserBadge,
 )
 from app.services.gamification_service import get_gamification_service
+from app.services.streak_maintenance import get_streak_maintenance_service
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +55,11 @@ def get_user_stats(
         )
 
         if not stats:
-            raise HTTPException(500, detail="Failed to get user stats")
+            # FIX: Distinguish system error from user error
+            raise HTTPException(
+                500,
+                detail="System error: Unable to retrieve user statistics. Please try again later or contact support if the issue persists."
+            )
 
         return UserStatsResponse(
             total_xp=stats.total_xp,
@@ -132,25 +138,55 @@ def get_activities(
     limit: int = Query(50, ge=1, le=100, description="Number of activities to return"),
     activity_type: Optional[str] = Query(None, description="Filter by activity type"),
     start_after: Optional[str] = Query(None, description="Activity ID to start after (pagination)"),
+    start_date: Optional[str] = Query(None, description="Start date filter (ISO format: YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS)"),
+    end_date: Optional[str] = Query(None, description="End date filter (ISO format: YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS)"),
     user: User = Depends(get_current_user)
 ):
     """Get user's recent activities with pagination support.
+
+    CRITICAL: Added start_date/end_date support (BLOCKS MERGE - feature was broken)
 
     Args:
         limit: Maximum number of activities to return
         activity_type: Optional filter by activity type
         start_after: Optional activity ID for pagination
+        start_date: Optional start date filter (ISO format)
+        end_date: Optional end date filter (ISO format)
 
     Returns:
         Dict with activities list and next_cursor for pagination
     """
     try:
+        from datetime import datetime, timezone
+
+        # Parse date strings to datetime objects
+        start_datetime = None
+        end_datetime = None
+
+        if start_date:
+            try:
+                start_datetime = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+                if start_datetime.tzinfo is None:
+                    start_datetime = start_datetime.replace(tzinfo=timezone.utc)
+            except ValueError as e:
+                raise HTTPException(400, detail=f"Invalid start_date format: {e}")
+
+        if end_date:
+            try:
+                end_datetime = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+                if end_datetime.tzinfo is None:
+                    end_datetime = end_datetime.replace(tzinfo=timezone.utc)
+            except ValueError as e:
+                raise HTTPException(400, detail=f"Invalid end_date format: {e}")
+
         service = get_gamification_service()
         activities, next_cursor = service.get_user_activities(
             user_id=user.user_id,
             limit=limit,
             activity_type=activity_type,
-            start_after_id=start_after
+            start_after_id=start_after,
+            start_date=start_datetime,
+            end_date=end_datetime
         )
 
         return {
@@ -158,6 +194,8 @@ def get_activities(
             "next_cursor": next_cursor
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error getting activities: {e}")
         raise HTTPException(500, detail=str(e)) from e
@@ -314,26 +352,65 @@ def update_xp_config(
 
     Returns:
         Success status
+
+    Raises:
+        HTTPException 403: If user is not an admin
+        HTTPException 400: If no updates provided or invalid values
     """
-    # TODO: Add admin role check
-    # For now, any authenticated user can update (will add proper admin check in Phase 7)
+    # HIGH: Add admin config validation
+    admin_emails = os.getenv("ADMIN_EMAILS", "").split(",")
+    admin_emails = [email.strip() for email in admin_emails if email.strip()]
+
+    # Explicit check: if ADMIN_EMAILS is not configured, deny all access
+    if not admin_emails:
+        logger.error("ADMIN_EMAILS environment variable not configured, denying XP config update")
+        raise HTTPException(
+            status_code=403,
+            detail="Admin configuration required. ADMIN_EMAILS environment variable must be set."
+        )
+
+    if user.email not in admin_emails:
+        logger.warning(f"Non-admin user {user.email} attempted to update XP config")
+        raise HTTPException(
+            status_code=403,
+            detail="Admin access required. This endpoint is restricted to administrators."
+        )
 
     try:
         service = get_gamification_service()
 
-        # Build updates dict from request
+        # Build updates dict from request with validation
         updates = {}
+
+        # Validate all XP values are positive
         if request.flashcard_set_completed is not None:
+            if request.flashcard_set_completed < 0:
+                raise HTTPException(400, detail="flashcard_set_completed must be non-negative")
             updates["flashcard_set_completed"] = request.flashcard_set_completed
+
         if request.study_guide_completed is not None:
+            if request.study_guide_completed < 0:
+                raise HTTPException(400, detail="study_guide_completed must be non-negative")
             updates["study_guide_completed"] = request.study_guide_completed
+
         if request.quiz_easy_passed is not None:
+            if request.quiz_easy_passed < 0:
+                raise HTTPException(400, detail="quiz_easy_passed must be non-negative")
             updates["quiz_easy_passed"] = request.quiz_easy_passed
+
         if request.quiz_hard_passed is not None:
+            if request.quiz_hard_passed < 0:
+                raise HTTPException(400, detail="quiz_hard_passed must be non-negative")
             updates["quiz_hard_passed"] = request.quiz_hard_passed
+
         if request.evaluation_low is not None:
+            if request.evaluation_low < 0:
+                raise HTTPException(400, detail="evaluation_low must be non-negative")
             updates["evaluation_low"] = request.evaluation_low
+
         if request.evaluation_high is not None:
+            if request.evaluation_high < 0:
+                raise HTTPException(400, detail="evaluation_high must be non-negative")
             updates["evaluation_high"] = request.evaluation_high
 
         if not updates:
@@ -344,6 +421,7 @@ def update_xp_config(
         if not success:
             raise HTTPException(500, detail="Failed to update XP config")
 
+        logger.info(f"XP configuration updated successfully by admin {user.email}")
         return {"status": "ok", "message": "XP configuration updated successfully"}
 
     except HTTPException:
@@ -353,99 +431,445 @@ def update_xp_config(
         raise HTTPException(500, detail=str(e)) from e
 
 # =============================================================================
-# Badge Endpoints
+# Badge Endpoints - REMOVED (Duplicate)
+# =============================================================================
+# CRITICAL: Old badge endpoints removed to prevent duplicate route errors
+# Phase 4 badge endpoints are defined below (lines 700+)
+# The following routes were removed:
+# - GET /badges (duplicate of line 706)
+# - GET /badges/definitions (replaced by GET /badges at line 706)
+# - POST /badges/seed (duplicate of line 838)
+
+
+# =============================================================================
+# Streak Endpoints
 # =============================================================================
 
-@router.get("/badges")
-def get_user_badges(
+@router.get("/streak/calendar")
+def get_streak_calendar(
+    days: int = Query(default=30, ge=1, le=90, description="Number of days to retrieve"),
     user: User = Depends(get_current_user)
 ):
-    """Get all badges earned by the current user.
+    """Get calendar data for streak visualization.
+
+    Args:
+        days: Number of days to retrieve (1-90)
 
     Returns:
-        List of user's earned badges with tier and times_earned info
+        Calendar data with activity days, freezes, and streak info
     """
     try:
         service = get_gamification_service()
-        badges = service.get_user_badges(user.user_id)
+        stats = service.get_or_create_user_stats(user.user_id, user.email)
+
+        if not stats:
+            raise HTTPException(500, detail="Failed to get user stats")
+
+        # Get activities for the specified period
+        from datetime import datetime, timezone, timedelta
+        end_date = datetime.now(timezone.utc)
+        start_date = end_date - timedelta(days=days)
+
+        activities, _ = service.get_user_activities(
+            user_id=user.user_id,
+            start_date=start_date,
+            end_date=end_date,
+            limit=1000  # Get all activities in period
+        )
+
+        # Build calendar data
+        calendar_days = []
+        activity_by_day = {}
+
+        # Group activities by day
+        for activity in activities:
+            day = service._get_streak_day(activity.timestamp).date().isoformat()
+            if day not in activity_by_day:
+                activity_by_day[day] = {
+                    "date": day,
+                    "has_activity": True,
+                    "freeze_used": False,
+                    "activity_count": 0
+                }
+            activity_by_day[day]["activity_count"] += 1
+            if activity.metadata.get("freeze_used"):
+                activity_by_day[day]["freeze_used"] = True
+
+        # Fill in all days in range
+        current_date = start_date.date()
+        end = end_date.date()
+        while current_date <= end:
+            day_str = current_date.isoformat()
+            if day_str in activity_by_day:
+                calendar_days.append(activity_by_day[day_str])
+            else:
+                calendar_days.append({
+                    "date": day_str,
+                    "has_activity": False,
+                    "freeze_used": False,
+                    "activity_count": 0
+                })
+            current_date += timedelta(days=1)
 
         return {
-            "badges": [badge.model_dump(mode='json') for badge in badges]
+            "days": calendar_days,
+            "current_streak": stats.streak.current_count,
+            "longest_streak": stats.streak.longest_streak,
+            "freezes_available": stats.streak.freezes_available
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error getting user badges: {e}")
+        logger.error(f"Error getting streak calendar: {e}")
         raise HTTPException(500, detail=str(e)) from e
 
 
-@router.get("/badges/definitions")
-def get_badge_definitions(
+@router.get("/streak/consistency")
+def get_weekly_consistency(
     user: User = Depends(get_current_user)
 ):
-    """Get all available badge definitions.
+    """Get weekly consistency status.
 
     Returns:
-        List of all badge definitions with requirements and tiers
+        Weekly consistency progress and bonus status
     """
     try:
         service = get_gamification_service()
-        definitions = service.get_badge_definitions()
+        stats = service.get_or_create_user_stats(user.user_id, user.email)
+
+        if not stats:
+            raise HTTPException(500, detail="Failed to get user stats")
+
+        # Calculate week boundaries
+        from datetime import datetime, timezone
+        current_time = datetime.now(timezone.utc)
+        week_start = service._get_week_start(current_time)
+        week_end = week_start + timedelta(days=7)
+
+        # Calculate progress percentage
+        completed = sum(1 for v in stats.streak.weekly_consistency.values() if v)
+        progress = (completed / 4) * 100
 
         return {
-            "badge_definitions": [badge.model_dump(mode='json') for badge in definitions]
+            "week_start": week_start.date().isoformat(),
+            "week_end": week_end.date().isoformat(),
+            "categories": stats.streak.weekly_consistency,
+            "bonus_active": getattr(stats.streak, 'bonus_active', False),
+            "bonus_multiplier": getattr(stats.streak, 'bonus_multiplier', 1.0),
+            "progress": progress,
+            "completed_count": completed,
+            "total_count": 4
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error getting badge definitions: {e}")
+        logger.error(f"Error getting weekly consistency: {e}")
         raise HTTPException(500, detail=str(e)) from e
 
 
-@router.post("/badges/seed")
-def seed_badges(
+@router.post("/streak/maintenance")
+def run_streak_maintenance(
     user: User = Depends(get_current_user)
 ):
-    """Seed initial badge definitions (admin only).
+    """Run daily streak maintenance (admin only).
 
-    Safe to call multiple times - will not overwrite existing badges.
+    This endpoint is called by Cloud Scheduler at 4:00 AM UTC daily.
+    Can also be manually triggered by admins for testing.
 
     Returns:
-        Success status
+        Maintenance run summary
 
     Raises:
-        HTTPException 403: If user is not an admin
+        HTTPException 403: If user is not an admin or ADMIN_EMAILS not configured
     """
-    # Check if user is admin
-    # Admin users are defined in ADMIN_EMAILS environment variable (comma-separated)
+    # HIGH: Add ADMIN_EMAILS configuration check to maintenance endpoint
     admin_emails = os.getenv("ADMIN_EMAILS", "").split(",")
     admin_emails = [email.strip() for email in admin_emails if email.strip()]
 
     # Explicit check: if ADMIN_EMAILS is not configured, deny all access
     if not admin_emails:
-        logger.error("ADMIN_EMAILS environment variable not configured, denying badge seed request")
+        logger.error("ADMIN_EMAILS environment variable not configured, denying streak maintenance request")
         raise HTTPException(
             status_code=403,
             detail="Admin configuration required. ADMIN_EMAILS environment variable must be set."
         )
 
     if user.email not in admin_emails:
-        logger.warning(f"Non-admin user {user.email} attempted to seed badges")
+        logger.warning(f"Non-admin user {user.email} attempted to run streak maintenance")
         raise HTTPException(
             status_code=403,
             detail="Admin access required. This endpoint is restricted to administrators."
         )
 
     try:
-        service = get_gamification_service()
-        success = service.seed_badge_definitions()
+        maintenance_service = get_streak_maintenance_service()
+        result = maintenance_service.run_daily_maintenance()
 
-        if not success:
-            raise HTTPException(500, detail="Failed to seed badge definitions")
+        logger.info(f"Streak maintenance run by {user.email}: {result}")
+        return result
 
-        logger.info(f"Badge definitions seeded successfully by admin {user.email}")
-        return {"status": "ok", "message": "Badge definitions seeded successfully"}
+    except Exception as e:
+        logger.error(f"Error running streak maintenance: {e}")
+        raise HTTPException(500, detail=str(e)) from e
+
+
+# =============================================================================
+# Badge Endpoints (Phase 4)
+# =============================================================================
+
+@router.get("/badges")
+def get_all_badges(
+    user: User = Depends(get_current_user),
+    include_inactive: bool = False
+):
+    """Get all badge definitions.
+
+    MEDIUM: Added input validation and clarity
+    MEDIUM: Only returns active badges by default
+
+    Args:
+        include_inactive: Include inactive badges (admin only, default: False)
+
+    Returns:
+        {
+            "badges": List of badge definitions,
+            "total": Total count,
+            "active_count": Count of active badges,
+            "inactive_count": Count of inactive badges
+        }
+    """
+    try:
+        from app.services.badge_definitions import get_all_badge_definitions
+
+        # Get all badge definitions
+        all_badges = get_all_badge_definitions()
+
+        # MEDIUM: Filter to only active badges unless admin requests inactive
+        if not include_inactive:
+            badges = [b for b in all_badges if b.active]
+        else:
+            # Check if user is admin for inactive badges
+            admin_emails = os.getenv("ADMIN_EMAILS", "").split(",")
+            admin_emails = [email.strip() for email in admin_emails if email.strip()]
+
+            if user.email not in admin_emails:
+                # Non-admin users only see active badges
+                badges = [b for b in all_badges if b.active]
+            else:
+                badges = all_badges
+
+        # Calculate counts
+        active_count = sum(1 for b in all_badges if b.active)
+        inactive_count = len(all_badges) - active_count
+
+        return {
+            "badges": [badge.model_dump(mode='json') for badge in badges],
+            "total": len(badges),
+            "active_count": active_count,
+            "inactive_count": inactive_count
+        }
+
+    except Exception as e:
+        logger.error(f"Error getting badges: {e}")
+        raise HTTPException(500, detail=str(e)) from e
+
+
+@router.get("/badges/earned")
+def get_earned_badges(
+    user: User = Depends(get_current_user)
+):
+    """Get user's earned badges.
+
+    Returns:
+        List of badges earned by the user
+    """
+    try:
+        from app.services.badge_service import get_badge_service
+
+        badge_service = get_badge_service()
+        earned_badges = badge_service.get_user_badges(user.user_id)
+
+        return {
+            "badges": [badge.model_dump(mode='json') for badge in earned_badges],
+            "total": len(earned_badges)
+        }
+
+    except Exception as e:
+        logger.error(f"Error getting earned badges: {e}")
+        raise HTTPException(500, detail=str(e)) from e
+
+
+@router.get("/badges/{badge_id}")
+def get_badge_details(
+    badge_id: str,
+    user: User = Depends(get_current_user)
+):
+    """Get details for a specific badge.
+
+    MEDIUM: Added input validation
+
+    Args:
+        badge_id: Badge identifier (alphanumeric and underscores only)
+
+    Returns:
+        {
+            "badge": Badge definition,
+            "earned": Whether user has earned this badge,
+            "earned_at": When badge was earned (if earned),
+            "progress": Progress toward badge (if not earned)
+        }
+
+    Raises:
+        400: Invalid badge_id format
+        404: Badge not found
+    """
+    try:
+        from app.services.badge_definitions import get_all_badge_definitions
+        from app.services.badge_service import get_badge_service
+
+        # MEDIUM: Input validation - badge_id should be alphanumeric with underscores
+        import re
+        if not re.match(r'^[a-z0-9_]+$', badge_id):
+            raise HTTPException(
+                400,
+                detail="Invalid badge_id format. Must be lowercase alphanumeric with underscores."
+            )
+
+        # MEDIUM: Limit badge_id length to prevent abuse
+        if len(badge_id) > 50:
+            raise HTTPException(400, detail="badge_id too long (max 50 characters)")
+
+        # Find badge definition
+        all_badges = get_all_badge_definitions()
+        badge_def = next((b for b in all_badges if b.badge_id == badge_id), None)
+
+        if not badge_def:
+            # FIX: Improved error message with helpful hint
+            raise HTTPException(
+                404,
+                detail=f"Badge '{badge_id}' not found. Check the badge ID and try again. Use GET /api/gamification/badges to see all available badges."
+            )
+
+        # MEDIUM: Don't show inactive badges to non-admin users
+        if not badge_def.active:
+            admin_emails = os.getenv("ADMIN_EMAILS", "").split(",")
+            admin_emails = [email.strip() for email in admin_emails if email.strip()]
+
+            if user.email not in admin_emails:
+                # FIX: Improved error message with helpful hint
+                raise HTTPException(
+                    404,
+                    detail=f"Badge '{badge_id}' not found. This badge may not be available yet. Use GET /api/gamification/badges to see all available badges."
+                )
+
+        # Check if user has earned it
+        badge_service = get_badge_service()
+        earned_badges = badge_service.get_user_badges(user.user_id)
+
+        # MEDIUM: Find the specific earned badge to get earned_at timestamp
+        earned_badge = next((b for b in earned_badges if b.badge_id == badge_id), None)
+        earned = earned_badge is not None
+        earned_at = earned_badge.earned_at.isoformat() if earned_badge else None
+
+        # Get progress if not earned
+        progress = None
+        if not earned:
+            service = get_gamification_service()
+            user_stats = service.get_user_stats(user.user_id)
+            if user_stats:
+                all_progress = badge_service.get_badge_progress(user.user_id, user_stats)
+                progress = all_progress.get(badge_id)
+
+        return {
+            "badge": badge_def.model_dump(mode='json'),
+            "earned": earned,
+            "earned_at": earned_at,  # MEDIUM: Added earned_at timestamp
+            "progress": progress
+        }
 
     except HTTPException:
         raise
+    except Exception as e:
+        logger.error(f"Error getting badge details: {e}")
+        raise HTTPException(500, detail=str(e)) from e
+
+
+@router.get("/badges/progress")
+def get_badge_progress(
+    user: User = Depends(get_current_user)
+):
+    """Get user's progress toward all badges.
+
+    Returns:
+        Progress information for all unearned badges
+    """
+    try:
+        from app.services.badge_service import get_badge_service
+
+        service = get_gamification_service()
+        user_stats = service.get_user_stats(user.user_id)
+
+        if not user_stats:
+            # FIX: User-friendly error message
+            raise HTTPException(
+                404,
+                detail="User statistics not found. Please complete an activity first to initialize your stats."
+            )
+
+        badge_service = get_badge_service()
+        progress = badge_service.get_badge_progress(user.user_id, user_stats)
+
+        return {
+            "progress": progress,
+            "total_badges_in_progress": len(progress)
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting badge progress: {e}")
+        raise HTTPException(500, detail=str(e)) from e
+
+
+@router.post("/badges/seed")
+def seed_all_badges(
+    user: User = Depends(get_current_user)
+):
+    """Seed all badge definitions (admin only).
+
+    CRITICAL: Function renamed from seed_badges to seed_all_badges to avoid duplicate
+
+    Returns:
+        Number of badges seeded
+    """
+    # Admin check
+    admin_emails = os.getenv("ADMIN_EMAILS", "").split(",")
+    admin_emails = [email.strip() for email in admin_emails if email.strip()]
+
+    if not admin_emails:
+        logger.error("ADMIN_EMAILS not configured")
+        raise HTTPException(403, detail="Admin configuration required")
+
+    if user.email not in admin_emails:
+        logger.warning(f"Non-admin {user.email} attempted to seed badges")
+        raise HTTPException(403, detail="Admin access required")
+
+    try:
+        from app.services.badge_definitions import seed_badge_definitions
+        from app.services.gcp_service import get_firestore_client
+
+        db = get_firestore_client()
+        count = seed_badge_definitions(db)
+
+        logger.info(f"Badges seeded by {user.email}: {count} badges")
+        return {
+            "status": "ok",
+            "badges_seeded": count,
+            "message": f"Successfully seeded {count} badge definitions"
+        }
+
     except Exception as e:
         logger.error(f"Error seeding badges: {e}")
         raise HTTPException(500, detail=str(e)) from e
@@ -562,5 +986,3 @@ def get_week7_quest_requirements():
     except Exception as e:
         logger.error(f"Error getting Week 7 quest requirements: {e}", exc_info=True)
         raise HTTPException(500, detail=str(e)) from e
-
-
