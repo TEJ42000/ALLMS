@@ -1401,6 +1401,9 @@ function displayQuiz(quizContent, questionContainer) {
     // Phase 5: Initialize accessibility features
     initializeQuizAccessibility(questionContainer);
 
+    // Phase 6: Initialize mobile features
+    initializeMobileQuiz(questionContainer);
+
     // Display current question
     displayCurrentQuestion(questionContainer);
 }
@@ -1647,6 +1650,49 @@ function updateNavigationSidebar() {
 
 // Store cleanup function for keyboard navigation
 let keyboardNavigationCleanup = null;
+
+// ========== Phase 6: Mobile Integration ==========
+
+// Store cleanup function for mobile features
+let mobileCleanup = null;
+
+/**
+ * Initialize mobile features for quiz
+ * @param {HTMLElement} container - Quiz container element
+ */
+function initializeMobileQuiz(container) {
+    if (!container) return;
+
+    // Prevent race condition: clean up existing initialization first
+    if (mobileCleanup) {
+        mobileCleanup();
+        mobileCleanup = null;
+    }
+
+    // Check if mobile functions are available
+    if (typeof initializeMobileFeatures !== 'function') {
+        console.warn('Quiz mobile functions not loaded');
+        mobileCleanup = () => {}; // Set dummy cleanup
+        return;
+    }
+
+    // Initialize mobile features
+    mobileCleanup = initializeMobileFeatures(
+        container,
+        quizState,
+        (newIndex) => {
+            // Navigate to question via swipe
+            quizState.currentQuestionIndex = newIndex;
+            displayCurrentQuestion(container);
+            updateNavigationSidebar();
+        }
+    );
+
+    // Optimize touch targets
+    if (typeof optimizeTouchTargets === 'function') {
+        optimizeTouchTargets(container);
+    }
+}
 
 /**
  * Initialize accessibility features for quiz
@@ -1977,6 +2023,12 @@ function restartQuiz() {
     if (keyboardNavigationCleanup && typeof keyboardNavigationCleanup === 'function') {
         keyboardNavigationCleanup();
         keyboardNavigationCleanup = null;
+    }
+
+    // Phase 6: Cleanup mobile features
+    if (mobileCleanup && typeof mobileCleanup === 'function') {
+        mobileCleanup();
+        mobileCleanup = null;
     }
 
     // Reset state
