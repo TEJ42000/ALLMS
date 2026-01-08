@@ -1,6 +1,6 @@
 /**
  * Flashcard Viewer Component
- * 
+ *
  * Provides interactive flashcard study interface with:
  * - Card flip animation
  * - Navigation controls
@@ -8,6 +8,14 @@
  * - Keyboard shortcuts
  * - Mobile touch gestures
  */
+
+// MEDIUM FIX: Extract magic numbers to constants
+const FLASHCARD_CONSTANTS = {
+    MAX_CARD_LENGTH: 5000,
+    NAVIGATION_LOCK_MS: 50,
+    SWIPE_THRESHOLD_PX: 50,
+    FLIP_ANIMATION_MS: 600
+};
 
 class FlashcardViewer {
     constructor(containerId, flashcards = []) {
@@ -51,12 +59,13 @@ class FlashcardViewer {
             }
 
             // HIGH FIX: Validate content length (prevent extremely long cards)
-            const maxLength = 5000;
+            // MEDIUM FIX: Use constant instead of magic number
             const content = card.question || card.term || '';
             const answer = card.answer || card.definition || '';
 
-            if (content.length > maxLength || answer.length > maxLength) {
-                console.warn(`[FlashcardViewer] Skipping card at index ${index} with content exceeding ${maxLength} characters`);
+            if (content.length > FLASHCARD_CONSTANTS.MAX_CARD_LENGTH ||
+                answer.length > FLASHCARD_CONSTANTS.MAX_CARD_LENGTH) {
+                console.warn(`[FlashcardViewer] Skipping card at index ${index} with content exceeding ${FLASHCARD_CONSTANTS.MAX_CARD_LENGTH} characters`);
                 return false;
             }
 
@@ -463,9 +472,10 @@ class FlashcardViewer {
             this.setupEventListeners();
 
             // Release lock after render completes
+            // MEDIUM FIX: Use constant instead of magic number
             setTimeout(() => {
                 this.isNavigating = false;
-            }, 50);
+            }, FLASHCARD_CONSTANTS.NAVIGATION_LOCK_MS);
         }
     }
 
@@ -489,9 +499,10 @@ class FlashcardViewer {
             this.setupEventListeners();
 
             // Release lock after render completes
+            // MEDIUM FIX: Use constant instead of magic number
             setTimeout(() => {
                 this.isNavigating = false;
-            }, 50);
+            }, FLASHCARD_CONSTANTS.NAVIGATION_LOCK_MS);
         } else {
             // Completed all cards
             this.showCompletionMessage();
@@ -729,6 +740,7 @@ class FlashcardViewer {
     /**
      * Show error message
      * MEDIUM FIX: User-friendly error handling
+     * HIGH FIX: Remove inline onclick for CSP compliance
      */
     showError(message) {
         if (!this.container) return;
@@ -738,11 +750,19 @@ class FlashcardViewer {
                 <div class="error-icon" aria-hidden="true">⚠️</div>
                 <h2>Oops! Something went wrong</h2>
                 <p>${this.escapeHtml(message)}</p>
-                <button class="btn-primary" onclick="location.reload()">
+                <button class="btn-primary" id="btn-reload-error">
                     Reload Page
                 </button>
             </div>
         `;
+
+        // HIGH FIX: Add event listener instead of inline onclick
+        const btnReload = document.getElementById('btn-reload-error');
+        if (btnReload) {
+            btnReload.addEventListener('click', () => {
+                location.reload();
+            });
+        }
     }
 
     /**
