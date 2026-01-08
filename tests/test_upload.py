@@ -143,20 +143,20 @@ class TestUploadEndpoint:
 
 class TestAnalyzeEndpoint:
     """Test analysis endpoint"""
-    
+
     @patch('app.routes.upload.extract_text')
     @patch('app.routes.upload.get_files_api_service')
-    async def test_analyze_file_not_found(self, mock_service, mock_extract):
+    def test_analyze_file_not_found(self, mock_service, mock_extract):
         """Test that analyzing non-existent file returns 404"""
         response = client.post(
             "/api/upload/nonexistent/analyze?course_id=test-course"
         )
         assert response.status_code == 404
         assert "not found" in response.json()["detail"]
-    
+
     @patch('app.routes.upload.extract_text')
     @patch('app.routes.upload.get_files_api_service')
-    async def test_analyze_extraction_failure(self, mock_service, mock_extract):
+    def test_analyze_extraction_failure(self, mock_service, mock_extract):
         """Test that extraction failure returns 500"""
         # First upload a file
         upload_response = client.post(
@@ -180,7 +180,7 @@ class TestAnalyzeEndpoint:
     
     @patch('app.routes.upload.extract_text')
     @patch('app.routes.upload.get_files_api_service')
-    async def test_analyze_rate_limit_retry(self, mock_service, mock_extract):
+    def test_analyze_rate_limit_retry(self, mock_service, mock_extract):
         """Test that rate limit triggers retry with exponential backoff"""
         from anthropic import RateLimitError
         
@@ -217,7 +217,7 @@ class TestAnalyzeEndpoint:
     
     @patch('app.routes.upload.extract_text')
     @patch('app.routes.upload.get_files_api_service')
-    async def test_analyze_prompt_injection_sanitized(self, mock_service, mock_extract):
+    def test_analyze_prompt_injection_sanitized(self, mock_service, mock_extract):
         """Test that prompt injection attempts are sanitized"""
         # First upload a file
         upload_response = client.post(

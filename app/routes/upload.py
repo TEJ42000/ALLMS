@@ -105,7 +105,12 @@ async def upload_file(
         HTTPException: If file type not allowed or upload fails
     """
     logger.info(f"Upload request: {file.filename} for course {course_id}")
-    
+
+    # MEDIUM FIX: Validate week_number if provided
+    if week_number is not None:
+        if week_number < 1 or week_number > 52:
+            raise HTTPException(400, "week_number must be between 1 and 52")
+
     # Validate file extension
     if not file.filename:
         raise HTTPException(400, "No filename provided")
@@ -152,8 +157,12 @@ async def upload_file(
 
         # CRITICAL FIX: Validate file content matches extension
         if not validate_file_content(file_path, ext):
-            # Clean up invalid file
-            file_path.unlink()
+            # CRITICAL FIX: Safe cleanup with race condition handling
+            try:
+                file_path.unlink(missing_ok=True)  # Python 3.8+ - no error if already deleted
+            except Exception as cleanup_error:
+                logger.warning(f"Failed to cleanup invalid file: {cleanup_error}")
+
             logger.warning(f"File content validation failed for {file.filename}")
             raise HTTPException(
                 400,
@@ -173,9 +182,11 @@ async def upload_file(
         raise  # Re-raise HTTP exceptions
     except Exception as e:
         logger.error(f"Upload failed: {str(e)}")
-        # Clean up partial file if it exists
-        if file_path.exists():
-            file_path.unlink()
+        # CRITICAL FIX: Safe cleanup with race condition handling
+        try:
+            file_path.unlink(missing_ok=True)  # Python 3.8+ - no error if already deleted
+        except Exception as cleanup_error:
+            logger.warning(f"Failed to cleanup file after error: {cleanup_error}")
         raise HTTPException(500, f"Upload failed: {str(e)}")
 
 
@@ -235,15 +246,19 @@ async def analyze_uploaded_file(
         logger.error(f"Extraction error: {str(e)}")
         raise HTTPException(500, f"Extraction error: {str(e)}")
     
-    # Truncate for analysis (Claude has token limits)
-    text_preview = result.text[:50000] if len(result.text) > 50000 else result.text
+    # HIGH FIX: Consistent truncation for Claude API
+    # Claude Sonnet 4 has ~200k token context, but we limit to ~30k chars (~7.5k tokens)
+    # to leave room for prompt and response
+    MAX_CONTENT_CHARS = 30000
+
+    text_preview = result.text[:MAX_CONTENT_CHARS] if len(result.text) > MAX_CONTENT_CHARS else result.text
 
     # CRITICAL FIX: Sanitize content to prevent prompt injection
-    # Remove potential prompt injection patterns
-    sanitized_content = text_preview[:30000]
     # Escape any potential instruction markers
-    sanitized_content = sanitized_content.replace("</CONTENT>", "[CONTENT_END]")
+    sanitized_content = text_preview.replace("</CONTENT>", "[CONTENT_END]")
     sanitized_content = sanitized_content.replace("<CONTENT>", "[CONTENT_START]")
+
+    logger.info(f"Using {len(sanitized_content)} characters for analysis (truncated from {len(result.text)})")
 
     # Analyze with Claude
     try:
@@ -272,6 +287,7 @@ Return JSON with this exact structure:
         # CRITICAL FIX: Add rate limit handling with exponential backoff
         max_retries = 3
         retry_delay = 1  # Start with 1 second
+        max_delay = 8  # HIGH FIX: Cap maximum delay at 8 seconds
 
         for attempt in range(max_retries):
             try:
@@ -285,7 +301,7 @@ Return JSON with this exact structure:
                 if attempt < max_retries - 1:
                     logger.warning(f"Rate limit hit, retrying in {retry_delay}s (attempt {attempt + 1}/{max_retries})")
                     await asyncio.sleep(retry_delay)
-                    retry_delay *= 2  # Exponential backoff
+                    retry_delay = min(retry_delay * 2, max_delay)  # HIGH FIX: Exponential backoff with cap
                 else:
                     logger.error(f"Rate limit exceeded after {max_retries} attempts")
                     raise HTTPException(429, "AI service rate limit exceeded. Please try again in a few moments.")
