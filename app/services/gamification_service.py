@@ -425,6 +425,16 @@ class GamificationService:
             # Calculate XP
             xp_awarded = self.calculate_xp_for_activity(activity_type, activity_data)
 
+            # Apply weekly consistency bonus if active
+            consistency_bonus = 0
+            if xp_awarded > 0 and getattr(stats.streak, 'bonus_active', False):
+                bonus_multiplier = getattr(stats.streak, 'bonus_multiplier', 1.0)
+                if bonus_multiplier > 1.0:
+                    original_xp = xp_awarded
+                    xp_awarded = int(xp_awarded * bonus_multiplier)
+                    consistency_bonus = xp_awarded - original_xp
+                    logger.info(f"Weekly consistency bonus applied: {original_xp} XP -> {xp_awarded} XP (multiplier: {bonus_multiplier})")
+
             if xp_awarded == 0:
                 logger.info(f"No XP awarded for {activity_type} (did not meet criteria)")
                 # Still log the activity but don't update stats
@@ -498,6 +508,7 @@ class GamificationService:
                 metadata={
                     "time_of_day": self._get_time_of_day(),
                     "freeze_used": freeze_used,
+                    "consistency_bonus": consistency_bonus if consistency_bonus > 0 else None,
                 }
             )
 

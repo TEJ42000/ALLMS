@@ -155,20 +155,28 @@ class StreakMaintenanceService:
             # User missed at least one day
             if days_diff == 2 and user_stats.streak.freezes_available > 0:
                 # Missed exactly 1 day, can apply freeze
-                self._apply_freeze(user_stats.user_id)
-                result["freeze_applied"] = True
-                result["notification_sent"] = self._send_freeze_notification(user_stats)
-                
-                # Log freeze application
-                self._log_streak_event(
-                    user_stats.user_id,
-                    "freeze_applied",
-                    user_stats.streak.current_count,
-                    {
-                        "freezes_remaining": user_stats.streak.freezes_available - 1,
-                        "days_missed": 1
-                    }
-                )
+                freeze_applied = self._apply_freeze(user_stats.user_id)
+
+                if freeze_applied:
+                    result["freeze_applied"] = True
+                    result["notification_sent"] = self._send_freeze_notification(user_stats)
+
+                    # Log freeze application
+                    self._log_streak_event(
+                        user_stats.user_id,
+                        "freeze_applied",
+                        user_stats.streak.current_count,
+                        {
+                            "freezes_remaining": max(0, user_stats.streak.freezes_available - 1),
+                            "days_missed": 1
+                        }
+                    )
+                else:
+                    # Freeze application failed (race condition or no freezes left)
+                    # Break the streak instead
+                    self._break_streak(user_stats.user_id, user_stats.streak.current_count)
+                    result["streak_broken"] = True
+                    result["notification_sent"] = self._send_streak_broken_notification(user_stats)
 
             else:
                 # Streak broken (missed >1 day or no freeze available)
@@ -196,23 +204,55 @@ class StreakMaintenanceService:
     def _apply_freeze(self, user_id: str) -> bool:
         """Apply a streak freeze for a user.
 
+        Uses a transaction to prevent race conditions and ensure
+        freezes don't go negative.
+
         Args:
             user_id: User's IAP user ID
 
         Returns:
-            True if successful
+            True if successful, False if no freezes available or error
         """
         if not self.db:
             return False
 
         try:
+            from google.cloud import firestore
+
             doc_ref = self.db.collection(USER_STATS_COLLECTION).document(user_id)
-            doc_ref.update({
-                "streak.freezes_available": max(0, doc_ref.get().to_dict()["streak"]["freezes_available"] - 1),
-                "updated_at": datetime.now(timezone.utc)
-            })
-            logger.info(f"Applied streak freeze for user {user_id}")
-            return True
+
+            @firestore.transactional
+            def apply_freeze_transaction(transaction):
+                """Transaction to safely apply freeze."""
+                snapshot = doc_ref.get(transaction=transaction)
+
+                if not snapshot.exists:
+                    return False
+
+                data = snapshot.to_dict()
+                freezes_available = data.get("streak", {}).get("freezes_available", 0)
+
+                # Check if freeze is available
+                if freezes_available <= 0:
+                    logger.warning(f"No freezes available for user {user_id}")
+                    return False
+
+                # Apply freeze atomically
+                transaction.update(doc_ref, {
+                    "streak.freezes_available": freezes_available - 1,
+                    "updated_at": datetime.now(timezone.utc)
+                })
+
+                return True
+
+            # Execute transaction
+            transaction = self.db.transaction()
+            success = apply_freeze_transaction(transaction)
+
+            if success:
+                logger.info(f"Applied streak freeze for user {user_id}")
+
+            return success
 
         except Exception as e:
             logger.error(f"Error applying freeze for {user_id}: {e}", exc_info=True)
