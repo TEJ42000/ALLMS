@@ -1031,6 +1031,17 @@ class FlashcardViewer {
             return;
         }
 
+        // HIGH FIX: Warn user if cards were filtered out (silent card loss)
+        const filteredCount = starredIndices.length - validCards.length;
+        if (filteredCount > 0) {
+            console.warn(`[FlashcardViewer] ${filteredCount} starred cards were filtered out (invalid or null)`);
+            showNotification(
+                `${filteredCount} starred card${filteredCount > 1 ? 's were' : ' was'} filtered out due to invalid data. Showing ${validCards.length} valid card${validCards.length > 1 ? 's' : ''}.`,
+                'warning',
+                5000
+            );
+        }
+
         this.flashcards = validCards;
 
         this.isFilteredView = true;
@@ -1073,7 +1084,17 @@ class FlashcardViewer {
             return;
         }
 
-        // ISSUE #168: Defensive check for other original sets
+        // HIGH FIX: Consistent error handling - fail fast if Sets are critically corrupted
+        // Check if all Sets are completely missing (critical corruption)
+        const allSetsMissing = !this.originalReviewedCards && !this.originalKnownCards && !this.originalStarredCards;
+
+        if (allSetsMissing) {
+            console.error('[FlashcardViewer] All original Sets are missing - critical data corruption');
+            this.showError('Unable to restore full deck due to data corruption. Please refresh the page.');
+            return;
+        }
+
+        // ISSUE #168: Defensive check for other original sets - recover gracefully for individual Sets
         if (!this.originalReviewedCards || !(this.originalReviewedCards instanceof Set)) {
             console.warn('[FlashcardViewer] originalReviewedCards is not a Set, creating new Set');
             this.originalReviewedCards = new Set();
