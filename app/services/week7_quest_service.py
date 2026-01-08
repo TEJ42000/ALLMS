@@ -137,6 +137,87 @@ class Week7QuestService:
             logger.error(f"Error calculating exam readiness: {e}", exc_info=True)
             return 0
 
+    def calculate_quest_updates(
+        self,
+        user_id: str,
+        xp_bonus: int,
+        stats: UserStats,
+        activity_type: str
+    ) -> Dict[str, Any]:
+        """Calculate Week 7 quest updates without applying them.
+
+        HIGH: This method calculates updates that will be included in the atomic
+        update in gamification_service to prevent race conditions.
+
+        Args:
+            user_id: User's IAP user ID
+            xp_bonus: XP bonus earned (before doubling)
+            stats: Current user stats (BEFORE activity increment)
+            activity_type: Type of activity being logged
+
+        Returns:
+            Dictionary of Firestore update fields
+        """
+        if not stats.week7_quest.active:
+            return {}
+
+        try:
+            # Calculate exam readiness with PREDICTED activity counts
+            # We need to predict what the counts will be after the increment
+            predicted_stats = self._predict_stats_after_activity(stats, activity_type)
+            exam_readiness = self.calculate_exam_readiness(predicted_stats)
+
+            # Calculate double XP earned
+            double_xp_bonus = xp_bonus
+            total_double_xp = stats.week7_quest.double_xp_earned + double_xp_bonus
+
+            # Check if boss battle should be completed (100% readiness)
+            boss_completed = exam_readiness >= 100
+
+            # Build update dictionary
+            updates = {
+                "week7_quest.exam_readiness_percent": exam_readiness,
+                "week7_quest.double_xp_earned": total_double_xp
+            }
+
+            if boss_completed and not stats.week7_quest.boss_battle_completed:
+                updates["week7_quest.boss_battle_completed"] = True
+                logger.info(f"Boss battle completed for user {user_id[:8]}...!")
+
+            return updates
+
+        except Exception as e:
+            logger.error(f"Error calculating quest updates: {e}", exc_info=True)
+            return {}
+
+    def _predict_stats_after_activity(self, stats: UserStats, activity_type: str) -> UserStats:
+        """Predict what stats will look like after activity increment.
+
+        Args:
+            stats: Current stats
+            activity_type: Type of activity being logged
+
+        Returns:
+            Copy of stats with predicted increments
+        """
+        # Create a copy to avoid modifying original
+        import copy
+        predicted = copy.deepcopy(stats)
+
+        # Increment the appropriate counter
+        if activity_type == "quiz_completed":
+            predicted.activities.quizzes_completed += 1
+            # Assume it passed (conservative estimate)
+            predicted.activities.quizzes_passed += 1
+        elif activity_type == "flashcard_set_completed":
+            predicted.activities.flashcards_reviewed += 1
+        elif activity_type == "study_guide_completed":
+            predicted.activities.guides_completed += 1
+        elif activity_type == "evaluation_completed":
+            predicted.activities.evaluations_submitted += 1
+
+        return predicted
+
     def update_quest_progress(
         self,
         user_id: str,
@@ -144,6 +225,9 @@ class Week7QuestService:
         stats: UserStats
     ) -> Dict[str, Any]:
         """Update Week 7 quest progress.
+
+        DEPRECATED: This method is deprecated in favor of calculate_quest_updates()
+        which is called from gamification_service to prevent race conditions.
 
         Args:
             user_id: User's IAP user ID

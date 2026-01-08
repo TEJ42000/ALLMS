@@ -433,10 +433,21 @@ class GamificationService:
 
             # Apply Week 7 double XP if quest is active
             week7_bonus = 0
+            week7_quest_updates = {}
             if stats.week7_quest.active and xp_awarded > 0:
                 week7_bonus = xp_awarded  # Double the XP
                 xp_awarded = xp_awarded * 2
                 logger.info(f"Week 7 quest active - doubled XP from {xp_awarded//2} to {xp_awarded}")
+
+                # HIGH: Calculate quest updates NOW to avoid race condition
+                # This will be included in the atomic update below
+                quest_service = get_week7_quest_service()
+                week7_quest_updates = quest_service.calculate_quest_updates(
+                    user_id=user_id,
+                    xp_bonus=week7_bonus,
+                    stats=stats,
+                    activity_type=activity_type
+                )
 
             if xp_awarded == 0:
                 logger.info(f"No XP awarded for {activity_type} (did not meet criteria)")
@@ -554,15 +565,12 @@ class GamificationService:
             elif activity_type == "evaluation_completed":
                 updates["activities.evaluations_submitted"] = Increment(1)
 
-            doc_ref.update(updates)
+            # HIGH: Include Week 7 quest updates in atomic update to prevent race condition
+            if week7_quest_updates:
+                updates.update(week7_quest_updates)
+                logger.info(f"Including Week 7 quest updates in atomic update: {week7_quest_updates}")
 
-            # Update Week 7 quest progress if active
-            if stats.week7_quest.active and week7_bonus > 0:
-                quest_service = get_week7_quest_service()
-                # Refresh stats to get updated activity counts
-                updated_stats = self.get_or_create_user_stats(user_id, user_email, course_id)
-                if updated_stats:
-                    quest_service.update_quest_progress(user_id, week7_bonus, updated_stats)
+            doc_ref.update(updates)
 
             logger.info(f"Logged activity {activity_type} for {user_id}, awarded {xp_awarded} XP, streak: {new_streak_count}")
 
