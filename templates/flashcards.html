@@ -43,7 +43,9 @@
     <!-- CRITICAL FIX: Use direct paths (no url_for - static route doesn't exist) -->
     <!-- HIGH FIX: External JavaScript files for CSP compliance -->
     <!-- MEDIUM FIX: Load utils.js first for shared functions -->
+    <!-- PHASE 2C: Load spaced-repetition.js before flashcard-viewer.js -->
     <script src="/static/js/utils.js"></script>
+    <script src="/static/js/spaced-repetition.js"></script>
     <script src="/static/js/flashcard-viewer.js"></script>
     <script src="/static/js/flashcard-page.js"></script>
 </body>

@@ -89,6 +89,11 @@ class FlashcardViewer {
         // PHASE 2B: Track card notes
         this.cardNotes = new Map(); // Map<cardIndex, noteText>
 
+        // PHASE 2C: Spaced Repetition
+        this.spacedRepetition = new SpacedRepetitionService();
+        this.srMode = false; // Spaced repetition mode
+        this.srQuality = null; // Quality rating for current card
+
         // Store original flashcards for restoration after filtering
         this.originalFlashcards = [...this.flashcards];
 
@@ -300,7 +305,49 @@ class FlashcardViewer {
                         <span class="icon" aria-hidden="true">↺</span>
                         <span class="label">Restart</span>
                     </button>
+
+                    <!-- PHASE 2C: Spaced Repetition toggle -->
+                    <button class="btn-action ${this.srMode ? 'active' : ''}"
+                            id="btn-sr-mode"
+                            aria-label="Toggle spaced repetition mode"
+                            aria-pressed="${this.srMode}">
+                        <span class="icon" aria-hidden="true">🧠</span>
+                        <span class="label">SR Mode</span>
+                    </button>
                 </div>
+
+                <!-- PHASE 2C: Spaced Repetition Quality Rating -->
+                ${this.srMode && this.isFlipped ? `
+                    <div class="sr-quality-rating" role="group" aria-label="Rate your recall quality">
+                        <div class="sr-rating-title">How well did you recall this card?</div>
+                        <div class="sr-rating-buttons">
+                            <button class="btn-quality btn-quality-0" data-quality="0" aria-label="Complete blackout">
+                                <span class="quality-number">0</span>
+                                <span class="quality-label">Blackout</span>
+                            </button>
+                            <button class="btn-quality btn-quality-1" data-quality="1" aria-label="Incorrect, but familiar">
+                                <span class="quality-number">1</span>
+                                <span class="quality-label">Familiar</span>
+                            </button>
+                            <button class="btn-quality btn-quality-2" data-quality="2" aria-label="Incorrect, but easy">
+                                <span class="quality-number">2</span>
+                                <span class="quality-label">Easy</span>
+                            </button>
+                            <button class="btn-quality btn-quality-3" data-quality="3" aria-label="Correct with difficulty">
+                                <span class="quality-number">3</span>
+                                <span class="quality-label">Difficult</span>
+                            </button>
+                            <button class="btn-quality btn-quality-4" data-quality="4" aria-label="Correct after hesitation">
+                                <span class="quality-number">4</span>
+                                <span class="quality-label">Hesitation</span>
+                            </button>
+                            <button class="btn-quality btn-quality-5" data-quality="5" aria-label="Perfect recall">
+                                <span class="quality-number">5</span>
+                                <span class="quality-label">Perfect</span>
+                            </button>
+                        </div>
+                    </div>
+                ` : ''}
 
                 <!-- Study Stats -->
                 <!-- MEDIUM FIX: Add ARIA live region to stats -->
@@ -422,6 +469,24 @@ class FlashcardViewer {
             btnRestart.addEventListener('click', restartHandler);
             this.eventListeners.push({ element: btnRestart, event: 'click', handler: restartHandler });
         }
+
+        // PHASE 2C: SR Mode toggle
+        const btnSRMode = document.getElementById('btn-sr-mode');
+        if (btnSRMode) {
+            const srModeHandler = () => this.toggleSRMode();
+            btnSRMode.addEventListener('click', srModeHandler);
+            this.eventListeners.push({ element: btnSRMode, event: 'click', handler: srModeHandler });
+        }
+
+        // PHASE 2C: Quality rating buttons
+        const qualityButtons = document.querySelectorAll('.btn-quality');
+        qualityButtons.forEach(button => {
+            const quality = parseInt(button.dataset.quality);
+            const qualityHandler = () => this.rateCardQuality(quality);
+            button.addEventListener('click', qualityHandler);
+            this.eventListeners.push({ element: button, event: 'click', handler: qualityHandler });
+        });
+
         } catch (error) {
             // MEDIUM FIX: Catch and log setup errors
             console.error('[FlashcardViewer] Error setting up event listeners:', error);
@@ -1036,6 +1101,191 @@ class FlashcardViewer {
             window.removeEventListener('beforeunload', this.beforeUnloadHandler);
             this.beforeUnloadHandler = null;
         }
+    }
+
+    // =========================================================================
+    // PHASE 2C: Spaced Repetition Methods
+    // =========================================================================
+
+    /**
+     * Toggle spaced repetition mode
+     */
+    toggleSRMode() {
+        this.srMode = !this.srMode;
+        console.log('[FlashcardViewer] SR Mode:', this.srMode ? 'ON' : 'OFF');
+
+        // Filter cards if entering SR mode
+        if (this.srMode) {
+            this.filterDueCards();
+        } else {
+            // Restore all cards
+            this.flashcards = [...this.originalFlashcards];
+            this.currentIndex = 0;
+        }
+
+        this.render();
+    }
+
+    /**
+     * Filter cards to show only those due for review
+     */
+    filterDueCards() {
+        const cardIds = this.flashcards.map((_, index) => `card_${index}`);
+        const dueCardIds = this.spacedRepetition.getDueCards(cardIds);
+
+        // Filter flashcards to only due cards
+        this.flashcards = this.originalFlashcards.filter((_, index) =>
+            dueCardIds.includes(`card_${index}`)
+        );
+
+        if (this.flashcards.length === 0) {
+            this.showNoCardsMessage();
+        } else {
+            this.currentIndex = 0;
+            console.log(`[FlashcardViewer] Filtered to ${this.flashcards.length} due cards`);
+        }
+    }
+
+    /**
+     * Rate card quality and record review
+     *
+     * @param {number} quality - Quality rating (0-5)
+     */
+    rateCardQuality(quality) {
+        const cardId = `card_${this.currentIndex}`;
+
+        // Record review in spaced repetition system
+        const newState = this.spacedRepetition.recordReview(cardId, quality);
+
+        console.log(`[FlashcardViewer] Card rated ${quality}, next review: ${newState.interval} days`);
+
+        // Show feedback
+        this.showQualityFeedback(quality, newState);
+
+        // Move to next card after a short delay
+        setTimeout(() => {
+            this.nextCard();
+        }, 1500);
+    }
+
+    /**
+     * Show feedback after quality rating
+     *
+     * @param {number} quality - Quality rating
+     * @param {Object} state - Updated card state
+     */
+    showQualityFeedback(quality, state) {
+        const feedbackMessages = {
+            0: '😰 Don\'t worry, you\'ll get it next time!',
+            1: '🤔 Keep practicing!',
+            2: '💪 You\'re making progress!',
+            3: '👍 Good job!',
+            4: '🌟 Great recall!',
+            5: '🎉 Perfect! Excellent memory!'
+        };
+
+        const message = feedbackMessages[quality] || 'Review recorded!';
+        const nextReview = this.spacedRepetition.getNextReviewFormatted(`card_${this.currentIndex}`);
+
+        // Create temporary feedback element
+        const feedback = document.createElement('div');
+        feedback.className = 'sr-feedback';
+        feedback.innerHTML = `
+            <div class="sr-feedback-message">${message}</div>
+            <div class="sr-feedback-next">Next review: ${nextReview}</div>
+        `;
+
+        this.container.appendChild(feedback);
+
+        // Animate in
+        setTimeout(() => feedback.classList.add('show'), 10);
+
+        // Remove after delay
+        setTimeout(() => {
+            feedback.classList.remove('show');
+            setTimeout(() => feedback.remove(), 300);
+        }, 1200);
+    }
+
+    /**
+     * Show message when no cards are due
+     */
+    showNoCardsMessage() {
+        this.container.innerHTML = `
+            <div class="flashcard-completion">
+                <div class="completion-icon" aria-hidden="true">🎯</div>
+                <h2>All Caught Up!</h2>
+                <p>No cards are due for review right now.</p>
+
+                <div class="sr-stats-summary">
+                    ${this.getSRStatsSummary()}
+                </div>
+
+                <div class="completion-actions">
+                    <button class="btn-primary" id="btn-review-all">
+                        Review All Cards
+                    </button>
+                    <button class="btn-secondary" id="btn-exit-sr">
+                        Exit SR Mode
+                    </button>
+                </div>
+            </div>
+        `;
+
+        // Add event listeners
+        const btnReviewAll = document.getElementById('btn-review-all');
+        if (btnReviewAll) {
+            btnReviewAll.addEventListener('click', () => {
+                this.srMode = false;
+                this.flashcards = [...this.originalFlashcards];
+                this.currentIndex = 0;
+                this.render();
+            });
+        }
+
+        const btnExitSR = document.getElementById('btn-exit-sr');
+        if (btnExitSR) {
+            btnExitSR.addEventListener('click', () => {
+                this.srMode = false;
+                this.flashcards = [...this.originalFlashcards];
+                this.currentIndex = 0;
+                this.render();
+            });
+        }
+    }
+
+    /**
+     * Get SR statistics summary HTML
+     *
+     * @returns {string} HTML for statistics summary
+     */
+    getSRStatsSummary() {
+        const cardIds = this.originalFlashcards.map((_, index) => `card_${index}`);
+        const stats = this.spacedRepetition.getStatistics(cardIds);
+
+        return `
+            <div class="sr-stats">
+                <div class="sr-stat">
+                    <div class="sr-stat-value">${stats.new}</div>
+                    <div class="sr-stat-label">New</div>
+                </div>
+                <div class="sr-stat">
+                    <div class="sr-stat-value">${stats.learning}</div>
+                    <div class="sr-stat-label">Learning</div>
+                </div>
+                <div class="sr-stat">
+                    <div class="sr-stat-value">${stats.review}</div>
+                    <div class="sr-stat-label">Review</div>
+                </div>
+                <div class="sr-stat">
+                    <div class="sr-stat-value">${stats.mastered}</div>
+                    <div class="sr-stat-label">Mastered</div>
+                </div>
+            </div>
+            <div class="sr-upcoming">
+                <p><strong>Due this week:</strong> ${stats.dueThisWeek} cards</p>
+            </div>
+        `;
     }
 
     // =========================================================================
