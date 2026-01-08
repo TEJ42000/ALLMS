@@ -20,14 +20,45 @@ logger = logging.getLogger(__name__)
 # This should be a long, random string stored securely (e.g., in Google Secret Manager)
 TOKEN_SECRET = os.getenv('GDPR_TOKEN_SECRET')
 
+# Check if we're in production
+ENVIRONMENT = os.getenv('ENVIRONMENT', 'development').lower()
+IS_PRODUCTION = ENVIRONMENT in ['production', 'prod']
+
 if not TOKEN_SECRET:
-    # Development fallback: generate a random secret
-    # WARNING: This will change on every restart, invalidating all tokens
-    TOKEN_SECRET = secrets.token_hex(32)
-    logger.warning(
-        "GDPR_TOKEN_SECRET not set in environment. Using randomly generated secret. "
-        "This is NOT suitable for production. All tokens will be invalidated on restart."
-    )
+    if IS_PRODUCTION:
+        # CRITICAL: In production, TOKEN_SECRET is required
+        error_msg = (
+            "CRITICAL: GDPR_TOKEN_SECRET environment variable is not set in production! "
+            "This is a security requirement. Generate a secret with: "
+            "python3 -c \"import secrets; print(secrets.token_hex(32))\" "
+            "and store it in Google Secret Manager or environment variables."
+        )
+        logger.critical(error_msg)
+        raise ValueError(error_msg)
+    else:
+        # Development fallback: generate a random secret
+        # WARNING: This will change on every restart, invalidating all tokens
+        TOKEN_SECRET = secrets.token_hex(32)
+        logger.warning(
+            "GDPR_TOKEN_SECRET not set in environment. Using randomly generated secret. "
+            "This is OK for development but NOT suitable for production. "
+            "All tokens will be invalidated on restart."
+        )
+else:
+    # Validate token secret length
+    if len(TOKEN_SECRET) < 64:
+        error_msg = (
+            f"GDPR_TOKEN_SECRET is too short ({len(TOKEN_SECRET)} chars). "
+            "It must be at least 64 characters (32 bytes hex-encoded) for security. "
+            "Generate a new secret with: python3 -c \"import secrets; print(secrets.token_hex(32))\""
+        )
+        if IS_PRODUCTION:
+            logger.critical(error_msg)
+            raise ValueError(error_msg)
+        else:
+            logger.warning(error_msg)
+    else:
+        logger.info(f"GDPR_TOKEN_SECRET loaded successfully ({len(TOKEN_SECRET)} chars)")
 
 # Token expiration times
 TOKEN_EXPIRY_MINUTES = {
@@ -191,7 +222,7 @@ def validate_deletion_token(token: str, user_id: str, email: str) -> Tuple[bool,
     return is_valid, error
 
 
-# Email sending functionality (placeholder - implement with actual email service)
+# Email sending functionality
 async def send_deletion_confirmation_email(
     email: str,
     user_id: str,
@@ -199,64 +230,43 @@ async def send_deletion_confirmation_email(
     expiry: datetime
 ) -> bool:
     """Send account deletion confirmation email.
-    
-    In production, this should use an email service like SendGrid, AWS SES, etc.
-    For now, this is a placeholder that logs the email content.
-    
+
+    Uses configured email service (SendGrid, AWS SES, or console for development).
+    Email provider is configured via EMAIL_SERVICE_PROVIDER environment variable.
+
     Args:
         email: User's email address
         user_id: User ID
         token: Deletion confirmation token
         expiry: Token expiry datetime
-        
+
     Returns:
         True if email sent successfully, False otherwise
     """
-    # TODO: Implement actual email sending
-    # For now, just log the email content
-    
+    # Log email details for debugging
     expiry_str = expiry.strftime("%Y-%m-%d %H:%M:%S UTC")
+    logger.info(f"Sending deletion confirmation email to {email} (expires: {expiry_str})")
     
-    email_content = f"""
-    Subject: Confirm Account Deletion - ALLMS
-    
-    To: {email}
-    
-    Dear User,
-    
-    You have requested to delete your ALLMS account. This action is permanent and cannot be undone.
-    
-    To confirm account deletion, please use the following token:
-    
-    {token}
-    
-    This token will expire at: {expiry_str}
-    
-    If you did not request this deletion, please ignore this email and your account will remain active.
-    
-    For security reasons, this token can only be used once and will expire in 30 minutes.
-    
-    Best regards,
-    ALLMS Team
-    
-    ---
-    This is an automated message. Please do not reply to this email.
-    """
-    
-    logger.info(f"[EMAIL PLACEHOLDER] Deletion confirmation email for {email}:")
-    logger.info(email_content)
-    
-    # In production, replace with actual email sending:
-    # try:
-    #     email_service.send(
-    #         to=email,
-    #         subject="Confirm Account Deletion - ALLMS",
-    #         body=email_content
-    #     )
-    #     return True
-    # except Exception as e:
-    #     logger.error(f"Failed to send deletion email: {e}")
-    #     return False
-    
-    return True  # Placeholder success
+    # Use real email service
+    try:
+        from app.services.email_service import get_email_service
+
+        email_service = get_email_service()
+        success = await email_service.send_deletion_confirmation_email(
+            to_email=email,
+            user_id=user_id,
+            token=token,
+            expiry=expiry
+        )
+
+        if success:
+            logger.info(f"Deletion confirmation email sent successfully to {email}")
+        else:
+            logger.error(f"Failed to send deletion confirmation email to {email}")
+
+        return success
+
+    except Exception as e:
+        logger.error(f"Error sending deletion confirmation email: {e}", exc_info=True)
+        return False
 

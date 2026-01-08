@@ -7,11 +7,81 @@ This guide covers deploying the GDPR compliance features to production.
 Before deploying GDPR features, ensure you have:
 
 - [ ] Google Cloud Project with Firestore enabled
-- [ ] Redis instance (for production rate limiting)
+- [ ] **Redis instance (REQUIRED for multi-instance deployments)** OR single-worker deployment
 - [ ] Email service configured (SendGrid, AWS SES, or SMTP)
 - [ ] SSL/TLS certificates for HTTPS
 - [ ] Domain name configured
 - [ ] Google Secret Manager access (for storing secrets)
+
+## ⚠️ IMPORTANT: Rate Limiting Deployment Options
+
+The GDPR implementation includes rate limiting to prevent abuse. You have **two deployment options**:
+
+### Option A: Redis-Based Rate Limiting (RECOMMENDED for Production)
+
+**Use this if:**
+- You need to scale to multiple instances
+- You want persistent rate limits across restarts
+- You need distributed rate limiting
+
+**Requirements:**
+- Redis instance (Google Cloud Memorystore or self-hosted)
+- Set `RATE_LIMIT_BACKEND=redis`
+- Configure Redis connection details
+
+**Pros:**
+- ✅ Works with multiple instances
+- ✅ Persistent across restarts
+- ✅ Distributed and synchronized
+- ✅ Production-ready
+
+**Cons:**
+- ❌ Requires Redis infrastructure
+- ❌ Additional cost
+
+### Option B: In-Memory Rate Limiting (Development/Single-Worker Only)
+
+**Use this if:**
+- You're deploying to a single instance only
+- You're in development/testing
+- You want to avoid Redis setup initially
+
+**Requirements:**
+- Set `RATE_LIMIT_BACKEND=memory`
+- **CRITICAL:** Deploy with `--max-instances=1` (Cloud Run) or single worker
+- Accept that rate limits reset on restart
+
+**Pros:**
+- ✅ No additional infrastructure
+- ✅ Simple setup
+- ✅ No extra cost
+
+**Cons:**
+- ❌ Only works with single instance
+- ❌ Rate limits reset on restart
+- ❌ Not suitable for high-traffic production
+- ❌ Cannot scale horizontally
+
+**Single-Worker Deployment Example:**
+```bash
+# Cloud Run with single instance
+gcloud run deploy allms \
+    --image gcr.io/YOUR_PROJECT/allms:latest \
+    --max-instances=1 \
+    --min-instances=1 \
+    --set-env-vars RATE_LIMIT_BACKEND=memory
+
+# WARNING: This limits your application to a single instance!
+# If the instance crashes, there will be downtime until it restarts.
+```
+
+**⚠️ Production Recommendation:**
+For production deployments, **always use Redis** (Option A). In-memory rate limiting should only be used for:
+- Development environments
+- Testing/staging with low traffic
+- Temporary deployments while setting up Redis
+
+See [GDPR_RATE_LIMITING.md](GDPR_RATE_LIMITING.md) for detailed information on rate limiting implementation and migration.
 
 ## Pre-Deployment Checklist
 
@@ -109,6 +179,8 @@ aws iam create-access-key --user-name ses-smtp-user
 
 ### Step 1: Deploy Application
 
+**Option A: Production Deployment with Redis (Recommended)**
+
 ```bash
 # Build Docker image
 docker build -t gcr.io/YOUR_PROJECT/allms:gdpr-v1 .
@@ -116,17 +188,55 @@ docker build -t gcr.io/YOUR_PROJECT/allms:gdpr-v1 .
 # Push to Container Registry
 docker push gcr.io/YOUR_PROJECT/allms:gdpr-v1
 
-# Deploy to Cloud Run
+# Deploy to Cloud Run with Redis rate limiting
 gcloud run deploy allms \
     --image gcr.io/YOUR_PROJECT/allms:gdpr-v1 \
     --platform managed \
     --region us-central1 \
     --allow-unauthenticated \
+    --min-instances=1 \
+    --max-instances=10 \
+    --set-env-vars ENVIRONMENT=production \
     --set-env-vars GDPR_TOKEN_SECRET=projects/YOUR_PROJECT/secrets/gdpr-token-secret/versions/latest \
     --set-env-vars RATE_LIMIT_BACKEND=redis \
     --set-env-vars REDIS_HOST=YOUR_REDIS_HOST \
+    --set-env-vars REDIS_PORT=6379 \
+    --set-env-vars REDIS_PASSWORD=YOUR_REDIS_PASSWORD \
+    --set-env-vars REDIS_SSL=true \
     --set-env-vars EMAIL_SERVICE_PROVIDER=sendgrid \
-    --set-env-vars SENDGRID_API_KEY=projects/YOUR_PROJECT/secrets/sendgrid-api-key/versions/latest
+    --set-env-vars SENDGRID_API_KEY=projects/YOUR_PROJECT/secrets/sendgrid-api-key/versions/latest \
+    --set-env-vars EMAIL_FROM_ADDRESS=noreply@yourdomain.com
+```
+
+**Option B: Single-Worker Deployment with In-Memory Rate Limiting (Not Recommended for Production)**
+
+```bash
+# Build Docker image
+docker build -t gcr.io/YOUR_PROJECT/allms:gdpr-v1 .
+
+# Push to Container Registry
+docker push gcr.io/YOUR_PROJECT/allms:gdpr-v1
+
+# Deploy to Cloud Run with SINGLE INSTANCE ONLY
+gcloud run deploy allms \
+    --image gcr.io/YOUR_PROJECT/allms:gdpr-v1 \
+    --platform managed \
+    --region us-central1 \
+    --allow-unauthenticated \
+    --min-instances=1 \
+    --max-instances=1 \
+    --set-env-vars ENVIRONMENT=production \
+    --set-env-vars GDPR_TOKEN_SECRET=projects/YOUR_PROJECT/secrets/gdpr-token-secret/versions/latest \
+    --set-env-vars RATE_LIMIT_BACKEND=memory \
+    --set-env-vars EMAIL_SERVICE_PROVIDER=sendgrid \
+    --set-env-vars SENDGRID_API_KEY=projects/YOUR_PROJECT/secrets/sendgrid-api-key/versions/latest \
+    --set-env-vars EMAIL_FROM_ADDRESS=noreply@yourdomain.com
+
+# ⚠️ WARNING: This deployment is limited to a single instance!
+# - Cannot scale horizontally
+# - Rate limits reset on restart
+# - Single point of failure
+# - Only suitable for low-traffic deployments
 ```
 
 ### Step 2: Verify Deployment
