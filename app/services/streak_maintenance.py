@@ -8,7 +8,7 @@ import logging
 from datetime import datetime, timezone, timedelta
 from typing import List, Dict, Any, Optional
 
-from google.cloud.firestore_v1 import FieldFilter
+# HIGH: Remove unused FieldFilter import
 
 from app.models.gamification_models import UserStats, StreakInfo
 from app.services.gcp_service import get_firestore_client

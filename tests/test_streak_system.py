@@ -506,3 +506,93 @@ class TestStreakSystemIntegration:
         # Requires actual Firestore or emulator
         pass
 
+
+class TestActivityDateFiltering:
+    """Test activity date filtering (CRITICAL - BLOCKS MERGE)."""
+
+    @pytest.fixture
+    def gamification_service(self):
+        """Create gamification service with mocked DB."""
+        with patch('app.services.gamification_service.get_firestore_client'):
+            service = GamificationService()
+            service.db = Mock()
+            return service
+
+    def test_get_activities_with_start_date(self, gamification_service):
+        """Test filtering activities by start date (CRITICAL #1)."""
+        from app.models.gamification_models import UserActivity
+
+        # Mock query chain
+        mock_query = Mock()
+        mock_collection = Mock()
+        mock_collection.where.return_value = mock_query
+        mock_query.where.return_value = mock_query
+        mock_query.order_by.return_value = mock_query
+        mock_query.limit.return_value = mock_query
+        mock_query.stream.return_value = []
+
+        gamification_service.db.collection.return_value = mock_collection
+
+        # Test with start_date
+        start_date = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        activities, cursor = gamification_service.get_user_activities(
+            user_id="test_user",
+            start_date=start_date
+        )
+
+        # Verify start_date filter was applied
+        assert mock_query.where.called
+        # Check that FieldFilter was called with timestamp >= start_date
+        calls = mock_query.where.call_args_list
+        assert any('timestamp' in str(call) for call in calls)
+
+    def test_get_activities_with_end_date(self, gamification_service):
+        """Test filtering activities by end date (CRITICAL #1)."""
+        # Mock query chain
+        mock_query = Mock()
+        mock_collection = Mock()
+        mock_collection.where.return_value = mock_query
+        mock_query.where.return_value = mock_query
+        mock_query.order_by.return_value = mock_query
+        mock_query.limit.return_value = mock_query
+        mock_query.stream.return_value = []
+
+        gamification_service.db.collection.return_value = mock_collection
+
+        # Test with end_date
+        end_date = datetime(2026, 1, 31, tzinfo=timezone.utc)
+        activities, cursor = gamification_service.get_user_activities(
+            user_id="test_user",
+            end_date=end_date
+        )
+
+        # Verify end_date filter was applied
+        assert mock_query.where.called
+
+    def test_get_activities_with_date_range(self, gamification_service):
+        """Test filtering activities by date range (CRITICAL #1)."""
+        # Mock query chain
+        mock_query = Mock()
+        mock_collection = Mock()
+        mock_collection.where.return_value = mock_query
+        mock_query.where.return_value = mock_query
+        mock_query.order_by.return_value = mock_query
+        mock_query.limit.return_value = mock_query
+        mock_query.stream.return_value = []
+
+        gamification_service.db.collection.return_value = mock_collection
+
+        # Test with both start_date and end_date
+        start_date = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        end_date = datetime(2026, 1, 31, tzinfo=timezone.utc)
+        activities, cursor = gamification_service.get_user_activities(
+            user_id="test_user",
+            start_date=start_date,
+            end_date=end_date
+        )
+
+        # Verify both filters were applied
+        assert mock_query.where.called
+        # Should have at least 3 where calls: user_id, start_date, end_date
+        assert mock_query.where.call_count >= 3
+

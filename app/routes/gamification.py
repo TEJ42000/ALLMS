@@ -134,25 +134,55 @@ def get_activities(
     limit: int = Query(50, ge=1, le=100, description="Number of activities to return"),
     activity_type: Optional[str] = Query(None, description="Filter by activity type"),
     start_after: Optional[str] = Query(None, description="Activity ID to start after (pagination)"),
+    start_date: Optional[str] = Query(None, description="Start date filter (ISO format: YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS)"),
+    end_date: Optional[str] = Query(None, description="End date filter (ISO format: YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS)"),
     user: User = Depends(get_current_user)
 ):
     """Get user's recent activities with pagination support.
+
+    CRITICAL: Added start_date/end_date support (BLOCKS MERGE - feature was broken)
 
     Args:
         limit: Maximum number of activities to return
         activity_type: Optional filter by activity type
         start_after: Optional activity ID for pagination
+        start_date: Optional start date filter (ISO format)
+        end_date: Optional end date filter (ISO format)
 
     Returns:
         Dict with activities list and next_cursor for pagination
     """
     try:
+        from datetime import datetime, timezone
+
+        # Parse date strings to datetime objects
+        start_datetime = None
+        end_datetime = None
+
+        if start_date:
+            try:
+                start_datetime = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+                if start_datetime.tzinfo is None:
+                    start_datetime = start_datetime.replace(tzinfo=timezone.utc)
+            except ValueError as e:
+                raise HTTPException(400, detail=f"Invalid start_date format: {e}")
+
+        if end_date:
+            try:
+                end_datetime = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+                if end_datetime.tzinfo is None:
+                    end_datetime = end_datetime.replace(tzinfo=timezone.utc)
+            except ValueError as e:
+                raise HTTPException(400, detail=f"Invalid end_date format: {e}")
+
         service = get_gamification_service()
         activities, next_cursor = service.get_user_activities(
             user_id=user.user_id,
             limit=limit,
             activity_type=activity_type,
-            start_after_id=start_after
+            start_after_id=start_after,
+            start_date=start_datetime,
+            end_date=end_datetime
         )
 
         return {
@@ -160,6 +190,8 @@ def get_activities(
             "next_cursor": next_cursor
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error getting activities: {e}")
         raise HTTPException(500, detail=str(e)) from e
@@ -632,16 +664,27 @@ def run_streak_maintenance(
 
     Returns:
         Maintenance run summary
+
+    Raises:
+        HTTPException 403: If user is not an admin or ADMIN_EMAILS not configured
     """
-    # Check if user is admin
+    # HIGH: Add ADMIN_EMAILS configuration check to maintenance endpoint
     admin_emails = os.getenv("ADMIN_EMAILS", "").split(",")
     admin_emails = [email.strip() for email in admin_emails if email.strip()]
+
+    # Explicit check: if ADMIN_EMAILS is not configured, deny all access
+    if not admin_emails:
+        logger.error("ADMIN_EMAILS environment variable not configured, denying streak maintenance request")
+        raise HTTPException(
+            status_code=403,
+            detail="Admin configuration required. ADMIN_EMAILS environment variable must be set."
+        )
 
     if user.email not in admin_emails:
         logger.warning(f"Non-admin user {user.email} attempted to run streak maintenance")
         raise HTTPException(
             status_code=403,
-            detail="Admin access required"
+            detail="Admin access required. This endpoint is restricted to administrators."
         )
 
     try:

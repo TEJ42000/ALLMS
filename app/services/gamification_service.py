@@ -967,15 +967,21 @@ class GamificationService:
         user_id: str,
         limit: int = DEFAULT_QUERY_LIMIT,
         activity_type: Optional[str] = None,
-        start_after_id: Optional[str] = None
+        start_after_id: Optional[str] = None,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None
     ) -> tuple[List[UserActivity], Optional[str]]:
         """Get user's recent activities with pagination support.
+
+        CRITICAL: Added start_date/end_date support (BLOCKS MERGE - feature was broken)
 
         Args:
             user_id: User's IAP user ID
             limit: Maximum number of activities to return
             activity_type: Optional filter by activity type
             start_after_id: Optional activity ID to start after (for pagination)
+            start_date: Optional start date filter (inclusive)
+            end_date: Optional end date filter (inclusive)
 
         Returns:
             Tuple of (List of UserActivity objects, next_cursor for pagination)
@@ -988,6 +994,13 @@ class GamificationService:
             query = self.db.collection(USER_ACTIVITIES_COLLECTION).where(
                 filter=FieldFilter("user_id", "==", user_id)
             ).order_by("timestamp", direction="DESCENDING").limit(min(limit, MAX_QUERY_LIMIT))
+
+            # CRITICAL: Add date range filtering
+            if start_date:
+                query = query.where(filter=FieldFilter("timestamp", ">=", start_date))
+
+            if end_date:
+                query = query.where(filter=FieldFilter("timestamp", "<=", end_date))
 
             if activity_type:
                 query = query.where(filter=FieldFilter("activity_type", "==", activity_type))
