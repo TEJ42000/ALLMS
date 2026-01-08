@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="/static/css/styles.css">
     <link rel="stylesheet" href="/static/css/quiz-enhancements.css">
     <link rel="stylesheet" href="/static/css/quiz-answer-enhancements.css">
+    <link rel="stylesheet" href="/static/css/quiz-navigation-controls.css">
     <!-- EasyMDE Markdown Editor -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/easymde@2.18.0/dist/easymde.min.css">
     <script src="https://cdn.jsdelivr.net/npm/easymde@2.18.0/dist/easymde.min.js"></script>
@@ -296,7 +297,10 @@
                             <div class="quiz-progress"><span id="quiz-current">1</span> / <span id="quiz-total">10</span></div>
                             <div class="quiz-score">Score: <span id="quiz-score">0</span></div>
                         </div>
-                        <div id="quiz-question-container"></div>
+                        <div class="quiz-main-content">
+                            <div id="quiz-question-container"></div>
+                            <div id="quiz-nav-sidebar-container"></div>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -399,6 +403,7 @@
     <script src="/static/js/onboarding-tour.js" defer></script>
     <script src="/static/js/quiz-display-enhancements.js" defer></script>
     <script src="/static/js/quiz-answer-enhancements.js" defer></script>
+    <script src="/static/js/quiz-navigation-controls.js" defer></script>
     <script src="/static/js/app.js" defer></script>
 </body>
 </html>
