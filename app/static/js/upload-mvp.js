@@ -236,52 +236,161 @@ class UploadManager {
     async generateQuiz() {
         if (!this.currentAnalysis) {
             console.warn('[UploadManager] No analysis available for quiz generation');
+            if (typeof showNotification === 'function') {
+                showNotification('Please analyze a file first before generating a quiz', 'warning');
+            }
             return;
         }
-        
-        const topic = this.currentAnalysis.analysis?.main_topics?.[0] || 'Uploaded Content';
-        
-        console.log('[UploadManager] Generating quiz for topic:', topic);
-        
-        // Switch to quiz tab
-        const quizTab = document.querySelector('[data-tab="quiz"]');
-        if (quizTab) quizTab.click();
-        
-        // Show notification
+
+        const analysis = this.currentAnalysis.analysis;
+        const topic = analysis?.main_topics?.[0] || 'Uploaded Content';
+        const difficulty = analysis?.difficulty_score > 7 ? 'hard' : (analysis?.difficulty_score > 4 ? 'medium' : 'easy');
+
+        console.log('[UploadManager] Generating quiz for topic:', topic, 'difficulty:', difficulty);
+
+        // Show loading notification
         if (typeof showNotification === 'function') {
-            showNotification(
-                `Quiz generation for "${topic}" will be integrated with the existing quiz system in Phase 2`,
-                'info',
-                5000
-            );
-        } else {
-            console.info(`[UploadManager] Quiz generation for "${topic}" - Phase 2 integration pending`);
+            showNotification(`Generating quiz on "${topic}"...`, 'info', 3000);
+        }
+
+        try {
+            // Call existing quiz generation API
+            const response = await fetch(`${window.API_BASE || ''}/api/quizzes/courses/${this.courseId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-User-ID': window.getUserId ? window.getUserId() : 'demo_user'
+                },
+                body: JSON.stringify({
+                    course_id: this.courseId,
+                    topic: topic,
+                    num_questions: 10,
+                    difficulty: difficulty,
+                    allow_duplicate: false,
+                    // Include analysis context for better question generation
+                    context: {
+                        key_concepts: analysis?.key_concepts || [],
+                        learning_objectives: analysis?.learning_objectives || []
+                    }
+                })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.detail || `Failed to generate quiz: ${response.status}`);
+            }
+
+            const data = await response.json();
+
+            // Switch to quiz tab
+            const quizTab = document.querySelector('[data-tab="quiz"]');
+            if (quizTab) quizTab.click();
+
+            // Trigger quiz display (call existing function if available)
+            if (typeof window.displayQuiz === 'function') {
+                window.displayQuiz(data.quiz);
+            } else if (typeof window.resetQuizState === 'function') {
+                window.resetQuizState(data.quiz);
+            }
+
+            // Show success notification
+            if (typeof showNotification === 'function') {
+                showNotification(`Quiz generated successfully! ${data.quiz.questions.length} questions ready.`, 'success');
+            }
+
+            console.log('[UploadManager] Quiz generated successfully:', data.quiz);
+
+        } catch (error) {
+            console.error('[UploadManager] Error generating quiz:', error);
+            if (typeof showNotification === 'function') {
+                showNotification(`Failed to generate quiz: ${error.message}`, 'error');
+            }
         }
     }
     
     async generateFlashcards() {
         if (!this.currentAnalysis) {
             console.warn('[UploadManager] No analysis available for flashcard generation');
+            if (typeof showNotification === 'function') {
+                showNotification('Please analyze a file first before generating flashcards', 'warning');
+            }
             return;
         }
-        
-        const topic = this.currentAnalysis.analysis?.main_topics?.[0] || 'Uploaded Content';
-        
-        console.log('[UploadManager] Generating flashcards for topic:', topic);
-        
-        // Switch to flashcards tab
-        const flashcardsTab = document.querySelector('[data-tab="flashcards"]');
-        if (flashcardsTab) flashcardsTab.click();
-        
-        // Show notification
+
+        const analysis = this.currentAnalysis.analysis;
+        const topic = analysis?.main_topics?.[0] || 'Uploaded Content';
+        const numConcepts = analysis?.key_concepts?.length || 10;
+        const numCards = Math.min(numConcepts * 2, 20); // 2 cards per concept, max 20
+
+        console.log('[UploadManager] Generating flashcards for topic:', topic, 'num_cards:', numCards);
+
+        // Show loading notification
         if (typeof showNotification === 'function') {
-            showNotification(
-                `Flashcard generation for "${topic}" will be integrated with the existing flashcard system in Phase 2`,
-                'info',
-                5000
-            );
-        } else {
-            console.info(`[UploadManager] Flashcard generation for "${topic}" - Phase 2 integration pending`);
+            showNotification(`Generating ${numCards} flashcards on "${topic}"...`, 'info', 3000);
+        }
+
+        try {
+            // Call existing flashcard generation API
+            const response = await fetch(`${window.API_BASE || ''}/api/files-content/flashcards`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    course_id: this.courseId,
+                    topic: topic,
+                    num_cards: numCards,
+                    // Include analysis context for better flashcard generation
+                    context: {
+                        key_concepts: analysis?.key_concepts || [],
+                        extracted_text: this.currentAnalysis.extracted_text?.substring(0, 5000) || ''
+                    }
+                })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.detail || `Failed to generate flashcards: ${response.status}`);
+            }
+
+            const data = await response.json();
+
+            if (!data.flashcards || data.flashcards.length === 0) {
+                throw new Error('No flashcards generated');
+            }
+
+            // Switch to flashcards tab
+            const flashcardsTab = document.querySelector('[data-tab="flashcards"]');
+            if (flashcardsTab) flashcardsTab.click();
+
+            // Transform and display flashcards (call existing function if available)
+            if (typeof window.flashcards !== 'undefined') {
+                window.flashcards = data.flashcards.map(card => ({
+                    question: card.front || card.question || 'No question',
+                    answer: card.back || card.answer || 'No answer',
+                    category: 'upload',
+                    known: false
+                }));
+                window.currentCardIndex = 0;
+
+                if (typeof window.updateFlashcardDisplay === 'function') {
+                    window.updateFlashcardDisplay();
+                }
+                if (typeof window.updateFlashcardStats === 'function') {
+                    window.updateFlashcardStats();
+                }
+            }
+
+            // Show success notification
+            if (typeof showNotification === 'function') {
+                showNotification(`${data.flashcards.length} flashcards generated successfully!`, 'success');
+            }
+
+            console.log('[UploadManager] Flashcards generated successfully:', data.flashcards.length);
+
+        } catch (error) {
+            console.error('[UploadManager] Error generating flashcards:', error);
+            if (typeof showNotification === 'function') {
+                showNotification(`Failed to generate flashcards: ${error.message}`, 'error');
+            }
         }
     }
     
