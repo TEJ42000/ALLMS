@@ -482,7 +482,8 @@ class GamificationService:
                     user_id=user_id,
                     xp_bonus=week7_bonus,
                     stats=stats,
-                    activity_type=activity_type
+                    activity_type=activity_type,
+                    course_id=course_id  # MEDIUM: Add course validation
                 )
 
             if xp_awarded == 0:

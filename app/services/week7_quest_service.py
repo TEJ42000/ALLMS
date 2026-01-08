@@ -4,7 +4,7 @@ Manages the Week 7 "Boss Prep" quest system with double XP rewards and exam read
 """
 
 import logging
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from typing import Dict, Any, Optional
 
 from app.models.gamification_models import UserStats, Week7Quest
@@ -57,7 +57,7 @@ class Week7QuestService:
         try:
             # Check if it's Week 7
             if current_week != 7:
-                return False, None
+                return False, f"Quest can only be activated during Week 7 (current week: {current_week})"
 
             # Get user stats
             doc_ref = self.db.collection(USER_STATS_COLLECTION).document(user_id)
@@ -149,7 +149,8 @@ class Week7QuestService:
         user_id: str,
         xp_bonus: int,
         stats: UserStats,
-        activity_type: str
+        activity_type: str,
+        course_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """Calculate Week 7 quest updates without applying them.
 
@@ -161,12 +162,22 @@ class Week7QuestService:
             xp_bonus: XP bonus earned (before doubling)
             stats: Current user stats (BEFORE activity increment)
             activity_type: Type of activity being logged
+            course_id: Optional course ID for validation
 
         Returns:
             Dictionary of Firestore update fields
         """
         if not stats.week7_quest.active:
             return {}
+
+        # MEDIUM: Validate course_id if provided
+        if course_id and stats.week7_quest.course_id:
+            if stats.week7_quest.course_id != course_id:
+                logger.warning(
+                    f"Quest course mismatch for user {user_id[:8]}...: "
+                    f"quest course={stats.week7_quest.course_id}, activity course={course_id}"
+                )
+                return {}
 
         try:
             # Calculate exam readiness with PREDICTED activity counts
@@ -214,7 +225,12 @@ class Week7QuestService:
         # Increment the appropriate counter
         if activity_type == "quiz_completed":
             predicted.activities.quizzes_completed += 1
-            # Assume it passed (conservative estimate)
+            # CRITICAL: Don't assume quiz passes - use conservative estimate
+            # Only increment quizzes_passed if we know it passed
+            # For prediction purposes, we don't increment to be conservative
+        elif activity_type == "quiz_passed":
+            # If we know it passed, increment both
+            predicted.activities.quizzes_completed += 1
             predicted.activities.quizzes_passed += 1
         elif activity_type == "flashcard_set_completed":
             predicted.activities.flashcards_reviewed += 1
@@ -243,7 +259,19 @@ class Week7QuestService:
 
         Returns:
             Quest update info
+
+        Raises:
+            DeprecationWarning: This method should not be called directly
         """
+        # MEDIUM: Raise deprecation warning
+        import warnings
+        warnings.warn(
+            "update_quest_progress() is deprecated. Use calculate_quest_updates() instead. "
+            "This method will be removed in a future version.",
+            DeprecationWarning,
+            stacklevel=2
+        )
+
         if not self.db:
             return {"updated": False}
 

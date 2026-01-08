@@ -100,6 +100,7 @@ class TestWeek7QuestService:
         assert activated is False
         assert message is not None
         assert "week 7" in message.lower()
+        assert "current week: 5" in message.lower()
 
     def test_activate_quest_wrong_course(self, quest_service, base_stats):
         """Test quest activation fails for wrong course."""
