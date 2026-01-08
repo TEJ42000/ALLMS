@@ -111,21 +111,27 @@ class Week7QuestService:
         """
         try:
             # CRITICAL: Use correct field names from ActivityCounters model
+            # CRITICAL: Ensure non-negative values
+            flashcard_count = max(0, stats.activities.flashcards_reviewed)
+            quiz_count = max(0, stats.activities.quizzes_passed)
+            evaluation_count = max(0, stats.activities.evaluations_submitted)
+            guide_count = max(0, stats.activities.guides_completed)
+
             # Calculate progress for each category
             flashcard_progress = min(
-                (stats.activities.flashcards_reviewed / EXAM_READINESS_THRESHOLDS["flashcards"]) * 100,
+                (flashcard_count / EXAM_READINESS_THRESHOLDS["flashcards"]) * 100,
                 100
             )
             quiz_progress = min(
-                (stats.activities.quizzes_passed / EXAM_READINESS_THRESHOLDS["quizzes"]) * 100,
+                (quiz_count / EXAM_READINESS_THRESHOLDS["quizzes"]) * 100,
                 100
             )
             evaluation_progress = min(
-                (stats.activities.evaluations_submitted / EXAM_READINESS_THRESHOLDS["evaluations"]) * 100,
+                (evaluation_count / EXAM_READINESS_THRESHOLDS["evaluations"]) * 100,
                 100
             )
             guide_progress = min(
-                (stats.activities.guides_completed / EXAM_READINESS_THRESHOLDS["guides"]) * 100,
+                (guide_count / EXAM_READINESS_THRESHOLDS["guides"]) * 100,
                 100
             )
 

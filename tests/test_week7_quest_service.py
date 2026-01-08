@@ -33,6 +33,7 @@ class TestWeek7QuestService:
         """Create base user stats for testing."""
         return UserStats(
             user_id="test_user",
+            user_email="test@example.com",
             course_id="test_course",
             total_xp=1000,
             level=5,
@@ -86,17 +87,18 @@ class TestWeek7QuestService:
         doc_mock = Mock()
         doc_mock.exists = True
         doc_mock.to_dict.return_value = base_stats.model_dump(mode='json')
-        
+
         quest_service.db.collection.return_value.document.return_value.get.return_value = doc_mock
-        
+
         # Try to activate in week 5
         activated, message = quest_service.check_and_activate_quest(
             user_id="test_user",
             course_id="test_course",
             current_week=5
         )
-        
+
         assert activated is False
+        assert message is not None
         assert "week 7" in message.lower()
 
     def test_activate_quest_wrong_course(self, quest_service, base_stats):
@@ -170,22 +172,24 @@ class TestWeek7QuestService:
     def test_exam_readiness_partial_progress(self, quest_service, base_stats):
         """Test exam readiness with partial progress."""
         # Set some activities (50% of requirements)
+        # Requirements: 50 flashcards, 5 quizzes, 3 evaluations, 2 guides
         base_stats.activities.flashcards_reviewed = 25  # 50% of 50
-        base_stats.activities.quizzes_passed = 2  # 50% of 4
-        base_stats.activities.evaluations_submitted = 1  # 50% of 2
+        base_stats.activities.quizzes_passed = 2  # 40% of 5 (but average will be ~47%)
+        base_stats.activities.evaluations_submitted = 1  # 33% of 3
         base_stats.activities.guides_completed = 1  # 50% of 2
-        
+
         readiness = quest_service.calculate_exam_readiness(base_stats)
-        assert 40 <= readiness <= 60  # Should be around 50%
+        assert 40 <= readiness <= 50  # Should be around 43%
 
     def test_exam_readiness_full_progress(self, quest_service, base_stats):
         """Test exam readiness with all requirements met."""
         # Set all activities to meet requirements
+        # Requirements: 50 flashcards, 5 quizzes, 3 evaluations, 2 guides
         base_stats.activities.flashcards_reviewed = 50
-        base_stats.activities.quizzes_passed = 4
-        base_stats.activities.evaluations_submitted = 2
+        base_stats.activities.quizzes_passed = 5
+        base_stats.activities.evaluations_submitted = 3
         base_stats.activities.guides_completed = 2
-        
+
         readiness = quest_service.calculate_exam_readiness(base_stats)
         assert readiness == 100
 
@@ -235,13 +239,14 @@ class TestWeek7QuestService:
         """Test boss battle completion when reaching 100% readiness."""
         base_stats.week7_quest.active = True
         base_stats.week7_quest.course_id = "test_course"
-        
+
         # Set activities to almost complete
+        # Requirements: 50 flashcards, 5 quizzes, 3 evaluations, 2 guides
         base_stats.activities.flashcards_reviewed = 49
-        base_stats.activities.quizzes_passed = 4
-        base_stats.activities.evaluations_submitted = 2
+        base_stats.activities.quizzes_passed = 5
+        base_stats.activities.evaluations_submitted = 3
         base_stats.activities.guides_completed = 2
-        
+
         # This flashcard should complete the quest
         updates = quest_service.calculate_quest_updates(
             user_id="test_user",
@@ -249,7 +254,7 @@ class TestWeek7QuestService:
             stats=base_stats,
             activity_type="flashcard_set_completed"
         )
-        
+
         assert updates.get("week7_quest.boss_battle_completed") is True
 
     # =============================================================================
@@ -281,11 +286,22 @@ class TestWeek7QuestService:
     def test_get_quest_requirements(self, quest_service):
         """Test getting quest requirements."""
         requirements = quest_service.get_quest_requirements()
-        
-        assert "flashcard_sets_required" in requirements
-        assert "quizzes_required" in requirements
-        assert "evaluations_required" in requirements
-        assert "study_guides_required" in requirements
-        assert requirements["flashcard_sets_required"] == 50
-        assert requirements["quizzes_required"] == 4
+
+        # Check structure
+        assert "requirements" in requirements
+        assert "double_xp_multiplier" in requirements
+        assert "boss_battle" in requirements
+
+        # Check individual requirements
+        reqs = requirements["requirements"]
+        assert "flashcards" in reqs
+        assert "quizzes" in reqs
+        assert "evaluations" in reqs
+        assert "guides" in reqs
+
+        # Check values
+        assert reqs["flashcards"]["required"] == 50
+        assert reqs["quizzes"]["required"] == 5
+        assert reqs["evaluations"]["required"] == 3
+        assert reqs["guides"]["required"] == 2
 
