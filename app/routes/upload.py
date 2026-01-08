@@ -7,9 +7,16 @@ This module provides endpoints for:
 3. Extracting text and generating structured analysis
 
 MVP Implementation - Issue #200
+
+Security Features:
+- IAP authentication integration (via dependency injection)
+- CSRF protection using Origin/Referer headers
+- File type and content validation
+- Rate limiting (in-memory for MVP, Redis recommended for production)
+- Path traversal prevention
 """
 
-from fastapi import APIRouter, UploadFile, Form, HTTPException, Query, Header, Request
+from fastapi import APIRouter, UploadFile, Form, HTTPException, Query, Header, Request, Depends
 from pathlib import Path
 import uuid
 import shutil
@@ -18,6 +25,7 @@ from typing import Optional, Dict, Any, List
 import json
 import re
 import asyncio
+import os
 from anthropic import RateLimitError
 from urllib.parse import quote
 import secrets
@@ -30,6 +38,8 @@ from app.services.text_extractor import extract_text
 from app.services.files_api_service import get_files_api_service
 from app.services.course_materials_service import CourseMaterialsService, generate_material_id
 from app.models.course_models import CourseMaterial
+from app.models.auth_models import User
+from app.dependencies.auth import require_allowed_user
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -57,16 +67,32 @@ FILE_SIGNATURES = {
 }
 
 # CRITICAL: CSRF protection configuration
-# In production, use a proper session-based CSRF token system
+# Load allowed origins from environment variable for production flexibility
+# Format: comma-separated list of origins
+# Example: "https://allms.app,https://www.allms.app"
+_env_origins = os.getenv("ALLOWED_ORIGINS", "")
 ALLOWED_ORIGINS = [
     "http://localhost:8000",
     "http://127.0.0.1:8000",
-    "https://allms.app",  # Production domain
-    # Add your production domains here
+    "http://localhost:8080",
+    "http://127.0.0.1:8080",
 ]
+# Add production origins from environment
+if _env_origins:
+    ALLOWED_ORIGINS.extend([origin.strip() for origin in _env_origins.split(",") if origin.strip()])
 
 # HIGH: Rate limiting configuration
-# In production, use Redis or similar for distributed rate limiting
+# ⚠️ MVP LIMITATION: In-memory rate limiting
+# This implementation is NOT suitable for production multi-instance deployments.
+# For production, replace with Redis-based rate limiting (see docs/UPLOAD_MVP_PRODUCTION.md)
+#
+# Why this is MVP-only:
+# - State is not shared between instances
+# - Resets on application restart
+# - No cleanup of old entries (memory leak potential)
+# - Cannot enforce limits across multiple Cloud Run instances
+#
+# Production solution: Use slowapi with Redis backend
 RATE_LIMIT_UPLOADS = 10  # Max uploads per user per minute
 RATE_LIMIT_WINDOW = 60  # Window in seconds
 rate_limit_store: Dict[str, List[float]] = defaultdict(list)
@@ -104,38 +130,7 @@ def validate_csrf(origin: Optional[str] = None, referer: Optional[str] = None) -
     raise HTTPException(403, "Missing CSRF headers")
 
 
-def validate_user_authentication(authorization: Optional[str] = None) -> str:
-    """
-    Validate user authentication.
 
-    HIGH SECURITY: Ensures only authenticated users can upload files.
-
-    TODO: Integrate with existing authentication system
-    Currently returns a placeholder user_id.
-
-    Args:
-        authorization: Authorization header (Bearer token)
-
-    Returns:
-        user_id: Authenticated user identifier
-
-    Raises:
-        HTTPException: If authentication fails
-    """
-    # TODO: Replace with actual authentication
-    # For now, we'll allow unauthenticated access for MVP
-    # In production, this MUST be replaced with proper auth
-
-    # Placeholder implementation
-    if authorization and authorization.startswith("Bearer "):
-        # TODO: Validate JWT token
-        # TODO: Extract user_id from token
-        return "authenticated_user"
-
-    # For MVP, allow anonymous uploads
-    # TODO: Remove this in production
-    logger.warning("Upload without authentication (MVP only)")
-    return "anonymous_user"
 
 
 def check_rate_limit(user_id: str, client_ip: str) -> None:
@@ -264,29 +259,37 @@ async def upload_file(
     week_number: Optional[int] = Form(None),
     origin: Optional[str] = Header(None),
     referer: Optional[str] = Header(None),
-    authorization: Optional[str] = Header(None)
+    current_user: User = Depends(require_allowed_user)
 ) -> Dict[str, Any]:
     """
     Upload a course material file.
-    
+
+    Security:
+        - Requires authentication (IAP or allow-listed user)
+        - CSRF protection via Origin/Referer headers
+        - Rate limiting per user
+        - File type and content validation
+        - Path traversal prevention
+
     Args:
         file: The uploaded file
         course_id: Course identifier
         week_number: Optional week number for organization
-        
+        current_user: Authenticated user (injected by dependency)
+
     Returns:
         JSON with material_id, filename, and storage path
-        
+
     Raises:
         HTTPException: If file type not allowed or upload fails
     """
-    # CRITICAL FIX: CSRF protection
+    # CRITICAL: CSRF protection
     validate_csrf(origin, referer)
 
-    # HIGH FIX: Authentication
-    user_id = validate_user_authentication(authorization)
+    # Get user_id from authenticated user
+    user_id = current_user.user_id
 
-    # HIGH FIX: Rate limiting
+    # HIGH: Rate limiting
     client_ip = request.client.host if request.client else "unknown"
     check_rate_limit(user_id, client_ip)
 
@@ -421,28 +424,31 @@ async def analyze_uploaded_file(
     course_id: str = Query(..., description="Course identifier"),
     origin: Optional[str] = Header(None),
     referer: Optional[str] = Header(None),
-    authorization: Optional[str] = Header(None)
+    current_user: User = Depends(require_allowed_user)
 ) -> Dict[str, Any]:
     """
     Extract text and analyze uploaded file with Claude AI.
-    
+
+    Security:
+        - Requires authentication (IAP or allow-listed user)
+        - CSRF protection via Origin/Referer headers
+        - Path traversal prevention
+
     Args:
         material_id: Unique identifier from upload
         course_id: Course identifier
-        
+        current_user: Authenticated user (injected by dependency)
+
     Returns:
         JSON with extraction results and AI analysis
-        
+
     Raises:
         HTTPException: If file not found or analysis fails
     """
-    # CRITICAL FIX: CSRF protection
+    # CRITICAL: CSRF protection
     validate_csrf(origin, referer)
 
-    # HIGH FIX: Authentication
-    user_id = validate_user_authentication(authorization)
-
-    # CRITICAL FIX: Sanitize course_id to prevent path traversal
+    # CRITICAL: Sanitize course_id to prevent path traversal
     course_id = sanitize_course_id(course_id)
 
     logger.info(f"Analysis request: {material_id} for course {course_id}")
@@ -613,16 +619,22 @@ async def list_uploads(
     limit: int = Query(20, ge=1, le=100, description="Maximum number of uploads to return"),
     origin: Optional[str] = Header(None),
     referer: Optional[str] = Header(None),
-    authorization: Optional[str] = Header(None)
+    current_user: User = Depends(require_allowed_user)
 ) -> Dict[str, Any]:
     """
     List uploaded materials for a course.
 
     Returns recent uploads with their metadata and analysis status.
 
+    Security:
+        - Requires authentication (IAP or allow-listed user)
+        - CSRF protection via Origin/Referer headers
+        - Path traversal prevention
+
     Args:
         course_id: Course identifier
         limit: Maximum number of materials to return (1-100)
+        current_user: Authenticated user (injected by dependency)
 
     Returns:
         JSON with list of materials and count
@@ -630,13 +642,10 @@ async def list_uploads(
     Raises:
         HTTPException: If course_id is invalid
     """
-    # CRITICAL FIX: CSRF protection
+    # CRITICAL: CSRF protection
     validate_csrf(origin, referer)
 
-    # HIGH FIX: Authentication
-    user_id = validate_user_authentication(authorization)
-
-    # CRITICAL FIX: Sanitize course_id
+    # CRITICAL: Sanitize course_id
     course_id = sanitize_course_id(course_id)
 
     try:
