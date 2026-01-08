@@ -296,7 +296,15 @@ class TestCourseAwareMode:
 
 
 class TestCacheFunctionality:
-    """Tests for caching functionality in AI Tutor."""
+    """Tests for caching functionality in AI Tutor.
+
+    Note: These tests verify basic caching behavior. For production-grade
+    cache verification, see issue #193 for planned enhancements:
+    - Cache hit/miss verification
+    - TTL expiration testing
+    - Cache key collision testing
+    - Cache invalidation testing
+    """
 
     def test_chat_uses_cache_on_repeated_request(self, client, sample_chat_request, mock_tutor_response):
         """Test that repeated identical requests may use cache (if implemented).
@@ -304,6 +312,9 @@ class TestCacheFunctionality:
         Note: This test verifies that repeated requests work correctly.
         Actual cache hit verification would require inspecting cache internals
         or counting API calls, which is implementation-dependent.
+
+        TODO: Add cache hit verification when cache implementation is finalized.
+        See issue #193 for planned cache testing enhancements.
         """
         with patch('app.services.anthropic_client.client') as mock_client:
             mock_client.messages.create = AsyncMock(return_value=mock_tutor_response)
@@ -320,6 +331,8 @@ class TestCacheFunctionality:
             assert response1.json()["content"] == response2.json()["content"]
 
             # Verify API was called (cache implementation may vary)
+            # Note: Actual cache hit would mean call_count == 1, but this is
+            # implementation-dependent and may not be reliable in all environments
             assert mock_client.messages.create.call_count >= 1
 
     def test_chat_different_messages_not_cached(self, client, mock_tutor_response):

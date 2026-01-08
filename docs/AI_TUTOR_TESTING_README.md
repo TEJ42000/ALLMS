@@ -296,13 +296,18 @@ with patch('app.services.anthropic_client.client') as mock_client:
    - Future: Add integration tests with real materials
 
 ### Future Enhancements:
-- [ ] Implement week filtering feature in endpoints
-- [ ] Add cache hit/miss verification tests
+- [ ] Implement week filtering feature in endpoints (Issue #192)
+- [ ] Add cache hit/miss verification tests (Issue #193)
 - [ ] Add integration tests without mocks
-- [ ] Test cache TTL and expiration
-- [ ] Test cache key collision handling
-- [ ] Refactor concurrent request tests for better isolation
+- [ ] Test cache TTL and expiration (Issue #193)
+- [ ] Test cache key collision handling (Issue #193)
+- [ ] Test very large materials (context size limits)
+- [ ] Document anthropic version for RateLimitError support
 - [ ] Add performance benchmarks
+
+### Tracked Issues:
+- **Issue #192:** Week filtering implementation
+- **Issue #193:** Cache testing improvements
 
 ---
 
