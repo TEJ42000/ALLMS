@@ -104,9 +104,23 @@ class OnboardingTour {
         // Remove potentially dangerous characters
         const sanitized = selector.trim();
 
-        // Basic validation - must start with . or # or be an element name
-        if (!/^[.#]?[\w-[\]="]+$/.test(sanitized)) {
+        // Enhanced validation for CSS selectors
+        // Allows: .class, #id, element, [attribute], [attribute="value"], combinations
+        // Pattern breakdown:
+        // ^[.#]? - Optional class (.) or id (#) prefix
+        // [\w-]+ - Word characters and hyphens (element/class/id name)
+        // (\[[\w-]+(?:="[\w\s-]+")?\])? - Optional attribute selector
+        // (\s*[.#]?[\w-]+)* - Optional additional selectors (for combinations)
+        const selectorPattern = /^[.#]?[\w-]+(\[[\w-]+(?:="[\w\s-]+")?\])?(\s*[.#>+~]?[\w-]+(\[[\w-]+(?:="[\w\s-]+")?\])?)*$/;
+
+        if (!selectorPattern.test(sanitized)) {
             console.warn('[OnboardingTour] Invalid selector:', selector);
+            return null;
+        }
+
+        // Additional safety check - reject selectors with script-like content
+        if (sanitized.includes('<') || sanitized.includes('>') || sanitized.includes('javascript:')) {
+            console.warn('[OnboardingTour] Potentially dangerous selector:', selector);
             return null;
         }
 

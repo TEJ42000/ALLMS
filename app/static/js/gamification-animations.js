@@ -14,6 +14,8 @@ class GamificationAnimations {
         this.animationQueue = [];
         this.isAnimating = false;
         this.soundEnabled = localStorage.getItem('gamification_sound') !== 'false';
+        this.isSharing = false; // Prevent race conditions in share functionality
+        this.eventListeners = []; // Track event listeners for cleanup
         this.init();
     }
 
@@ -21,6 +23,19 @@ class GamificationAnimations {
         console.log('[GamificationAnimations] Initializing...');
         this.loadSounds();
         this.setupEventListeners();
+    }
+
+    /**
+     * Cleanup method to remove event listeners
+     */
+    cleanup() {
+        console.log('[GamificationAnimations] Cleaning up event listeners...');
+
+        // Remove all tracked event listeners
+        this.eventListeners.forEach(({ element, event, handler }) => {
+            element.removeEventListener(event, handler);
+        });
+        this.eventListeners = [];
     }
 
     /**
@@ -107,14 +122,28 @@ class GamificationAnimations {
     }
 
     /**
-     * Setup event listeners
+     * Setup event listeners with tracking for cleanup
      */
     setupEventListeners() {
+        // Create handlers
+        const levelUpHandler = (e) => this.showLevelUpAnimation(e.detail);
+        const xpGainHandler = (e) => this.showXPGainAnimation(e.detail);
+        const badgeEarnedHandler = (e) => this.showBadgeEarnedAnimation(e.detail);
+        const streakMilestoneHandler = (e) => this.showStreakMilestoneAnimation(e.detail);
+
         // Listen for gamification events
-        document.addEventListener('gamification:levelup', (e) => this.showLevelUpAnimation(e.detail));
-        document.addEventListener('gamification:xpgain', (e) => this.showXPGainAnimation(e.detail));
-        document.addEventListener('gamification:badgeearned', (e) => this.showBadgeEarnedAnimation(e.detail));
-        document.addEventListener('gamification:streakmilestone', (e) => this.showStreakMilestoneAnimation(e.detail));
+        document.addEventListener('gamification:levelup', levelUpHandler);
+        document.addEventListener('gamification:xpgain', xpGainHandler);
+        document.addEventListener('gamification:badgeearned', badgeEarnedHandler);
+        document.addEventListener('gamification:streakmilestone', streakMilestoneHandler);
+
+        // Track for cleanup
+        this.eventListeners.push(
+            { element: document, event: 'gamification:levelup', handler: levelUpHandler },
+            { element: document, event: 'gamification:xpgain', handler: xpGainHandler },
+            { element: document, event: 'gamification:badgeearned', handler: badgeEarnedHandler },
+            { element: document, event: 'gamification:streakmilestone', handler: streakMilestoneHandler }
+        );
     }
 
     /**
@@ -131,11 +160,38 @@ class GamificationAnimations {
     }
 
     /**
-     * Validate and sanitize numeric input
+     * Validate and sanitize numeric input with range validation
      */
-    sanitizeNumber(value, defaultValue = 0) {
+    sanitizeNumber(value, defaultValue = 0, min = -Infinity, max = Infinity) {
         const num = parseInt(value, 10);
-        return isNaN(num) ? defaultValue : num;
+
+        if (isNaN(num)) {
+            return defaultValue;
+        }
+
+        // Clamp to range
+        return Math.max(min, Math.min(max, num));
+    }
+
+    /**
+     * Sanitize text for canvas rendering
+     * Canvas doesn't interpret HTML, so we just need to ensure safe strings
+     */
+    sanitizeCanvasText(text, maxLength = 100) {
+        if (text === null || text === undefined) return '';
+
+        // Convert to string and trim
+        let sanitized = String(text).trim();
+
+        // Remove control characters and non-printable characters
+        sanitized = sanitized.replace(/[\x00-\x1F\x7F-\x9F]/g, '');
+
+        // Limit length to prevent canvas overflow
+        if (sanitized.length > maxLength) {
+            sanitized = sanitized.substring(0, maxLength) + '...';
+        }
+
+        return sanitized;
     }
 
     /**
@@ -144,10 +200,10 @@ class GamificationAnimations {
     showLevelUpAnimation(data) {
         const { newLevel, newLevelTitle, xpGained } = data;
 
-        // Sanitize inputs
-        const safeLevel = this.sanitizeNumber(newLevel, 1);
+        // Sanitize inputs with range validation
+        const safeLevel = this.sanitizeNumber(newLevel, 1, 1, 100); // Level 1-100
         const safeTitle = this.escapeHtml(newLevelTitle);
-        const safeXP = this.sanitizeNumber(xpGained, 0);
+        const safeXP = this.sanitizeNumber(xpGained, 0, 0, 10000); // XP 0-10000
 
         // Play sound
         this.playSound('levelUp');
@@ -195,8 +251,8 @@ class GamificationAnimations {
     showXPGainAnimation(data) {
         const { xpGained, activityType, position } = data;
 
-        // Sanitize inputs
-        const safeXP = this.sanitizeNumber(xpGained, 0);
+        // Sanitize inputs with range validation
+        const safeXP = this.sanitizeNumber(xpGained, 0, 0, 1000); // XP 0-1000 per action
 
         // Play sound
         this.playSound('xpGain');
@@ -312,8 +368,8 @@ class GamificationAnimations {
     showStreakMilestoneAnimation(data) {
         const { streakCount } = data;
 
-        // Sanitize inputs
-        const safeStreak = this.sanitizeNumber(streakCount, 0);
+        // Sanitize inputs with range validation
+        const safeStreak = this.sanitizeNumber(streakCount, 0, 0, 365); // Streak 0-365 days
 
         // Play sound
         this.playSound('streakMilestone');
@@ -409,9 +465,16 @@ class GamificationAnimations {
     }
 
     /**
-     * Share achievement (generates shareable image)
+     * Share achievement (generates shareable image) with race condition prevention
      */
     async shareAchievement(data) {
+        // Prevent race condition
+        if (this.isSharing) {
+            console.log('[GamificationAnimations] Share already in progress, ignoring');
+            return;
+        }
+
+        this.isSharing = true;
         console.log('[GamificationAnimations] Sharing achievement:', data);
 
         try {
@@ -456,6 +519,9 @@ class GamificationAnimations {
             });
         } catch (error) {
             console.error('[GamificationAnimations] Error in shareAchievement:', error);
+        } finally {
+            // Always reset flag
+            this.isSharing = false;
         }
     }
 
@@ -474,10 +540,10 @@ class GamificationAnimations {
                 return null;
             }
 
-            // Sanitize data
-            const safeName = this.escapeHtml(data.badgeName || 'Achievement');
-            const safeIcon = this.escapeHtml(data.badgeIcon || '🏆');
-            const safeTier = this.escapeHtml(data.badgeTier || 'Bronze');
+            // Sanitize data for canvas (not HTML)
+            const safeName = this.sanitizeCanvasText(data.badgeName || 'Achievement', 50);
+            const safeIcon = this.sanitizeCanvasText(data.badgeIcon || '🏆', 10);
+            const safeTier = this.sanitizeCanvasText(data.badgeTier || 'Bronze', 20);
 
             // Background gradient
             const gradient = ctx.createLinearGradient(0, 0, 0, 630);
@@ -501,15 +567,19 @@ class GamificationAnimations {
             ctx.font = 'bold 42px Arial, sans-serif';
             ctx.fillText(safeName, 600, 380);
 
-            // Tier
+            // Tier - validate against whitelist
+            const validTiers = ['bronze', 'silver', 'gold'];
+            const tierLower = safeTier.toLowerCase();
+            const validatedTier = validTiers.includes(tierLower) ? tierLower : 'bronze';
+
             const tierColors = {
                 'bronze': '#cd7f32',
                 'silver': '#c0c0c0',
                 'gold': '#ffd700'
             };
-            ctx.fillStyle = tierColors[safeTier.toLowerCase()] || '#d4af37';
+            ctx.fillStyle = tierColors[validatedTier];
             ctx.font = 'bold 32px Arial, sans-serif';
-            ctx.fillText(safeTier.toUpperCase(), 600, 430);
+            ctx.fillText(validatedTier.toUpperCase(), 600, 430);
 
             // Footer
             ctx.fillStyle = '#d4af37';
@@ -541,4 +611,11 @@ if (document.readyState === 'loading') {
 } else {
     window.gamificationAnimations = new GamificationAnimations();
 }
+
+// Cleanup on page unload to prevent memory leaks
+window.addEventListener('beforeunload', () => {
+    if (window.gamificationAnimations && typeof window.gamificationAnimations.cleanup === 'function') {
+        window.gamificationAnimations.cleanup();
+    }
+});
 

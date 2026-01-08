@@ -66,11 +66,17 @@ class ProgressVisualizations {
     }
 
     /**
-     * Validate and sanitize numeric input
+     * Validate and sanitize numeric input with range validation
      */
-    sanitizeNumber(value, defaultValue = 0) {
+    sanitizeNumber(value, defaultValue = 0, min = -Infinity, max = Infinity) {
         const num = parseFloat(value);
-        return isNaN(num) ? defaultValue : num;
+
+        if (isNaN(num)) {
+            return defaultValue;
+        }
+
+        // Clamp to range
+        return Math.max(min, Math.min(max, num));
     }
 
     /**
