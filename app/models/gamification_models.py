@@ -22,7 +22,7 @@ from pydantic import BaseModel, Field
 
 class StreakInfo(BaseModel):
     """Streak tracking information."""
-    
+
     current_count: int = Field(default=0, description="Current streak count in days")
     longest_streak: int = Field(default=0, description="Longest streak ever achieved")
     last_activity_date: datetime = Field(
@@ -46,6 +46,20 @@ class StreakInfo(BaseModel):
             "guide": False
         },
         description="Weekly consistency tracking for bonus"
+    )
+    week_start: Optional[str] = Field(
+        default=None,
+        description="Start of current week (ISO format) for consistency tracking"
+    )
+    bonus_active: bool = Field(
+        default=False,
+        description="Whether weekly consistency bonus is active"
+    )
+    bonus_multiplier: float = Field(
+        default=1.0,
+        ge=1.0,  # Must be >= 1.0
+        le=2.0,  # Must be <= 2.0 (max 100% bonus)
+        description="XP multiplier when bonus is active (1.0-2.0)"
     )
 
 
