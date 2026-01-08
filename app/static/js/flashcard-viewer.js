@@ -86,6 +86,9 @@ class FlashcardViewer {
         this.knownCards = new Set();
         this.starredCards = new Set();
 
+        // PHASE 2B: Track card notes
+        this.cardNotes = new Map(); // Map<cardIndex, noteText>
+
         // Store original flashcards for restoration after filtering
         this.originalFlashcards = [...this.flashcards];
 
@@ -267,6 +270,23 @@ class FlashcardViewer {
                         <span class="label">Know</span>
                     </button>
 
+                    <!-- PHASE 2B: Notes button -->
+                    <button class="btn-action ${this.cardNotes.has(this.currentIndex) ? 'active' : ''}"
+                            id="btn-notes"
+                            aria-label="Add or view notes for this card"
+                            aria-pressed="${this.cardNotes.has(this.currentIndex)}">
+                        <span class="icon" aria-hidden="true">📝</span>
+                        <span class="label">Notes</span>
+                    </button>
+
+                    <!-- PHASE 2B: Report issue button -->
+                    <button class="btn-action"
+                            id="btn-report"
+                            aria-label="Report an issue with this card">
+                        <span class="icon" aria-hidden="true">⚠️</span>
+                        <span class="label">Report</span>
+                    </button>
+
                     <button class="btn-action"
                             id="btn-shuffle"
                             aria-label="Shuffle all flashcards">
@@ -371,6 +391,22 @@ class FlashcardViewer {
             const knowHandler = () => this.toggleKnown();
             btnKnow.addEventListener('click', knowHandler);
             this.eventListeners.push({ element: btnKnow, event: 'click', handler: knowHandler });
+        }
+
+        // PHASE 2B: Notes button
+        const btnNotes = document.getElementById('btn-notes');
+        if (btnNotes) {
+            const notesHandler = () => this.showNotesModal();
+            btnNotes.addEventListener('click', notesHandler);
+            this.eventListeners.push({ element: btnNotes, event: 'click', handler: notesHandler });
+        }
+
+        // PHASE 2B: Report button
+        const btnReport = document.getElementById('btn-report');
+        if (btnReport) {
+            const reportHandler = () => this.showReportModal();
+            btnReport.addEventListener('click', reportHandler);
+            this.eventListeners.push({ element: btnReport, event: 'click', handler: reportHandler });
         }
 
         const btnShuffle = document.getElementById('btn-shuffle');
@@ -1000,6 +1036,241 @@ class FlashcardViewer {
             window.removeEventListener('beforeunload', this.beforeUnloadHandler);
             this.beforeUnloadHandler = null;
         }
+    }
+
+    // =========================================================================
+    // PHASE 2B: Notes and Report Methods
+    // =========================================================================
+
+    /**
+     * Show notes modal for current card
+     */
+    showNotesModal() {
+        const currentCard = this.flashcards[this.currentIndex];
+        const existingNote = this.cardNotes.get(this.currentIndex) || '';
+
+        // Create modal HTML
+        const modalHTML = `
+            <div class="modal-overlay" id="notes-modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>📝 Card Notes</h3>
+                        <button class="modal-close" aria-label="Close modal">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="card-preview">
+                            <strong>Front:</strong> ${this.escapeHtml(currentCard.front)}
+                        </div>
+                        <textarea
+                            id="note-input"
+                            placeholder="Add your notes here..."
+                            rows="6"
+                            aria-label="Note text"
+                        >${this.escapeHtml(existingNote)}</textarea>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn-secondary" id="btn-cancel-note">Cancel</button>
+                        <button class="btn-primary" id="btn-save-note">Save Note</button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Add modal to DOM
+        document.body.insertAdjacentHTML('beforeend', modalHTML);
+
+        // Setup modal event listeners
+        const modal = document.getElementById('notes-modal');
+        const closeBtn = modal.querySelector('.modal-close');
+        const cancelBtn = document.getElementById('btn-cancel-note');
+        const saveBtn = document.getElementById('btn-save-note');
+        const noteInput = document.getElementById('note-input');
+
+        // Focus on textarea
+        noteInput.focus();
+
+        // Close modal function
+        const closeModal = () => {
+            modal.remove();
+        };
+
+        // Save note function
+        const saveNote = () => {
+            const noteText = noteInput.value.trim();
+            if (noteText) {
+                this.cardNotes.set(this.currentIndex, noteText);
+                console.log('[FlashcardViewer] Note saved for card', this.currentIndex);
+            } else {
+                this.cardNotes.delete(this.currentIndex);
+            }
+            this.render(); // Re-render to update button state
+            closeModal();
+        };
+
+        // Event listeners
+        closeBtn.addEventListener('click', closeModal);
+        cancelBtn.addEventListener('click', closeModal);
+        saveBtn.addEventListener('click', saveNote);
+
+        // Close on overlay click
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                closeModal();
+            }
+        });
+
+        // Close on Escape key
+        const escapeHandler = (e) => {
+            if (e.key === 'Escape') {
+                closeModal();
+                document.removeEventListener('keydown', escapeHandler);
+            }
+        };
+        document.addEventListener('keydown', escapeHandler);
+
+        // Save on Ctrl+Enter
+        noteInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                e.preventDefault();
+                saveNote();
+            }
+        });
+    }
+
+    /**
+     * Show report issue modal for current card
+     */
+    showReportModal() {
+        const currentCard = this.flashcards[this.currentIndex];
+
+        // Create modal HTML
+        const modalHTML = `
+            <div class="modal-overlay" id="report-modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>⚠️ Report Issue</h3>
+                        <button class="modal-close" aria-label="Close modal">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="card-preview">
+                            <div><strong>Front:</strong> ${this.escapeHtml(currentCard.front)}</div>
+                            <div><strong>Back:</strong> ${this.escapeHtml(currentCard.back)}</div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="issue-type">Issue Type:</label>
+                            <select id="issue-type" aria-label="Issue type">
+                                <option value="typo">Typo or Spelling Error</option>
+                                <option value="incorrect">Incorrect Information</option>
+                                <option value="unclear">Unclear or Confusing</option>
+                                <option value="formatting">Formatting Issue</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="issue-description">Description:</label>
+                            <textarea
+                                id="issue-description"
+                                placeholder="Please describe the issue..."
+                                rows="4"
+                                aria-label="Issue description"
+                                required
+                            ></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn-secondary" id="btn-cancel-report">Cancel</button>
+                        <button class="btn-primary" id="btn-submit-report">Submit Report</button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Add modal to DOM
+        document.body.insertAdjacentHTML('beforeend', modalHTML);
+
+        // Setup modal event listeners
+        const modal = document.getElementById('report-modal');
+        const closeBtn = modal.querySelector('.modal-close');
+        const cancelBtn = document.getElementById('btn-cancel-report');
+        const submitBtn = document.getElementById('btn-submit-report');
+        const issueType = document.getElementById('issue-type');
+        const issueDescription = document.getElementById('issue-description');
+
+        // Focus on description
+        issueDescription.focus();
+
+        // Close modal function
+        const closeModal = () => {
+            modal.remove();
+        };
+
+        // Submit report function
+        const submitReport = async () => {
+            const description = issueDescription.value.trim();
+            if (!description) {
+                alert('Please provide a description of the issue.');
+                return;
+            }
+
+            // Disable button during submission
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Submitting...';
+
+            try {
+                const reportData = {
+                    card_index: this.currentIndex,
+                    card_front: currentCard.front,
+                    card_back: currentCard.back,
+                    issue_type: issueType.value,
+                    description: description,
+                    timestamp: new Date().toISOString()
+                };
+
+                // TODO: Send to backend API
+                console.log('[FlashcardViewer] Issue reported:', reportData);
+
+                // For now, just show success message
+                alert('Thank you for reporting this issue! We will review it shortly.');
+                closeModal();
+            } catch (error) {
+                console.error('[FlashcardViewer] Failed to submit report:', error);
+                alert('Failed to submit report. Please try again.');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Submit Report';
+            }
+        };
+
+        // Event listeners
+        closeBtn.addEventListener('click', closeModal);
+        cancelBtn.addEventListener('click', closeModal);
+        submitBtn.addEventListener('click', submitReport);
+
+        // Close on overlay click
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                closeModal();
+            }
+        });
+
+        // Close on Escape key
+        const escapeHandler = (e) => {
+            if (e.key === 'Escape') {
+                closeModal();
+                document.removeEventListener('keydown', escapeHandler);
+            }
+        };
+        document.addEventListener('keydown', escapeHandler);
+    }
+
+    /**
+     * Escape HTML to prevent XSS
+     */
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
 
     // =========================================================================
