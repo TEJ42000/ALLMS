@@ -518,6 +518,7 @@ class BadgeService:
                     }
             
             elif category == "activity":
+                # HIGH: Complete progress calculation for all activity types
                 # Return progress for first criteria found
                 if "flashcard_sets" in criteria:
                     # FIX: Changed activity_counters to activities
@@ -526,6 +527,30 @@ class BadgeService:
                         "current": user_stats.activities.flashcards_reviewed,
                         "required": criteria["flashcard_sets"],
                         "percentage": min(100, int(user_stats.activities.flashcards_reviewed / criteria["flashcard_sets"] * 100))
+                    }
+
+                # HIGH: Add quizzes passed progress
+                if "quizzes_passed" in criteria:
+                    return {
+                        "current": user_stats.activities.quizzes_passed,
+                        "required": criteria["quizzes_passed"],
+                        "percentage": min(100, int(user_stats.activities.quizzes_passed / criteria["quizzes_passed"] * 100))
+                    }
+
+                # HIGH: Add evaluations progress
+                if "evaluations" in criteria:
+                    return {
+                        "current": user_stats.activities.evaluations_submitted,
+                        "required": criteria["evaluations"],
+                        "percentage": min(100, int(user_stats.activities.evaluations_submitted / criteria["evaluations"] * 100))
+                    }
+
+                # HIGH: Add study guides progress
+                if "study_guides" in criteria:
+                    return {
+                        "current": user_stats.activities.guides_completed,
+                        "required": criteria["study_guides"],
+                        "percentage": min(100, int(user_stats.activities.guides_completed / criteria["study_guides"] * 100))
                     }
             
             return None
