@@ -217,6 +217,8 @@ class BadgeDefinition(BaseModel):
     """Master list of all available badges.
 
     Stored in Firestore: badge_definitions/{badge_id}
+
+    CRITICAL: Updated to match Phase 4 implementation
     """
 
     badge_id: str = Field(..., description="Unique badge ID")
@@ -226,16 +228,23 @@ class BadgeDefinition(BaseModel):
 
     category: str = Field(
         ...,
-        description="Badge category: behavioral, achievement, milestone"
+        description="Badge category: streak, xp, activity, consistency, special"
     )
 
-    tiers: List[str] = Field(
-        default_factory=lambda: ["bronze", "silver", "gold"],
-        description="Available tiers"
+    rarity: str = Field(
+        default="common",
+        description="Badge rarity: common, uncommon, rare, epic, legendary"
     )
-    tier_requirements: Dict[str, int] = Field(
-        default_factory=lambda: {"bronze": 1, "silver": 5, "gold": 10},
-        description="Times earned required for each tier"
+
+    criteria: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Unlock criteria (e.g., {'streak_days': 30})"
+    )
+
+    points: int = Field(
+        default=0,
+        ge=0,
+        description="Points awarded for earning this badge"
     )
 
     active: bool = Field(default=True, description="Whether badge is active")
@@ -248,21 +257,23 @@ class BadgeDefinition(BaseModel):
 class UserBadge(BaseModel):
     """User-earned badge.
 
-    Stored in Firestore: user_achievements/{user_id}/badges/{badge_id}
+    Stored in Firestore: user_badges/{user_id}_{badge_id}
+
+    CRITICAL: Updated to match Phase 4 implementation
     """
 
+    user_id: str = Field(..., description="User's IAP user ID")
     badge_id: str = Field(..., description="Badge ID")
-    badge_name: str = Field(..., description="Badge name")
-    badge_description: str = Field(..., description="Badge description")
-    badge_icon: str = Field(..., description="Badge icon")
 
-    tier: str = Field(default="bronze", description="Current tier: bronze, silver, gold")
     earned_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
-        description="When badge was first earned"
+        description="When badge was earned"
     )
-    times_earned: int = Field(default=1, ge=1, description="Number of times earned")
-    course_id: Optional[str] = Field(None, description="Course ID if applicable")
+
+    progress: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Progress toward badge (for tracking)"
+    )
 
 
 # =============================================================================

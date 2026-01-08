@@ -226,13 +226,19 @@ class BadgeService:
         criteria: Dict[str, Any],
         user_stats: UserStats
     ) -> bool:
-        """Check consistency badge criteria."""
+        """Check consistency badge criteria.
+
+        CRITICAL: Unimplemented criteria return False with logging
+        """
         # Consecutive weeks with bonus
         if "consecutive_weeks_bonus" in criteria:
-            # This requires tracking consecutive weeks (future enhancement)
-            # For now, return False
+            # CRITICAL: Not yet implemented - requires tracking consecutive weeks
+            # This will be implemented in a future update
+            logger.debug(f"Consistency badge criteria not yet implemented: consecutive_weeks_bonus")
             return False
-        
+
+        # CRITICAL: Log unknown criteria
+        logger.warning(f"Unknown consistency criteria: {criteria}")
         return False
 
     def _check_special_criteria(
@@ -240,21 +246,43 @@ class BadgeService:
         criteria: Dict[str, Any],
         user_stats: UserStats
     ) -> bool:
-        """Check special badge criteria."""
+        """Check special badge criteria.
+
+        CRITICAL: Unimplemented criteria return False with logging
+        """
         # Early adopter (joined before specific date)
         if "joined_before" in criteria:
-            joined_date = datetime.fromisoformat(criteria["joined_before"])
-            if user_stats.created_at <= joined_date:
-                return True
-        
+            try:
+                joined_date = datetime.fromisoformat(criteria["joined_before"])
+                if user_stats.created_at <= joined_date:
+                    return True
+            except (ValueError, TypeError) as e:
+                logger.error(f"Invalid joined_before date format: {e}")
+                return False
+
         # Perfect week (all 4 categories every day for 7 days)
         if "perfect_week" in criteria:
-            # This requires daily activity tracking (future enhancement)
+            # CRITICAL: Not yet implemented - requires daily activity tracking
+            logger.debug(f"Special badge criteria not yet implemented: perfect_week")
             return False
-        
-        # Time-based badges (night owl, early bird)
-        # These are checked in activity logging based on timestamp
-        
+
+        # Time-based badges (night owl, early bird, weekend warrior, etc.)
+        # CRITICAL: Not yet implemented - requires activity timestamp tracking
+        unimplemented_criteria = [
+            "night_activities", "early_activities", "weekend_streaks",
+            "flashcard_combo", "flashcards_one_session", "hard_quiz_streak",
+            "high_complexity_evaluations"
+        ]
+
+        for crit in unimplemented_criteria:
+            if crit in criteria:
+                logger.debug(f"Special badge criteria not yet implemented: {crit}")
+                return False
+
+        # CRITICAL: Log unknown criteria
+        if criteria:
+            logger.warning(f"Unknown special criteria: {criteria}")
+
         return False
 
     def _unlock_badge(
