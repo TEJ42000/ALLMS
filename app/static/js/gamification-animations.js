@@ -68,10 +68,36 @@ class GamificationAnimations {
     }
 
     /**
+     * Escape HTML to prevent XSS attacks
+     */
+    escapeHtml(unsafe) {
+        if (unsafe === null || unsafe === undefined) return '';
+        return String(unsafe)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+    /**
+     * Validate and sanitize numeric input
+     */
+    sanitizeNumber(value, defaultValue = 0) {
+        const num = parseInt(value, 10);
+        return isNaN(num) ? defaultValue : num;
+    }
+
+    /**
      * Show level up animation with confetti
      */
     showLevelUpAnimation(data) {
         const { newLevel, newLevelTitle, xpGained } = data;
+
+        // Sanitize inputs
+        const safeLevel = this.sanitizeNumber(newLevel, 1);
+        const safeTitle = this.escapeHtml(newLevelTitle);
+        const safeXP = this.sanitizeNumber(xpGained, 0);
 
         // Play sound
         this.playSound('levelUp');
@@ -83,8 +109,8 @@ class GamificationAnimations {
             <div class="level-up-content">
                 <div class="level-up-icon">🎉</div>
                 <h2 class="level-up-title">Level Up!</h2>
-                <div class="level-up-level">Level ${newLevel}</div>
-                <div class="level-up-rank">${newLevelTitle}</div>
+                <div class="level-up-level">Level ${safeLevel}</div>
+                <div class="level-up-rank">${safeTitle}</div>
                 <div class="level-up-message">You've reached a new level!</div>
                 <button class="level-up-close">Continue</button>
             </div>
@@ -98,11 +124,11 @@ class GamificationAnimations {
         // Confetti celebration
         this.triggerConfetti('levelup');
 
-        // Close button
+        // Close button with { once: true } to prevent multiple listeners
         modal.querySelector('.level-up-close').addEventListener('click', () => {
             modal.classList.remove('show');
             setTimeout(() => modal.remove(), 300);
-        });
+        }, { once: true });
 
         // Auto-close after 5 seconds
         setTimeout(() => {
@@ -119,6 +145,9 @@ class GamificationAnimations {
     showXPGainAnimation(data) {
         const { xpGained, activityType, position } = data;
 
+        // Sanitize inputs
+        const safeXP = this.sanitizeNumber(xpGained, 0);
+
         // Play sound
         this.playSound('xpGain');
 
@@ -128,7 +157,7 @@ class GamificationAnimations {
         indicator.innerHTML = `
             <div class="xp-gain-content">
                 <span class="xp-gain-icon">⭐</span>
-                <span class="xp-gain-amount">+${xpGained} XP</span>
+                <span class="xp-gain-amount">+${safeXP} XP</span>
             </div>
         `;
 
@@ -171,6 +200,16 @@ class GamificationAnimations {
     showBadgeEarnedAnimation(data) {
         const { badgeName, badgeIcon, badgeTier, badgeDescription } = data;
 
+        // Sanitize inputs
+        const safeName = this.escapeHtml(badgeName);
+        const safeIcon = this.escapeHtml(badgeIcon);
+        const safeTier = this.escapeHtml(badgeTier);
+        const safeDescription = this.escapeHtml(badgeDescription);
+
+        // Validate tier
+        const validTiers = ['bronze', 'silver', 'gold'];
+        const tierClass = validTiers.includes(safeTier.toLowerCase()) ? safeTier.toLowerCase() : 'bronze';
+
         // Play sound
         this.playSound('badgeEarned');
 
@@ -179,11 +218,11 @@ class GamificationAnimations {
         modal.className = 'badge-earned-modal';
         modal.innerHTML = `
             <div class="badge-earned-content">
-                <div class="badge-earned-icon">${badgeIcon}</div>
+                <div class="badge-earned-icon">${safeIcon}</div>
                 <h2 class="badge-earned-title">Badge Unlocked!</h2>
-                <div class="badge-earned-name">${badgeName}</div>
-                <div class="badge-earned-tier ${badgeTier.toLowerCase()}">${badgeTier}</div>
-                <div class="badge-earned-description">${badgeDescription}</div>
+                <div class="badge-earned-name">${safeName}</div>
+                <div class="badge-earned-tier ${tierClass}">${safeTier}</div>
+                <div class="badge-earned-description">${safeDescription}</div>
                 <button class="badge-earned-share">Share Achievement</button>
                 <button class="badge-earned-close">Continue</button>
             </div>
@@ -197,16 +236,16 @@ class GamificationAnimations {
         // Gold confetti for badges
         this.triggerConfetti('badge');
 
-        // Share button
+        // Share button with { once: true }
         modal.querySelector('.badge-earned-share').addEventListener('click', () => {
             this.shareAchievement(data);
-        });
+        }, { once: true });
 
-        // Close button
+        // Close button with { once: true }
         modal.querySelector('.badge-earned-close').addEventListener('click', () => {
             modal.classList.remove('show');
             setTimeout(() => modal.remove(), 300);
-        });
+        }, { once: true });
 
         // Auto-close after 6 seconds
         setTimeout(() => {
@@ -223,6 +262,9 @@ class GamificationAnimations {
     showStreakMilestoneAnimation(data) {
         const { streakCount } = data;
 
+        // Sanitize inputs
+        const safeStreak = this.sanitizeNumber(streakCount, 0);
+
         // Play sound
         this.playSound('streakMilestone');
 
@@ -233,7 +275,7 @@ class GamificationAnimations {
             <div class="streak-milestone-content">
                 <div class="streak-milestone-icon">🔥</div>
                 <div class="streak-milestone-text">
-                    <div class="streak-milestone-title">${streakCount} Day Streak!</div>
+                    <div class="streak-milestone-title">${safeStreak} Day Streak!</div>
                     <div class="streak-milestone-message">You're on fire! Keep it up!</div>
                 </div>
             </div>
@@ -321,33 +363,50 @@ class GamificationAnimations {
      */
     async shareAchievement(data) {
         console.log('[GamificationAnimations] Sharing achievement:', data);
-        
-        // Create shareable graphic
-        const canvas = await this.createShareableGraphic(data);
-        
-        // Convert to blob
-        canvas.toBlob(async (blob) => {
-            if (navigator.share && navigator.canShare({ files: [new File([blob], 'achievement.png', { type: 'image/png' })] })) {
-                // Use Web Share API
-                try {
-                    await navigator.share({
-                        files: [new File([blob], 'achievement.png', { type: 'image/png' })],
-                        title: 'My Achievement',
-                        text: `I just earned the ${data.badgeName} badge!`
-                    });
-                } catch (e) {
-                    console.log('[GamificationAnimations] Share cancelled or failed');
-                }
-            } else {
-                // Fallback: download image
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = 'achievement.png';
-                a.click();
-                URL.revokeObjectURL(url);
+
+        try {
+            // Create shareable graphic
+            const canvas = await this.createShareableGraphic(data);
+
+            if (!canvas) {
+                console.error('[GamificationAnimations] Failed to create canvas');
+                return;
             }
-        });
+
+            // Convert to blob with null check
+            canvas.toBlob(async (blob) => {
+                // Null check for blob
+                if (!blob) {
+                    console.error('[GamificationAnimations] Failed to convert canvas to blob');
+                    return;
+                }
+
+                try {
+                    const file = new File([blob], 'achievement.png', { type: 'image/png' });
+
+                    if (navigator.share && navigator.canShare({ files: [file] })) {
+                        // Use Web Share API
+                        await navigator.share({
+                            files: [file],
+                            title: 'My Achievement',
+                            text: `I just earned the ${this.escapeHtml(data.badgeName)} badge!`
+                        });
+                    } else {
+                        // Fallback: download image
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = 'achievement.png';
+                        a.click();
+                        URL.revokeObjectURL(url);
+                    }
+                } catch (e) {
+                    console.error('[GamificationAnimations] Share failed:', e);
+                }
+            });
+        } catch (error) {
+            console.error('[GamificationAnimations] Error in shareAchievement:', error);
+        }
     }
 
     /**

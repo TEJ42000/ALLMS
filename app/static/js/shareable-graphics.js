@@ -22,6 +22,27 @@ class ShareableGraphics {
     }
 
     /**
+     * Escape HTML to prevent XSS attacks
+     */
+    escapeHtml(unsafe) {
+        if (unsafe === null || unsafe === undefined) return '';
+        return String(unsafe)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+    /**
+     * Validate and sanitize numeric input
+     */
+    sanitizeNumber(value, defaultValue = 0) {
+        const num = parseFloat(value);
+        return isNaN(num) ? defaultValue : num;
+    }
+
+    /**
      * Setup canvas for graphics generation
      */
     setupCanvas() {
@@ -57,7 +78,7 @@ class ShareableGraphics {
 
         dashboard.appendChild(shareSection);
 
-        // Add event listeners
+        // Add event listeners with { once: false } for reusability
         shareSection.querySelectorAll('.share-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 const type = btn.dataset.type;
@@ -106,8 +127,24 @@ class ShareableGraphics {
                 fetch('/api/gamification/badges')
             ]);
 
+            // Validate response status codes
+            if (!statsRes.ok) {
+                throw new Error(`Stats API error! status: ${statsRes.status}`);
+            }
+            if (!badgesRes.ok) {
+                throw new Error(`Badges API error! status: ${badgesRes.status}`);
+            }
+
             const stats = await statsRes.json();
             const badges = await badgesRes.json();
+
+            // Validate data structure
+            if (!stats || typeof stats !== 'object') {
+                throw new Error('Invalid stats data');
+            }
+            if (!badges || !Array.isArray(badges)) {
+                throw new Error('Invalid badges data');
+            }
 
             return { ...stats, badges };
         } catch (error) {
@@ -333,27 +370,43 @@ class ShareableGraphics {
      * Share graphic
      */
     async shareGraphic(canvas, type) {
-        canvas.toBlob(async (blob) => {
-            const file = new File([blob], `${type}.png`, { type: 'image/png' });
+        if (!canvas) {
+            console.error('[ShareableGraphics] Canvas is null or undefined');
+            return;
+        }
 
-            // Try Web Share API
-            if (navigator.share && navigator.canShare({ files: [file] })) {
-                try {
-                    await navigator.share({
-                        files: [file],
-                        title: 'My Study Progress',
-                        text: 'Check out my progress on LLS Study Portal!'
-                    });
-                    console.log('[ShareableGraphics] Shared successfully');
-                } catch (error) {
-                    if (error.name !== 'AbortError') {
-                        console.error('[ShareableGraphics] Share failed:', error);
-                        this.downloadGraphic(blob, type);
+        canvas.toBlob(async (blob) => {
+            // Null check for blob
+            if (!blob) {
+                console.error('[ShareableGraphics] Failed to convert canvas to blob');
+                return;
+            }
+
+            try {
+                const safeType = this.escapeHtml(type);
+                const file = new File([blob], `${safeType}.png`, { type: 'image/png' });
+
+                // Try Web Share API
+                if (navigator.share && navigator.canShare({ files: [file] })) {
+                    try {
+                        await navigator.share({
+                            files: [file],
+                            title: 'My Study Progress',
+                            text: 'Check out my progress on LLS Study Portal!'
+                        });
+                        console.log('[ShareableGraphics] Shared successfully');
+                    } catch (error) {
+                        if (error.name !== 'AbortError') {
+                            console.error('[ShareableGraphics] Share failed:', error);
+                            this.downloadGraphic(blob, safeType);
+                        }
                     }
+                } else {
+                    // Fallback: download
+                    this.downloadGraphic(blob, safeType);
                 }
-            } else {
-                // Fallback: download
-                this.downloadGraphic(blob, type);
+            } catch (error) {
+                console.error('[ShareableGraphics] Error in shareGraphic:', error);
             }
         });
     }

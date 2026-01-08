@@ -22,6 +22,27 @@ class ProgressVisualizations {
     }
 
     /**
+     * Escape HTML to prevent XSS attacks
+     */
+    escapeHtml(unsafe) {
+        if (unsafe === null || unsafe === undefined) return '';
+        return String(unsafe)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+    /**
+     * Validate and sanitize numeric input
+     */
+    sanitizeNumber(value, defaultValue = 0) {
+        const num = parseFloat(value);
+        return isNaN(num) ? defaultValue : num;
+    }
+
+    /**
      * Enhance progress bars with color transitions
      */
     enhanceProgressBars() {
@@ -135,34 +156,46 @@ class ProgressVisualizations {
     async updateHeaderCircularProgress() {
         try {
             const response = await fetch('/api/gamification/stats');
+
+            // Validate response status
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
             const data = await response.json();
-            
+
+            // Validate data structure
+            if (!data || typeof data !== 'object') {
+                throw new Error('Invalid response data');
+            }
+
             const circle = document.querySelector('.circular-progress-fill');
             const levelText = document.querySelector('.circular-progress-level');
-            
+
             if (!circle || !levelText) return;
-            
-            // Calculate progress percentage
-            const totalXP = data.total_xp || 0;
-            const xpToNext = data.xp_to_next_level || 100;
+
+            // Calculate progress percentage with sanitized values
+            const totalXP = this.sanitizeNumber(data.total_xp, 0);
+            const xpToNext = this.sanitizeNumber(data.xp_to_next_level, 100);
             const currentLevelXP = totalXP % xpToNext;
-            const percentage = (currentLevelXP / xpToNext) * 100;
-            
+            const percentage = xpToNext > 0 ? (currentLevelXP / xpToNext) * 100 : 0;
+
             // Update circle
             const circumference = 2 * Math.PI * 25;
             const offset = circumference - (percentage / 100) * circumference;
-            
+
             circle.style.strokeDasharray = `${circumference} ${circumference}`;
             circle.style.strokeDashoffset = offset;
             circle.style.transition = 'stroke-dashoffset 1s ease';
-            
-            // Update level text
-            levelText.textContent = data.current_level || 1;
-            
+
+            // Update level text with sanitized value
+            const currentLevel = this.sanitizeNumber(data.current_level, 1);
+            levelText.textContent = currentLevel;
+
             // Update color based on progress
             const color = this.getProgressColor(percentage);
             circle.style.stroke = color;
-            
+
         } catch (error) {
             console.error('[ProgressVisualizations] Error updating circular progress:', error);
         }
@@ -203,41 +236,57 @@ class ProgressVisualizations {
     async updateExamReadiness() {
         try {
             const response = await fetch('/api/gamification/stats');
+
+            // Validate response status
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
             const data = await response.json();
-            
+
+            // Validate data structure
+            if (!data || typeof data !== 'object') {
+                throw new Error('Invalid response data');
+            }
+
             const circle = document.querySelector('.exam-circle-fill');
             const percentageText = document.querySelector('.exam-percentage-value');
-            
+
             if (!circle || !percentageText) return;
-            
-            // Calculate readiness based on activities
+
+            // Calculate readiness based on activities with sanitized values
             const activities = data.activities || {};
-            const quizzesPassed = (activities.quiz_easy_passed || 0) + (activities.quiz_hard_passed || 0);
-            const evaluationsCompleted = (activities.evaluation_low || 0) + (activities.evaluation_high || 0);
-            const studyGuidesCompleted = activities.study_guide_completed || 0;
-            
+            const quizEasy = this.sanitizeNumber(activities.quiz_easy_passed, 0);
+            const quizHard = this.sanitizeNumber(activities.quiz_hard_passed, 0);
+            const evalLow = this.sanitizeNumber(activities.evaluation_low, 0);
+            const evalHigh = this.sanitizeNumber(activities.evaluation_high, 0);
+            const studyGuides = this.sanitizeNumber(activities.study_guide_completed, 0);
+
+            const quizzesPassed = quizEasy + quizHard;
+            const evaluationsCompleted = evalLow + evalHigh;
+
             // Simple readiness formula (can be enhanced)
-            const readiness = Math.min(100, Math.round(
-                (quizzesPassed * 10) + 
-                (evaluationsCompleted * 15) + 
-                (studyGuidesCompleted * 5)
-            ));
-            
+            const readiness = Math.min(100, Math.max(0, Math.round(
+                (quizzesPassed * 10) +
+                (evaluationsCompleted * 15) +
+                (studyGuides * 5)
+            )));
+
             // Animate circle
             const circumference = 2 * Math.PI * 60;
             const offset = circumference - (readiness / 100) * circumference;
-            
+
             circle.style.strokeDasharray = `${circumference} ${circumference}`;
             circle.style.strokeDashoffset = offset;
             circle.style.transition = 'stroke-dashoffset 1.5s ease';
-            
+
             // Animate percentage
             this.animateNumber(percentageText, 0, readiness, 1500);
-            
+
             // Update color
             const color = this.getProgressColor(readiness);
             circle.style.stroke = color;
-            
+
         } catch (error) {
             console.error('[ProgressVisualizations] Error updating exam readiness:', error);
         }
@@ -300,17 +349,17 @@ class ProgressVisualizations {
      * Setup real-time progress updates
      */
     setupRealTimeUpdates() {
-        // Listen for XP updates
+        // Listen for XP updates with { once: false } (default, but explicit for clarity)
         document.addEventListener('gamification:xpgain', () => {
             this.updateHeaderCircularProgress();
             this.updateExamReadiness();
         });
-        
+
         // Listen for level ups
         document.addEventListener('gamification:levelup', () => {
             this.updateHeaderCircularProgress();
         });
-        
+
         // Periodic refresh (every 30 seconds)
         setInterval(() => {
             this.updateHeaderCircularProgress();

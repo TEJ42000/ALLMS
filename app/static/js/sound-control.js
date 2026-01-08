@@ -29,6 +29,7 @@ class SoundControl {
             <span class="sound-control-icon">🔊</span>
         `;
 
+        // Event listeners don't need { once: true } as control persists
         control.addEventListener('click', () => this.toggle());
         control.addEventListener('keypress', (e) => {
             if (e.key === 'Enter' || e.key === ' ') {

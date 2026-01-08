@@ -39,8 +39,21 @@ class OnboardingTour {
                 position: 'top'
             }
         ];
-        
+
         this.init();
+    }
+
+    /**
+     * Escape HTML to prevent XSS attacks
+     */
+    escapeHtml(unsafe) {
+        if (unsafe === null || unsafe === undefined) return '';
+        return String(unsafe)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
     }
 
     init() {
@@ -131,30 +144,37 @@ class OnboardingTour {
     createTooltip(step, stepIndex) {
         const tooltip = document.createElement('div');
         tooltip.className = 'onboarding-tooltip';
+
+        // Sanitize step data
+        const safeTitle = this.escapeHtml(step.title);
+        const safeContent = this.escapeHtml(step.content);
+        const safeStepIndex = parseInt(stepIndex, 10);
+        const safeStepsLength = parseInt(this.steps.length, 10);
+
         tooltip.innerHTML = `
-            <div class="onboarding-tooltip-title">${step.title}</div>
-            <div class="onboarding-tooltip-content">${step.content}</div>
+            <div class="onboarding-tooltip-title">${safeTitle}</div>
+            <div class="onboarding-tooltip-content">${safeContent}</div>
             <div class="onboarding-tooltip-buttons">
                 <button class="onboarding-btn onboarding-btn-skip">Skip Tour</button>
-                ${stepIndex > 0 ? '<button class="onboarding-btn onboarding-btn-back">Back</button>' : ''}
+                ${safeStepIndex > 0 ? '<button class="onboarding-btn onboarding-btn-back">Back</button>' : ''}
                 <button class="onboarding-btn onboarding-btn-next">
-                    ${stepIndex === this.steps.length - 1 ? 'Finish' : 'Next'}
+                    ${safeStepIndex === safeStepsLength - 1 ? 'Finish' : 'Next'}
                 </button>
             </div>
             <div class="onboarding-progress">
-                Step ${stepIndex + 1} of ${this.steps.length}
+                Step ${safeStepIndex + 1} of ${safeStepsLength}
             </div>
         `;
 
-        // Add event listeners
-        tooltip.querySelector('.onboarding-btn-skip').addEventListener('click', () => this.skip());
-        
+        // Add event listeners with { once: true }
+        tooltip.querySelector('.onboarding-btn-skip').addEventListener('click', () => this.skip(), { once: true });
+
         const backBtn = tooltip.querySelector('.onboarding-btn-back');
         if (backBtn) {
-            backBtn.addEventListener('click', () => this.back());
+            backBtn.addEventListener('click', () => this.back(), { once: true });
         }
-        
-        tooltip.querySelector('.onboarding-btn-next').addEventListener('click', () => this.next());
+
+        tooltip.querySelector('.onboarding-btn-next').addEventListener('click', () => this.next(), { once: true });
 
         return tooltip;
     }
