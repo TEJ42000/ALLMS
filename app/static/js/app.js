@@ -1000,6 +1000,9 @@ let isGeneratingQuiz = false;
 // Phase 1: Enhancement utilities (timer, progress bar, etc.)
 let quizEnhancements = null;
 
+// Phase 2: Cleanup function for event listeners
+let phase2Cleanup = null;
+
 // Simulated user ID (stored in localStorage until real auth)
 function getUserId() {
     let userId = localStorage.getItem('allms_user_id');
@@ -1242,6 +1245,12 @@ function backToQuizList() {
     }
     quizEnhancements = null;
 
+    // CRITICAL FIX: Cleanup Phase 2 event listeners
+    if (phase2Cleanup && typeof phase2Cleanup === 'function') {
+        phase2Cleanup();
+        phase2Cleanup = null;
+    }
+
     const selectionView = document.getElementById('quiz-selection-view');
     const quizContent = document.getElementById('quiz-content');
 
@@ -1452,18 +1461,7 @@ function displayCurrentQuestion(container) {
                     <strong>Related Articles:</strong> ${question.articles.map(a => escapeHtml(a)).join(', ')}
                 </div>
             ` : ''}
-            <div class="quiz-options">
-                ${question.options.map((option, index) => `
-                    <button
-                        class="quiz-option ${userAnswer === index ? 'selected' : ''}"
-                        data-answer-index="${index}"
-                        ${userAnswer !== null ? 'disabled' : ''}
-                    >
-                        <span class="option-letter">${String.fromCharCode(65 + index)}</span>
-                        <span class="option-text">${escapeHtml(option)}</span>
-                    </button>
-                `).join('')}
-            </div>
+            <div id="quiz-options-placeholder"></div>
             ${userAnswer !== null ? `
                 <div class="answer-feedback ${userAnswer === question.correct_index ? 'correct' : 'incorrect'}">
                     <strong>${userAnswer === question.correct_index ? '✓ Correct!' : '✗ Incorrect'}</strong>
@@ -1490,8 +1488,57 @@ function displayCurrentQuestion(container) {
 
     container.innerHTML = html;
 
-    // Use event delegation on the container to avoid memory leaks from per-element listeners
-    container.addEventListener('click', handleQuizContainerClick);
+    // CRITICAL FIX: Remove old event listeners before adding new ones
+    // MEDIUM: Document container cloning behavior
+    //
+    // We clone and replace the container to remove ALL event listeners.
+    // This is more reliable than tracking individual listeners.
+    //
+    // IMPORTANT: After this operation, any external references to the old
+    // container will be stale. The container variable is reassigned to the
+    // new cloned element. This is safe because:
+    // 1. We're in the displayCurrentQuestion function scope
+    // 2. The container is re-queried on each question change
+    // 3. Event listeners are re-attached to the new container below
+    //
+    // Alternative approaches considered:
+    // - removeEventListener: Requires tracking all listener references
+    // - AbortController: Not supported in older browsers
+    // - Clone/replace: Simple, reliable, works everywhere
+    const oldContainer = container;
+    const newContainer = container.cloneNode(true);
+    container.parentNode.replaceChild(newContainer, container);
+    container = newContainer;
+
+    // Phase 2: Create enhanced answer options if available
+    const optionsPlaceholder = container.querySelector('#quiz-options-placeholder');
+    if (optionsPlaceholder && typeof createAnswerOptionsContainer === 'function') {
+        const optionsContainer = createAnswerOptionsContainer(
+            question.options,
+            userAnswer,
+            userAnswer !== null,
+            userAnswer !== null ? question.correct_index : null
+        );
+        optionsPlaceholder.replaceWith(optionsContainer);
+
+        // CRITICAL FIX: Cleanup old Phase 2 listeners before adding new ones
+        if (phase2Cleanup && typeof phase2Cleanup === 'function') {
+            phase2Cleanup();
+            phase2Cleanup = null;
+        }
+
+        // CRITICAL FIX: Use Phase 2 event handlers OR fallback to old handler, not both
+        if (typeof initializePhase2Enhancements === 'function') {
+            // Phase 2 handles all option clicks internally
+            phase2Cleanup = initializePhase2Enhancements(container, selectAnswer);
+        } else {
+            // Fallback: Use event delegation on the container
+            container.addEventListener('click', handleQuizContainerClick);
+        }
+    } else {
+        // No Phase 2: Use event delegation on the container
+        container.addEventListener('click', handleQuizContainerClick);
+    }
 }
 
 /**
@@ -1501,12 +1548,14 @@ function displayCurrentQuestion(container) {
 function handleQuizContainerClick(event) {
     const target = event.target;
 
-    // Handle quiz option selection
-    const optionBtn = target.closest('.quiz-option');
+    // Handle quiz option selection (both old and Phase 2 enhanced options)
+    const optionBtn = target.closest('.quiz-option') || target.closest('.quiz-option-enhanced');
     if (optionBtn && !optionBtn.disabled) {
-        const index = parseInt(optionBtn.dataset.answerIndex, 10);
-        selectAnswer(index);
-        return;
+        const index = parseInt(optionBtn.dataset.answerIndex || optionBtn.dataset.optionIndex, 10);
+        if (!isNaN(index)) {
+            selectAnswer(index);
+            return;
+        }
     }
 
     // Handle previous button
@@ -1754,6 +1803,12 @@ function restartQuiz() {
         quizEnhancements.timer = null;
     }
     quizEnhancements = null;
+
+    // CRITICAL FIX: Cleanup Phase 2 event listeners
+    if (phase2Cleanup && typeof phase2Cleanup === 'function') {
+        phase2Cleanup();
+        phase2Cleanup = null;
+    }
 
     // Reset state
     quizState = {

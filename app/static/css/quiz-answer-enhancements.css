@@ -1,0 +1,355 @@
+/**
+ * Quiz Answer Options Enhancements - Phase 2 Styles
+ * 
+ * Features:
+ * - Enhanced hover effects
+ * - Better selected state styling
+ * - Answer feedback (correct/incorrect)
+ * - Smooth animations
+ * - Ripple effects
+ * 
+ * Performance: GPU-accelerated animations (transform, opacity)
+ * Accessibility: High contrast, focus indicators, ARIA support
+ */
+
+/* Answer Options Container */
+.quiz-options-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    margin: 1.5rem 0;
+}
+
+/* Enhanced Answer Option */
+.quiz-option-enhanced {
+    position: relative;
+    display: flex;
+    align-items: center;
+    width: 100%;
+    padding: 1rem 1.25rem;
+    background: var(--option-bg, #ffffff);
+    border: 2px solid var(--option-border, #e0e0e0);
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    font-size: 1rem;
+    text-align: left;
+    overflow: hidden;
+    
+    /* GPU acceleration */
+    will-change: transform, box-shadow;
+    transform: translateZ(0);
+}
+
+.option-content {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    width: 100%;
+    position: relative;
+    z-index: 1;
+}
+
+/* Option Letter (A, B, C, D) */
+.option-letter {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    background: var(--option-letter-bg, #f5f5f5);
+    border-radius: 50%;
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: var(--option-letter-color, #666);
+    flex-shrink: 0;
+    transition: all 0.3s ease;
+}
+
+/* Option Text */
+.option-text {
+    flex: 1;
+    color: var(--text-primary, #1a1a1a);
+    line-height: 1.5;
+}
+
+/* Checkmark Icon */
+.option-checkmark {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    background: var(--primary, #2196f3);
+    color: white;
+    border-radius: 50%;
+    font-size: 1rem;
+    font-weight: bold;
+    flex-shrink: 0;
+    animation: checkmarkAppear 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+@keyframes checkmarkAppear {
+    0% {
+        transform: scale(0) rotate(-45deg);
+        opacity: 0;
+    }
+    100% {
+        transform: scale(1) rotate(0deg);
+        opacity: 1;
+    }
+}
+
+/* Feedback Icon (Correct/Incorrect) */
+.option-feedback-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 50%;
+    font-size: 1rem;
+    font-weight: bold;
+    flex-shrink: 0;
+    animation: feedbackAppear 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+@keyframes feedbackAppear {
+    0% {
+        transform: scale(0) rotate(180deg);
+        opacity: 0;
+    }
+    100% {
+        transform: scale(1) rotate(0deg);
+        opacity: 1;
+    }
+}
+
+/* Hover State */
+.quiz-option-enhanced:hover:not(.disabled) {
+    border-color: var(--primary, #2196f3);
+    box-shadow: 0 4px 12px rgba(33, 150, 243, 0.15);
+    transform: translateY(-2px);
+}
+
+.quiz-option-enhanced:hover:not(.disabled) .option-letter {
+    background: var(--primary-light, #e3f2fd);
+    color: var(--primary, #2196f3);
+}
+
+/* Focus State */
+.quiz-option-enhanced:focus {
+    outline: 2px solid var(--primary, #2196f3);
+    outline-offset: 2px;
+}
+
+.quiz-option-enhanced:focus:not(:focus-visible) {
+    outline: none;
+}
+
+/* Active/Pressed State */
+.quiz-option-enhanced:active:not(.disabled) {
+    transform: scale(0.98);
+}
+
+/* Selected State */
+.quiz-option-enhanced.selected {
+    background: var(--primary-light, #e3f2fd);
+    border-color: var(--primary, #2196f3);
+    box-shadow: 0 2px 8px rgba(33, 150, 243, 0.2);
+}
+
+.quiz-option-enhanced.selected .option-letter {
+    background: var(--primary, #2196f3);
+    color: white;
+}
+
+/* Disabled State */
+.quiz-option-enhanced.disabled {
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+/* Correct Answer State */
+.quiz-option-enhanced.correct {
+    background: var(--success-light, #e8f5e9);
+    border-color: var(--success, #4caf50);
+    animation: correctPulse 0.6s ease;
+}
+
+.quiz-option-enhanced.correct .option-letter {
+    background: var(--success, #4caf50);
+    color: white;
+}
+
+.quiz-option-enhanced.correct .option-feedback-icon {
+    background: var(--success, #4caf50);
+    color: white;
+}
+
+@keyframes correctPulse {
+    0%, 100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.02);
+    }
+}
+
+/* Incorrect Answer State */
+.quiz-option-enhanced.incorrect {
+    background: var(--danger-light, #ffebee);
+    border-color: var(--danger, #f44336);
+    animation: incorrectShake 0.5s ease;
+}
+
+.quiz-option-enhanced.incorrect .option-letter {
+    background: var(--danger, #f44336);
+    color: white;
+}
+
+.quiz-option-enhanced.incorrect .option-feedback-icon {
+    background: var(--danger, #f44336);
+    color: white;
+}
+
+@keyframes incorrectShake {
+    0%, 100% {
+        transform: translateX(0);
+    }
+    25% {
+        transform: translateX(-5px);
+    }
+    75% {
+        transform: translateX(5px);
+    }
+}
+
+/* Ripple Effect */
+.ripple-effect {
+    position: absolute;
+    border-radius: 50%;
+    background: rgba(33, 150, 243, 0.3);
+    transform: scale(0);
+    animation: ripple 0.6s ease-out;
+    pointer-events: none;
+}
+
+@keyframes ripple {
+    to {
+        transform: scale(2);
+        opacity: 0;
+    }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .quiz-option-enhanced {
+        padding: 0.875rem 1rem;
+        font-size: 0.9375rem;
+    }
+    
+    .option-letter {
+        width: 1.75rem;
+        height: 1.75rem;
+        font-size: 0.8125rem;
+    }
+    
+    .option-checkmark,
+    .option-feedback-icon {
+        width: 1.25rem;
+        height: 1.25rem;
+        font-size: 0.875rem;
+    }
+    
+    .option-content {
+        gap: 0.75rem;
+    }
+}
+
+/* Touch Devices - Larger tap targets */
+@media (hover: none) and (pointer: coarse) {
+    .quiz-option-enhanced {
+        min-height: 56px; /* Minimum touch target size */
+        padding: 1rem 1.25rem;
+    }
+}
+
+/* High Contrast Mode */
+@media (prefers-contrast: high) {
+    .quiz-option-enhanced {
+        border-width: 3px;
+    }
+    
+    .quiz-option-enhanced.selected,
+    .quiz-option-enhanced.correct,
+    .quiz-option-enhanced.incorrect {
+        border-width: 4px;
+    }
+}
+
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+    .quiz-option-enhanced,
+    .option-letter,
+    .option-checkmark,
+    .option-feedback-icon,
+    .ripple-effect {
+        animation: none;
+        transition: none;
+    }
+    
+    .quiz-option-enhanced:hover:not(.disabled) {
+        transform: none;
+    }
+}
+
+/* Dark Mode */
+@media (prefers-color-scheme: dark) {
+    .quiz-option-enhanced {
+        background: var(--option-bg-dark, #2a2a2a);
+        border-color: var(--option-border-dark, #424242);
+    }
+    
+    .option-letter {
+        background: var(--option-letter-bg-dark, #3a3a3a);
+        color: var(--option-letter-color-dark, #b0b0b0);
+    }
+    
+    .option-text {
+        color: var(--text-primary-dark, #ffffff);
+    }
+    
+    .quiz-option-enhanced:hover:not(.disabled) {
+        box-shadow: 0 4px 12px rgba(33, 150, 243, 0.3);
+    }
+    
+    .quiz-option-enhanced.selected {
+        background: var(--primary-dark, #1565c0);
+        border-color: var(--primary-light, #42a5f5);
+    }
+    
+    .quiz-option-enhanced.correct {
+        background: var(--success-dark, #2e7d32);
+        border-color: var(--success-light, #66bb6a);
+    }
+    
+    .quiz-option-enhanced.incorrect {
+        background: var(--danger-dark, #c62828);
+        border-color: var(--danger-light, #ef5350);
+    }
+}
+
+/* Print Styles */
+@media print {
+    .quiz-option-enhanced {
+        border: 1px solid #000;
+        box-shadow: none;
+        page-break-inside: avoid;
+    }
+    
+    .ripple-effect {
+        display: none;
+    }
+}
+

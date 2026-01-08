@@ -48,7 +48,8 @@
       }
     },
     "collectCoverageFrom": [
-      "app/static/js/quiz-display-enhancements.js"
+      "app/static/js/quiz-display-enhancements.js",
+      "app/static/js/quiz-answer-enhancements.js"
     ],
     "testMatch": [
       "**/tests/**/*.test.js"
