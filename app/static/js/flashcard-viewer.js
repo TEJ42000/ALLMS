@@ -98,11 +98,8 @@ class FlashcardViewer {
         // CRITICAL FIX: Prevent touch gesture race conditions
         this.isSwiping = false;
 
-        // CRITICAL FIX: Store beforeunload handler as instance property
-        this.beforeUnloadHandler = () => {
-            this.cleanup();
-        };
-        window.addEventListener('beforeunload', this.beforeUnloadHandler);
+        // HIGH FIX: beforeUnloadHandler is now set up only when needed (when user has progress)
+        this.beforeUnloadHandler = null;
 
         this.init();
     }
@@ -463,6 +460,7 @@ class FlashcardViewer {
 
     /**
      * Flip the current card
+     * HIGH FIX: Set up beforeUnloadHandler when user makes progress
      */
     flipCard() {
         this.isFlipped = !this.isFlipped;
@@ -470,10 +468,12 @@ class FlashcardViewer {
         if (flashcard) {
             flashcard.classList.toggle('flipped');
         }
-        
+
         // Mark as reviewed when flipped
         if (this.isFlipped) {
             this.reviewedCards.add(this.currentIndex);
+            // HIGH FIX: Set up beforeUnloadHandler now that user has progress
+            this.setupBeforeUnloadHandler();
         }
     }
 
@@ -537,12 +537,15 @@ class FlashcardViewer {
     /**
      * Toggle star on current card
      * CRITICAL FIX: Remove old listeners before re-rendering
+     * HIGH FIX: Set up beforeUnloadHandler when user makes progress
      */
     toggleStar() {
         if (this.starredCards.has(this.currentIndex)) {
             this.starredCards.delete(this.currentIndex);
         } else {
             this.starredCards.add(this.currentIndex);
+            // HIGH FIX: Set up beforeUnloadHandler now that user has progress
+            this.setupBeforeUnloadHandler();
         }
         this.cleanupEventListeners();  // CRITICAL: Remove old listeners first
         this.render();
@@ -552,12 +555,15 @@ class FlashcardViewer {
     /**
      * Toggle known status on current card
      * CRITICAL FIX: Remove old listeners before re-rendering
+     * HIGH FIX: Set up beforeUnloadHandler when user makes progress
      */
     toggleKnown() {
         if (this.knownCards.has(this.currentIndex)) {
             this.knownCards.delete(this.currentIndex);
         } else {
             this.knownCards.add(this.currentIndex);
+            // HIGH FIX: Set up beforeUnloadHandler now that user has progress
+            this.setupBeforeUnloadHandler();
         }
         this.cleanupEventListeners();  // CRITICAL: Remove old listeners first
         this.render();
@@ -870,6 +876,35 @@ class FlashcardViewer {
             };
             document.addEventListener('keydown', escHandler);
         });
+    }
+
+    /**
+     * Setup beforeUnloadHandler to warn user about losing progress
+     * HIGH FIX: Only set up when user has actual progress to lose
+     */
+    setupBeforeUnloadHandler() {
+        // Only set up if not already set up
+        if (this.beforeUnloadHandler) {
+            return;
+        }
+
+        // Only warn if user has progress
+        const hasProgress = this.reviewedCards.size > 0 ||
+                           this.knownCards.size > 0 ||
+                           this.starredCards.size > 0;
+
+        if (!hasProgress) {
+            return;
+        }
+
+        this.beforeUnloadHandler = (e) => {
+            // Modern browsers ignore custom messages, but we still need to return a value
+            e.preventDefault();
+            e.returnValue = '';
+            return '';
+        };
+
+        window.addEventListener('beforeunload', this.beforeUnloadHandler);
     }
 
     /**

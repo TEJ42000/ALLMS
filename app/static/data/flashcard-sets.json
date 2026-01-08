@@ -3,7 +3,6 @@
         "id": 1,
         "title": "ECHR Fundamentals",
         "description": "Basic concepts and principles of the European Convention on Human Rights",
-        "cardCount": 20,
         "cards": [
             { "question": "What does ECHR stand for?", "answer": "European Convention on Human Rights" },
             { "question": "When was the ECHR adopted?", "answer": "November 4, 1950" },
@@ -31,7 +30,6 @@
         "id": 2,
         "title": "Legal Terminology",
         "description": "Essential legal terms and definitions",
-        "cardCount": 15,
         "cards": [
             { "term": "Tort", "definition": "A civil wrong that causes harm or loss" },
             { "term": "Plaintiff", "definition": "The party who initiates a lawsuit" },
@@ -54,7 +52,6 @@
         "id": 3,
         "title": "Case Law Essentials",
         "description": "Important cases and their holdings",
-        "cardCount": 10,
         "cards": [
             { "question": "What was the holding in Handyside v UK (1976)?", "answer": "Freedom of expression includes information that may offend, shock, or disturb" },
             { "question": "What principle was established in Sunday Times v UK (1979)?", "answer": "Restrictions on freedom of expression must be prescribed by law" },
