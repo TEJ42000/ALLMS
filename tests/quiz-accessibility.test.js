@@ -213,7 +213,7 @@ describe('Quiz Accessibility - Phase 5', () => {
     describe('announceQuestionChange', () => {
         test('announces question change', (done) => {
             announceQuestionChange(1, 10, 'What is the answer?');
-            
+
             setTimeout(() => {
                 const region = document.getElementById('quiz-sr-announcements');
                 expect(region.textContent).toContain('Question 1 of 10');
@@ -221,12 +221,27 @@ describe('Quiz Accessibility - Phase 5', () => {
                 done();
             }, 150);
         });
+
+        test('validates questionNumber parameter', () => {
+            expect(() => announceQuestionChange(-1, 10, 'Test')).not.toThrow();
+            expect(() => announceQuestionChange(0, 10, 'Test')).not.toThrow();
+        });
+
+        test('validates totalQuestions parameter', () => {
+            expect(() => announceQuestionChange(1, 0, 'Test')).not.toThrow();
+            expect(() => announceQuestionChange(1, -1, 'Test')).not.toThrow();
+        });
+
+        test('validates questionText parameter', () => {
+            expect(() => announceQuestionChange(1, 10, '')).not.toThrow();
+            expect(() => announceQuestionChange(1, 10, null)).not.toThrow();
+        });
     });
     
     describe('announceAnswerSelection', () => {
         test('announces answer selection', (done) => {
             announceAnswerSelection('Option text', 'A');
-            
+
             setTimeout(() => {
                 const region = document.getElementById('quiz-sr-announcements');
                 expect(region.textContent).toContain('Selected option A');
@@ -234,12 +249,22 @@ describe('Quiz Accessibility - Phase 5', () => {
                 done();
             }, 150);
         });
+
+        test('validates optionText parameter', () => {
+            expect(() => announceAnswerSelection('', 'A')).not.toThrow();
+            expect(() => announceAnswerSelection(null, 'A')).not.toThrow();
+        });
+
+        test('validates optionLetter parameter', () => {
+            expect(() => announceAnswerSelection('Test', '')).not.toThrow();
+            expect(() => announceAnswerSelection('Test', null)).not.toThrow();
+        });
     });
     
     describe('announceTimerWarning', () => {
         test('announces timer warning', (done) => {
             announceTimerWarning(30);
-            
+
             setTimeout(() => {
                 const region = document.getElementById('quiz-sr-announcements');
                 expect(region.textContent).toContain('Warning');
@@ -247,12 +272,17 @@ describe('Quiz Accessibility - Phase 5', () => {
                 done();
             }, 150);
         });
+
+        test('validates secondsRemaining parameter', () => {
+            expect(() => announceTimerWarning(-1)).not.toThrow();
+            expect(() => announceTimerWarning(null)).not.toThrow();
+        });
     });
     
     describe('announceQuizCompletion', () => {
         test('announces quiz completion', (done) => {
             announceQuizCompletion(8, 10);
-            
+
             setTimeout(() => {
                 const region = document.getElementById('quiz-sr-announcements');
                 expect(region.textContent).toContain('Quiz completed');
@@ -260,6 +290,20 @@ describe('Quiz Accessibility - Phase 5', () => {
                 expect(region.textContent).toContain('80 percent');
                 done();
             }, 150);
+        });
+
+        test('validates score parameter', () => {
+            expect(() => announceQuizCompletion(-1, 10)).not.toThrow();
+            expect(() => announceQuizCompletion(null, 10)).not.toThrow();
+        });
+
+        test('validates total parameter', () => {
+            expect(() => announceQuizCompletion(8, 0)).not.toThrow();
+            expect(() => announceQuizCompletion(8, -1)).not.toThrow();
+        });
+
+        test('validates score not greater than total', () => {
+            expect(() => announceQuizCompletion(11, 10)).not.toThrow();
         });
     });
     
@@ -321,14 +365,24 @@ describe('Quiz Accessibility - Phase 5', () => {
     describe('ensureVisibleFocus', () => {
         test('adds focus-visible class to container', () => {
             const container = document.createElement('div');
-            
+
             ensureVisibleFocus(container);
-            
+
             expect(container.classList.contains('focus-visible-enabled')).toBeTruthy();
         });
-        
+
         test('validates container parameter', () => {
             expect(() => ensureVisibleFocus(null)).not.toThrow();
+        });
+
+        test('prevents duplicate initialization', () => {
+            const container = document.createElement('div');
+
+            ensureVisibleFocus(container);
+            ensureVisibleFocus(container); // Call again
+
+            // Should still only have the class once
+            expect(container.classList.contains('focus-visible-enabled')).toBeTruthy();
         });
     });
     

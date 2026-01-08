@@ -110,9 +110,12 @@ function navigateOptions(direction) {
 function closeActiveModal() {
     const modal = document.querySelector('.modal-overlay');
     if (modal) {
+        // Get modal label for better announcement
+        const modalLabel = modal.getAttribute('aria-label') || 'Dialog';
         modal.remove();
-        announceToScreenReader('Dialog closed');
+        announceToScreenReader(`${modalLabel} closed`);
     }
+    // Don't announce if no modal exists
 }
 
 /**
@@ -163,6 +166,22 @@ function announceToScreenReader(message, priority = 'polite') {
  * @param {string} questionText - Question text
  */
 function announceQuestionChange(questionNumber, totalQuestions, questionText) {
+    // Input validation
+    if (typeof questionNumber !== 'number' || questionNumber < 1) {
+        console.error('announceQuestionChange: questionNumber must be a positive number');
+        return;
+    }
+
+    if (typeof totalQuestions !== 'number' || totalQuestions < 1) {
+        console.error('announceQuestionChange: totalQuestions must be a positive number');
+        return;
+    }
+
+    if (typeof questionText !== 'string' || questionText.trim() === '') {
+        console.error('announceQuestionChange: questionText must be a non-empty string');
+        return;
+    }
+
     const message = `Question ${questionNumber} of ${totalQuestions}: ${questionText}`;
     announceToScreenReader(message);
 }
@@ -173,6 +192,17 @@ function announceQuestionChange(questionNumber, totalQuestions, questionText) {
  * @param {string} optionLetter - Option letter (A, B, C, D)
  */
 function announceAnswerSelection(optionText, optionLetter) {
+    // Input validation
+    if (typeof optionText !== 'string' || optionText.trim() === '') {
+        console.error('announceAnswerSelection: optionText must be a non-empty string');
+        return;
+    }
+
+    if (typeof optionLetter !== 'string' || optionLetter.trim() === '') {
+        console.error('announceAnswerSelection: optionLetter must be a non-empty string');
+        return;
+    }
+
     const message = `Selected option ${optionLetter}: ${optionText}`;
     announceToScreenReader(message);
 }
@@ -182,6 +212,12 @@ function announceAnswerSelection(optionText, optionLetter) {
  * @param {number} secondsRemaining - Seconds remaining
  */
 function announceTimerWarning(secondsRemaining) {
+    // Input validation
+    if (typeof secondsRemaining !== 'number' || secondsRemaining < 0) {
+        console.error('announceTimerWarning: secondsRemaining must be a non-negative number');
+        return;
+    }
+
     const message = `Warning: ${secondsRemaining} seconds remaining`;
     announceToScreenReader(message, 'assertive');
 }
@@ -192,6 +228,22 @@ function announceTimerWarning(secondsRemaining) {
  * @param {number} total - Total questions
  */
 function announceQuizCompletion(score, total) {
+    // Input validation
+    if (typeof score !== 'number' || score < 0) {
+        console.error('announceQuizCompletion: score must be a non-negative number');
+        return;
+    }
+
+    if (typeof total !== 'number' || total <= 0) {
+        console.error('announceQuizCompletion: total must be a positive number');
+        return;
+    }
+
+    if (score > total) {
+        console.error('announceQuizCompletion: score cannot be greater than total');
+        return;
+    }
+
     const percentage = Math.round((score / total) * 100);
     const message = `Quiz completed. You scored ${score} out of ${total}, ${percentage} percent`;
     announceToScreenReader(message, 'assertive');
@@ -312,6 +364,11 @@ function ensureVisibleFocus(container) {
     if (!container || !(container instanceof HTMLElement)) {
         console.error('ensureVisibleFocus: container must be an HTMLElement');
         return;
+    }
+
+    // Check if already initialized to prevent duplicate listeners
+    if (container.classList.contains('focus-visible-enabled')) {
+        return; // Already initialized
     }
 
     // Add focus-visible class to container

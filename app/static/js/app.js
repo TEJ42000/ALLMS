@@ -1655,12 +1655,16 @@ let keyboardNavigationCleanup = null;
 function initializeQuizAccessibility(container) {
     if (!container) return;
 
-    // Only initialize once
-    if (keyboardNavigationCleanup) return;
+    // Prevent race condition: clean up existing initialization first
+    if (keyboardNavigationCleanup) {
+        keyboardNavigationCleanup();
+        keyboardNavigationCleanup = null;
+    }
 
     // Check if accessibility functions are available
     if (typeof initializeKeyboardNavigation !== 'function') {
         console.warn('Quiz accessibility functions not loaded');
+        keyboardNavigationCleanup = () => {}; // Set dummy cleanup to prevent re-initialization
         return;
     }
 
