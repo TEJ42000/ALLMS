@@ -92,11 +92,14 @@ Tests for materials loading functionality.
 - `test_chat_materials_loading_error` - Materials loading error handling
 
 ### 7. TestWeekFiltering (2 tests)
-Tests for week-based filtering.
+Tests for week parameter handling.
 
 **Tests:**
-- `test_topics_filtered_by_week` - Topics filtered by week
-- `test_examples_filtered_by_week` - Examples filtered by week
+- `test_topics_with_week_parameter` - Topics endpoint accepts week parameter
+- `test_examples_with_week_parameter` - Examples endpoint accepts week parameter
+
+**Note:** Week filtering is not yet implemented. These tests verify that endpoints
+accept the week parameter without errors. Actual filtering is a future enhancement.
 
 ### 8. TestErrorHandling (6 tests)
 Tests for comprehensive error handling.
@@ -167,9 +170,9 @@ Tests for handling concurrent requests.
 - Non-existent courses
 
 ### ✅ Functionality
-- Caching (repeated requests)
-- Materials loading
-- Week filtering
+- Caching (repeated requests - basic verification)
+- Materials loading (with proper mocking)
+- Week parameter handling (filtering not yet implemented)
 - Conversation history
 - Context variations
 - Response formatting
@@ -277,9 +280,26 @@ with patch('app.services.anthropic_client.client') as mock_client:
 
 ---
 
-## 🐛 Known Limitations
+## 🐛 Known Limitations & Future Work
 
-None at this time. All tests pass successfully.
+### Current Limitations:
+1. **Cache Testing** - Tests verify repeated requests work, but don't verify actual cache hits
+   - Future: Add tests for cache TTL, key collision, cache invalidation
+
+2. **Week Filtering** - Week parameter is accepted but filtering not yet implemented
+   - Future: Implement actual week filtering in endpoints
+
+3. **Materials Loading** - Tests use mocks, not actual materials
+   - Future: Add integration tests with real materials
+
+### Future Enhancements:
+- [ ] Implement week filtering feature in endpoints
+- [ ] Add cache hit/miss verification tests
+- [ ] Add integration tests without mocks
+- [ ] Test cache TTL and expiration
+- [ ] Test cache key collision handling
+- [ ] Refactor concurrent request tests for better isolation
+- [ ] Add performance benchmarks
 
 ---
 
