@@ -136,21 +136,32 @@ function createAnswerOptionsContainer(options, selectedIndex = null, isDisabled 
  * @param {MouseEvent} event - Click event
  */
 function addRippleEffect(option, event) {
+    // HIGH: Input validation
+    if (!option || !(option instanceof HTMLElement)) {
+        console.error('addRippleEffect: option must be an HTMLElement');
+        return;
+    }
+
+    if (!event || typeof event.clientX !== 'number' || typeof event.clientY !== 'number') {
+        console.error('addRippleEffect: event must have clientX and clientY properties');
+        return;
+    }
+
     const ripple = document.createElement('span');
     ripple.className = 'ripple-effect';
-    
+
     // Calculate ripple position
     const rect = option.getBoundingClientRect();
     const size = Math.max(rect.width, rect.height);
     const x = event.clientX - rect.left - size / 2;
     const y = event.clientY - rect.top - size / 2;
-    
+
     ripple.style.width = ripple.style.height = `${size}px`;
     ripple.style.left = `${x}px`;
     ripple.style.top = `${y}px`;
-    
+
     option.appendChild(ripple);
-    
+
     // Remove ripple after animation
     setTimeout(() => {
         ripple.remove();
@@ -214,8 +225,39 @@ function handleOptionSelection(option, onSelect) {
  * @param {number|null} selectedIndex - Index of selected answer
  */
 function showAnswerFeedback(container, correctIndex, selectedIndex = null) {
+    // HIGH: Input validation
+    if (!container || !(container instanceof HTMLElement)) {
+        console.error('showAnswerFeedback: container must be an HTMLElement');
+        return;
+    }
+
+    if (typeof correctIndex !== 'number' || !Number.isInteger(correctIndex) || correctIndex < 0) {
+        console.error('showAnswerFeedback: correctIndex must be a non-negative integer');
+        return;
+    }
+
+    if (selectedIndex !== null && (typeof selectedIndex !== 'number' || !Number.isInteger(selectedIndex) || selectedIndex < 0)) {
+        console.error('showAnswerFeedback: selectedIndex must be null or a non-negative integer');
+        return;
+    }
+
     const options = container.querySelectorAll('.quiz-option-enhanced');
-    
+
+    if (options.length === 0) {
+        console.error('showAnswerFeedback: no options found in container');
+        return;
+    }
+
+    if (correctIndex >= options.length) {
+        console.error(`showAnswerFeedback: correctIndex ${correctIndex} is out of bounds (max: ${options.length - 1})`);
+        return;
+    }
+
+    if (selectedIndex !== null && selectedIndex >= options.length) {
+        console.error(`showAnswerFeedback: selectedIndex ${selectedIndex} is out of bounds (max: ${options.length - 1})`);
+        return;
+    }
+
     options.forEach((option, index) => {
         // Disable all options
         option.classList.add('disabled');
@@ -260,28 +302,43 @@ function showAnswerFeedback(container, correctIndex, selectedIndex = null) {
  * @param {Function} onOptionSelect - Callback when option is selected
  */
 function initializePhase2Enhancements(container, onOptionSelect) {
-    // Use event delegation for better performance
-    container.addEventListener('click', (event) => {
+    // CRITICAL FIX: Use event delegation for better performance
+    // Store handler references for cleanup
+    const clickHandler = (event) => {
         const option = event.target.closest('.quiz-option-enhanced');
         if (option) {
+            // CRITICAL FIX: Stop propagation to prevent double handling
+            event.stopPropagation();
+
             // Add ripple effect
             addRippleEffect(option, event);
-            
+
             // Handle selection
             handleOptionSelection(option, onOptionSelect);
         }
-    });
-    
-    // Keyboard navigation
-    container.addEventListener('keydown', (event) => {
+    };
+
+    const keydownHandler = (event) => {
         const option = event.target.closest('.quiz-option-enhanced');
         if (!option) return;
-        
+
         if (event.key === 'Enter' || event.key === ' ') {
             event.preventDefault();
+            // CRITICAL FIX: Stop propagation to prevent double handling
+            event.stopPropagation();
             handleOptionSelection(option, onOptionSelect);
         }
-    });
+    };
+
+    // Add event listeners
+    container.addEventListener('click', clickHandler);
+    container.addEventListener('keydown', keydownHandler);
+
+    // CRITICAL FIX: Return cleanup function to remove listeners
+    return () => {
+        container.removeEventListener('click', clickHandler);
+        container.removeEventListener('keydown', keydownHandler);
+    };
 }
 
 // Export for use in main app.js (both Node.js and browser)

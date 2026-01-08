@@ -1000,6 +1000,9 @@ let isGeneratingQuiz = false;
 // Phase 1: Enhancement utilities (timer, progress bar, etc.)
 let quizEnhancements = null;
 
+// Phase 2: Cleanup function for event listeners
+let phase2Cleanup = null;
+
 // Simulated user ID (stored in localStorage until real auth)
 function getUserId() {
     let userId = localStorage.getItem('allms_user_id');
@@ -1242,6 +1245,12 @@ function backToQuizList() {
     }
     quizEnhancements = null;
 
+    // CRITICAL FIX: Cleanup Phase 2 event listeners
+    if (phase2Cleanup && typeof phase2Cleanup === 'function') {
+        phase2Cleanup();
+        phase2Cleanup = null;
+    }
+
     const selectionView = document.getElementById('quiz-selection-view');
     const quizContent = document.getElementById('quiz-content');
 
@@ -1479,6 +1488,13 @@ function displayCurrentQuestion(container) {
 
     container.innerHTML = html;
 
+    // CRITICAL FIX: Remove old event listeners before adding new ones
+    // Clone and replace to remove all event listeners
+    const oldContainer = container;
+    const newContainer = container.cloneNode(true);
+    container.parentNode.replaceChild(newContainer, container);
+    container = newContainer;
+
     // Phase 2: Create enhanced answer options if available
     const optionsPlaceholder = container.querySelector('#quiz-options-placeholder');
     if (optionsPlaceholder && typeof createAnswerOptionsContainer === 'function') {
@@ -1490,14 +1506,24 @@ function displayCurrentQuestion(container) {
         );
         optionsPlaceholder.replaceWith(optionsContainer);
 
-        // Initialize Phase 2 event handlers
-        if (typeof initializePhase2Enhancements === 'function') {
-            initializePhase2Enhancements(container, selectAnswer);
+        // CRITICAL FIX: Cleanup old Phase 2 listeners before adding new ones
+        if (phase2Cleanup && typeof phase2Cleanup === 'function') {
+            phase2Cleanup();
+            phase2Cleanup = null;
         }
-    }
 
-    // Use event delegation on the container to avoid memory leaks from per-element listeners
-    container.addEventListener('click', handleQuizContainerClick);
+        // CRITICAL FIX: Use Phase 2 event handlers OR fallback to old handler, not both
+        if (typeof initializePhase2Enhancements === 'function') {
+            // Phase 2 handles all option clicks internally
+            phase2Cleanup = initializePhase2Enhancements(container, selectAnswer);
+        } else {
+            // Fallback: Use event delegation on the container
+            container.addEventListener('click', handleQuizContainerClick);
+        }
+    } else {
+        // No Phase 2: Use event delegation on the container
+        container.addEventListener('click', handleQuizContainerClick);
+    }
 }
 
 /**
@@ -1762,6 +1788,12 @@ function restartQuiz() {
         quizEnhancements.timer = null;
     }
     quizEnhancements = null;
+
+    // CRITICAL FIX: Cleanup Phase 2 event listeners
+    if (phase2Cleanup && typeof phase2Cleanup === 'function') {
+        phase2Cleanup();
+        phase2Cleanup = null;
+    }
 
     // Reset state
     quizState = {
