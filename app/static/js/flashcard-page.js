@@ -12,84 +12,36 @@
 // Flashcard data and initialization
 let flashcardViewer = null;
 
-// Sample flashcard sets (replace with API call in Phase 2)
-const flashcardSets = [
-    {
-        id: 1,
-        title: "ECHR Fundamentals",
-        description: "Basic concepts and principles of the European Convention on Human Rights",
-        cardCount: 20,
-        cards: [
-            { question: "What does ECHR stand for?", answer: "European Convention on Human Rights" },
-            { question: "When was the ECHR adopted?", answer: "November 4, 1950" },
-            { question: "How many articles are in the ECHR?", answer: "59 articles" },
-            { question: "What is Article 2 of the ECHR?", answer: "Right to life" },
-            { question: "What is Article 3 of the ECHR?", answer: "Prohibition of torture" },
-            { question: "What is Article 5 of the ECHR?", answer: "Right to liberty and security" },
-            { question: "What is Article 6 of the ECHR?", answer: "Right to a fair trial" },
-            { question: "What is Article 8 of the ECHR?", answer: "Right to respect for private and family life" },
-            { question: "What is Article 10 of the ECHR?", answer: "Freedom of expression" },
-            { question: "What is Article 11 of the ECHR?", answer: "Freedom of assembly and association" },
-            { question: "Where is the European Court of Human Rights located?", answer: "Strasbourg, France" },
-            { question: "How many judges are on the European Court of Human Rights?", answer: "One judge per member state" },
-            { question: "What is the principle of subsidiarity in ECHR?", answer: "National authorities are primarily responsible for protecting rights" },
-            { question: "What is the margin of appreciation?", answer: "Discretion given to states in implementing Convention rights" },
-            { question: "What is a derogation under ECHR?", answer: "Temporary suspension of certain rights in emergencies" },
-            { question: "What is Article 14 of the ECHR?", answer: "Prohibition of discrimination" },
-            { question: "What is Protocol 1, Article 1?", answer: "Protection of property" },
-            { question: "What is the 'living instrument' doctrine?", answer: "ECHR is interpreted in light of present-day conditions" },
-            { question: "What is the exhaustion of domestic remedies rule?", answer: "Applicants must use all available national remedies before applying to ECtHR" },
-            { question: "What is a pilot judgment?", answer: "Judgment addressing systemic issues affecting many cases" }
-        ]
-    },
-    {
-        id: 2,
-        title: "Legal Terminology",
-        description: "Essential legal terms and definitions",
-        cardCount: 15,
-        cards: [
-            { term: "Tort", definition: "A civil wrong that causes harm or loss" },
-            { term: "Plaintiff", definition: "The party who initiates a lawsuit" },
-            { term: "Defendant", definition: "The party being sued or accused" },
-            { term: "Burden of proof", definition: "The obligation to prove one's assertion" },
-            { term: "Precedent", definition: "A legal decision that serves as an authoritative rule in future cases" },
-            { term: "Jurisdiction", definition: "The authority of a court to hear and decide a case" },
-            { term: "Statute", definition: "A written law passed by a legislative body" },
-            { term: "Common law", definition: "Law developed through judicial decisions rather than statutes" },
-            { term: "Equity", definition: "A system of law based on fairness and justice" },
-            { term: "Injunction", definition: "A court order requiring a party to do or refrain from doing something" },
-            { term: "Damages", definition: "Monetary compensation for loss or injury" },
-            { term: "Liability", definition: "Legal responsibility for one's actions or omissions" },
-            { term: "Negligence", definition: "Failure to exercise reasonable care" },
-            { term: "Breach", definition: "Violation of a law, obligation, or agreement" },
-            { term: "Remedy", definition: "Legal means to enforce a right or redress a wrong" }
-        ]
-    },
-    {
-        id: 3,
-        title: "Case Law Essentials",
-        description: "Important cases and their holdings",
-        cardCount: 10,
-        cards: [
-            { question: "What was the holding in Handyside v UK (1976)?", answer: "Freedom of expression includes information that may offend, shock, or disturb" },
-            { question: "What principle was established in Sunday Times v UK (1979)?", answer: "Restrictions on freedom of expression must be prescribed by law" },
-            { question: "What was decided in Soering v UK (1989)?", answer: "Extradition may violate Article 3 if it exposes person to inhuman treatment" },
-            { question: "What did McCann v UK (1995) establish?", answer: "Use of lethal force must be absolutely necessary" },
-            { question: "What was the outcome of Pretty v UK (2002)?", answer: "No right to die under Article 2" },
-            { question: "What principle came from Tyrer v UK (1978)?", answer: "Corporal punishment violates Article 3" },
-            { question: "What was decided in Golder v UK (1975)?", answer: "Right of access to court is implicit in Article 6" },
-            { question: "What did Marckx v Belgium (1979) establish?", answer: "Discrimination against children born out of wedlock violates Article 8" },
-            { question: "What was the holding in Dudgeon v UK (1981)?", answer: "Criminalization of homosexual acts violates Article 8" },
-            { question: "What principle was established in Airey v Ireland (1979)?", answer: "Effective access to court may require legal aid" }
-        ]
-    }
-];
+// MEDIUM FIX: Track event listeners for cleanup
+let setsClickHandler = null;
+
+// MEDIUM FIX: Load flashcard sets from JSON file instead of hardcoding
+let flashcardSets = [];
 
 // Load flashcard sets on page load
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
+    await loadFlashcardData();
     loadFlashcardSets();
     setupBackButton();
 });
+
+/**
+ * Load flashcard data from JSON file
+ * MEDIUM FIX: Separate data from code
+ */
+async function loadFlashcardData() {
+    try {
+        const response = await fetch('/static/data/flashcard-sets.json');
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        flashcardSets = await response.json();
+        console.log('[FlashcardPage] Loaded', flashcardSets.length, 'flashcard sets');
+    } catch (error) {
+        console.error('[FlashcardPage] Error loading flashcard data:', error);
+        showError('Failed to load flashcard sets. Please refresh the page.');
+    }
+}
 
 /**
  * Load and display flashcard sets
@@ -121,13 +73,27 @@ function loadFlashcardSets() {
         </div>
     `).join('');
 
+    // MEDIUM FIX: Remove old event listener before adding new one
+    if (setsClickHandler) {
+        setsContainer.removeEventListener('click', setsClickHandler);
+    }
+
     // HIGH FIX: Use event delegation instead of inline onclick
-    setsContainer.addEventListener('click', function(e) {
+    setsClickHandler = function(e) {
         if (e.target.classList.contains('btn-study')) {
             const setId = parseInt(e.target.getAttribute('data-set-id'));
+
+            // MEDIUM FIX: Validate setId is a valid number
+            if (isNaN(setId) || setId <= 0) {
+                console.error('[FlashcardPage] Invalid set ID:', setId);
+                showError('Invalid flashcard set. Please try again.');
+                return;
+            }
+
             startFlashcards(setId);
         }
-    });
+    };
+    setsContainer.addEventListener('click', setsClickHandler);
 }
 
 /**
@@ -164,7 +130,7 @@ function startFlashcards(setId) {
         window.flashcardViewer = flashcardViewer;
     } catch (error) {
         console.error('[FlashcardPage] Error initializing flashcard viewer:', error);
-        alert('Failed to start flashcard viewer. Please try again.');
+        showError('Failed to start flashcard viewer. Please try again.');
     }
 }
 
@@ -203,5 +169,43 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+/**
+ * Show error message with better UI
+ * MEDIUM FIX: Replace generic alert with styled error message
+ */
+function showError(message) {
+    // Create error overlay
+    const overlay = document.createElement('div');
+    overlay.className = 'error-overlay';
+    overlay.innerHTML = `
+        <div class="error-dialog" role="alertdialog" aria-labelledby="error-title" aria-describedby="error-message">
+            <div class="error-icon" aria-hidden="true">⚠️</div>
+            <h2 id="error-title">Error</h2>
+            <p id="error-message">${escapeHtml(message)}</p>
+            <button class="btn-primary" id="btn-close-error" autofocus>OK</button>
+        </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    // Close on button click
+    const btnClose = document.getElementById('btn-close-error');
+    if (btnClose) {
+        btnClose.addEventListener('click', () => {
+            document.body.removeChild(overlay);
+        });
+        btnClose.focus();
+    }
+
+    // Close on ESC key
+    const escHandler = (e) => {
+        if (e.key === 'Escape') {
+            document.body.removeChild(overlay);
+            document.removeEventListener('keydown', escHandler);
+        }
+    };
+    document.addEventListener('keydown', escHandler);
 }
 

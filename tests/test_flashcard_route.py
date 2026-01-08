@@ -54,10 +54,25 @@ class TestFlashcardRoute:
         response = client.get('/flashcards')
         assert 'id="flashcard-sets"' in response.text
 
-    def test_flashcard_page_has_sample_data(self, client):
-        """Test that page includes sample flashcard data."""
+    def test_flashcard_page_includes_page_js(self, client):
+        """Test that page includes flashcard-page.js (external file)."""
         response = client.get('/flashcards')
-        assert 'ECHR Fundamentals' in response.text
-        assert 'Legal Terminology' in response.text
-        assert 'Case Law Essentials' in response.text
+        assert 'flashcard-page.js' in response.text
+
+    def test_flashcard_page_includes_page_css(self, client):
+        """Test that page includes flashcard-page.css (external file)."""
+        response = client.get('/flashcards')
+        assert 'flashcard-page.css' in response.text
+
+    def test_flashcard_page_no_inline_scripts(self, client):
+        """Test that page has no inline scripts (CSP compliance)."""
+        response = client.get('/flashcards')
+        # Should not have inline script tags with content
+        assert '<script>' not in response.text or 'flashcard-page.js' in response.text
+
+    def test_flashcard_page_no_inline_styles(self, client):
+        """Test that page has no inline styles (CSP compliance)."""
+        response = client.get('/flashcards')
+        # Should not have inline style tags
+        assert '<style>' not in response.text
 
