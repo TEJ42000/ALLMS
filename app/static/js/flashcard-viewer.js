@@ -245,7 +245,8 @@ class FlashcardViewer {
                 </div>
 
                 <!-- Study Stats -->
-                <div class="flashcard-stats">
+                <!-- MEDIUM FIX: Add ARIA live region to stats -->
+                <div class="flashcard-stats" role="status" aria-live="polite" aria-atomic="false">
                     <div class="stat">
                         <span class="stat-label">Reviewed:</span>
                         <span class="stat-value">${Math.max(0, this.reviewedCards.size)}</span>
@@ -275,25 +276,27 @@ class FlashcardViewer {
     /**
      * Setup event listeners for controls
      * MEDIUM FIX: Add keyboard handler for flashcard div
+     * MEDIUM FIX: Add try-catch for error handling
      */
     setupEventListeners() {
-        // Flip card on click
-        const flashcard = document.getElementById('flashcard');
-        if (flashcard) {
-            const flipHandler = () => this.flipCard();
-            flashcard.addEventListener('click', flipHandler);
-            this.eventListeners.push({ element: flashcard, event: 'click', handler: flipHandler });
+        try {
+            // Flip card on click
+            const flashcard = document.getElementById('flashcard');
+            if (flashcard) {
+                const flipHandler = () => this.flipCard();
+                flashcard.addEventListener('click', flipHandler);
+                this.eventListeners.push({ element: flashcard, event: 'click', handler: flipHandler });
 
-            // MEDIUM FIX: Add keyboard handler for Enter/Space on flashcard
-            const keyHandler = (e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    this.flipCard();
-                }
-            };
-            flashcard.addEventListener('keydown', keyHandler);
-            this.eventListeners.push({ element: flashcard, event: 'keydown', handler: keyHandler });
-        }
+                // MEDIUM FIX: Add keyboard handler for Enter/Space on flashcard
+                const keyHandler = (e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        this.flipCard();
+                    }
+                };
+                flashcard.addEventListener('keydown', keyHandler);
+                this.eventListeners.push({ element: flashcard, event: 'keydown', handler: keyHandler });
+            }
 
         // Navigation buttons
         const btnPrevious = document.getElementById('btn-previous');
@@ -344,6 +347,11 @@ class FlashcardViewer {
             const restartHandler = () => this.restart();
             btnRestart.addEventListener('click', restartHandler);
             this.eventListeners.push({ element: btnRestart, event: 'click', handler: restartHandler });
+        }
+        } catch (error) {
+            // MEDIUM FIX: Catch and log setup errors
+            console.error('[FlashcardViewer] Error setting up event listeners:', error);
+            this.showError('Failed to setup flashcard controls');
         }
     }
 
@@ -575,8 +583,19 @@ class FlashcardViewer {
     /**
      * Restart from the beginning
      * CRITICAL FIX: Remove old listeners before re-rendering
+     * MEDIUM FIX: Add confirmation dialog
      */
     restart() {
+        // MEDIUM FIX: Confirm restart if user has progress
+        if (this.reviewedCards.size > 0 || this.knownCards.size > 0 || this.starredCards.size > 0) {
+            const confirmed = confirm(
+                'Restarting will reset all your progress (reviewed, known, and starred cards). Continue?'
+            );
+            if (!confirmed) {
+                return;
+            }
+        }
+
         this.currentIndex = 0;
         this.isFlipped = false;
         this.reviewedCards.clear();
