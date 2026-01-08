@@ -30,11 +30,23 @@ USER_BADGES_COLLECTION = "user_badges"
 
 
 class BadgeService:
-    """Service for managing badges and achievements."""
+    """Service for managing badges and achievements.
+
+    CRITICAL: Includes comprehensive error handling for service unavailability
+    """
 
     def __init__(self):
-        """Initialize badge service."""
-        self.db = get_firestore_client()
+        """Initialize badge service.
+
+        CRITICAL: Handles Firestore unavailability gracefully
+        """
+        try:
+            self.db = get_firestore_client()
+            if not self.db:
+                logger.error("Firestore client is None - badge service degraded")
+        except Exception as e:
+            logger.error(f"Failed to initialize Firestore client: {e}")
+            self.db = None
 
     def check_and_unlock_badges(
         self,
@@ -297,6 +309,9 @@ class BadgeService:
     ) -> Optional[UserBadge]:
         """Unlock a badge for user.
 
+        CRITICAL: Uses Firestore transaction to prevent race conditions
+        CRITICAL: Handles service unavailability gracefully
+
         Args:
             user_id: User's IAP user ID
             badge_def: Badge definition
@@ -304,24 +319,45 @@ class BadgeService:
         Returns:
             UserBadge if successful, None otherwise
         """
+        # CRITICAL: Check if Firestore is available
+        if not self.db:
+            logger.error(f"Cannot unlock badge {badge_def.badge_id} - Firestore unavailable")
+            return None
+
         try:
-            user_badge = UserBadge(
-                user_id=user_id,
-                badge_id=badge_def.badge_id,
-                earned_at=datetime.now(timezone.utc)
-            )
-            
-            # Save to Firestore
             doc_id = f"{user_id}_{badge_def.badge_id}"
-            self.db.collection(USER_BADGES_COLLECTION).document(doc_id).set(
-                user_badge.model_dump(mode='json')
-            )
-            
-            logger.info(f"Badge {badge_def.badge_id} unlocked for user {user_id}")
-            return user_badge
+            doc_ref = self.db.collection(USER_BADGES_COLLECTION).document(doc_id)
+
+            # CRITICAL: Use transaction to prevent race condition
+            # If two requests try to unlock the same badge simultaneously,
+            # only one will succeed
+            @self.db.transactional
+            def unlock_in_transaction(transaction):
+                # Check if badge already exists
+                snapshot = doc_ref.get(transaction=transaction)
+                if snapshot.exists:
+                    logger.info(f"Badge {badge_def.badge_id} already unlocked for {user_id}")
+                    return UserBadge(**snapshot.to_dict())
+
+                # Create new badge
+                user_badge = UserBadge(
+                    user_id=user_id,
+                    badge_id=badge_def.badge_id,
+                    earned_at=datetime.now(timezone.utc)
+                )
+
+                # Save to Firestore within transaction
+                transaction.set(doc_ref, user_badge.model_dump(mode='json'))
+
+                logger.info(f"Badge {badge_def.badge_id} unlocked for user {user_id}")
+                return user_badge
+
+            # Execute transaction
+            transaction = self.db.transaction()
+            return unlock_in_transaction(transaction)
 
         except Exception as e:
-            logger.error(f"Error unlocking badge {badge_def.badge_id} for {user_id}: {e}")
+            logger.error(f"Error unlocking badge {badge_def.badge_id} for {user_id}: {e}", exc_info=True)
             return None
 
     def get_user_badges(self, user_id: str) -> List[UserBadge]:
