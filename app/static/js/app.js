@@ -989,11 +989,16 @@ let quizState = {
     userAnswers: [],
     score: 0,
     isComplete: false,
-    startTime: null      // Track quiz start time
+    startTime: null,     // Track quiz start time
+    timeLimit: null,     // Phase 1: Time limit in seconds (for timed quizzes)
+    flaggedQuestions: [] // Phase 1: Array of flagged question indices
 };
 
 // Race condition protection - prevent multiple simultaneous quiz generations
 let isGeneratingQuiz = false;
+
+// Phase 1: Enhancement utilities (timer, progress bar, etc.)
+let quizEnhancements = null;
 
 // Simulated user ID (stored in localStorage until real auth)
 function getUserId() {
@@ -1197,8 +1202,15 @@ async function startSavedQuiz(quizId) {
             userAnswers: new Array(quiz.questions.length).fill(null),
             score: 0,
             isComplete: false,
-            startTime: Date.now()
+            startTime: Date.now(),
+            timeLimit: quiz.timeLimit || null,  // Phase 1: Timer support
+            flaggedQuestions: []  // Phase 1: Flag for review
         };
+
+        // Phase 1: Initialize enhancements if available
+        if (typeof initializePhase1Enhancements === 'function') {
+            quizEnhancements = initializePhase1Enhancements(quizState);
+        }
 
         // Show quiz content
         showQuizContent();
@@ -1223,6 +1235,13 @@ function showQuizContent() {
 }
 
 function backToQuizList() {
+    // Phase 1: Cleanup timer before leaving quiz
+    if (quizEnhancements && quizEnhancements.timer) {
+        quizEnhancements.timer.stop();
+        quizEnhancements.timer = null;
+    }
+    quizEnhancements = null;
+
     const selectionView = document.getElementById('quiz-selection-view');
     const quizContent = document.getElementById('quiz-content');
 
@@ -1328,8 +1347,15 @@ async function generateQuiz() {
             userAnswers: new Array(quiz.questions.length).fill(null),
             score: 0,
             isComplete: false,
-            startTime: Date.now()
+            startTime: Date.now(),
+            timeLimit: quiz.timeLimit || null,  // Phase 1: Timer support
+            flaggedQuestions: []  // Phase 1: Flag for review
         };
+
+        // Phase 1: Initialize enhancements if available
+        if (typeof initializePhase1Enhancements === 'function') {
+            quizEnhancements = initializePhase1Enhancements(quizState);
+        }
 
         // Show notification if this was an existing quiz
         if (!data.is_new) {
@@ -1394,12 +1420,32 @@ function displayCurrentQuestion(container) {
     const questionNum = quizState.currentQuestionIndex + 1;
     const userAnswer = quizState.userAnswers[quizState.currentQuestionIndex];
 
-    let html = `
-        <div class="quiz-question-card">
+    // Phase 1: Create enhanced question header if enhancements are available
+    let headerHTML = '';
+    if (typeof createEnhancedQuestionHeader === 'function' && quizEnhancements) {
+        const header = createEnhancedQuestionHeader(
+            question,
+            questionNum,
+            quizState.questions.length,
+            quizEnhancements.timer
+        );
+        // Convert DOM element to HTML string
+        const tempDiv = document.createElement('div');
+        tempDiv.appendChild(header);
+        headerHTML = tempDiv.innerHTML;
+    } else {
+        // Fallback to original header
+        headerHTML = `
             <div class="question-header">
                 <h3>Question ${questionNum}</h3>
                 ${question.difficulty ? `<span class="difficulty-badge difficulty-${question.difficulty}">${question.difficulty}</span>` : ''}
             </div>
+        `;
+    }
+
+    let html = `
+        <div class="quiz-question-card">
+            ${headerHTML}
             <p class="question-text">${escapeHtml(question.question)}</p>
             ${question.articles && question.articles.length > 0 ? `
                 <div class="question-articles">
@@ -1702,6 +1748,13 @@ function handleResultsContainerClick(event) {
 }
 
 function restartQuiz() {
+    // Phase 1: Cleanup timer before restarting
+    if (quizEnhancements && quizEnhancements.timer) {
+        quizEnhancements.timer.stop();
+        quizEnhancements.timer = null;
+    }
+    quizEnhancements = null;
+
     // Reset state
     quizState = {
         quizId: null,
@@ -1711,7 +1764,9 @@ function restartQuiz() {
         userAnswers: [],
         score: 0,
         isComplete: false,
-        startTime: null
+        startTime: null,
+        timeLimit: null,
+        flaggedQuestions: []
     };
 
     // Go back to quiz list
