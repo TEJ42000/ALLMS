@@ -94,7 +94,7 @@ class OnboardingTour {
     }
 
     /**
-     * Validate and sanitize CSS selector
+     * Validate and sanitize CSS selector (ReDoS-safe)
      */
     validateSelector(selector) {
         if (!selector || typeof selector !== 'string') {
@@ -104,23 +104,56 @@ class OnboardingTour {
         // Remove potentially dangerous characters
         const sanitized = selector.trim();
 
-        // Enhanced validation for CSS selectors
-        // Allows: .class, #id, element, [attribute], [attribute="value"], combinations
-        // Pattern breakdown:
-        // ^[.#]? - Optional class (.) or id (#) prefix
-        // [\w-]+ - Word characters and hyphens (element/class/id name)
-        // (\[[\w-]+(?:="[\w\s-]+")?\])? - Optional attribute selector
-        // (\s*[.#]?[\w-]+)* - Optional additional selectors (for combinations)
-        const selectorPattern = /^[.#]?[\w-]+(\[[\w-]+(?:="[\w\s-]+")?\])?(\s*[.#>+~]?[\w-]+(\[[\w-]+(?:="[\w\s-]+")?\])?)*$/;
-
-        if (!selectorPattern.test(sanitized)) {
-            console.warn('[OnboardingTour] Invalid selector:', selector);
+        // Length check to prevent ReDoS attacks
+        if (sanitized.length > 200) {
+            console.warn('[OnboardingTour] Selector too long:', selector);
             return null;
         }
 
         // Additional safety check - reject selectors with script-like content
-        if (sanitized.includes('<') || sanitized.includes('>') || sanitized.includes('javascript:')) {
+        if (sanitized.includes('<') || sanitized.includes('javascript:')) {
             console.warn('[OnboardingTour] Potentially dangerous selector:', selector);
+            return null;
+        }
+
+        // Use atomic groups and possessive quantifiers to prevent ReDoS
+        // Split validation into simpler, non-backtracking checks
+
+        // Check 1: Must start with valid selector character
+        if (!/^[.#a-zA-Z]/.test(sanitized)) {
+            console.warn('[OnboardingTour] Invalid selector start:', selector);
+            return null;
+        }
+
+        // Check 2: Only allow safe characters (no backtracking)
+        // Allows: letters, numbers, hyphens, underscores, dots, hashes, brackets, quotes, equals, spaces, combinators
+        if (!/^[a-zA-Z0-9\-_.\#\[\]="'\s>+~]+$/.test(sanitized)) {
+            console.warn('[OnboardingTour] Invalid characters in selector:', selector);
+            return null;
+        }
+
+        // Check 3: Validate bracket pairs are balanced
+        const openBrackets = (sanitized.match(/\[/g) || []).length;
+        const closeBrackets = (sanitized.match(/\]/g) || []).length;
+        if (openBrackets !== closeBrackets) {
+            console.warn('[OnboardingTour] Unbalanced brackets in selector:', selector);
+            return null;
+        }
+
+        // Check 4: Validate quotes are balanced
+        const doubleQuotes = (sanitized.match(/"/g) || []).length;
+        const singleQuotes = (sanitized.match(/'/g) || []).length;
+        if (doubleQuotes % 2 !== 0 || singleQuotes % 2 !== 0) {
+            console.warn('[OnboardingTour] Unbalanced quotes in selector:', selector);
+            return null;
+        }
+
+        // Check 5: Try to use querySelector to validate (safest approach)
+        try {
+            // This will throw if selector is invalid
+            document.createDocumentFragment().querySelector(sanitized);
+        } catch (e) {
+            console.warn('[OnboardingTour] Invalid CSS selector:', selector, e.message);
             return null;
         }
 
