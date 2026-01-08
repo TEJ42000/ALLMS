@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Privacy Dashboard - ALLMS</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <style>
+        .privacy-dashboard {
+            max-width: 1000px;
+            margin: 40px auto;
+            padding: 20px;
+        }
+        .dashboard-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+        }
+        .dashboard-header h1 {
+            margin: 0 0 10px 0;
+        }
+        .dashboard-header p {
+            margin: 0;
+            opacity: 0.9;
+        }
+        .privacy-section {
+            background: white;
+            border-radius: 8px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .privacy-section h2 {
+            color: #2c3e50;
+            margin-top: 0;
+            border-bottom: 2px solid #ecf0f1;
+            padding-bottom: 10px;
+        }
+        .consent-toggle {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            margin-bottom: 10px;
+        }
+        .consent-toggle label {
+            font-weight: 500;
+            color: #34495e;
+        }
+        .consent-toggle small {
+            display: block;
+            color: #7f8c8d;
+            margin-top: 5px;
+        }
+        .toggle-switch {
+            position: relative;
+            width: 60px;
+            height: 30px;
+        }
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 30px;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 22px;
+            width: 22px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        input:checked + .slider {
+            background-color: #4caf50;
+        }
+        input:checked + .slider:before {
+            transform: translateX(30px);
+        }
+        .action-button {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+            transition: background 0.3s;
+        }
+        .action-button:hover {
+            background: #2980b9;
+        }
+        .action-button.danger {
+            background: #e74c3c;
+        }
+        .action-button.danger:hover {
+            background: #c0392b;
+        }
+        .action-button.success {
+            background: #27ae60;
+        }
+        .action-button.success:hover {
+            background: #229954;
+        }
+        .info-box {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+        .warning-box {
+            background: #fff3e0;
+            border-left: 4px solid #ff9800;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+        .danger-box {
+            background: #ffebee;
+            border-left: 4px solid #f44336;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+        .data-summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .data-card {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 6px;
+            text-align: center;
+        }
+        .data-card h3 {
+            margin: 0 0 10px 0;
+            color: #3498db;
+            font-size: 32px;
+        }
+        .data-card p {
+            margin: 0;
+            color: #7f8c8d;
+        }
+        #deleteModal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+        .modal-content {
+            background-color: white;
+            margin: 10% auto;
+            padding: 30px;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 500px;
+        }
+        .modal-buttons {
+            margin-top: 20px;
+            text-align: right;
+        }
+    </style>
+</head>
+<body>
+    {% include 'partials/user_header.html' %}
+    
+    <div class="privacy-dashboard">
+        <div class="dashboard-header">
+            <h1>🔒 Privacy Dashboard</h1>
+            <p>Manage your data and privacy settings in compliance with GDPR</p>
+        </div>
+
+        <!-- Data Summary -->
+        <div class="privacy-section">
+            <h2>📊 Your Data Summary</h2>
+            <div class="data-summary">
+                <div class="data-card">
+                    <h3 id="quizCount">-</h3>
+                    <p>Quiz Results</p>
+                </div>
+                <div class="data-card">
+                    <h3 id="conversationCount">-</h3>
+                    <p>AI Conversations</p>
+                </div>
+                <div class="data-card">
+                    <h3 id="materialCount">-</h3>
+                    <p>Uploaded Materials</p>
+                </div>
+                <div class="data-card">
+                    <h3 id="accountAge">-</h3>
+                    <p>Account Age (days)</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Privacy Settings -->
+        <div class="privacy-section">
+            <h2>⚙️ Privacy Settings</h2>
+            <p>Control how your data is used</p>
+            
+            <div class="consent-toggle">
+                <div>
+                    <label>Essential Cookies</label>
+                    <small>Required for basic functionality (cannot be disabled)</small>
+                </div>
+                <label class="toggle-switch">
+                    <input type="checkbox" checked disabled>
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <div class="consent-toggle">
+                <div>
+                    <label>AI Tutoring Features</label>
+                    <small>Allow AI-powered tutoring and personalized recommendations</small>
+                </div>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="aiTutoringToggle" checked onchange="updateConsent('ai_tutoring', this.checked)">
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <div class="consent-toggle">
+                <div>
+                    <label>Analytics</label>
+                    <small>Help us improve the platform by sharing usage data</small>
+                </div>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="analyticsToggle" checked onchange="updateConsent('analytics', this.checked)">
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <div class="consent-toggle">
+                <div>
+                    <label>Marketing Emails</label>
+                    <small>Receive updates and educational content</small>
+                </div>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="marketingToggle" onchange="updateConsent('marketing', this.checked)">
+                    <span class="slider"></span>
+                </label>
+            </div>
+        </div>
+
+        <!-- Data Export -->
+        <div class="privacy-section">
+            <h2>📥 Export Your Data</h2>
+            <div class="info-box">
+                <p><strong>Right to Access:</strong> Download all your personal data in JSON format. This includes your profile, quiz results, AI conversations, and uploaded materials.</p>
+            </div>
+            <button class="action-button success" onclick="exportData()">
+                📥 Download My Data
+            </button>
+        </div>
+
+        <!-- Account Deletion -->
+        <div class="privacy-section">
+            <h2>🗑️ Delete Account</h2>
+            <div class="danger-box">
+                <p><strong>Right to be Forgotten:</strong> Permanently delete your account and all associated data. This action cannot be undone.</p>
+                <p><strong>Note:</strong> Your data will be retained for 30 days before permanent deletion to allow for account recovery.</p>
+            </div>
+            <button class="action-button danger" onclick="showDeleteModal()">
+                🗑️ Delete My Account
+            </button>
+        </div>
+
+        <!-- Legal Information -->
+        <div class="privacy-section">
+            <h2>📄 Legal Information</h2>
+            <p>Learn more about how we protect your privacy:</p>
+            <ul>
+                <li><a href="/privacy-policy">Privacy Policy</a> - How we collect and use your data</li>
+                <li><a href="/terms-of-service">Terms of Service</a> - Our terms and conditions</li>
+                <li><a href="/cookie-policy">Cookie Policy</a> - Information about cookies</li>
+            </ul>
+            <div class="info-box">
+                <p><strong>Questions or Concerns?</strong> Contact our Data Protection Officer at <a href="mailto:dpo@allms.example.com">dpo@allms.example.com</a></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div id="deleteModal">
+        <div class="modal-content">
+            <h2>⚠️ Confirm Account Deletion</h2>
+            <p>Are you sure you want to delete your account? This will:</p>
+            <ul>
+                <li>Mark your account for deletion</li>
+                <li>Disable access to all features</li>
+                <li>Permanently delete all data after 30 days</li>
+            </ul>
+            <p><strong>Type your email to confirm:</strong></p>
+            <input type="email" id="confirmEmail" placeholder="your@email.com" style="width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 4px;">
+            <div class="modal-buttons">
+                <button class="action-button" onclick="closeDeleteModal()">Cancel</button>
+                <button class="action-button danger" onclick="confirmDelete()">Delete Account</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+    <script>
+        // Load privacy settings and data summary on page load
+        document.addEventListener('DOMContentLoaded', async () => {
+            await loadPrivacySettings();
+            await loadDataSummary();
+        });
+
+        async function loadPrivacySettings() {
+            try {
+                const response = await fetch('/api/gdpr/privacy-settings', {
+                    headers: {
+                        'X-User-ID': getUserId()
+                    }
+                });
+                const data = await response.json();
+                if (data.success && data.settings) {
+                    document.getElementById('aiTutoringToggle').checked = data.settings.ai_tutoring_enabled;
+                    document.getElementById('analyticsToggle').checked = data.settings.analytics_enabled;
+                    document.getElementById('marketingToggle').checked = data.settings.marketing_emails_enabled;
+                }
+            } catch (error) {
+                console.error('Error loading privacy settings:', error);
+            }
+        }
+
+        async function loadDataSummary() {
+            // This would load actual counts from the backend
+            // For now, showing placeholders
+            document.getElementById('quizCount').textContent = '...';
+            document.getElementById('conversationCount').textContent = '...';
+            document.getElementById('materialCount').textContent = '...';
+            document.getElementById('accountAge').textContent = '...';
+        }
+
+        async function updateConsent(type, granted) {
+            try {
+                const response = await fetch('/api/gdpr/consent', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-User-ID': getUserId()
+                    },
+                    body: JSON.stringify({
+                        consent_type: type,
+                        status: granted ? 'granted' : 'revoked'
+                    })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    alert(`Consent ${granted ? 'granted' : 'revoked'} for ${type}`);
+                }
+            } catch (error) {
+                console.error('Error updating consent:', error);
+                alert('Failed to update consent. Please try again.');
+            }
+        }
+
+        async function exportData() {
+            try {
+                const response = await fetch('/api/gdpr/export', {
+                    method: 'POST',
+                    headers: {
+                        'X-User-ID': getUserId()
+                    }
+                });
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `user_data_export_${new Date().toISOString()}.json`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+                alert('Your data has been downloaded successfully!');
+            } catch (error) {
+                console.error('Error exporting data:', error);
+                alert('Failed to export data. Please try again.');
+            }
+        }
+
+        function showDeleteModal() {
+            document.getElementById('deleteModal').style.display = 'block';
+        }
+
+        function closeDeleteModal() {
+            document.getElementById('deleteModal').style.display = 'none';
+            document.getElementById('confirmEmail').value = '';
+        }
+
+        async function confirmDelete() {
+            const email = document.getElementById('confirmEmail').value;
+            if (!email) {
+                alert('Please enter your email to confirm deletion.');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/gdpr/delete', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-User-ID': getUserId()
+                    },
+                    body: JSON.stringify({
+                        user_id: getUserId(),
+                        email: email,
+                        confirmation_token: 'confirmed',
+                        delete_all_data: true
+                    })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    alert(data.message);
+                    // Redirect to logout or home page
+                    window.location.href = '/';
+                } else {
+                    alert('Failed to delete account. Please check your email and try again.');
+                }
+            } catch (error) {
+                console.error('Error deleting account:', error);
+                alert('Failed to delete account. Please try again.');
+            }
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('deleteModal');
+            if (event.target == modal) {
+                closeDeleteModal();
+            }
+        }
+    </script>
+</body>
+</html>
+
