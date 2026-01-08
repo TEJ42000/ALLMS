@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flashcards - ECHR Learning</title>
+    <link rel="icon" type="image/svg+xml" href="/static/images/favicon.svg">
+
+    <!-- CRITICAL FIX: Standalone template (no base.html dependency) -->
+    <!-- CRITICAL FIX: Use direct paths (no url_for - static route doesn't exist) -->
+    <!-- CRITICAL FIX: All styles in external CSS files (CSP compliance) -->
+    <link rel="stylesheet" href="/static/css/flashcard-viewer.css">
+    <link rel="stylesheet" href="/static/css/flashcard-page.css">
+</head>
+<body>
+    <div class="container">
+        <div class="page-header">
+            <h1>📇 Flashcards</h1>
+            <p class="subtitle">Study and review key concepts</p>
+        </div>
+
+        <!-- Flashcard Set Selection -->
+        <div class="flashcard-sets" id="flashcard-sets">
+            <h2>Select a Flashcard Set</h2>
+            <div class="sets-grid">
+                <!-- Flashcard sets will be loaded here -->
+                <div class="loading">Loading flashcard sets...</div>
+            </div>
+        </div>
+
+        <!-- Flashcard Viewer Container -->
+        <div id="flashcard-viewer-container" style="display: none;">
+            <div class="viewer-header">
+                <button class="btn-back" id="btn-back-to-sets">
+                    ← Back to Sets
+                </button>
+                <h2 id="set-title">Flashcard Set</h2>
+            </div>
+            <div id="flashcard-viewer"></div>
+        </div>
+    </div>
+
+    <!-- CRITICAL FIX: Use direct paths (no url_for - static route doesn't exist) -->
+    <!-- HIGH FIX: External JavaScript files for CSP compliance -->
+    <!-- MEDIUM FIX: Load utils.js first for shared functions -->
+    <script src="/static/js/utils.js"></script>
+    <script src="/static/js/flashcard-viewer.js"></script>
+    <script src="/static/js/flashcard-page.js"></script>
+</body>
+</html>
+

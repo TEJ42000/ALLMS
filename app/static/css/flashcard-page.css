@@ -1,0 +1,250 @@
+/**
+ * Flashcard Page Styles
+ *
+ * Styles for the flashcard sets selection page
+ * HIGH FIX: Moved from inline styles for CSP compliance
+ * CRITICAL FIX: Includes base styles for standalone template
+ */
+
+/* CRITICAL FIX: Base styles (moved from inline) */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    padding: 20px;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    background: #f5f5f5;
+    border-radius: 16px;
+    padding: 40px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+
+.page-header {
+    text-align: center;
+    margin-bottom: 40px;
+}
+
+.page-header h1 {
+    font-size: 36px;
+    color: #333;
+    margin-bottom: 10px;
+}
+
+.subtitle {
+    font-size: 18px;
+    color: #666;
+}
+
+.flashcard-sets h2 {
+    font-size: 24px;
+    color: #333;
+    margin-bottom: 20px;
+}
+
+.sets-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+    margin-bottom: 40px;
+}
+
+.flashcard-set-card {
+    background: white;
+    border-radius: 12px;
+    padding: 24px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.flashcard-set-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+.set-icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+}
+
+.flashcard-set-card h3 {
+    font-size: 20px;
+    color: #333;
+    margin-bottom: 12px;
+}
+
+.flashcard-set-card p {
+    font-size: 14px;
+    color: #666;
+    margin-bottom: 16px;
+    line-height: 1.5;
+}
+
+.set-meta {
+    margin-bottom: 16px;
+}
+
+.card-count {
+    display: inline-block;
+    padding: 4px 12px;
+    background: #f0f0f0;
+    border-radius: 12px;
+    font-size: 12px;
+    color: #666;
+    font-weight: 600;
+}
+
+.btn-study {
+    width: 100%;
+    padding: 12px;
+    background: #667eea;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.btn-study:hover {
+    background: #5568d3;
+}
+
+.viewer-header {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.btn-back {
+    padding: 10px 20px;
+    background: white;
+    border: 2px solid #667eea;
+    color: #667eea;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-back:hover {
+    background: #667eea;
+    color: white;
+}
+
+.viewer-header h2 {
+    font-size: 24px;
+    color: #333;
+    margin: 0;
+}
+
+.loading {
+    text-align: center;
+    padding: 40px;
+    color: #666;
+}
+
+.no-sets {
+    text-align: center;
+    padding: 40px;
+    color: #666;
+    font-size: 16px;
+}
+
+/* MEDIUM FIX: Error overlay styles */
+.error-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    animation: fadeIn 0.2s ease;
+}
+
+.error-dialog {
+    background: white;
+    border-radius: 12px;
+    padding: 32px;
+    max-width: 400px;
+    width: 90%;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    text-align: center;
+    animation: slideIn 0.3s ease;
+}
+
+.error-dialog .error-icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+}
+
+.error-dialog h2 {
+    font-size: 24px;
+    color: #333;
+    margin-bottom: 12px;
+}
+
+.error-dialog p {
+    font-size: 16px;
+    color: #666;
+    margin-bottom: 24px;
+    line-height: 1.5;
+}
+
+.error-dialog .btn-primary {
+    padding: 12px 32px;
+    background: #667eea;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.error-dialog .btn-primary:hover {
+    background: #5568d3;
+}
+
+.error-dialog .btn-primary:focus {
+    outline: 2px solid #667eea;
+    outline-offset: 2px;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateY(-20px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
