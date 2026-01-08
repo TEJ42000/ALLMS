@@ -12,7 +12,7 @@ Security Features:
 - IAP authentication integration (via dependency injection)
 - CSRF protection using Origin/Referer headers
 - File type and content validation
-- Rate limiting (in-memory for MVP, Redis recommended for production)
+- Distributed rate limiting (Redis-backed in production, in-memory for dev)
 - Path traversal prevention
 """
 
@@ -30,13 +30,15 @@ from anthropic import RateLimitError
 from urllib.parse import quote
 import secrets
 import hashlib
-import time
-from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 
 from app.services.text_extractor import extract_text
 from app.services.files_api_service import get_files_api_service
 from app.services.course_materials_service import CourseMaterialsService, generate_material_id
+from app.services.rate_limiter import check_upload_rate_limit
+from app.services.storage_service import get_storage_backend
+from app.services.background_tasks import enqueue_text_extraction, is_background_processing_enabled
+from app.services.upload_metrics import get_upload_metrics, UploadStatus, ExtractionStatus
 from app.models.course_models import CourseMaterial
 from app.models.auth_models import User
 from app.dependencies.auth import require_allowed_user
@@ -51,7 +53,7 @@ router = APIRouter(prefix="/api/upload", tags=["Upload"])
 materials_service = CourseMaterialsService()
 
 # Upload configuration
-UPLOAD_DIR = Path("Materials/uploads")
+UPLOAD_DIR = Path("Materials/uploads").resolve()  # Resolve to absolute path for security checks
 ALLOWED_EXTENSIONS = {"pdf", "docx", "pptx", "txt", "md", "html"}
 MAX_SIZE_MB = 25
 MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024
@@ -81,21 +83,9 @@ ALLOWED_ORIGINS = [
 if _env_origins:
     ALLOWED_ORIGINS.extend([origin.strip() for origin in _env_origins.split(",") if origin.strip()])
 
-# HIGH: Rate limiting configuration
-# ⚠️ MVP LIMITATION: In-memory rate limiting
-# This implementation is NOT suitable for production multi-instance deployments.
-# For production, replace with Redis-based rate limiting (see docs/UPLOAD_MVP_PRODUCTION.md)
-#
-# Why this is MVP-only:
-# - State is not shared between instances
-# - Resets on application restart
-# - No cleanup of old entries (memory leak potential)
-# - Cannot enforce limits across multiple Cloud Run instances
-#
-# Production solution: Use slowapi with Redis backend
-RATE_LIMIT_UPLOADS = 10  # Max uploads per user per minute
-RATE_LIMIT_WINDOW = 60  # Window in seconds
-rate_limit_store: Dict[str, List[float]] = defaultdict(list)
+# Rate limiting is now handled by app/services/rate_limiter.py
+# Supports both Redis (production) and in-memory (development) backends
+# Configure via RATE_LIMIT_BACKEND environment variable
 
 
 def validate_csrf(origin: Optional[str] = None, referer: Optional[str] = None) -> None:
@@ -133,39 +123,7 @@ def validate_csrf(origin: Optional[str] = None, referer: Optional[str] = None) -
 
 
 
-def check_rate_limit(user_id: str, client_ip: str) -> None:
-    """
-    Check rate limit for uploads.
 
-    HIGH SECURITY: Prevents abuse and DoS attacks.
-
-    Args:
-        user_id: User identifier
-        client_ip: Client IP address
-
-    Raises:
-        HTTPException: If rate limit exceeded
-    """
-    # Use combination of user_id and IP for rate limiting
-    key = f"{user_id}:{client_ip}"
-    now = time.time()
-
-    # Clean up old entries
-    rate_limit_store[key] = [
-        timestamp for timestamp in rate_limit_store[key]
-        if now - timestamp < RATE_LIMIT_WINDOW
-    ]
-
-    # Check if limit exceeded
-    if len(rate_limit_store[key]) >= RATE_LIMIT_UPLOADS:
-        logger.warning(f"Rate limit exceeded for {key}")
-        raise HTTPException(
-            429,
-            f"Rate limit exceeded. Maximum {RATE_LIMIT_UPLOADS} uploads per {RATE_LIMIT_WINDOW} seconds."
-        )
-
-    # Add current request
-    rate_limit_store[key].append(now)
 
 
 def sanitize_course_id(course_id: str) -> str:
@@ -211,6 +169,86 @@ def sanitize_course_id(course_id: str) -> str:
         raise HTTPException(400, "course_id must contain only letters, numbers, hyphens, and underscores")
 
     return course_id
+
+
+def validate_path_within_base(file_path: Path, base_dir: Path) -> Path:
+    """
+    Validate that a file path is within the allowed base directory.
+
+    CRITICAL SECURITY: Prevents path traversal attacks by ensuring resolved
+    paths stay within the allowed directory.
+
+    Args:
+        file_path: Path to validate (can be relative or absolute)
+        base_dir: Base directory that must contain the file
+
+    Returns:
+        Resolved absolute path if valid
+
+    Raises:
+        HTTPException: If path would escape the base directory
+    """
+    try:
+        # Resolve both paths to absolute paths
+        resolved_base = base_dir.resolve()
+        resolved_path = file_path.resolve()
+
+        # Check if the resolved path starts with the base directory
+        # Use os.path.commonpath to handle edge cases correctly
+        try:
+            common = Path(os.path.commonpath([resolved_base, resolved_path]))
+            if common != resolved_base:
+                raise ValueError("Path escapes base directory")
+        except ValueError:
+            # commonpath raises ValueError if paths are on different drives (Windows)
+            # or if one path would escape the other
+            raise HTTPException(400, "Invalid file path: path traversal detected")
+
+        # Additional check: ensure the string representation starts with base
+        if not str(resolved_path).startswith(str(resolved_base)):
+            raise HTTPException(400, "Invalid file path: path traversal detected")
+
+        return resolved_path
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Path validation error: {e}")
+        raise HTTPException(400, f"Invalid file path: {str(e)}")
+
+
+def construct_safe_storage_path(course_id: str, filename: str) -> str:
+    """
+    Construct a safe storage path from user inputs.
+
+    CRITICAL SECURITY: Validates that the constructed path stays within
+    the uploads directory to prevent path traversal.
+
+    Args:
+        course_id: Sanitized course identifier
+        filename: Sanitized filename
+
+    Returns:
+        Safe relative storage path (e.g., "uploads/course-id/file.pdf")
+
+    Raises:
+        HTTPException: If path validation fails
+    """
+    # Construct the path using pathlib for safety
+    base_dir = UPLOAD_DIR
+
+    # Build path: Materials/uploads/course_id/filename
+    target_path = base_dir / course_id / filename
+
+    # Validate the path stays within UPLOAD_DIR
+    validated_path = validate_path_within_base(target_path, base_dir)
+
+    # Return relative path from Materials/ directory for storage
+    # This is what gets stored in Firestore and used by storage backends
+    materials_base = Path("Materials").resolve()
+    relative_path = validated_path.relative_to(materials_base)
+
+    return str(relative_path)
 
 
 def validate_file_content(file_path: Path, expected_ext: str) -> bool:
@@ -283,15 +321,23 @@ async def upload_file(
     Raises:
         HTTPException: If file type not allowed or upload fails
     """
+    # Start timing for metrics
+    import time
+    start_time = time.time()
+    metrics = get_upload_metrics()
+
     # CRITICAL: CSRF protection
     validate_csrf(origin, referer)
 
     # Get user_id from authenticated user
     user_id = current_user.user_id
 
-    # HIGH: Rate limiting
+    # HIGH: Rate limiting (Redis-backed in production, in-memory for dev)
     client_ip = request.client.host if request.client else "unknown"
-    check_rate_limit(user_id, client_ip)
+    is_allowed, error_msg = check_upload_rate_limit(user_id, client_ip)
+    if not is_allowed:
+        metrics.record_rate_limit(user_id, client_ip)
+        raise HTTPException(429, error_msg)
 
     # CRITICAL FIX: Sanitize course_id to prevent path traversal
     course_id = sanitize_course_id(course_id)
@@ -329,29 +375,53 @@ async def upload_file(
     
     # Generate unique material ID
     material_id = str(uuid.uuid4())[:8]
-    
-    # Sanitize filename (remove path traversal attempts)
-    safe_filename = file.filename.replace("/", "_").replace("\\", "_")
+
+    # CRITICAL SECURITY: Sanitize filename (remove path traversal attempts)
+    # Remove any directory separators and null bytes
+    safe_filename = file.filename.replace("/", "_").replace("\\", "_").replace("\x00", "")
+    # Limit filename length to prevent issues
+    if len(safe_filename) > 200:
+        # Keep extension but truncate name
+        name_parts = safe_filename.rsplit(".", 1)
+        if len(name_parts) == 2:
+            safe_filename = name_parts[0][:190] + "." + name_parts[1]
+        else:
+            safe_filename = safe_filename[:200]
     safe_filename = f"{material_id}_{safe_filename}"
-    
-    # Ensure upload directory exists
-    course_dir = UPLOAD_DIR / course_id
-    course_dir.mkdir(parents=True, exist_ok=True)
-    
-    # Save file
-    file_path = course_dir / safe_filename
+
+    # CRITICAL SECURITY: Construct and validate storage path
+    # This ensures the path stays within Materials/uploads/
+    try:
+        storage_path = construct_safe_storage_path(course_id, safe_filename)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to construct safe storage path: {e}")
+        raise HTTPException(400, "Invalid file path")
+
+    # Get storage backend (GCS in production, local in dev)
+    storage = get_storage_backend()
 
     try:
-        with open(file_path, "wb") as f:
-            shutil.copyfileobj(file.file, f)
+        # Save file to storage (GCS or local)
+        saved_path = storage.save_file(file.file, storage_path)
+        logger.info(f"File saved to storage: {saved_path}")
 
-        logger.info(f"File saved: {file_path}")
+        # CRITICAL SECURITY: Get and validate local file path
+        # Validate that the returned path is within allowed directory
+        file_path = storage.get_file_path(storage_path)
 
-        # CRITICAL FIX: Validate file content matches extension
+        # For local storage, validate the path is within Materials/
+        if isinstance(storage, type(storage)) and hasattr(storage, 'base_dir'):
+            # Local storage - validate path
+            materials_base = Path("Materials").resolve()
+            file_path = validate_path_within_base(file_path, materials_base)
+
+        # CRITICAL: Validate file content matches extension
         if not validate_file_content(file_path, ext):
-            # CRITICAL FIX: Safe cleanup with race condition handling
+            # CRITICAL: Safe cleanup with race condition handling
             try:
-                file_path.unlink(missing_ok=True)  # Python 3.8+ - no error if already deleted
+                storage.delete_file(storage_path)
             except Exception as cleanup_error:
                 logger.warning(f"Failed to cleanup invalid file: {cleanup_error}")
 
@@ -362,13 +432,12 @@ async def upload_file(
             )
 
         # FIRESTORE: Store material metadata
-        storage_path = f"uploads/{course_id}/{safe_filename}"
         now = datetime.now(timezone.utc)
 
         material = CourseMaterial(
             id=material_id,
             filename=file.filename,
-            storagePath=storage_path,
+            storagePath=saved_path,  # Use the full storage path (gs:// for GCS, relative for local)
             fileSize=size,
             fileType=ext,
             tier="user_uploaded",
@@ -395,24 +464,73 @@ async def upload_file(
         except Exception as e:
             logger.error(f"Failed to store material metadata: {e}")
             # Don't fail the upload if Firestore fails
-            # File is already saved locally
+            # File is already saved in storage
+
+        # Optional: Enqueue background text extraction
+        processing_status = "pending"
+        if is_background_processing_enabled():
+            try:
+                task_id = enqueue_text_extraction(course_id, material_id)
+                processing_status = "queued"
+                logger.info(f"Enqueued text extraction task: {task_id}")
+            except Exception as e:
+                logger.error(f"Failed to enqueue extraction task: {e}")
+                processing_status = "pending"
+
+        # Record successful upload metrics
+        duration_ms = (time.time() - start_time) * 1000
+        metrics.record_upload(
+            status=UploadStatus.SUCCESS,
+            file_size=size,
+            file_type=ext,
+            duration_ms=duration_ms,
+            user_id=user_id,
+            course_id=course_id
+        )
 
         return {
             "status": "success",
             "material_id": material_id,
             "filename": file.filename,
-            "storage_path": storage_path,
+            "storage_path": saved_path,
             "size_bytes": size,
-            "message": f"File uploaded successfully. Use /api/upload/{material_id}/analyze to process."
+            "processing_status": processing_status,
+            "message": f"File uploaded successfully. {'Processing queued.' if processing_status == 'queued' else 'Use /api/upload/' + material_id + '/analyze to process.'}"
         }
 
-    except HTTPException:
+    except HTTPException as http_exc:
+        # Record failed upload metrics
+        duration_ms = (time.time() - start_time) * 1000
+        status = UploadStatus.INVALID_FILE if http_exc.status_code == 400 else UploadStatus.FAILED
+        metrics.record_upload(
+            status=status,
+            file_size=size if 'size' in locals() else 0,
+            file_type=ext if 'ext' in locals() else "unknown",
+            duration_ms=duration_ms,
+            user_id=user_id,
+            course_id=course_id if 'course_id' in locals() else "unknown",
+            error=str(http_exc.detail)
+        )
         raise  # Re-raise HTTP exceptions
     except Exception as e:
         logger.error(f"Upload failed: {str(e)}")
+
+        # Record failed upload metrics
+        duration_ms = (time.time() - start_time) * 1000
+        metrics.record_upload(
+            status=UploadStatus.STORAGE_ERROR,
+            file_size=size if 'size' in locals() else 0,
+            file_type=ext if 'ext' in locals() else "unknown",
+            duration_ms=duration_ms,
+            user_id=user_id,
+            course_id=course_id if 'course_id' in locals() else "unknown",
+            error=str(e)
+        )
+
         # CRITICAL FIX: Safe cleanup with race condition handling
         try:
-            file_path.unlink(missing_ok=True)  # Python 3.8+ - no error if already deleted
+            if 'storage' in locals() and 'storage_path' in locals():
+                storage.delete_file(storage_path)
         except Exception as cleanup_error:
             logger.warning(f"Failed to cleanup file after error: {cleanup_error}")
         raise HTTPException(500, f"Upload failed: {str(e)}")
@@ -453,27 +571,38 @@ async def analyze_uploaded_file(
 
     logger.info(f"Analysis request: {material_id} for course {course_id}")
 
-    # HIGH FIX: Find the file with proper error handling for race conditions
-    course_dir = UPLOAD_DIR / course_id
-    if not course_dir.exists():
-        raise HTTPException(404, f"Course directory not found: {course_id}")
+    # Get storage backend
+    storage = get_storage_backend()
 
-    # Use sorted() to ensure consistent ordering if multiple files match
-    matching_files = sorted(course_dir.glob(f"{material_id}_*"))
+    # Find the material in Firestore to get storage path
+    try:
+        material = materials_service.get_material(course_id, material_id)
+        if not material:
+            raise HTTPException(404, f"Material not found: {material_id}")
 
-    if not matching_files:
-        raise HTTPException(404, f"File not found: {material_id}")
+        # CRITICAL SECURITY: Validate storage path before use
+        # Even though this comes from Firestore, validate it to prevent
+        # issues if the database is compromised or contains legacy data
+        storage_path = material.storagePath
 
-    if len(matching_files) > 1:
-        logger.warning(f"Multiple files found for {material_id}, using first: {matching_files[0].name}")
+        # Get file path from storage (downloads from GCS if needed)
+        file_path = storage.get_file_path(storage_path)
 
-    file_path = matching_files[0]
+        # CRITICAL SECURITY: Validate the returned path is within Materials/
+        materials_base = Path("Materials").resolve()
+        file_path = validate_path_within_base(file_path, materials_base)
 
-    # Verify file still exists (race condition check)
-    if not file_path.exists():
-        raise HTTPException(404, f"File was deleted: {material_id}")
+        # Verify file exists
+        if not storage.file_exists(storage_path):
+            raise HTTPException(404, f"File was deleted: {material_id}")
 
-    logger.info(f"Analyzing file: {file_path}")
+        logger.info(f"Analyzing file: {file_path}")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to locate file: {e}")
+        raise HTTPException(500, f"Failed to locate file: {str(e)}")
     
     # Extract text using existing service
     try:
@@ -671,5 +800,95 @@ async def list_uploads(
     except Exception as e:
         logger.error(f"Failed to list uploads: {e}")
         raise HTTPException(500, f"Failed to retrieve uploads: {str(e)}")
+
+
+@router.post("/process-extraction")
+async def process_extraction_task(
+    request: Request
+) -> Dict[str, Any]:
+    """
+    Background task endpoint for text extraction.
+
+    This endpoint is called by Cloud Tasks to process text extraction asynchronously.
+    For security, it should only be accessible from Cloud Tasks (configure IAP/service account).
+
+    Request body:
+        {
+            "course_id": "course-id",
+            "material_id": "material-id",
+            "task_type": "text_extraction"
+        }
+
+    Returns:
+        JSON with extraction results
+    """
+    try:
+        # Parse request body
+        body = await request.json()
+        course_id = body.get("course_id")
+        material_id = body.get("material_id")
+
+        if not course_id or not material_id:
+            raise HTTPException(400, "Missing course_id or material_id")
+
+        logger.info(f"Processing extraction task: {material_id} for course {course_id}")
+
+        # Get material from Firestore
+        material = materials_service.get_material(course_id, material_id)
+        if not material:
+            raise HTTPException(404, f"Material not found: {material_id}")
+
+        # Get storage backend
+        storage = get_storage_backend()
+
+        # CRITICAL SECURITY: Get and validate file path
+        storage_path = material.storagePath
+        file_path = storage.get_file_path(storage_path)
+
+        # CRITICAL SECURITY: Validate the path is within Materials/
+        materials_base = Path("Materials").resolve()
+        file_path = validate_path_within_base(file_path, materials_base)
+
+        # Extract text
+        result = extract_text(file_path)
+
+        # Update Firestore with results
+        if result.success:
+            materials_service.update_text_extraction(
+                course_id=course_id,
+                material_id=material_id,
+                extracted_text=result.text,
+                text_length=len(result.text)
+            )
+            logger.info(f"Extraction successful: {len(result.text)} characters")
+
+            return {
+                "status": "success",
+                "material_id": material_id,
+                "text_length": len(result.text),
+                "message": "Text extraction completed"
+            }
+        else:
+            materials_service.update_text_extraction(
+                course_id=course_id,
+                material_id=material_id,
+                extracted_text="",
+                text_length=0,
+                error=result.error
+            )
+            logger.error(f"Extraction failed: {result.error}")
+
+            return {
+                "status": "error",
+                "material_id": material_id,
+                "error": result.error,
+                "message": "Text extraction failed"
+            }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Background extraction task failed: {e}")
+        raise HTTPException(500, f"Task processing failed: {str(e)}")
 
 

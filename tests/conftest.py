@@ -23,6 +23,55 @@ def pytest_configure(config):
 os.environ["ANTHROPIC_API_KEY"] = "test-api-key-for-testing"
 os.environ["AUTH_ENABLED"] = "false"  # Disable auth for tests by default
 os.environ["AUTH_MOCK_USER_EMAIL"] = "dev@mgms.eu"  # Use valid domain for mock user
+os.environ["GOOGLE_CLOUD_PROJECT"] = "test-project"  # Prevent GCP client initialization
+os.environ["GCP_PROJECT_ID"] = "test-project"
+
+# Mock Google Cloud clients BEFORE any imports
+# This prevents the clients from trying to authenticate
+import sys
+_mock_secretmanager = MagicMock()
+_mock_firestore = MagicMock()
+_mock_storage = MagicMock()
+
+# Mock the google.cloud modules
+sys.modules['google.cloud.secretmanager'] = _mock_secretmanager
+sys.modules['google.cloud.firestore'] = _mock_firestore
+sys.modules['google.cloud.storage'] = _mock_storage
+
+# Mock GCP services BEFORE importing app to prevent connection attempts
+# This is critical because services are instantiated at module level
+
+# 1. Mock Secret Manager (prevents timeout when getting API keys)
+def _mock_get_secret(secret_id: str, version: str = "latest"):
+    """Mock get_secret to return test values from environment."""
+    env_var_name = secret_id.upper().replace("-", "_")
+    return os.getenv(env_var_name)
+
+_secret_patcher = patch('app.services.gcp_service.get_secret', side_effect=_mock_get_secret)
+_secret_patcher.start()
+
+# 2. Mock Firestore (prevents connection attempts)
+_mock_firestore_client = MagicMock()
+_mock_collection = MagicMock()
+_mock_document = MagicMock()
+_mock_subcollection = MagicMock()
+_mock_doc_ref = MagicMock()
+_mock_doc_snapshot = MagicMock()
+
+# Setup chain: db.collection().document().collection()
+_mock_firestore_client.collection.return_value = _mock_collection
+_mock_collection.document.return_value = _mock_document
+_mock_document.collection.return_value = _mock_subcollection
+_mock_subcollection.document.return_value = _mock_doc_ref
+
+# Mock document operations
+_mock_doc_snapshot.exists = False
+_mock_doc_ref.get.return_value = _mock_doc_snapshot
+_mock_doc_ref.set.return_value = None
+_mock_subcollection.stream.return_value = []
+
+_firestore_patcher = patch('app.services.gcp_service.get_firestore_client', return_value=_mock_firestore_client)
+_firestore_patcher.start()
 
 # Clear any cached auth config before importing app
 # This ensures our test environment variables are used
@@ -256,3 +305,50 @@ def mock_iap_headers_external():
         "X-Goog-Authenticated-User-Email": "accounts.google.com:guest@external.com",
         "X-Goog-Authenticated-User-Id": "accounts.google.com:987654321"
     }
+
+
+# =============================================================================
+# Firestore Mocking
+# =============================================================================
+
+@pytest.fixture(autouse=True)
+def mock_firestore():
+    """
+    Mock Firestore client for all tests.
+
+    This fixture is autouse=True, so it applies to all tests automatically.
+    Tests that need specific Firestore behavior can override this.
+    """
+    with patch('app.services.gcp_service.get_firestore_client') as mock_get_client:
+        # Create mock Firestore client
+        mock_client = MagicMock()
+
+        # Mock collection/document chain
+        mock_collection = MagicMock()
+        mock_document = MagicMock()
+        mock_subcollection = MagicMock()
+
+        # Setup chain: db.collection().document().collection()
+        mock_client.collection.return_value = mock_collection
+        mock_collection.document.return_value = mock_document
+        mock_document.collection.return_value = mock_subcollection
+
+        # Mock document operations
+        mock_doc_ref = MagicMock()
+        mock_subcollection.document.return_value = mock_doc_ref
+
+        # Mock get() to return non-existent document by default
+        mock_doc_snapshot = MagicMock()
+        mock_doc_snapshot.exists = False
+        mock_doc_ref.get.return_value = mock_doc_snapshot
+
+        # Mock set() to succeed
+        mock_doc_ref.set.return_value = None
+
+        # Mock stream() to return empty list by default
+        mock_subcollection.stream.return_value = []
+
+        # Return the mock client
+        mock_get_client.return_value = mock_client
+
+        yield mock_client
