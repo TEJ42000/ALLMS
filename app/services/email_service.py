@@ -25,17 +25,26 @@ class EmailProvider(str, Enum):
 
 class EmailService:
     """Email service for sending GDPR-related emails."""
-    
+
     def __init__(self):
         """Initialize email service based on environment configuration."""
         self.provider = EmailProvider(os.getenv('EMAIL_SERVICE_PROVIDER', 'console'))
-        
-        if self.provider == EmailProvider.SENDGRID:
-            self._init_sendgrid()
-        elif self.provider == EmailProvider.SES:
-            self._init_ses()
-        else:
-            logger.info("Using console email provider (development mode)")
+        self.initialized = False
+        self.initialization_error = None
+
+        try:
+            if self.provider == EmailProvider.SENDGRID:
+                self._init_sendgrid()
+            elif self.provider == EmailProvider.SES:
+                self._init_ses()
+            else:
+                logger.info("Using console email provider (development mode)")
+
+            self.initialized = True
+        except Exception as e:
+            self.initialization_error = str(e)
+            logger.error(f"Email service initialization failed: {e}")
+            # Don't raise - allow service to start but log error
     
     def _init_sendgrid(self):
         """Initialize SendGrid client."""
@@ -219,6 +228,30 @@ class EmailService:
             text_body=text_body
         )
     
+    def health_check(self) -> dict:
+        """Check email service health and configuration.
+
+        Returns:
+            Dictionary with health status information
+        """
+        status = {
+            "provider": self.provider.value,
+            "initialized": self.initialized,
+            "healthy": self.initialized and self.initialization_error is None
+        }
+
+        if self.initialization_error:
+            status["error"] = self.initialization_error
+
+        # Provider-specific checks
+        if self.provider == EmailProvider.SENDGRID:
+            status["sendgrid_configured"] = hasattr(self, 'sendgrid_client')
+        elif self.provider == EmailProvider.SES:
+            status["ses_configured"] = hasattr(self, 'ses_client')
+            status["ses_region"] = getattr(self, 'ses_region', None)
+
+        return status
+
     async def send_email(
         self,
         to_email: str,
@@ -228,20 +261,25 @@ class EmailService:
         from_email: Optional[str] = None
     ) -> bool:
         """Send email using configured provider.
-        
+
         Args:
             to_email: Recipient email address
             subject: Email subject
             html_body: HTML email body
             text_body: Plain text email body
             from_email: Sender email (optional, uses default)
-            
+
         Returns:
             True if email sent successfully, False otherwise
         """
+        # Check if service is initialized
+        if not self.initialized:
+            logger.error(f"Email service not initialized: {self.initialization_error}")
+            return False
+
         if not from_email:
             from_email = os.getenv('EMAIL_FROM_ADDRESS', 'noreply@allms.example.com')
-        
+
         try:
             if self.provider == EmailProvider.SENDGRID:
                 return await self._send_sendgrid(to_email, from_email, subject, html_body, text_body)

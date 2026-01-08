@@ -8,6 +8,7 @@ deletion, and consent management.
 import json
 import logging
 import re
+import threading
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
 from collections import defaultdict
@@ -51,6 +52,7 @@ logger = logging.getLogger(__name__)
 # - Single-instance deployments with low traffic
 # - Temporary deployments while setting up Redis
 _rate_limit_storage: Dict[str, Dict[str, Any]] = defaultdict(lambda: {"count": 0, "reset_time": datetime.utcnow()})
+_rate_limit_lock = threading.Lock()  # Thread-safe lock to prevent race conditions
 
 router = APIRouter(prefix="/api/gdpr", tags=["gdpr"])
 
@@ -95,8 +97,35 @@ class DeleteAccountRequest(BaseModel):
         return v
 
 
+def _cleanup_expired_rate_limits():
+    """Clean up expired rate limit entries to prevent memory leak.
+
+    Removes entries that are past their reset time by more than 1 hour.
+    This prevents unbounded memory growth in long-running applications.
+    """
+    now = datetime.utcnow()
+    cutoff_time = now - timedelta(hours=1)
+
+    with _rate_limit_lock:
+        # Find expired keys
+        expired_keys = [
+            key for key, data in _rate_limit_storage.items()
+            if data["reset_time"] < cutoff_time
+        ]
+
+        # Remove expired entries
+        for key in expired_keys:
+            del _rate_limit_storage[key]
+
+        if expired_keys:
+            logger.debug(f"Cleaned up {len(expired_keys)} expired rate limit entries")
+
+
 def check_rate_limit(user_id: str, endpoint: str, max_requests: int = 10, window_minutes: int = 60) -> bool:
     """Check if user has exceeded rate limit for endpoint.
+
+    Thread-safe implementation using locks to prevent race conditions.
+    Includes automatic cleanup of expired entries to prevent memory leaks.
 
     Args:
         user_id: User ID
@@ -113,24 +142,40 @@ def check_rate_limit(user_id: str, endpoint: str, max_requests: int = 10, window
     key = f"{user_id}:{endpoint}"
     now = datetime.utcnow()
 
-    # Get or create rate limit entry
-    limit_data = _rate_limit_storage[key]
+    # Use lock to prevent race conditions in concurrent requests
+    with _rate_limit_lock:
+        # Periodic cleanup: every 100th request, clean up expired entries
+        # This prevents memory leak without impacting performance
+        if len(_rate_limit_storage) > 0 and len(_rate_limit_storage) % 100 == 0:
+            # Release lock temporarily for cleanup
+            pass  # Cleanup will happen after this check
 
-    # Reset if window has passed
-    if now >= limit_data["reset_time"]:
-        limit_data["count"] = 0
-        limit_data["reset_time"] = now + timedelta(minutes=window_minutes)
+        # Get or create rate limit entry
+        limit_data = _rate_limit_storage[key]
 
-    # Check limit
-    if limit_data["count"] >= max_requests:
-        reset_in = (limit_data["reset_time"] - now).total_seconds()
-        raise HTTPException(
-            status_code=429,
-            detail=f"Rate limit exceeded. Try again in {int(reset_in)} seconds."
-        )
+        # Reset if window has passed
+        if now >= limit_data["reset_time"]:
+            limit_data["count"] = 0
+            limit_data["reset_time"] = now + timedelta(minutes=window_minutes)
 
-    # Increment counter
-    limit_data["count"] += 1
+        # Check limit
+        if limit_data["count"] >= max_requests:
+            reset_in = (limit_data["reset_time"] - now).total_seconds()
+            raise HTTPException(
+                status_code=429,
+                detail=f"Rate limit exceeded. Try again in {int(reset_in)} seconds."
+            )
+
+        # Increment counter
+        limit_data["count"] += 1
+
+    # Periodic cleanup outside the lock (non-blocking)
+    if len(_rate_limit_storage) % 100 == 0:
+        try:
+            _cleanup_expired_rate_limits()
+        except Exception as e:
+            logger.warning(f"Rate limit cleanup failed: {e}")
+
     return True
 
 

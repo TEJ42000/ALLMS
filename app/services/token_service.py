@@ -24,6 +24,9 @@ TOKEN_SECRET = os.getenv('GDPR_TOKEN_SECRET')
 ENVIRONMENT = os.getenv('ENVIRONMENT', 'development').lower()
 IS_PRODUCTION = ENVIRONMENT in ['production', 'prod']
 
+# Development secret file path (for persistent tokens in dev)
+DEV_SECRET_FILE = os.path.join(os.path.dirname(__file__), '..', '..', '.dev_token_secret')
+
 if not TOKEN_SECRET:
     if IS_PRODUCTION:
         # CRITICAL: In production, TOKEN_SECRET is required
@@ -36,14 +39,31 @@ if not TOKEN_SECRET:
         logger.critical(error_msg)
         raise ValueError(error_msg)
     else:
-        # Development fallback: generate a random secret
-        # WARNING: This will change on every restart, invalidating all tokens
-        TOKEN_SECRET = secrets.token_hex(32)
-        logger.warning(
-            "GDPR_TOKEN_SECRET not set in environment. Using randomly generated secret. "
-            "This is OK for development but NOT suitable for production. "
-            "All tokens will be invalidated on restart."
-        )
+        # Development fallback: use persistent secret file
+        # This prevents token invalidation on restart
+        try:
+            if os.path.exists(DEV_SECRET_FILE):
+                with open(DEV_SECRET_FILE, 'r') as f:
+                    TOKEN_SECRET = f.read().strip()
+                logger.info("Loaded development token secret from .dev_token_secret file")
+            else:
+                # Generate new secret and save it
+                TOKEN_SECRET = secrets.token_hex(32)
+                with open(DEV_SECRET_FILE, 'w') as f:
+                    f.write(TOKEN_SECRET)
+                logger.warning(
+                    "GDPR_TOKEN_SECRET not set in environment. Generated new development secret "
+                    "and saved to .dev_token_secret file. This secret will persist across restarts. "
+                    "For production, set GDPR_TOKEN_SECRET environment variable."
+                )
+        except Exception as e:
+            # Fallback to random secret if file operations fail
+            TOKEN_SECRET = secrets.token_hex(32)
+            logger.warning(
+                f"Failed to read/write development secret file: {e}. "
+                "Using random secret (tokens will be invalidated on restart). "
+                "For production, set GDPR_TOKEN_SECRET environment variable."
+            )
 else:
     # Validate token secret length
     if len(TOKEN_SECRET) < 64:

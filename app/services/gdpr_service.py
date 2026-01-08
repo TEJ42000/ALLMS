@@ -260,14 +260,35 @@ class GDPRService:
 
             if soft_delete:
                 # Mark user as deleted but retain data
+                # Use transaction to ensure atomic operation
                 try:
+                    from google.cloud.firestore import transactional
+
+                    @transactional
+                    def mark_user_deleted(transaction, user_ref):
+                        """Transactional update to mark user as deleted."""
+                        # Read user document first to ensure it exists
+                        user_doc = user_ref.get(transaction=transaction)
+                        if not user_doc.exists:
+                            raise ValueError(f"User {user_id} not found")
+
+                        # Update user document with deletion markers
+                        transaction.update(user_ref, {
+                            'deleted': True,
+                            'deleted_at': deletion_timestamp,
+                            'permanent_deletion_date': permanent_deletion_date,
+                            'deletion_requested_at': deletion_timestamp
+                        })
+
+                    # Execute transaction
                     user_ref = self.db.collection('users').document(user_id)
-                    user_ref.update({
-                        'deleted': True,
-                        'deleted_at': deletion_timestamp,
-                        'permanent_deletion_date': permanent_deletion_date
-                    })
-                    logger.info(f"User {user_id} marked for deletion (soft delete)")
+                    transaction = self.db.transaction()
+                    mark_user_deleted(transaction, user_ref)
+
+                    logger.info(f"User {user_id} marked for deletion (soft delete) via transaction")
+                except ValueError as e:
+                    logger.error(f"User not found for deletion: {e}")
+                    raise
                 except Exception as e:
                     logger.error(f"Error marking user for deletion: {e}")
                     raise

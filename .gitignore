@@ -131,6 +131,9 @@ ENV/
 env.bak/
 venv.bak/
 
+# GDPR Development Secrets (never commit!)
+.dev_token_secret
+
 # Spyder project settings
 .spyderproject
 .spyproject
