@@ -194,9 +194,11 @@ async def flashcards_page(request: Request):
     - Allows public access to study materials (Phase 1)
     - User context is passed but not required
     - Future Phase 2 will add user-specific features (progress tracking, etc.)
+
+    HIGH FIX: Adds strict CSP headers for security.
     """
     user = get_user_from_request(request)
-    return templates.TemplateResponse(
+    response = templates.TemplateResponse(
         "flashcards.html",
         {
             "request": request,
@@ -204,3 +206,24 @@ async def flashcards_page(request: Request):
             "user": user
         }
     )
+
+    # HIGH FIX: Add strict Content Security Policy headers
+    # This enforces that all scripts/styles come from external files (no inline code)
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "script-src 'self'; "
+        "style-src 'self'; "
+        "img-src 'self' data:; "
+        "font-src 'self'; "
+        "connect-src 'self'; "
+        "frame-ancestors 'none'; "
+        "base-uri 'self'; "
+        "form-action 'self'"
+    )
+
+    # Additional security headers
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+
+    return response

@@ -697,8 +697,9 @@ class FlashcardViewer {
      * HIGH FIX: Validate starred indices to prevent corruption
      */
     reviewStarredCards() {
+        // CRITICAL FIX: Replace alert() with showError()
         if (this.starredCards.size === 0) {
-            alert('No starred cards to review!');
+            this.showError('No starred cards to review!');
             return;
         }
 
@@ -716,8 +717,9 @@ class FlashcardViewer {
             return index >= 0 && index < this.originalFlashcards.length;
         });
 
+        // CRITICAL FIX: Replace alert() with showError()
         if (validIndices.length === 0) {
-            alert('No valid starred cards found!');
+            this.showError('No valid starred cards found!');
             return;
         }
 

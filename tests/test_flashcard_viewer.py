@@ -31,8 +31,13 @@ def driver():
 
 @pytest.fixture
 def flashcard_page(driver):
-    """Navigate to flashcards page before each test."""
-    driver.get('http://localhost:8000/flashcards')
+    """Navigate to flashcards page before each test.
+
+    HIGH FIX: Use environment variable for base URL instead of hardcoded localhost.
+    """
+    import os
+    base_url = os.getenv('TEST_BASE_URL', 'http://localhost:8000')
+    driver.get(f'{base_url}/flashcards')
     wait = WebDriverWait(driver, 10)
     wait.until(EC.presence_of_element_located((By.CLASS_NAME, 'flashcard-sets')))
     return driver
@@ -294,22 +299,29 @@ class TestCardActions:
         assert 'Card 1 of' in progress_text.text
 
     def test_shuffle_button_shows_confirmation(self):
-        """Test that shuffle button shows confirmation dialog."""
+        """Test that shuffle button shows confirmation dialog.
+
+        CRITICAL FIX: Updated to work with custom modal dialogs instead of native confirm().
+        """
         # Star a card first
         btn_star = self.driver.find_element(By.ID, 'btn-star')
         btn_star.click()
         time.sleep(0.3)
-        
-        # Click shuffle - should show alert
+
+        # Click shuffle - should show custom modal dialog
         btn_shuffle = self.driver.find_element(By.ID, 'btn-shuffle')
         btn_shuffle.click()
-        
-        # Wait for alert
+
+        # CRITICAL FIX: Wait for custom modal dialog instead of native alert
         wait = WebDriverWait(self.driver, 3)
-        alert = wait.until(EC.alert_is_present())
-        
-        assert alert is not None, "Shuffle should show confirmation dialog"
-        alert.dismiss()  # Cancel the shuffle
+        modal = wait.until(EC.presence_of_element_located((By.CLASS_NAME, 'error-overlay')))
+
+        assert modal is not None, "Shuffle should show confirmation dialog"
+
+        # CRITICAL FIX: Click Cancel button instead of alert.dismiss()
+        btn_cancel = self.driver.find_element(By.ID, 'btn-cancel-confirm')
+        btn_cancel.click()
+        time.sleep(0.3)
 
 
 class TestStatistics:
@@ -512,10 +524,13 @@ class TestStarredCardsValidation:
         btn_shuffle = self.driver.find_element(By.ID, 'btn-shuffle')
         btn_shuffle.click()
 
-        # Accept alert
+        # CRITICAL FIX: Accept custom modal dialog instead of native alert
         wait = WebDriverWait(self.driver, 3)
-        alert = wait.until(EC.alert_is_present())
-        alert.accept()
+        modal = wait.until(EC.presence_of_element_located((By.CLASS_NAME, 'error-overlay')))
+
+        # Click Continue button
+        btn_confirm = self.driver.find_element(By.ID, 'btn-confirm-confirm')
+        btn_confirm.click()
         time.sleep(0.5)
 
         # Check starred count is 0

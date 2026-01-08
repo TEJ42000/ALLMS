@@ -26,9 +26,71 @@ document.addEventListener('DOMContentLoaded', async function() {
 });
 
 /**
+ * Validate flashcard set schema
+ * HIGH FIX: Comprehensive JSON schema validation
+ * @param {object} set - The flashcard set to validate
+ * @param {number} index - The index of the set (for logging)
+ * @returns {boolean} - True if valid, false otherwise
+ */
+function validateFlashcardSet(set, index) {
+    // Check if set is an object
+    if (!set || typeof set !== 'object') {
+        console.warn(`[FlashcardPage] Invalid set at index ${index}: not an object`);
+        return false;
+    }
+
+    // Required fields
+    if (typeof set.id !== 'number' || set.id <= 0) {
+        console.warn(`[FlashcardPage] Invalid set at index ${index}: id must be positive number`);
+        return false;
+    }
+
+    if (typeof set.title !== 'string' || set.title.trim().length === 0) {
+        console.warn(`[FlashcardPage] Invalid set at index ${index}: title must be non-empty string`);
+        return false;
+    }
+
+    if (!Array.isArray(set.cards)) {
+        console.warn(`[FlashcardPage] Invalid set at index ${index}: cards must be array`);
+        return false;
+    }
+
+    if (set.cards.length === 0) {
+        console.warn(`[FlashcardPage] Empty set at index ${index}: ${set.title}`);
+        return false;
+    }
+
+    // Validate each card
+    const validCards = set.cards.every((card, cardIndex) => {
+        if (!card || typeof card !== 'object') {
+            console.warn(`[FlashcardPage] Invalid card at set ${index}, card ${cardIndex}`);
+            return false;
+        }
+
+        // Card must have either question/answer OR term/definition
+        const hasQuestionAnswer =
+            typeof card.question === 'string' && card.question.trim().length > 0 &&
+            typeof card.answer === 'string' && card.answer.trim().length > 0;
+
+        const hasTermDefinition =
+            typeof card.term === 'string' && card.term.trim().length > 0 &&
+            typeof card.definition === 'string' && card.definition.trim().length > 0;
+
+        if (!hasQuestionAnswer && !hasTermDefinition) {
+            console.warn(`[FlashcardPage] Invalid card at set ${index}, card ${cardIndex}: missing content`);
+            return false;
+        }
+
+        return true;
+    });
+
+    return validCards;
+}
+
+/**
  * Load flashcard data from JSON file
  * MEDIUM FIX: Separate data from code
- * MEDIUM FIX: Add JSON response validation
+ * HIGH FIX: Comprehensive JSON schema validation
  */
 async function loadFlashcardData() {
     try {
@@ -38,30 +100,13 @@ async function loadFlashcardData() {
         }
         const data = await response.json();
 
-        // MEDIUM FIX: Validate JSON structure
+        // HIGH FIX: Validate JSON structure
         if (!Array.isArray(data)) {
             throw new Error('Invalid data format: expected array');
         }
 
-        // MEDIUM FIX: Validate each flashcard set
-        const validSets = data.filter((set, index) => {
-            if (!set || typeof set !== 'object') {
-                console.warn(`[FlashcardPage] Skipping invalid set at index ${index}`);
-                return false;
-            }
-
-            if (!set.id || !set.title || !Array.isArray(set.cards)) {
-                console.warn(`[FlashcardPage] Skipping incomplete set at index ${index}:`, set);
-                return false;
-            }
-
-            if (set.cards.length === 0) {
-                console.warn(`[FlashcardPage] Skipping empty set at index ${index}:`, set.title);
-                return false;
-            }
-
-            return true;
-        });
+        // HIGH FIX: Validate each flashcard set with comprehensive schema validation
+        const validSets = data.filter((set, index) => validateFlashcardSet(set, index));
 
         if (validSets.length === 0) {
             throw new Error('No valid flashcard sets found');
