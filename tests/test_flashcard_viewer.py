@@ -7,6 +7,9 @@ This uses pytest with selenium for browser automation testing.
 
 import pytest
 import time
+
+# Guard selenium imports - skip tests if selenium not available
+selenium = pytest.importorskip("selenium")
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys

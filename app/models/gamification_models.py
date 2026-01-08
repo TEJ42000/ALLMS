@@ -13,7 +13,18 @@ Firestore structure:
 
 from datetime import datetime, timezone
 from typing import Optional, Dict, Any, List
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, EmailStr
+
+
+# =============================================================================
+# User Model
+# =============================================================================
+
+class User(BaseModel):
+    """Simple user model used in tests and services."""
+    user_id: str = Field(..., description="User's IAP user ID")
+    email: EmailStr = Field(..., description="User's email address")
+    name: Optional[str] = Field(None, description="User display name")
 
 
 # =============================================================================
