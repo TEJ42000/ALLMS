@@ -28,12 +28,13 @@ Comprehensive unit test suite for AI Tutor and Assessment endpoints, achieving 8
 
 | Metric | Value |
 |--------|-------|
-| Total Test Functions | 40 |
-| Test File Lines | 637 |
+| Total Test Functions | 48 |
+| Test File Lines | ~750 |
 | Test Classes | 11 |
 | Coverage Target | 80%+ |
 | Previous Tests | 19 |
-| New Tests Added | 21 |
+| New Tests Added | 29 |
+| Parametrized Tests | 9 |
 
 ---
 
@@ -101,15 +102,17 @@ Tests for week parameter handling.
 **Note:** Week filtering is not yet implemented. These tests verify that endpoints
 accept the week parameter without errors. Actual filtering is a future enhancement.
 
-### 8. TestErrorHandling (6 tests)
-Tests for comprehensive error handling.
+### 8. TestErrorHandling (9 tests)
+Tests for comprehensive error handling and validation boundaries.
 
 **Tests:**
-- `test_chat_with_very_long_message` - Very long message handling
+- `test_chat_message_at_max_length` - Message at 5000 char limit (boundary)
+- `test_chat_message_exceeds_max_length` - Message over 5000 chars (validation)
+- `test_chat_message_boundary_cases` - Parametrized boundary tests (1, 100, 4999, 5000 chars)
 - `test_chat_with_special_characters` - Special characters handling
 - `test_chat_with_unicode_characters` - Unicode characters handling
 - `test_chat_api_timeout` - API timeout handling
-- `test_chat_api_rate_limit` - API rate limit handling
+- `test_chat_api_rate_limit` - API rate limit handling (with import guard)
 
 ### 9. TestConversationHistory (3 tests)
 Tests for conversation history handling.
@@ -303,12 +306,72 @@ with patch('app.services.anthropic_client.client') as mock_client:
 
 ---
 
+## 🔧 Troubleshooting
+
+### Common Issues
+
+#### ImportError: cannot import name 'RateLimitError'
+**Problem:** anthropic package version doesn't have RateLimitError
+**Solution:** Tests include import guard that falls back to generic Exception
+
+#### Tests hang or timeout
+**Problem:** Async mocks not properly configured
+**Solution:** Ensure AsyncMock is used for async methods:
+```python
+mock_client.messages.create = AsyncMock(return_value=mock_response)
+```
+
+#### Validation errors in tests
+**Problem:** Message length exceeds 5000 character limit
+**Solution:** Check message length in test data:
+```python
+assert len(message) <= 5000, "Message exceeds max length"
+```
+
+#### Cache tests fail
+**Problem:** Cache behavior is implementation-dependent
+**Solution:** Tests verify repeated requests work, not actual cache hits
+
+#### Concurrent test failures
+**Problem:** Race conditions in threading
+**Solution:** Tests use proper thread synchronization with join()
+
+### Test Best Practices
+
+1. **Always use mocks for external services**
+   - Mock Anthropic API client
+   - Mock FilesAPIService
+   - Mock CourseService
+
+2. **Use parametrize for repeated patterns**
+   - Reduces code duplication
+   - Makes test intent clearer
+   - Easier to add new test cases
+
+3. **Verify error messages, not just status codes**
+   - Check "detail" field in error responses
+   - Verify error mentions the problem
+
+4. **Test boundary conditions**
+   - Minimum values (1 char)
+   - Maximum values (5000 chars)
+   - Just under max (4999 chars)
+   - Just over max (5001 chars)
+
+5. **Use proper assertions**
+   - Include failure messages
+   - Test specific fields, not just existence
+   - Verify data types and formats
+
+---
+
 ## 📚 References
 
 - [Issue #156](https://github.com/TEJ42000/ALLMS/issues/156)
 - [AI Tutor Routes](../app/routes/ai_tutor.py)
 - [Pytest Documentation](https://docs.pytest.org/)
 - [FastAPI Testing](https://fastapi.tiangolo.com/tutorial/testing/)
+- [Pytest Parametrize](https://docs.pytest.org/en/stable/how-to/parametrize.html)
 
 ---
 

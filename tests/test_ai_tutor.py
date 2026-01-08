@@ -73,6 +73,11 @@ class TestChatEndpoint:
         })
 
         assert response.status_code == 422
+        data = response.json()
+        assert "detail" in data
+        # Verify error mentions the missing field
+        error_str = str(data["detail"]).lower()
+        assert "message" in error_str or "required" in error_str
 
     def test_chat_default_context(self, client, mock_tutor_response):
         """Test that default context is applied when not provided."""
@@ -429,19 +434,54 @@ class TestWeekFiltering:
 class TestErrorHandling:
     """Tests for comprehensive error handling."""
 
-    def test_chat_with_very_long_message(self, client, mock_tutor_response):
-        """Test chat with very long message."""
+    def test_chat_message_at_max_length(self, client, mock_tutor_response):
+        """Test chat with message at maximum allowed length (5000 chars)."""
         with patch('app.services.anthropic_client.client') as mock_client:
             mock_client.messages.create = AsyncMock(return_value=mock_tutor_response)
 
-            long_message = "A" * 10000  # 10k characters
+            # Exactly 5000 characters (max allowed)
+            max_message = "A" * 5000
             response = client.post("/api/tutor/chat", json={
-                "message": long_message,
+                "message": max_message,
                 "context": "Private Law"
             })
 
-            # Should handle long messages
-            assert response.status_code in [200, 422]
+            # Should accept message at max length
+            assert response.status_code == 200
+
+    def test_chat_message_exceeds_max_length(self, client):
+        """Test chat with message exceeding maximum length (>5000 chars)."""
+        # 5001 characters (exceeds max)
+        too_long_message = "A" * 5001
+        response = client.post("/api/tutor/chat", json={
+            "message": too_long_message,
+            "context": "Private Law"
+        })
+
+        # Should reject with validation error
+        assert response.status_code == 422
+        data = response.json()
+        assert "detail" in data
+
+    @pytest.mark.parametrize("length,expected_status", [
+        (1, 200),       # Minimum valid length
+        (100, 200),     # Normal length
+        (4999, 200),    # Just under max
+        (5000, 200),    # Exactly max
+    ])
+    def test_chat_message_boundary_cases(self, client, mock_tutor_response, length, expected_status):
+        """Test chat with various message length boundaries."""
+        with patch('app.services.anthropic_client.client') as mock_client:
+            mock_client.messages.create = AsyncMock(return_value=mock_tutor_response)
+
+            message = "A" * length
+            response = client.post("/api/tutor/chat", json={
+                "message": message,
+                "context": "Private Law"
+            })
+
+            assert response.status_code == expected_status, \
+                f"Expected {expected_status} for length {length}, got {response.status_code}"
 
     def test_chat_with_special_characters(self, client, mock_tutor_response):
         """Test chat with special characters in message."""
@@ -546,25 +586,23 @@ class TestConversationHistory:
 class TestContextVariations:
     """Tests for different context variations."""
 
-    def test_chat_with_all_law_contexts(self, client, mock_tutor_response):
-        """Test chat with all different law contexts."""
+    @pytest.mark.parametrize("context", [
+        "Constitutional Law",
+        "Administrative Law",
+        "Criminal Law",
+        "Private Law",
+        "International Law"
+    ])
+    def test_chat_with_law_contexts(self, client, mock_tutor_response, context):
+        """Test chat with different law contexts."""
         with patch('app.services.anthropic_client.client') as mock_client:
             mock_client.messages.create = AsyncMock(return_value=mock_tutor_response)
 
-            contexts = [
-                "Constitutional Law",
-                "Administrative Law",
-                "Criminal Law",
-                "Private Law",
-                "International Law"
-            ]
-
-            for context in contexts:
-                response = client.post("/api/tutor/chat", json={
-                    "message": "Test question",
-                    "context": context
-                })
-                assert response.status_code == 200
+            response = client.post("/api/tutor/chat", json={
+                "message": "Test question",
+                "context": context
+            })
+            assert response.status_code == 200
 
     def test_chat_with_custom_context(self, client, mock_tutor_response):
         """Test chat with custom context."""
@@ -594,17 +632,27 @@ class TestResponseFormatting:
     """Tests for response formatting and structure."""
 
     def test_chat_response_has_timestamp(self, client, sample_chat_request, mock_tutor_response):
-        """Test that chat response includes timestamp."""
+        """Test that chat response includes valid timestamp."""
         with patch('app.services.anthropic_client.client') as mock_client:
             mock_client.messages.create = AsyncMock(return_value=mock_tutor_response)
 
+            before_request = datetime.now(timezone.utc)
             response = client.post("/api/tutor/chat", json=sample_chat_request)
+            after_request = datetime.now(timezone.utc)
 
             assert response.status_code == 200
             data = response.json()
             assert "timestamp" in data
+
             # Verify timestamp is valid ISO format
-            datetime.fromisoformat(data["timestamp"].replace('Z', '+00:00'))
+            timestamp = datetime.fromisoformat(data["timestamp"].replace('Z', '+00:00'))
+
+            # Verify timestamp is reasonable (within request time window)
+            assert before_request <= timestamp <= after_request, \
+                f"Timestamp {timestamp} not within request window {before_request} - {after_request}"
+
+            # Verify timestamp is timezone-aware
+            assert timestamp.tzinfo is not None, "Timestamp should be timezone-aware"
 
     def test_chat_response_structure(self, client, sample_chat_request, mock_tutor_response):
         """Test complete response structure."""
@@ -646,21 +694,47 @@ class TestConcurrentRequests:
     """Tests for handling concurrent requests."""
 
     def test_multiple_concurrent_chat_requests(self, client, mock_tutor_response):
-        """Test handling multiple concurrent chat requests."""
+        """Test handling multiple concurrent chat requests using threading.
+
+        Note: This test uses threading to simulate actual concurrent requests,
+        not just sequential requests in a loop.
+        """
+        import threading
+
         with patch('app.services.anthropic_client.client') as mock_client:
             mock_client.messages.create = AsyncMock(return_value=mock_tutor_response)
 
-            # Simulate concurrent requests
-            requests = [
-                {"message": f"Question {i}", "context": "Private Law"}
-                for i in range(5)
-            ]
+            # Store results from threads
+            results = []
+            errors = []
 
-            responses = [
-                client.post("/api/tutor/chat", json=req)
-                for req in requests
-            ]
+            def make_request(request_data, index):
+                """Make a request in a thread."""
+                try:
+                    response = client.post("/api/tutor/chat", json=request_data)
+                    results.append((index, response))
+                except Exception as e:
+                    errors.append((index, e))
 
-            # All should succeed
-            for response in responses:
-                assert response.status_code == 200
+            # Create threads for concurrent requests
+            threads = []
+            for i in range(5):
+                request_data = {"message": f"Question {i}", "context": "Private Law"}
+                thread = threading.Thread(target=make_request, args=(request_data, i))
+                threads.append(thread)
+
+            # Start all threads (concurrent execution)
+            for thread in threads:
+                thread.start()
+
+            # Wait for all threads to complete
+            for thread in threads:
+                thread.join(timeout=5.0)
+
+            # Verify no errors occurred
+            assert len(errors) == 0, f"Errors in concurrent requests: {errors}"
+
+            # All requests should succeed
+            assert len(results) == 5
+            for index, response in results:
+                assert response.status_code == 200, f"Request {index} failed"
