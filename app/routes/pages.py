@@ -1,12 +1,13 @@
 """Page Rendering Routes for the LLS Study Portal."""
 
 import logging
-from typing import Any, Dict, Optional
+from typing import Dict, Optional
 
 from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
+from app.models.auth_models import User
 from app.services.course_service import get_course_service
 
 logger = logging.getLogger(__name__)
@@ -17,7 +18,7 @@ router = APIRouter(tags=["Pages"])
 templates = Jinja2Templates(directory="templates")
 
 
-def get_user_from_request(request: Request) -> Optional[Any]:
+def get_user_from_request(request: Request) -> Optional[User]:
     """Extract user from request state (set by auth middleware).
 
     Args:
