@@ -119,20 +119,56 @@ class FlashcardViewer {
         this.timeTrackerInterval = null;
         this.gamificationInitialized = false;
 
+        // CRITICAL FIX: Ready flag for async initialization
+        this.ready = false;
+
         // CRITICAL FIX: Initialize asynchronously to avoid race conditions
         this.initializeAsync();
     }
 
     /**
      * CRITICAL FIX: Async initialization to prevent race conditions
+     * Sets this.ready = true when complete
      */
     async initializeAsync() {
-        // Check if user is authenticated for gamification
-        await this.checkGamificationStatus();
-        this.gamificationInitialized = true;
+        try {
+            // Check if user is authenticated for gamification
+            await this.checkGamificationStatus();
+            this.gamificationInitialized = true;
 
-        // Initialize the viewer
-        this.init();
+            // Initialize the viewer
+            this.init();
+
+            // CRITICAL FIX: Mark as ready
+            this.ready = true;
+        } catch (error) {
+            console.error('[FlashcardViewer] Initialization failed:', error);
+            this.ready = false;
+            this.showError('Failed to initialize flashcard viewer');
+        }
+    }
+
+    /**
+     * CRITICAL FIX: Wait for viewer to be ready
+     * @returns {Promise<boolean>} True when ready
+     */
+    async waitForReady() {
+        if (this.ready) return true;
+
+        return new Promise((resolve) => {
+            const checkReady = setInterval(() => {
+                if (this.ready) {
+                    clearInterval(checkReady);
+                    resolve(true);
+                }
+            }, 100);
+
+            // Timeout after 10 seconds
+            setTimeout(() => {
+                clearInterval(checkReady);
+                resolve(false);
+            }, 10000);
+        });
     }
 
     /**
@@ -1089,9 +1125,10 @@ class FlashcardViewer {
      * Cleanup all resources including beforeunload handler
      * CRITICAL FIX: Full cleanup when destroying viewer
      * CRITICAL FIX: Prevent memory leaks from timers and event listeners
+     * CRITICAL FIX: Make cleanup async to await session end
      * PHASE 2A: End gamification session on cleanup
      */
-    cleanup() {
+    async cleanup() {
         console.log('[FlashcardViewer] Cleaning up all resources...');
 
         // CRITICAL FIX: Stop time tracker to prevent memory leak
@@ -1101,11 +1138,14 @@ class FlashcardViewer {
             console.log('[FlashcardViewer] Time tracker stopped');
         }
 
-        // PHASE 2A: End gamification session
+        // CRITICAL FIX: Await session end before nulling properties
         if (this.gamificationEnabled && this.sessionId) {
-            this.endGamificationSession().catch(error => {
+            try {
+                await this.endGamificationSession();
+                console.log('[FlashcardViewer] Gamification session ended');
+            } catch (error) {
                 console.error('[FlashcardViewer] Error ending gamification session:', error);
-            });
+            }
         }
 
         // Remove DOM event listeners
@@ -1336,7 +1376,7 @@ class FlashcardViewer {
                     </div>
                     <div class="modal-body">
                         <div class="card-preview">
-                            <strong>Front:</strong> ${this.escapeHtml(currentCard.front)}
+                            <strong>Front:</strong> ${this.escapeHtml(currentCard.question || currentCard.term || '')}
                         </div>
                         <textarea
                             id="note-input"
@@ -1366,8 +1406,17 @@ class FlashcardViewer {
         // Focus on textarea
         noteInput.focus();
 
+        // CRITICAL FIX: Escape handler defined first for cleanup
+        const escapeHandler = (e) => {
+            if (e.key === 'Escape') {
+                closeModal();
+            }
+        };
+
         // Close modal function
         const closeModal = () => {
+            // CRITICAL FIX: Always remove escape handler
+            document.removeEventListener('keydown', escapeHandler);
             modal.remove();
         };
 
@@ -1397,12 +1446,6 @@ class FlashcardViewer {
         });
 
         // Close on Escape key
-        const escapeHandler = (e) => {
-            if (e.key === 'Escape') {
-                closeModal();
-                document.removeEventListener('keydown', escapeHandler);
-            }
-        };
         document.addEventListener('keydown', escapeHandler);
 
         // Save on Ctrl+Enter
@@ -1430,8 +1473,8 @@ class FlashcardViewer {
                     </div>
                     <div class="modal-body">
                         <div class="card-preview">
-                            <div><strong>Front:</strong> ${this.escapeHtml(currentCard.front)}</div>
-                            <div><strong>Back:</strong> ${this.escapeHtml(currentCard.back)}</div>
+                            <div><strong>Front:</strong> ${this.escapeHtml(currentCard.question || currentCard.term || '')}</div>
+                            <div><strong>Back:</strong> ${this.escapeHtml(currentCard.answer || currentCard.definition || '')}</div>
                         </div>
 
                         <div class="form-group">
@@ -1478,8 +1521,17 @@ class FlashcardViewer {
         // Focus on description
         issueDescription.focus();
 
+        // CRITICAL FIX: Escape handler defined first for cleanup
+        const escapeHandler = (e) => {
+            if (e.key === 'Escape') {
+                closeModal();
+            }
+        };
+
         // Close modal function
         const closeModal = () => {
+            // CRITICAL FIX: Always remove escape handler
+            document.removeEventListener('keydown', escapeHandler);
             modal.remove();
         };
 
@@ -1532,42 +1584,7 @@ class FlashcardViewer {
         });
 
         // Close on Escape key
-        const escapeHandler = (e) => {
-            if (e.key === 'Escape') {
-                closeModal();
-                document.removeEventListener('keydown', escapeHandler);
-            }
-        };
         document.addEventListener('keydown', escapeHandler);
-    }
-
-    /**
-     * Escape HTML to prevent XSS
-     * MEDIUM FIX: Enhanced XSS prevention with additional sanitization
-     */
-    escapeHtml(text) {
-        if (text === null || text === undefined) {
-            return '';
-        }
-
-        // Convert to string
-        text = String(text);
-
-        // MEDIUM FIX: Additional sanitization for common XSS vectors
-        const div = document.createElement('div');
-        div.textContent = text;
-        let escaped = div.innerHTML;
-
-        // MEDIUM FIX: Extra protection against attribute-based XSS
-        escaped = escaped
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#x27;')
-            .replace(/\//g, '&#x2F;');
-
-        return escaped;
     }
 
     // =========================================================================

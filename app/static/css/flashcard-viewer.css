@@ -760,26 +760,7 @@
     margin-top: 24px;
 }
 
-.btn-secondary {
-    padding: 12px 24px;
-    background: #e0e0e0;
-    color: #333;
-    border: none;
-    border-radius: 8px;
-    font-size: 16px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background 0.2s ease;
-}
-
-.btn-secondary:hover {
-    background: #d0d0d0;
-}
-
-.btn-secondary:focus {
-    outline: 2px solid #667eea;
-    outline-offset: 2px;
-}
+/* CRITICAL FIX: Removed duplicate .btn-secondary - consolidated at top */
 
 /* ============================================================================
    Completion Screen
@@ -841,37 +822,7 @@
     flex-wrap: wrap;
 }
 
-.btn-primary,
-.btn-secondary {
-    padding: 14px 28px;
-    border-radius: 8px;
-    font-size: 16px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    border: none;
-}
-
-.btn-primary {
-    background: #667eea;
-    color: white;
-}
-
-.btn-primary:hover {
-    background: #5568d3;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
-}
-
-.btn-secondary {
-    background: white;
-    color: #667eea;
-    border: 2px solid #667eea;
-}
-
-.btn-secondary:hover {
-    background: #f5f5f5;
-}
+/* CRITICAL FIX: Removed duplicate button styles - consolidated at top */
 
 /* ============================================================================
    Responsive Design
