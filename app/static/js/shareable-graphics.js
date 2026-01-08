@@ -12,6 +12,7 @@ class ShareableGraphics {
     constructor() {
         this.canvas = null;
         this.ctx = null;
+        this.isGenerating = false; // Prevent race conditions
         this.init();
     }
 
@@ -40,6 +41,43 @@ class ShareableGraphics {
     sanitizeNumber(value, defaultValue = 0) {
         const num = parseFloat(value);
         return isNaN(num) ? defaultValue : num;
+    }
+
+    /**
+     * Validate stats response data
+     */
+    validateStatsData(data) {
+        if (!data || typeof data !== 'object') {
+            throw new Error('Invalid stats data: must be an object');
+        }
+
+        // Check for required fields
+        const requiredFields = ['current_level', 'total_xp', 'level_title'];
+        for (const field of requiredFields) {
+            if (!(field in data)) {
+                console.warn(`[ShareableGraphics] Missing field: ${field}`);
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Validate badges response data
+     */
+    validateBadgesData(badges) {
+        if (!Array.isArray(badges)) {
+            throw new Error('Invalid badges data: must be an array');
+        }
+
+        // Validate each badge has required fields
+        badges.forEach((badge, index) => {
+            if (!badge || typeof badge !== 'object') {
+                console.warn(`[ShareableGraphics] Invalid badge at index ${index}`);
+            }
+        });
+
+        return true;
     }
 
     /**
@@ -139,33 +177,52 @@ class ShareableGraphics {
     }
 
     /**
-     * Generate and share graphic
+     * Generate and share graphic with race condition prevention
      */
     async generateAndShare(type) {
-        console.log('[ShareableGraphics] Generating:', type);
-
-        // Fetch user stats
-        const stats = await this.fetchUserStats();
-
-        // Generate graphic based on type
-        let canvas;
-        switch (type) {
-            case 'weekly-report':
-                canvas = await this.generateWeeklyReport(stats);
-                break;
-            case 'badge-showcase':
-                canvas = await this.generateBadgeShowcase(stats);
-                break;
-            case 'level-achievement':
-                canvas = await this.generateLevelAchievement(stats);
-                break;
-            default:
-                console.error('[ShareableGraphics] Unknown type:', type);
-                return;
+        // Prevent race condition - only one generation at a time
+        if (this.isGenerating) {
+            console.log('[ShareableGraphics] Generation already in progress, ignoring click');
+            return;
         }
 
-        // Share or download
-        await this.shareGraphic(canvas, type);
+        this.isGenerating = true;
+        console.log('[ShareableGraphics] Generating:', type);
+
+        try {
+            // Fetch user stats
+            const stats = await this.fetchUserStats();
+
+            if (!stats) {
+                console.error('[ShareableGraphics] Failed to fetch stats');
+                return;
+            }
+
+            // Generate graphic based on type
+            let canvas;
+            switch (type) {
+                case 'weekly-report':
+                    canvas = await this.generateWeeklyReport(stats);
+                    break;
+                case 'badge-showcase':
+                    canvas = await this.generateBadgeShowcase(stats);
+                    break;
+                case 'level-achievement':
+                    canvas = await this.generateLevelAchievement(stats);
+                    break;
+                default:
+                    console.error('[ShareableGraphics] Unknown type:', type);
+                    return;
+            }
+
+            // Share or download
+            await this.shareGraphic(canvas, type);
+        } catch (error) {
+            console.error('[ShareableGraphics] Error generating graphic:', error);
+        } finally {
+            // Always reset flag
+            this.isGenerating = false;
+        }
     }
 
     /**
@@ -181,13 +238,9 @@ class ShareableGraphics {
             const stats = await statsRes.json();
             const badges = await badgesRes.json();
 
-            // Validate data structure
-            if (!stats || typeof stats !== 'object') {
-                throw new Error('Invalid stats data');
-            }
-            if (!badges || !Array.isArray(badges)) {
-                throw new Error('Invalid badges data');
-            }
+            // Validate data structure and types
+            this.validateStatsData(stats);
+            this.validateBadgesData(badges);
 
             return { ...stats, badges };
         } catch (error) {

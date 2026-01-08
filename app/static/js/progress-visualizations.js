@@ -11,6 +11,7 @@
 class ProgressVisualizations {
     constructor() {
         this.observers = []; // Track MutationObservers for cleanup
+        this.intervals = []; // Track setInterval for cleanup
         this.init();
     }
 
@@ -35,6 +36,12 @@ class ProgressVisualizations {
             }
         });
         this.observers = [];
+
+        // Clear setInterval timers
+        this.intervals.forEach(interval => {
+            if (interval) clearInterval(interval);
+        });
+        this.intervals = [];
 
         // Clear animation timers
         if (this.animationTimers) {
@@ -64,6 +71,37 @@ class ProgressVisualizations {
     sanitizeNumber(value, defaultValue = 0) {
         const num = parseFloat(value);
         return isNaN(num) ? defaultValue : num;
+    }
+
+    /**
+     * Validate response data structure
+     */
+    validateStatsData(data) {
+        if (!data || typeof data !== 'object') {
+            throw new Error('Invalid data: must be an object');
+        }
+
+        // Validate required fields exist and are correct type
+        const requiredFields = {
+            'total_xp': 'number',
+            'current_level': 'number',
+            'xp_to_next_level': 'number'
+        };
+
+        for (const [field, type] of Object.entries(requiredFields)) {
+            if (!(field in data)) {
+                console.warn(`[ProgressVisualizations] Missing field: ${field}`);
+            } else if (typeof data[field] !== type) {
+                console.warn(`[ProgressVisualizations] Invalid type for ${field}: expected ${type}, got ${typeof data[field]}`);
+            }
+        }
+
+        // Validate activities is an object if present
+        if (data.activities && typeof data.activities !== 'object') {
+            throw new Error('Invalid data: activities must be an object');
+        }
+
+        return true;
     }
 
     /**
@@ -236,10 +274,8 @@ class ProgressVisualizations {
             const response = await this.safeFetch('/api/gamification/stats');
             const data = await response.json();
 
-            // Validate data structure
-            if (!data || typeof data !== 'object') {
-                throw new Error('Invalid response data');
-            }
+            // Validate data structure and types
+            this.validateStatsData(data);
 
             const circle = document.querySelector('.circular-progress-fill');
             const levelText = document.querySelector('.circular-progress-level');
@@ -310,10 +346,8 @@ class ProgressVisualizations {
             const response = await this.safeFetch('/api/gamification/stats');
             const data = await response.json();
 
-            // Validate data structure
-            if (!data || typeof data !== 'object') {
-                throw new Error('Invalid response data');
-            }
+            // Validate data structure and types
+            this.validateStatsData(data);
 
             const circle = document.querySelector('.exam-circle-fill');
             const percentageText = document.querySelector('.exam-percentage-value');
@@ -416,28 +450,17 @@ class ProgressVisualizations {
     }
 
     /**
-     * Enhance stat cards with micro-interactions
+     * Enhance stat cards with micro-interactions (using CSS classes)
      */
     enhanceStatCards() {
         const statCards = document.querySelectorAll('.stat-card');
-        
+
         statCards.forEach(card => {
-            // Add hover effect
-            card.addEventListener('mouseenter', () => {
-                card.style.transform = 'translateY(-8px) scale(1.02)';
-            });
-            
-            card.addEventListener('mouseleave', () => {
-                card.style.transform = 'translateY(0) scale(1)';
-            });
-            
-            // Add click animation
-            card.addEventListener('click', () => {
-                card.style.transform = 'scale(0.98)';
-                setTimeout(() => {
-                    card.style.transform = 'translateY(-8px) scale(1.02)';
-                }, 100);
-            });
+            // Add enhanced class to enable CSS animations
+            card.classList.add('enhanced');
+
+            // Note: Hover and active effects are now handled by CSS
+            // See styles.css: .stat-card:hover and .stat-card:active
         });
     }
 
@@ -456,11 +479,12 @@ class ProgressVisualizations {
             this.updateHeaderCircularProgress();
         });
 
-        // Periodic refresh (every 30 seconds)
-        setInterval(() => {
+        // Periodic refresh (every 30 seconds) - track for cleanup
+        const refreshInterval = setInterval(() => {
             this.updateHeaderCircularProgress();
             this.updateExamReadiness();
         }, 30000);
+        this.intervals.push(refreshInterval);
     }
 
     /**
