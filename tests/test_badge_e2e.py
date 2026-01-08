@@ -64,21 +64,23 @@ class TestBadgeE2E:
             user_email=mock_user.email,
             total_xp=450,
             streak=StreakInfo(current_count=1),
-            activity_counters=ActivityCounters()
+            # FIX: Changed activity_counters to activities
+            activities=ActivityCounters()
         )
-        
+
         # Step 1: User logs activity earning 50 XP
         with patch('app.services.gamification_service.get_firestore_client') as mock_db:
             # Mock Firestore responses
             mock_db.return_value = Mock()
-            
+
             # Activity logging would update XP to 500
             updated_stats = UserStats(
                 user_id=mock_user.user_id,
                 user_email=mock_user.email,
                 total_xp=500,  # Now meets Novice criteria
                 streak=StreakInfo(current_count=1),
-                activity_counters=ActivityCounters()
+                # FIX: Changed activity_counters to activities
+                activities=ActivityCounters()
             )
             
             # Step 2: Badge service checks for unlocks
@@ -301,7 +303,8 @@ class TestBadgeE2E:
             user_email=mock_user.email,
             total_xp=250,
             streak=StreakInfo(current_count=1),
-            activity_counters=ActivityCounters()
+            # FIX: Changed activity_counters to activities
+            activities=ActivityCounters()
         )
         
         with patch.object(BadgeService, '_get_badge_definitions') as mock_get_defs:

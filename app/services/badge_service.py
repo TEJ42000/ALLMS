@@ -220,7 +220,8 @@ class BadgeService:
             
             # Activity badges
             elif category == "activity":
-                return self._check_activity_criteria(criteria, user_stats.activity_counters)
+                # FIX: Changed activity_counters to activities (correct attribute name)
+                return self._check_activity_criteria(criteria, user_stats.activities)
             
             # Consistency badges
             elif category == "consistency":
@@ -519,10 +520,12 @@ class BadgeService:
             elif category == "activity":
                 # Return progress for first criteria found
                 if "flashcard_sets" in criteria:
+                    # FIX: Changed activity_counters to activities
+                    # FIX: Changed flashcard_sets_completed to flashcards_reviewed
                     return {
-                        "current": user_stats.activity_counters.flashcard_sets_completed,
+                        "current": user_stats.activities.flashcards_reviewed,
                         "required": criteria["flashcard_sets"],
-                        "percentage": min(100, int(user_stats.activity_counters.flashcard_sets_completed / criteria["flashcard_sets"] * 100))
+                        "percentage": min(100, int(user_stats.activities.flashcards_reviewed / criteria["flashcard_sets"] * 100))
                     }
             
             return None

@@ -193,7 +193,8 @@ class TestBadgeIntegration:
             user_email="test@example.com",
             total_xp=500,
             streak=StreakInfo(current_count=1),
-            activity_counters=ActivityCounters()
+            # FIX: Changed activity_counters to activities
+            activities=ActivityCounters()
         )
         
         # Mock badge definitions

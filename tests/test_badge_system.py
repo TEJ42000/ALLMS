@@ -40,11 +40,12 @@ class TestBadgeService:
                 current_count=15,
                 longest_count=20
             ),
-            activity_counters=ActivityCounters(
-                flashcard_sets_completed=25,
+            # FIX: Changed activity_counters to activities (correct attribute name)
+            activities=ActivityCounters(
+                flashcards_reviewed=25,  # FIX: Changed from flashcard_sets_completed
                 quizzes_passed=12,
-                evaluations_completed=8,
-                study_guides_completed=5
+                evaluations_submitted=8,  # FIX: Changed from evaluations_completed
+                guides_completed=5  # FIX: Changed from study_guides_completed
             )
         )
 
