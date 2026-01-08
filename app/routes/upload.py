@@ -193,20 +193,26 @@ def validate_path_within_base(file_path: Path, base_dir: Path) -> Path:
         resolved_base = base_dir.resolve()
         resolved_path = file_path.resolve()
 
-        # Check if the resolved path starts with the base directory
+        # CRITICAL SECURITY: Validate the resolved path is within base directory
         # Use os.path.commonpath to handle edge cases correctly
         try:
-            common = Path(os.path.commonpath([resolved_base, resolved_path]))
-            if common != resolved_base:
+            # Convert to strings for commonpath comparison
+            common = os.path.commonpath([str(resolved_base), str(resolved_path)])
+            # The common path must equal the base directory
+            if common != str(resolved_base):
                 raise ValueError("Path escapes base directory")
-        except ValueError:
+        except ValueError as e:
             # commonpath raises ValueError if paths are on different drives (Windows)
             # or if one path would escape the other
+            logger.warning(f"Path traversal attempt detected: {e}")
             raise HTTPException(400, "Invalid file path: path traversal detected")
 
         # Additional check: ensure the string representation starts with base
-        if not str(resolved_path).startswith(str(resolved_base)):
-            raise HTTPException(400, "Invalid file path: path traversal detected")
+        # This provides defense in depth
+        if not str(resolved_path).startswith(str(resolved_base) + os.sep):
+            # Also check for exact match (file at base directory root)
+            if str(resolved_path) != str(resolved_base):
+                raise HTTPException(400, "Invalid file path: path traversal detected")
 
         return resolved_path
 
@@ -240,12 +246,25 @@ def construct_safe_storage_path(course_id: str, filename: str) -> str:
     # Build path: Materials/uploads/course_id/filename
     target_path = base_dir / course_id / filename
 
-    # Validate the path stays within UPLOAD_DIR
+    # CRITICAL SECURITY: Validate the path stays within UPLOAD_DIR
     validated_path = validate_path_within_base(target_path, base_dir)
 
     # Return relative path from Materials/ directory for storage
     # This is what gets stored in Firestore and used by storage backends
     materials_base = Path("Materials").resolve()
+
+    # CRITICAL SECURITY: Ensure validated_path is within materials_base
+    # This should always be true since UPLOAD_DIR is Materials/uploads
+    # but we validate to be safe
+    try:
+        # Verify materials_base is a parent of validated_path
+        common = os.path.commonpath([str(materials_base), str(validated_path)])
+        if common != str(materials_base):
+            raise ValueError("Path escapes Materials directory")
+    except ValueError as e:
+        logger.error(f"Path validation failed in construct_safe_storage_path: {e}")
+        raise HTTPException(400, "Invalid file path: path traversal detected")
+
     relative_path = validated_path.relative_to(materials_base)
 
     return str(relative_path)
