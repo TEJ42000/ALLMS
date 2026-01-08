@@ -240,13 +240,8 @@ function setupBackButton() {
 }
 
 /**
- * Escape HTML to prevent XSS
+ * MEDIUM FIX: escapeHtml() is now in utils.js (shared across files)
  */
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
 
 /**
  * Show error message with better UI

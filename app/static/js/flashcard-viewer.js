@@ -813,12 +813,11 @@ class FlashcardViewer {
     }
 
     /**
-     * Escape HTML to prevent XSS
+     * MEDIUM FIX: escapeHtml() is now in utils.js (shared across files)
+     * Use global escapeHtml() function instead of instance method
      */
     escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
+        return escapeHtml(text);
     }
 
     /**
