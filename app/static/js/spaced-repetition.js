@@ -7,14 +7,21 @@
  */
 
 class SpacedRepetitionService {
-    constructor() {
+    /**
+     * CRITICAL FIX: Namespace localStorage keys by deck/course
+     * @param {string} namespace - Unique identifier for deck/course (e.g., 'deck_123' or 'course_456')
+     */
+    constructor(namespace = 'default') {
         // SM-2 algorithm constants
         this.MIN_EASINESS_FACTOR = 1.3;
         this.DEFAULT_EASINESS_FACTOR = 2.5;
-        
-        // Storage key for card data
-        this.STORAGE_KEY = 'flashcard_sr_data';
-        
+
+        // CRITICAL FIX: Namespace storage key to prevent data collision
+        this.namespace = namespace;
+        this.STORAGE_KEY = `flashcard_sr_data_${namespace}`;
+
+        console.log(`[SpacedRepetition] Initialized with namespace: ${namespace}, key: ${this.STORAGE_KEY}`);
+
         // Load existing data
         this.cardData = this.loadCardData();
     }
@@ -315,7 +322,10 @@ class SpacedRepetitionService {
                     console.log('[SpacedRepetition] Saved after cleanup');
                 } catch (retryError) {
                     console.error('[SpacedRepetition] Still failed after cleanup:', retryError);
-                    alert('Storage quota exceeded. Some progress may not be saved. Consider exporting your data.');
+                    // CRITICAL FIX: Use styled notification instead of alert()
+                    if (typeof showNotification === 'function') {
+                        showNotification('Storage quota exceeded. Some progress may not be saved. Consider exporting your data.', 'error', 0);
+                    }
                 }
             } else {
                 console.error('[SpacedRepetition] Failed to save card data:', error);

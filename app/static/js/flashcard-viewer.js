@@ -17,6 +17,56 @@ const FLASHCARD_CONSTANTS = {
     FLIP_ANIMATION_MS: 600
 };
 
+/**
+ * CRITICAL: Async Initialization Pattern Documentation
+ * =====================================================
+ *
+ * This class uses async initialization to prevent race conditions with gamification.
+ *
+ * Usage Pattern:
+ * ```javascript
+ * // Create instance (constructor is synchronous)
+ * const viewer = new FlashcardViewer('container-id', flashcards);
+ *
+ * // Wait for async initialization to complete (optional but recommended)
+ * const ready = await viewer.waitForReady();
+ * if (!ready) {
+ *     console.error('Viewer failed to initialize');
+ * }
+ *
+ * // Or check ready flag directly
+ * if (viewer.ready) {
+ *     // Viewer is ready to use
+ * }
+ * ```
+ *
+ * Initialization Flow:
+ * 1. Constructor runs synchronously (sets up basic properties)
+ * 2. initializeAsync() runs asynchronously:
+ *    - Checks gamification status (API call)
+ *    - Initializes viewer UI
+ *    - Sets this.ready = true
+ * 3. External code can wait using waitForReady() or check this.ready
+ *
+ * Why This Pattern?
+ * - Prevents race conditions from async constructor
+ * - Allows external code to wait for initialization
+ * - Provides error handling for initialization failures
+ * - Maintains backward compatibility (constructor still works)
+ *
+ * Alternative Factory Method Pattern:
+ * ```javascript
+ * // If you prefer factory method pattern, add this static method:
+ * static async create(containerId, flashcards) {
+ *     const viewer = new FlashcardViewer(containerId, flashcards);
+ *     await viewer.waitForReady();
+ *     return viewer;
+ * }
+ *
+ * // Usage:
+ * const viewer = await FlashcardViewer.create('container-id', flashcards);
+ * ```
+ */
 class FlashcardViewer {
     constructor(containerId, flashcards = []) {
         // HIGH: Validate containerId
@@ -90,7 +140,9 @@ class FlashcardViewer {
         this.cardNotes = new Map(); // Map<cardIndex, noteText>
 
         // PHASE 2C: Spaced Repetition
-        this.spacedRepetition = new SpacedRepetitionService();
+        // CRITICAL FIX: Create namespace from container ID or use default
+        const srNamespace = containerId || 'default';
+        this.spacedRepetition = new SpacedRepetitionService(srNamespace);
         this.srMode = false; // Spaced repetition mode
         this.srQuality = null; // Quality rating for current card
 
@@ -819,20 +871,22 @@ class FlashcardViewer {
 
     /**
      * Show completion message
+     * CRITICAL FIX: Add try-catch for error handling
      * MEDIUM FIX: Validate numeric values
      * PHASE 2A: Add XP and time tracking to completion
      */
     async showCompletionMessage() {
-        // MEDIUM FIX: Validate and sanitize numeric values
-        const totalCards = Math.max(1, this.flashcards.length);
-        const reviewedCount = Math.max(0, this.reviewedCards.size);
-        const knownCount = Math.max(0, this.knownCards.size);
-        const starredCount = Math.max(0, this.starredCards.size);
-        const accuracy = Math.min(100, Math.max(0, (knownCount / totalCards) * 100));
+        try {
+            // MEDIUM FIX: Validate and sanitize numeric values
+            const totalCards = Math.max(1, this.flashcards.length);
+            const reviewedCount = Math.max(0, this.reviewedCards.size);
+            const knownCount = Math.max(0, this.knownCards.size);
+            const starredCount = Math.max(0, this.starredCards.size);
+            const accuracy = Math.min(100, Math.max(0, (knownCount / totalCards) * 100));
 
-        // PHASE 2A: Award XP for completion
-        const xpAwarded = await this.awardFlashcardXP();
-        const timeSpent = this.getFormattedTimeSpent();
+            // PHASE 2A: Award XP for completion
+            const xpAwarded = await this.awardFlashcardXP();
+            const timeSpent = this.getFormattedTimeSpent();
 
         this.container.innerHTML = `
             <div class="flashcard-completion">
@@ -898,6 +952,11 @@ class FlashcardViewer {
         const btnBackToFull = document.getElementById('btn-back-to-full');
         if (btnBackToFull) {
             btnBackToFull.addEventListener('click', () => this.restoreFullDeck());
+        }
+        } catch (error) {
+            // CRITICAL FIX: Error handling for showCompletionMessage
+            console.error('[FlashcardViewer] Error showing completion message:', error);
+            this.showError('Failed to display completion message. Please try restarting.');
         }
     }
 
@@ -1539,7 +1598,8 @@ class FlashcardViewer {
         const submitReport = async () => {
             const description = issueDescription.value.trim();
             if (!description) {
-                alert('Please provide a description of the issue.');
+                // CRITICAL FIX: Use styled notification instead of alert()
+                showNotification('Please provide a description of the issue.', 'warning', 3000);
                 return;
             }
 
@@ -1548,10 +1608,11 @@ class FlashcardViewer {
             submitBtn.textContent = 'Submitting...';
 
             try {
+                // CRITICAL FIX: Use correct card properties
                 const reportData = {
                     card_index: this.currentIndex,
-                    card_front: currentCard.front,
-                    card_back: currentCard.back,
+                    card_front: currentCard.question || currentCard.term || '',
+                    card_back: currentCard.answer || currentCard.definition || '',
                     issue_type: issueType.value,
                     description: description,
                     timestamp: new Date().toISOString()
@@ -1560,12 +1621,13 @@ class FlashcardViewer {
                 // TODO: Send to backend API
                 console.log('[FlashcardViewer] Issue reported:', reportData);
 
-                // For now, just show success message
-                alert('Thank you for reporting this issue! We will review it shortly.');
+                // CRITICAL FIX: Use styled notification instead of alert()
+                showNotification('Thank you for reporting this issue! We will review it shortly.', 'success', 5000);
                 closeModal();
             } catch (error) {
                 console.error('[FlashcardViewer] Failed to submit report:', error);
-                alert('Failed to submit report. Please try again.');
+                // CRITICAL FIX: Use styled notification instead of alert()
+                showNotification('Failed to submit report. Please try again.', 'error', 5000);
                 submitBtn.disabled = false;
                 submitBtn.textContent = 'Submit Report';
             }
