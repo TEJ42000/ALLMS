@@ -6,6 +6,7 @@ sessions, and badges.
 
 import logging
 import os
+from datetime import datetime, timezone, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -26,6 +27,7 @@ from app.models.gamification_models import (
     UserBadge,
 )
 from app.services.gamification_service import get_gamification_service
+from app.services.streak_maintenance import get_streak_maintenance_service
 
 logger = logging.getLogger(__name__)
 
@@ -448,6 +450,169 @@ def seed_badges(
         raise
     except Exception as e:
         logger.error(f"Error seeding badges: {e}")
+        raise HTTPException(500, detail=str(e)) from e
+
+
+# =============================================================================
+# Streak Endpoints
+# =============================================================================
+
+@router.get("/streak/calendar")
+def get_streak_calendar(
+    days: int = Query(default=30, ge=1, le=90, description="Number of days to retrieve"),
+    user: User = Depends(get_current_user)
+):
+    """Get calendar data for streak visualization.
+
+    Args:
+        days: Number of days to retrieve (1-90)
+
+    Returns:
+        Calendar data with activity days, freezes, and streak info
+    """
+    try:
+        service = get_gamification_service()
+        stats = service.get_or_create_user_stats(user.user_id, user.email)
+
+        if not stats:
+            raise HTTPException(500, detail="Failed to get user stats")
+
+        # Get activities for the specified period
+        from datetime import datetime, timezone, timedelta
+        end_date = datetime.now(timezone.utc)
+        start_date = end_date - timedelta(days=days)
+
+        activities, _ = service.get_user_activities(
+            user_id=user.user_id,
+            start_date=start_date,
+            end_date=end_date,
+            limit=1000  # Get all activities in period
+        )
+
+        # Build calendar data
+        calendar_days = []
+        activity_by_day = {}
+
+        # Group activities by day
+        for activity in activities:
+            day = service._get_streak_day(activity.timestamp).date().isoformat()
+            if day not in activity_by_day:
+                activity_by_day[day] = {
+                    "date": day,
+                    "has_activity": True,
+                    "freeze_used": False,
+                    "activity_count": 0
+                }
+            activity_by_day[day]["activity_count"] += 1
+            if activity.metadata.get("freeze_used"):
+                activity_by_day[day]["freeze_used"] = True
+
+        # Fill in all days in range
+        current_date = start_date.date()
+        end = end_date.date()
+        while current_date <= end:
+            day_str = current_date.isoformat()
+            if day_str in activity_by_day:
+                calendar_days.append(activity_by_day[day_str])
+            else:
+                calendar_days.append({
+                    "date": day_str,
+                    "has_activity": False,
+                    "freeze_used": False,
+                    "activity_count": 0
+                })
+            current_date += timedelta(days=1)
+
+        return {
+            "days": calendar_days,
+            "current_streak": stats.streak.current_count,
+            "longest_streak": stats.streak.longest_streak,
+            "freezes_available": stats.streak.freezes_available
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting streak calendar: {e}")
+        raise HTTPException(500, detail=str(e)) from e
+
+
+@router.get("/streak/consistency")
+def get_weekly_consistency(
+    user: User = Depends(get_current_user)
+):
+    """Get weekly consistency status.
+
+    Returns:
+        Weekly consistency progress and bonus status
+    """
+    try:
+        service = get_gamification_service()
+        stats = service.get_or_create_user_stats(user.user_id, user.email)
+
+        if not stats:
+            raise HTTPException(500, detail="Failed to get user stats")
+
+        # Calculate week boundaries
+        from datetime import datetime, timezone
+        current_time = datetime.now(timezone.utc)
+        week_start = service._get_week_start(current_time)
+        week_end = week_start + timedelta(days=7)
+
+        # Calculate progress percentage
+        completed = sum(1 for v in stats.streak.weekly_consistency.values() if v)
+        progress = (completed / 4) * 100
+
+        return {
+            "week_start": week_start.date().isoformat(),
+            "week_end": week_end.date().isoformat(),
+            "categories": stats.streak.weekly_consistency,
+            "bonus_active": getattr(stats.streak, 'bonus_active', False),
+            "bonus_multiplier": getattr(stats.streak, 'bonus_multiplier', 1.0),
+            "progress": progress,
+            "completed_count": completed,
+            "total_count": 4
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting weekly consistency: {e}")
+        raise HTTPException(500, detail=str(e)) from e
+
+
+@router.post("/streak/maintenance")
+def run_streak_maintenance(
+    user: User = Depends(get_current_user)
+):
+    """Run daily streak maintenance (admin only).
+
+    This endpoint is called by Cloud Scheduler at 4:00 AM UTC daily.
+    Can also be manually triggered by admins for testing.
+
+    Returns:
+        Maintenance run summary
+    """
+    # Check if user is admin
+    admin_emails = os.getenv("ADMIN_EMAILS", "").split(",")
+    admin_emails = [email.strip() for email in admin_emails if email.strip()]
+
+    if user.email not in admin_emails:
+        logger.warning(f"Non-admin user {user.email} attempted to run streak maintenance")
+        raise HTTPException(
+            status_code=403,
+            detail="Admin access required"
+        )
+
+    try:
+        maintenance_service = get_streak_maintenance_service()
+        result = maintenance_service.run_daily_maintenance()
+
+        logger.info(f"Streak maintenance run by {user.email}: {result}")
+        return result
+
+    except Exception as e:
+        logger.error(f"Error running streak maintenance: {e}")
         raise HTTPException(500, detail=str(e)) from e
 
 

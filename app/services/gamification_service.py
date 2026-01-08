@@ -472,6 +472,11 @@ class GamificationService:
                 user_id, current_time
             )
 
+            # Update weekly consistency tracking
+            consistency_updated, bonus_earned = self.update_weekly_consistency(
+                user_id, activity_type, stats
+            )
+
             # Check for badge earning
             badges_earned = self.check_and_award_badges(
                 user_id, user_email, activity_type, activity_data, course_id
@@ -526,6 +531,18 @@ class GamificationService:
             # Apply freeze change if non-zero
             if freeze_delta != 0:
                 updates["streak.freezes_available"] = Increment(freeze_delta)
+
+            # Update weekly consistency if changed
+            if consistency_updated:
+                category_map = {
+                    "flashcard_set_completed": "flashcards",
+                    "quiz_completed": "quiz",
+                    "evaluation_completed": "evaluation",
+                    "study_guide_completed": "guide"
+                }
+                category = category_map.get(activity_type)
+                if category:
+                    updates[f"streak.weekly_consistency.{category}"] = True
 
             # Update activity counters with atomic increments
             if activity_type == "quiz_completed":
@@ -677,6 +694,121 @@ class GamificationService:
             # Log unexpected errors and re-raise as HTTPException
             logger.error(f"Unexpected error checking streak status for {user_id}: {e}", exc_info=True)
             raise HTTPException(status_code=500, detail="Error checking streak status")
+
+    def update_weekly_consistency(
+        self,
+        user_id: str,
+        activity_type: str,
+        stats: UserStats
+    ) -> tuple[bool, bool]:
+        """Update weekly consistency tracking and check for bonus.
+
+        Args:
+            user_id: User's IAP user ID
+            activity_type: Type of activity completed
+            stats: Current user stats
+
+        Returns:
+            Tuple of (consistency_updated, bonus_earned)
+        """
+        try:
+            # Map activity types to consistency categories
+            category_map = {
+                "flashcard_set_completed": "flashcards",
+                "quiz_completed": "quiz",
+                "evaluation_completed": "evaluation",
+                "study_guide_completed": "guide"
+            }
+
+            category = category_map.get(activity_type)
+            if not category:
+                # Activity doesn't count toward consistency
+                return False, False
+
+            # Check if we need to reset weekly consistency (new week)
+            current_time = datetime.now(timezone.utc)
+            week_start = self._get_week_start(current_time)
+
+            # Get stored week start from stats
+            stored_week_start = getattr(stats.streak, 'week_start', None)
+            if stored_week_start:
+                if isinstance(stored_week_start, str):
+                    stored_week_start = datetime.fromisoformat(stored_week_start)
+                elif not isinstance(stored_week_start, datetime):
+                    stored_week_start = None
+
+            # Reset if new week
+            if not stored_week_start or week_start > stored_week_start:
+                # New week - reset all categories
+                if not self.db:
+                    return False, False
+
+                doc_ref = self.db.collection(USER_STATS_COLLECTION).document(user_id)
+                doc_ref.update({
+                    "streak.weekly_consistency.flashcards": False,
+                    "streak.weekly_consistency.quiz": False,
+                    "streak.weekly_consistency.evaluation": False,
+                    "streak.weekly_consistency.guide": False,
+                    "streak.week_start": week_start.isoformat(),
+                    "streak.bonus_active": False
+                })
+                # Refresh stats after reset
+                stats = self.get_or_create_user_stats(user_id, stats.user_email)
+                if not stats:
+                    return False, False
+
+            # Check if category already completed this week
+            if stats.streak.weekly_consistency.get(category, False):
+                # Already completed this category this week
+                return False, False
+
+            # Mark category as completed
+            consistency_updated = True
+
+            # Check if all 4 categories are now complete
+            updated_consistency = stats.streak.weekly_consistency.copy()
+            updated_consistency[category] = True
+
+            all_complete = all(updated_consistency.values())
+            bonus_earned = all_complete and not getattr(stats.streak, 'bonus_active', False)
+
+            if bonus_earned:
+                # Activate bonus for next week
+                if self.db:
+                    doc_ref = self.db.collection(USER_STATS_COLLECTION).document(user_id)
+                    doc_ref.update({
+                        "streak.bonus_active": True,
+                        "streak.bonus_multiplier": 1.5  # 50% XP bonus
+                    })
+                logger.info(f"Weekly consistency bonus earned for {user_id}")
+
+            return consistency_updated, bonus_earned
+
+        except Exception as e:
+            logger.error(f"Error updating weekly consistency for {user_id}: {e}", exc_info=True)
+            return False, False
+
+    def _get_week_start(self, dt: datetime) -> datetime:
+        """Get the start of the week (Monday at 4:00 AM) for a given datetime.
+
+        Args:
+            dt: Datetime to get week start for
+
+        Returns:
+            Datetime representing Monday at 4:00 AM of the week
+        """
+        # Get the Monday of the current week
+        days_since_monday = dt.weekday()  # 0 = Monday, 6 = Sunday
+        monday = dt - timedelta(days=days_since_monday)
+
+        # Set to 4:00 AM (streak reset time)
+        week_start = monday.replace(hour=STREAK_RESET_HOUR, minute=0, second=0, microsecond=0)
+
+        # If current time is before Monday 4 AM, use previous week's Monday
+        if dt < week_start:
+            week_start = week_start - timedelta(days=7)
+
+        return week_start
 
     def update_streak(
         self,
