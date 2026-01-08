@@ -30,8 +30,15 @@ def get_user_from_request(request: Request) -> Optional[Any]:
 
 
 @router.get("/", response_class=HTMLResponse)
-async def landing_page(request: Request):
-    """Serve the course selection landing page."""
+async def landing_page(request: Request) -> HTMLResponse:
+    """Serve the course selection landing page.
+
+    Args:
+        request: The incoming HTTP request
+
+    Returns:
+        HTMLResponse with course selection page
+    """
     user = get_user_from_request(request)
     return templates.TemplateResponse(
         "course_selection.html",
@@ -45,12 +52,19 @@ async def landing_page(request: Request):
 
 
 @router.get("/courses/{course_id}/study-portal", response_class=HTMLResponse)
-async def course_study_portal(request: Request, course_id: str):
+async def course_study_portal(request: Request, course_id: str) -> HTMLResponse:
     """
     Serve the study portal for a specific course.
 
     Args:
+        request: The incoming HTTP request
         course_id: The unique identifier for the course
+
+    Returns:
+        HTMLResponse with study portal page
+
+    Raises:
+        HTTPException: If course not found (404), invalid course ID (400), or server error (500)
     """
     try:
         # Load course with weeks to get topics
@@ -97,8 +111,12 @@ async def course_study_portal(request: Request, course_id: str):
 
 
 @router.get("/health")
-async def health_check():
-    """Health check endpoint for Cloud Run."""
+async def health_check() -> Dict[str, str]:
+    """Health check endpoint for Cloud Run.
+
+    Returns:
+        Dictionary with service status information
+    """
     return {
         "status": "healthy",
         "service": "lls-study-portal",
@@ -111,8 +129,15 @@ async def health_check():
 # =============================================================================
 
 @router.get("/privacy-policy", response_class=HTMLResponse)
-async def privacy_policy(request: Request):
-    """Serve the privacy policy page."""
+async def privacy_policy(request: Request) -> HTMLResponse:
+    """Serve the privacy policy page.
+
+    Args:
+        request: The incoming HTTP request
+
+    Returns:
+        HTMLResponse with privacy policy page
+    """
     user = get_user_from_request(request)
     return templates.TemplateResponse(
         "privacy_policy.html",
@@ -125,8 +150,18 @@ async def privacy_policy(request: Request):
 
 
 @router.get("/privacy-dashboard", response_class=HTMLResponse)
-async def privacy_dashboard(request: Request):
-    """Serve the privacy dashboard page."""
+async def privacy_dashboard(request: Request) -> HTMLResponse:
+    """Serve the privacy dashboard page.
+
+    Args:
+        request: The incoming HTTP request
+
+    Returns:
+        HTMLResponse with privacy dashboard page
+
+    Raises:
+        HTTPException: If user is not authenticated (401)
+    """
     user = get_user_from_request(request)
 
     # Require authentication for privacy dashboard
@@ -144,8 +179,15 @@ async def privacy_dashboard(request: Request):
 
 
 @router.get("/terms-of-service", response_class=HTMLResponse)
-async def terms_of_service(request: Request):
-    """Serve the terms of service page."""
+async def terms_of_service(request: Request) -> HTMLResponse:
+    """Serve the terms of service page.
+
+    Args:
+        request: The incoming HTTP request
+
+    Returns:
+        HTMLResponse with terms of service page
+    """
     user = get_user_from_request(request)
     return templates.TemplateResponse(
         "terms_of_service.html",
@@ -158,8 +200,15 @@ async def terms_of_service(request: Request):
 
 
 @router.get("/cookie-policy", response_class=HTMLResponse)
-async def cookie_policy(request: Request):
-    """Serve the cookie policy page."""
+async def cookie_policy(request: Request) -> HTMLResponse:
+    """Serve the cookie policy page.
+
+    Args:
+        request: The incoming HTTP request
+
+    Returns:
+        HTMLResponse with cookie policy page
+    """
     user = get_user_from_request(request)
     return templates.TemplateResponse(
         "cookie_policy.html",
@@ -172,11 +221,20 @@ async def cookie_policy(request: Request):
 
 
 @router.get("/badges", response_class=HTMLResponse)
-async def badges_page(request: Request):
+async def badges_page(request: Request) -> HTMLResponse:
     """
     Serve the badges showcase page.
 
     CRITICAL: Added to fix missing HTML template issue
+
+    Args:
+        request: The incoming HTTP request
+
+    Returns:
+        HTMLResponse with badges showcase page
+
+    Raises:
+        HTTPException: If user is not authenticated (401)
     """
     user = get_user_from_request(request)
 
@@ -210,19 +268,16 @@ async def flashcards_page(request: Request) -> HTMLResponse:
 
     Returns:
         HTMLResponse with flashcards page and security headers
-
-    Raises:
-        HTTPException: If template rendering fails (unlikely)
     """
-    user: Optional[Any] = get_user_from_request(request)
+    user = get_user_from_request(request)
 
-    context: Dict[str, Any] = {
+    context = {
         "request": request,
         "title": "Flashcards - ECHR Learning",
         "user": user
     }
 
-    response: HTMLResponse = templates.TemplateResponse(
+    response = templates.TemplateResponse(
         "flashcards.html",
         context
     )
