@@ -113,26 +113,92 @@ test.describe('Quiz Display Enhancements - Phase 1', () => {
     });
     
     test.describe('Timer Display', () => {
-        test.skip('displays timer for timed quizzes', async ({ page }) => {
-            // Note: This test is skipped because we need to create a timed quiz
-            // In a real implementation, you would:
-            // 1. Create a timed quiz via API
-            // 2. Start the quiz
-            // 3. Verify timer is displayed
-            
-            // Example implementation:
-            // await page.click('#timed-quiz-option');
-            // await page.click('#start-quiz-btn');
-            // const timer = await page.locator('.quiz-timer');
-            // await expect(timer).toBeVisible();
+        test('timer functionality can be tested programmatically', async ({ page }) => {
+            // Navigate to page
+            await page.goto('/courses/echr/study-portal');
+
+            // Test QuizTimer class directly via browser console
+            const timerTest = await page.evaluate(() => {
+                // Create a timer with 5 seconds
+                const timer = new window.QuizTimer(5, null, null);
+
+                // Verify initial state
+                const initialTime = timer.getTimeRemaining();
+                const formattedTime = timer.getFormattedTime();
+
+                return {
+                    initialTime,
+                    formattedTime,
+                    hasStartMethod: typeof timer.start === 'function',
+                    hasStopMethod: typeof timer.stop === 'function',
+                    hasPauseMethod: typeof timer.pause === 'function',
+                    hasResumeMethod: typeof timer.resume === 'function'
+                };
+            });
+
+            expect(timerTest.initialTime).toBe(5);
+            expect(timerTest.formattedTime).toBe('0:05');
+            expect(timerTest.hasStartMethod).toBeTruthy();
+            expect(timerTest.hasStopMethod).toBeTruthy();
+            expect(timerTest.hasPauseMethod).toBeTruthy();
+            expect(timerTest.hasResumeMethod).toBeTruthy();
         });
-        
-        test.skip('timer counts down', async ({ page }) => {
-            // Skipped - requires timed quiz setup
+
+        test('timer display element can be created', async ({ page }) => {
+            await page.goto('/courses/echr/study-portal');
+
+            const timerDisplayTest = await page.evaluate(() => {
+                const timer = new window.QuizTimer(300, null, null);
+                const display = window.createTimerDisplay(timer);
+
+                return {
+                    hasTimerClass: display.classList.contains('quiz-timer'),
+                    hasRole: display.getAttribute('role') === 'timer',
+                    hasAriaLive: display.getAttribute('aria-live') === 'polite',
+                    hasIcon: display.querySelector('.timer-icon') !== null,
+                    hasText: display.querySelector('.timer-text') !== null
+                };
+            });
+
+            expect(timerDisplayTest.hasTimerClass).toBeTruthy();
+            expect(timerDisplayTest.hasRole).toBeTruthy();
+            expect(timerDisplayTest.hasAriaLive).toBeTruthy();
+            expect(timerDisplayTest.hasIcon).toBeTruthy();
+            expect(timerDisplayTest.hasText).toBeTruthy();
         });
-        
-        test.skip('timer shows warning when time is low', async ({ page }) => {
-            // Skipped - requires timed quiz setup
+
+        test('timer formats time correctly', async ({ page }) => {
+            await page.goto('/courses/echr/study-portal');
+
+            const formatTests = await page.evaluate(() => {
+                const tests = [];
+
+                // Test various time values
+                const testCases = [
+                    { seconds: 0, expected: '0:00' },
+                    { seconds: 5, expected: '0:05' },
+                    { seconds: 59, expected: '0:59' },
+                    { seconds: 60, expected: '1:00' },
+                    { seconds: 65, expected: '1:05' },
+                    { seconds: 125, expected: '2:05' },
+                    { seconds: 300, expected: '5:00' }
+                ];
+
+                testCases.forEach(testCase => {
+                    const timer = new window.QuizTimer(testCase.seconds, null, null);
+                    tests.push({
+                        input: testCase.seconds,
+                        expected: testCase.expected,
+                        actual: timer.getFormattedTime()
+                    });
+                });
+
+                return tests;
+            });
+
+            formatTests.forEach(test => {
+                expect(test.actual).toBe(test.expected);
+            });
         });
     });
     

@@ -40,6 +40,27 @@ function createQuestionTypeBadge(questionType) {
  * @returns {HTMLElement} - Progress bar container element
  */
 function createProgressBar(current, total) {
+    // HIGH #3: Input validation
+    if (typeof current !== 'number' || !Number.isInteger(current)) {
+        console.error('createProgressBar: current must be an integer');
+        current = 0;
+    }
+
+    if (typeof total !== 'number' || !Number.isInteger(total) || total <= 0) {
+        console.error('createProgressBar: total must be a positive integer');
+        total = 1;
+    }
+
+    if (current < 0) {
+        console.error('createProgressBar: current cannot be negative');
+        current = 0;
+    }
+
+    if (current >= total) {
+        console.error('createProgressBar: current cannot be >= total');
+        current = total - 1;
+    }
+
     const container = document.createElement('div');
     container.className = 'quiz-progress-bar';
     container.setAttribute('role', 'progressbar');
@@ -47,19 +68,19 @@ function createProgressBar(current, total) {
     container.setAttribute('aria-valuemin', '1');
     container.setAttribute('aria-valuemax', total);
     container.setAttribute('aria-label', `Question ${current + 1} of ${total}`);
-    
+
     const fill = document.createElement('div');
     fill.className = 'quiz-progress-fill';
-    
+
     // Calculate percentage (0-100)
     const percentage = ((current + 1) / total) * 100;
     fill.style.width = `${percentage}%`;
-    
+
     // Add transition for smooth animation
     fill.style.transition = 'width 0.3s ease';
-    
+
     container.appendChild(fill);
-    
+
     return container;
 }
 
@@ -74,29 +95,45 @@ class QuizTimer {
         this.onExpire = onExpire;
         this.intervalId = null;
         this.isPaused = false;
+        this.isExpired = false;  // HIGH #4: Prevent race condition
     }
-    
+
     start() {
         if (this.intervalId) return; // Already running
-        
+
         this.intervalId = setInterval(() => {
-            if (!this.isPaused) {
+            if (!this.isPaused && !this.isExpired) {
                 this.timeRemaining--;
-                
+
+                // HIGH #4: Call onTick in try-catch to prevent errors from breaking timer
                 if (this.onTick) {
-                    this.onTick(this.timeRemaining);
+                    try {
+                        this.onTick(this.timeRemaining);
+                    } catch (error) {
+                        console.error('Error in timer onTick callback:', error);
+                    }
                 }
-                
-                if (this.timeRemaining <= 0) {
+
+                if (this.timeRemaining <= 0 && !this.isExpired) {
+                    // HIGH #4: Set flag before calling callbacks to prevent race condition
+                    this.isExpired = true;
                     this.stop();
+
+                    // HIGH #4: Call onExpire in try-catch and use setTimeout to avoid blocking
                     if (this.onExpire) {
-                        this.onExpire();
+                        setTimeout(() => {
+                            try {
+                                this.onExpire();
+                            } catch (error) {
+                                console.error('Error in timer onExpire callback:', error);
+                            }
+                        }, 0);
                     }
                 }
             }
         }, 1000);
     }
-    
+
     stop() {
         if (this.intervalId) {
             clearInterval(this.intervalId);
@@ -281,8 +318,9 @@ function initializePhase1Enhancements(quizState) {
     };
 }
 
-// Export for use in main app.js
+// HIGH #6: Export for use in main app.js (both Node.js and browser)
 if (typeof module !== 'undefined' && module.exports) {
+    // Node.js / CommonJS
     module.exports = {
         createQuestionTypeBadge,
         createProgressBar,
@@ -293,5 +331,15 @@ if (typeof module !== 'undefined' && module.exports) {
         addFadeInAnimation,
         initializePhase1Enhancements
     };
+} else if (typeof window !== 'undefined') {
+    // Browser global exports
+    window.createQuestionTypeBadge = createQuestionTypeBadge;
+    window.createProgressBar = createProgressBar;
+    window.QuizTimer = QuizTimer;
+    window.createTimerDisplay = createTimerDisplay;
+    window.updateProgressBar = updateProgressBar;
+    window.createEnhancedQuestionHeader = createEnhancedQuestionHeader;
+    window.addFadeInAnimation = addFadeInAnimation;
+    window.initializePhase1Enhancements = initializePhase1Enhancements;
 }
 
