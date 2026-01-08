@@ -226,8 +226,9 @@ def validate_path_within_base(file_path: Path, base_dir: Path) -> Path:
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Path validation error: {e}")
-        raise HTTPException(400, f"Invalid file path: {str(e)}")
+        # SECURITY: Don't expose internal error details to client
+        logger.error(f"Path validation error: {e}", exc_info=True)
+        raise HTTPException(400, "Invalid file path")
 
 
 def construct_safe_storage_path(course_id: str, filename: str) -> str:
@@ -541,7 +542,8 @@ async def upload_file(
         )
         raise  # Re-raise HTTP exceptions
     except Exception as e:
-        logger.error(f"Upload failed: {str(e)}")
+        # SECURITY: Log full error server-side, don't expose to client
+        logger.error(f"Upload failed: {str(e)}", exc_info=True)
 
         # Record failed upload metrics
         duration_ms = (time.time() - start_time) * 1000
@@ -561,7 +563,9 @@ async def upload_file(
                 storage.delete_file(storage_path)
         except Exception as cleanup_error:
             logger.warning(f"Failed to cleanup file after error: {cleanup_error}")
-        raise HTTPException(500, f"Upload failed: {str(e)}")
+
+        # SECURITY: Generic error message to client
+        raise HTTPException(500, "Upload failed. Please try again later.")
 
 
 @router.post("/{material_id}/analyze")
@@ -629,22 +633,27 @@ async def analyze_uploaded_file(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to locate file: {e}")
-        raise HTTPException(500, f"Failed to locate file: {str(e)}")
-    
+        # SECURITY: Log full error server-side, generic message to client
+        logger.error(f"Failed to locate file: {e}", exc_info=True)
+        raise HTTPException(500, "Failed to locate file. Please try again later.")
+
     # Extract text using existing service
     try:
         result = extract_text(file_path)
-        
+
         if not result.success:
             logger.error(f"Extraction failed: {result.error}")
-            raise HTTPException(500, f"Text extraction failed: {result.error}")
-        
+            # SECURITY: Don't expose extraction error details to client
+            raise HTTPException(500, "Text extraction failed. The file may be corrupted or in an unsupported format.")
+
         logger.info(f"Extracted {len(result.text)} characters")
-        
+
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Extraction error: {str(e)}")
-        raise HTTPException(500, f"Extraction error: {str(e)}")
+        # SECURITY: Log full error server-side, generic message to client
+        logger.error(f"Extraction error: {str(e)}", exc_info=True)
+        raise HTTPException(500, "Text extraction failed. Please try again later.")
     
     # HIGH FIX: Consistent truncation for Claude API
     # Claude Sonnet 4 has ~200k token context, but we limit to ~30k chars (~7.5k tokens)
@@ -687,7 +696,10 @@ Return JSON with this exact structure:
         # CRITICAL FIX: Add rate limit handling with exponential backoff
         max_retries = 3
         retry_delay = 1  # Start with 1 second
-        max_delay = 8  # HIGH FIX: Cap maximum delay at 8 seconds
+        max_delay = 8  # Cap maximum delay at 8 seconds
+
+        response = None
+        last_error = None
 
         for attempt in range(max_retries):
             try:
@@ -698,14 +710,38 @@ Return JSON with this exact structure:
                 )
                 break  # Success, exit retry loop
             except RateLimitError as e:
+                last_error = e
                 if attempt < max_retries - 1:
                     logger.warning(f"Rate limit hit, retrying in {retry_delay}s (attempt {attempt + 1}/{max_retries})")
                     await asyncio.sleep(retry_delay)
-                    retry_delay = min(retry_delay * 2, max_delay)  # HIGH FIX: Exponential backoff with cap
+                    retry_delay = min(retry_delay * 2, max_delay)  # Exponential backoff with cap
                 else:
-                    logger.error(f"Rate limit exceeded after {max_retries} attempts")
-                    raise HTTPException(429, "AI service rate limit exceeded. Please try again in a few moments.")
-        
+                    logger.error(f"Rate limit exceeded after {max_retries} attempts: {e}")
+                    raise HTTPException(
+                        429,
+                        "AI service is currently busy. Please try again in a few moments."
+                    ) from e
+            except Exception as e:
+                # Handle other API errors (network, auth, etc.)
+                logger.error(f"Claude API error on attempt {attempt + 1}: {e}", exc_info=True)
+                last_error = e
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(retry_delay)
+                    retry_delay = min(retry_delay * 2, max_delay)
+                else:
+                    raise HTTPException(
+                        500,
+                        "Failed to analyze content. Please try again later."
+                    ) from e
+
+        # Verify we got a response
+        if response is None:
+            logger.error(f"No response after {max_retries} attempts. Last error: {last_error}")
+            raise HTTPException(
+                500,
+                "Failed to analyze content after multiple attempts. Please try again later."
+            )
+
         # Parse JSON response
         text = response.content[0].text
         
@@ -726,9 +762,12 @@ Return JSON with this exact structure:
                 "error_message": str(e)
             }
         
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Analysis error: {str(e)}")
-        raise HTTPException(500, f"AI analysis failed: {str(e)}")
+        # SECURITY: Log full error server-side, generic message to client
+        logger.error(f"Analysis error: {str(e)}", exc_info=True)
+        raise HTTPException(500, "AI analysis failed. Please try again later.")
 
     # FIRESTORE: Update material with extraction and analysis results
     try:
@@ -826,8 +865,9 @@ async def list_uploads(
         }
 
     except Exception as e:
-        logger.error(f"Failed to list uploads: {e}")
-        raise HTTPException(500, f"Failed to retrieve uploads: {str(e)}")
+        # SECURITY: Log full error server-side, generic message to client
+        logger.error(f"Failed to list uploads: {e}", exc_info=True)
+        raise HTTPException(500, "Failed to retrieve uploads. Please try again later.")
 
 
 @router.post("/process-extraction")
@@ -916,7 +956,8 @@ async def process_extraction_task(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Background extraction task failed: {e}")
-        raise HTTPException(500, f"Task processing failed: {str(e)}")
+        # SECURITY: Log full error server-side, generic message to client
+        logger.error(f"Background extraction task failed: {e}", exc_info=True)
+        raise HTTPException(500, "Task processing failed. Please try again later.")
 
 

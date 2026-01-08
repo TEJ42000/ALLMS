@@ -249,12 +249,14 @@ class UploadManager {
         
         // Show notification
         if (typeof showNotification === 'function') {
-            showNotification(`Generating quiz for "${topic}"...`, 'info', 3000);
+            showNotification(
+                `Quiz generation for "${topic}" will be integrated with the existing quiz system in Phase 2`,
+                'info',
+                5000
+            );
+        } else {
+            console.info(`[UploadManager] Quiz generation for "${topic}" - Phase 2 integration pending`);
         }
-        
-        // TODO: Integrate with existing quiz generation
-        // For now, just show a message
-        alert(`Quiz generation for "${topic}" - This will be integrated with the existing quiz system in Day 2`);
     }
     
     async generateFlashcards() {
@@ -273,12 +275,14 @@ class UploadManager {
         
         // Show notification
         if (typeof showNotification === 'function') {
-            showNotification(`Generating flashcards for "${topic}"...`, 'info', 3000);
+            showNotification(
+                `Flashcard generation for "${topic}" will be integrated with the existing flashcard system in Phase 2`,
+                'info',
+                5000
+            );
+        } else {
+            console.info(`[UploadManager] Flashcard generation for "${topic}" - Phase 2 integration pending`);
         }
-        
-        // TODO: Integrate with existing flashcard generation
-        // For now, just show a message
-        alert(`Flashcard generation for "${topic}" - This will be integrated with the existing flashcard system in Day 2`);
     }
     
     reset() {
