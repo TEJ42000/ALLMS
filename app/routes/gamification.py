@@ -699,3 +699,177 @@ def run_streak_maintenance(
         raise HTTPException(500, detail=str(e)) from e
 
 
+# =============================================================================
+# Badge Endpoints (Phase 4)
+# =============================================================================
+
+@router.get("/badges")
+def get_all_badges(
+    user: User = Depends(get_current_user)
+):
+    """Get all badge definitions.
+
+    Returns:
+        List of all available badges
+    """
+    try:
+        from app.services.badge_definitions import get_all_badge_definitions
+
+        badges = get_all_badge_definitions()
+        return {
+            "badges": [badge.model_dump(mode='json') for badge in badges],
+            "total": len(badges)
+        }
+
+    except Exception as e:
+        logger.error(f"Error getting badges: {e}")
+        raise HTTPException(500, detail=str(e)) from e
+
+
+@router.get("/badges/earned")
+def get_earned_badges(
+    user: User = Depends(get_current_user)
+):
+    """Get user's earned badges.
+
+    Returns:
+        List of badges earned by the user
+    """
+    try:
+        from app.services.badge_service import get_badge_service
+
+        badge_service = get_badge_service()
+        earned_badges = badge_service.get_user_badges(user.user_id)
+
+        return {
+            "badges": [badge.model_dump(mode='json') for badge in earned_badges],
+            "total": len(earned_badges)
+        }
+
+    except Exception as e:
+        logger.error(f"Error getting earned badges: {e}")
+        raise HTTPException(500, detail=str(e)) from e
+
+
+@router.get("/badges/{badge_id}")
+def get_badge_details(
+    badge_id: str,
+    user: User = Depends(get_current_user)
+):
+    """Get details for a specific badge.
+
+    Args:
+        badge_id: Badge identifier
+
+    Returns:
+        Badge definition and user's progress
+    """
+    try:
+        from app.services.badge_definitions import get_all_badge_definitions
+        from app.services.badge_service import get_badge_service
+
+        # Find badge definition
+        all_badges = get_all_badge_definitions()
+        badge_def = next((b for b in all_badges if b.badge_id == badge_id), None)
+
+        if not badge_def:
+            raise HTTPException(404, detail=f"Badge {badge_id} not found")
+
+        # Check if user has earned it
+        badge_service = get_badge_service()
+        earned_badges = badge_service.get_user_badges(user.user_id)
+        earned = any(b.badge_id == badge_id for b in earned_badges)
+
+        # Get progress if not earned
+        progress = None
+        if not earned:
+            service = get_gamification_service()
+            user_stats = service.get_user_stats(user.user_id)
+            if user_stats:
+                all_progress = badge_service.get_badge_progress(user.user_id, user_stats)
+                progress = all_progress.get(badge_id)
+
+        return {
+            "badge": badge_def.model_dump(mode='json'),
+            "earned": earned,
+            "progress": progress
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting badge details: {e}")
+        raise HTTPException(500, detail=str(e)) from e
+
+
+@router.get("/badges/progress")
+def get_badge_progress(
+    user: User = Depends(get_current_user)
+):
+    """Get user's progress toward all badges.
+
+    Returns:
+        Progress information for all unearned badges
+    """
+    try:
+        from app.services.badge_service import get_badge_service
+
+        service = get_gamification_service()
+        user_stats = service.get_user_stats(user.user_id)
+
+        if not user_stats:
+            raise HTTPException(404, detail="User stats not found")
+
+        badge_service = get_badge_service()
+        progress = badge_service.get_badge_progress(user.user_id, user_stats)
+
+        return {
+            "progress": progress,
+            "total_badges_in_progress": len(progress)
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting badge progress: {e}")
+        raise HTTPException(500, detail=str(e)) from e
+
+
+@router.post("/badges/seed")
+def seed_badges(
+    user: User = Depends(get_current_user)
+):
+    """Seed all badge definitions (admin only).
+
+    Returns:
+        Number of badges seeded
+    """
+    # Admin check
+    admin_emails = os.getenv("ADMIN_EMAILS", "").split(",")
+    admin_emails = [email.strip() for email in admin_emails if email.strip()]
+
+    if not admin_emails:
+        logger.error("ADMIN_EMAILS not configured")
+        raise HTTPException(403, detail="Admin configuration required")
+
+    if user.email not in admin_emails:
+        logger.warning(f"Non-admin {user.email} attempted to seed badges")
+        raise HTTPException(403, detail="Admin access required")
+
+    try:
+        from app.services.badge_definitions import seed_badge_definitions
+        from app.services.gcp_service import get_firestore_client
+
+        db = get_firestore_client()
+        count = seed_badge_definitions(db)
+
+        logger.info(f"Badges seeded by {user.email}: {count} badges")
+        return {
+            "status": "ok",
+            "badges_seeded": count,
+            "message": f"Successfully seeded {count} badge definitions"
+        }
+
+    except Exception as e:
+        logger.error(f"Error seeding badges: {e}")
+        raise HTTPException(500, detail=str(e)) from e
