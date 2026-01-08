@@ -1462,6 +1462,7 @@ function displayCurrentQuestion(container) {
                 </div>
             ` : ''}
             <div id="quiz-options-placeholder"></div>
+            <div id="quiz-flag-placeholder"></div>
             ${userAnswer !== null ? `
                 <div class="answer-feedback ${userAnswer === question.correct_index ? 'correct' : 'incorrect'}">
                     <strong>${userAnswer === question.correct_index ? '✓ Correct!' : '✗ Incorrect'}</strong>
@@ -1539,6 +1540,95 @@ function displayCurrentQuestion(container) {
         // No Phase 2: Use event delegation on the container
         container.addEventListener('click', handleQuizContainerClick);
     }
+
+    // Phase 3: Create flag button if available
+    const flagPlaceholder = container.querySelector('#quiz-flag-placeholder');
+    if (flagPlaceholder && typeof createFlagButton === 'function') {
+        const isFlagged = quizState.flaggedQuestions && quizState.flaggedQuestions.includes(quizState.currentQuestionIndex);
+        const flagButton = createFlagButton(quizState.currentQuestionIndex, isFlagged);
+
+        // Add click handler for flag button
+        flagButton.addEventListener('click', () => {
+            toggleQuestionFlag(quizState.currentQuestionIndex);
+        });
+
+        flagPlaceholder.replaceWith(flagButton);
+    }
+
+    // Phase 3: Update navigation sidebar if it exists
+    updateNavigationSidebar();
+}
+
+/**
+ * Toggle flag status for a question
+ * @param {number} questionIndex - Index of question to toggle
+ */
+function toggleQuestionFlag(questionIndex) {
+    if (!quizState.flaggedQuestions) {
+        quizState.flaggedQuestions = [];
+    }
+
+    const index = quizState.flaggedQuestions.indexOf(questionIndex);
+    if (index > -1) {
+        // Unflag
+        quizState.flaggedQuestions.splice(index, 1);
+    } else {
+        // Flag
+        quizState.flaggedQuestions.push(questionIndex);
+    }
+
+    // Update the display
+    const container = document.getElementById('quiz-question-container');
+    if (container) {
+        displayCurrentQuestion(container);
+    }
+}
+
+/**
+ * Update navigation sidebar with current quiz state
+ */
+function updateNavigationSidebar() {
+    const sidebarContainer = document.getElementById('quiz-nav-sidebar-container');
+    if (!sidebarContainer || typeof createQuestionNavSidebar !== 'function') {
+        return;
+    }
+
+    // Create new sidebar
+    const sidebar = createQuestionNavSidebar(quizState, (questionIndex) => {
+        // Navigate to selected question
+        quizState.currentQuestionIndex = questionIndex;
+        const container = document.getElementById('quiz-question-container');
+        if (container) {
+            displayCurrentQuestion(container);
+        }
+    });
+
+    // Replace old sidebar
+    sidebarContainer.innerHTML = '';
+    sidebarContainer.appendChild(sidebar);
+
+    // Add toggle functionality for mobile
+    const toggleBtn = sidebar.querySelector('.nav-sidebar-toggle');
+    if (toggleBtn) {
+        toggleBtn.addEventListener('click', () => {
+            sidebar.classList.toggle('collapsed');
+            const isCollapsed = sidebar.classList.contains('collapsed');
+            toggleBtn.textContent = isCollapsed ? '+' : '−';
+            toggleBtn.setAttribute('aria-expanded', isCollapsed ? 'false' : 'true');
+        });
+    }
+
+    // Add navigation button click handlers
+    const navButtons = sidebar.querySelectorAll('.question-nav-btn');
+    navButtons.forEach((btn, index) => {
+        btn.addEventListener('click', () => {
+            quizState.currentQuestionIndex = index;
+            const container = document.getElementById('quiz-question-container');
+            if (container) {
+                displayCurrentQuestion(container);
+            }
+        });
+    });
 }
 
 /**
