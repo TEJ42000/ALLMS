@@ -55,7 +55,11 @@ def get_user_stats(
         )
 
         if not stats:
-            raise HTTPException(500, detail="Failed to get user stats")
+            # FIX: Distinguish system error from user error
+            raise HTTPException(
+                500,
+                detail="System error: Unable to retrieve user statistics. Please try again later or contact support if the issue persists."
+            )
 
         return UserStatsResponse(
             total_xp=stats.total_xp,
@@ -742,7 +746,11 @@ def get_badge_details(
         badge_def = next((b for b in all_badges if b.badge_id == badge_id), None)
 
         if not badge_def:
-            raise HTTPException(404, detail=f"Badge {badge_id} not found")
+            # FIX: Improved error message with helpful hint
+            raise HTTPException(
+                404,
+                detail=f"Badge '{badge_id}' not found. Check the badge ID and try again. Use GET /api/gamification/badges to see all available badges."
+            )
 
         # MEDIUM: Don't show inactive badges to non-admin users
         if not badge_def.active:
@@ -750,7 +758,11 @@ def get_badge_details(
             admin_emails = [email.strip() for email in admin_emails if email.strip()]
 
             if user.email not in admin_emails:
-                raise HTTPException(404, detail=f"Badge {badge_id} not found")
+                # FIX: Improved error message with helpful hint
+                raise HTTPException(
+                    404,
+                    detail=f"Badge '{badge_id}' not found. This badge may not be available yet. Use GET /api/gamification/badges to see all available badges."
+                )
 
         # Check if user has earned it
         badge_service = get_badge_service()
@@ -800,7 +812,11 @@ def get_badge_progress(
         user_stats = service.get_user_stats(user.user_id)
 
         if not user_stats:
-            raise HTTPException(404, detail="User stats not found")
+            # FIX: User-friendly error message
+            raise HTTPException(
+                404,
+                detail="User statistics not found. Please complete an activity first to initialize your stats."
+            )
 
         badge_service = get_badge_service()
         progress = badge_service.get_badge_progress(user.user_id, user_stats)

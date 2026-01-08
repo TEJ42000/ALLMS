@@ -503,18 +503,28 @@ class BadgeService:
         try:
             if category == "streak":
                 if "streak_days" in criteria:
+                    # FIX: Add zero-division protection
+                    required = criteria["streak_days"]
+                    if required <= 0:
+                        logger.warning(f"Invalid streak_days criteria: {required}")
+                        return None
                     return {
                         "current": user_stats.streak.current_count,
-                        "required": criteria["streak_days"],
-                        "percentage": min(100, int(user_stats.streak.current_count / criteria["streak_days"] * 100))
+                        "required": required,
+                        "percentage": min(100, int(user_stats.streak.current_count / required * 100))
                     }
-            
+
             elif category == "xp":
                 if "total_xp" in criteria:
+                    # FIX: Add zero-division protection
+                    required = criteria["total_xp"]
+                    if required <= 0:
+                        logger.warning(f"Invalid total_xp criteria: {required}")
+                        return None
                     return {
                         "current": user_stats.total_xp,
-                        "required": criteria["total_xp"],
-                        "percentage": min(100, int(user_stats.total_xp / criteria["total_xp"] * 100))
+                        "required": required,
+                        "percentage": min(100, int(user_stats.total_xp / required * 100))
                     }
             
             elif category == "activity":
@@ -523,34 +533,54 @@ class BadgeService:
                 if "flashcard_sets" in criteria:
                     # FIX: Changed activity_counters to activities
                     # FIX: Changed flashcard_sets_completed to flashcards_reviewed
+                    # FIX: Add zero-division protection
+                    required = criteria["flashcard_sets"]
+                    if required <= 0:
+                        logger.warning(f"Invalid flashcard_sets criteria: {required}")
+                        return None
                     return {
                         "current": user_stats.activities.flashcards_reviewed,
-                        "required": criteria["flashcard_sets"],
-                        "percentage": min(100, int(user_stats.activities.flashcards_reviewed / criteria["flashcard_sets"] * 100))
+                        "required": required,
+                        "percentage": min(100, int(user_stats.activities.flashcards_reviewed / required * 100))
                     }
 
                 # HIGH: Add quizzes passed progress
                 if "quizzes_passed" in criteria:
+                    # FIX: Add zero-division protection
+                    required = criteria["quizzes_passed"]
+                    if required <= 0:
+                        logger.warning(f"Invalid quizzes_passed criteria: {required}")
+                        return None
                     return {
                         "current": user_stats.activities.quizzes_passed,
-                        "required": criteria["quizzes_passed"],
-                        "percentage": min(100, int(user_stats.activities.quizzes_passed / criteria["quizzes_passed"] * 100))
+                        "required": required,
+                        "percentage": min(100, int(user_stats.activities.quizzes_passed / required * 100))
                     }
 
                 # HIGH: Add evaluations progress
                 if "evaluations" in criteria:
+                    # FIX: Add zero-division protection
+                    required = criteria["evaluations"]
+                    if required <= 0:
+                        logger.warning(f"Invalid evaluations criteria: {required}")
+                        return None
                     return {
                         "current": user_stats.activities.evaluations_submitted,
-                        "required": criteria["evaluations"],
-                        "percentage": min(100, int(user_stats.activities.evaluations_submitted / criteria["evaluations"] * 100))
+                        "required": required,
+                        "percentage": min(100, int(user_stats.activities.evaluations_submitted / required * 100))
                     }
 
                 # HIGH: Add study guides progress
                 if "study_guides" in criteria:
+                    # FIX: Add zero-division protection
+                    required = criteria["study_guides"]
+                    if required <= 0:
+                        logger.warning(f"Invalid study_guides criteria: {required}")
+                        return None
                     return {
                         "current": user_stats.activities.guides_completed,
-                        "required": criteria["study_guides"],
-                        "percentage": min(100, int(user_stats.activities.guides_completed / criteria["study_guides"] * 100))
+                        "required": required,
+                        "percentage": min(100, int(user_stats.activities.guides_completed / required * 100))
                     }
             
             return None
