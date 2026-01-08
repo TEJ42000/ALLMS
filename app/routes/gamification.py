@@ -873,3 +873,119 @@ def seed_all_badges(
     except Exception as e:
         logger.error(f"Error seeding badges: {e}")
         raise HTTPException(500, detail=str(e)) from e
+
+
+# =============================================================================
+# Week 7 Quest Endpoints
+# =============================================================================
+
+@router.post("/quest/week7/activate")
+def activate_week7_quest(
+    current_week: int = Query(..., ge=1, le=13, description="Current week number"),
+    course_id: str = Query(..., description="Course ID"),
+    user: User = Depends(get_current_user)
+):
+    """Activate Week 7 Boss Quest for current user.
+
+    HIGH: Added API endpoint to activate quest
+
+    Args:
+        current_week: Current week number (1-13)
+        course_id: Course ID
+        user: Current authenticated user
+
+    Returns:
+        Activation status and message
+
+    Raises:
+        HTTPException: If activation fails
+    """
+    try:
+        from app.services.week7_quest_service import get_week7_quest_service
+
+        quest_service = get_week7_quest_service()
+        activated, message = quest_service.check_and_activate_quest(
+            user_id=user.user_id,
+            course_id=course_id,
+            current_week=current_week
+        )
+
+        if not activated and message:
+            raise HTTPException(400, detail=message)
+
+        logger.info(f"Week 7 quest activation attempt for user {user.user_id[:8]}... - Result: {activated}")
+        return {"status": "activated" if activated else "not_activated", "message": message}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        # CRITICAL: Don't expose internal error details to client
+        logger.error(f"Error activating Week 7 quest for user {user.user_id[:8]}...: {e}", exc_info=True)
+        raise HTTPException(500, detail="Failed to activate quest. Please try again later.") from e
+
+
+@router.get("/quest/week7/progress")
+def get_week7_quest_progress(
+    user: User = Depends(get_current_user)
+):
+    """Get detailed Week 7 quest progress for current user.
+
+    HIGH: Added API endpoint to get quest progress
+
+    Args:
+        user: Current authenticated user
+
+    Returns:
+        Quest progress including exam readiness, double XP earned, etc.
+
+    Raises:
+        HTTPException: If retrieval fails
+    """
+    try:
+        from app.services.gamification_service import get_gamification_service
+
+        service = get_gamification_service()
+        stats = service.get_or_create_user_stats(
+            user_id=user.user_id,
+            user_email=user.email,
+            course_id=None  # Will use existing course_id from stats
+        )
+
+        if not stats:
+            raise HTTPException(404, detail="User stats not found")
+
+        return {
+            "active": stats.week7_quest.active,
+            "course_id": stats.week7_quest.course_id,
+            "exam_readiness_percent": stats.week7_quest.exam_readiness_percent,
+            "boss_battle_completed": stats.week7_quest.boss_battle_completed,
+            "double_xp_earned": stats.week7_quest.double_xp_earned
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        # CRITICAL: Don't expose internal error details to client
+        logger.error(f"Error getting Week 7 quest progress: {e}", exc_info=True)
+        raise HTTPException(500, detail="Failed to retrieve quest progress. Please try again later.") from e
+
+
+@router.get("/quest/week7/requirements")
+def get_week7_quest_requirements():
+    """Get Week 7 quest requirements and thresholds.
+
+    HIGH: Added API endpoint to get quest requirements
+
+    Returns:
+        Quest requirements including exam readiness thresholds
+    """
+    try:
+        from app.services.week7_quest_service import get_week7_quest_service
+
+        quest_service = get_week7_quest_service()
+        return quest_service.get_quest_requirements()
+
+    except Exception as e:
+        # CRITICAL: Don't expose internal error details to client
+        logger.error(f"Error getting Week 7 quest requirements: {e}", exc_info=True)
+        raise HTTPException(500, detail="Failed to retrieve quest requirements. Please try again later.") from e

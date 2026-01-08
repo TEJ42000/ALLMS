@@ -76,8 +76,9 @@ class ActivityCounters(BaseModel):
 
 class Week7Quest(BaseModel):
     """Week 7 Boss Prep Quest tracking."""
-    
+
     active: bool = Field(default=False, description="Whether Week 7 mode is active")
+    course_id: Optional[str] = Field(None, description="Course ID for which quest is active")
     exam_readiness_percent: int = Field(default=0, ge=0, le=100, description="Exam readiness percentage")
     boss_battle_completed: bool = Field(default=False, description="Whether boss battle was completed")
     double_xp_earned: int = Field(default=0, description="Total double XP earned during Week 7")

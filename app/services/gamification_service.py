@@ -37,6 +37,12 @@ from app.services.gcp_service import get_firestore_client
 
 logger = logging.getLogger(__name__)
 
+# Import Week 7 quest service (avoid circular import)
+def get_week7_quest_service():
+    """Lazy import to avoid circular dependency."""
+    from app.services.week7_quest_service import get_week7_quest_service as _get_service
+    return _get_service()
+
 # =============================================================================
 # Constants
 # =============================================================================
@@ -83,6 +89,11 @@ STREAK_RESET_HOUR = 4
 BONUS_MULTIPLIER_MIN = 1.0
 BONUS_MULTIPLIER_MAX = 2.0
 WEEKLY_CONSISTENCY_BONUS_MULTIPLIER = 1.5  # 50% XP bonus
+
+# XP validation (CRITICAL: Prevent negative or excessive XP)
+MIN_XP_PER_ACTIVITY = 0
+MAX_XP_PER_ACTIVITY = 1000  # Maximum XP for a single activity
+MAX_TOTAL_XP = 1000000  # Maximum total XP (prevents overflow)
 
 
 class GamificationService:
@@ -346,13 +357,24 @@ class GamificationService:
         elif activity_type == "evaluation_completed":
             grade = activity_data.get("grade", 0)
             if grade >= 7:
-                return xp_config["evaluation_high"]
+                xp_awarded = xp_config["evaluation_high"]
             elif grade >= 1:
-                return xp_config["evaluation_low"]
-            return 0
+                xp_awarded = xp_config["evaluation_low"]
+            else:
+                xp_awarded = 0
+        else:
+            # Default: no XP
+            xp_awarded = 0
 
-        # Default: no XP
-        return 0
+        # CRITICAL: Validate XP is within acceptable range
+        if xp_awarded < MIN_XP_PER_ACTIVITY:
+            logger.warning(f"Negative XP calculated ({xp_awarded}) for {activity_type}, clamping to 0")
+            xp_awarded = MIN_XP_PER_ACTIVITY
+        elif xp_awarded > MAX_XP_PER_ACTIVITY:
+            logger.warning(f"Excessive XP calculated ({xp_awarded}) for {activity_type}, clamping to {MAX_XP_PER_ACTIVITY}")
+            xp_awarded = MAX_XP_PER_ACTIVITY
+
+        return xp_awarded
 
     def calculate_level_from_xp(self, total_xp: int) -> tuple[int, str, int]:
         """Calculate level, title, and XP to next level from total XP.
@@ -444,6 +466,29 @@ class GamificationService:
                     xp_awarded = int(xp_awarded * bonus_multiplier)
                     consistency_bonus = xp_awarded - original_xp
                     logger.info(f"Weekly consistency bonus applied: {original_xp} XP -> {xp_awarded} XP (multiplier: {bonus_multiplier})")
+
+            # Apply Week 7 double XP if quest is active
+            week7_bonus = 0
+            week7_quest_updates = {}
+            if stats.week7_quest.active and xp_awarded > 0:
+                # MEDIUM: week7_bonus represents the XP value that gets doubled
+                # This includes any bonuses applied before Week 7 (e.g., consistency bonus)
+                # Example: 100 base XP + 50 consistency = 150, then doubled to 300
+                # week7_bonus = 150 (the value that was doubled, not the base XP)
+                week7_bonus = xp_awarded  # XP value before doubling (includes consistency)
+                xp_awarded = xp_awarded * 2  # Double the current XP
+                logger.info(f"Week 7 quest active - doubled XP from {xp_awarded//2} to {xp_awarded}")
+
+                # HIGH: Calculate quest updates NOW to avoid race condition
+                # This will be included in the atomic update below
+                quest_service = get_week7_quest_service()
+                week7_quest_updates = quest_service.calculate_quest_updates(
+                    user_id=user_id,
+                    xp_bonus=week7_bonus,
+                    stats=stats,
+                    activity_type=activity_type,
+                    course_id=course_id  # MEDIUM: Add course validation
+                )
 
             if xp_awarded == 0:
                 logger.info(f"No XP awarded for {activity_type} (did not meet criteria)")
@@ -578,6 +623,11 @@ class GamificationService:
                 updates["activities.guides_completed"] = Increment(1)
             elif activity_type == "evaluation_completed":
                 updates["activities.evaluations_submitted"] = Increment(1)
+
+            # HIGH: Include Week 7 quest updates in atomic update to prevent race condition
+            if week7_quest_updates:
+                updates.update(week7_quest_updates)
+                logger.info(f"Including Week 7 quest updates in atomic update: {week7_quest_updates}")
 
             doc_ref.update(updates)
 
