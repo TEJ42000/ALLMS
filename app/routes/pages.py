@@ -183,3 +183,17 @@ async def badges_page(request: Request):
             "user": user
         }
     )
+
+
+@router.get("/flashcards", response_class=HTMLResponse)
+async def flashcards_page(request: Request):
+    """Serve the flashcards study page."""
+    user = get_user_from_request(request)
+    return templates.TemplateResponse(
+        "flashcards.html",
+        {
+            "request": request,
+            "title": "Flashcards - ECHR Learning",
+            "user": user
+        }
+    )
