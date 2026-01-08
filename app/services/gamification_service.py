@@ -38,6 +38,12 @@ from app.services.gcp_service import get_firestore_client
 
 logger = logging.getLogger(__name__)
 
+# Import Week 7 quest service (avoid circular import)
+def get_week7_quest_service():
+    """Lazy import to avoid circular dependency."""
+    from app.services.week7_quest_service import get_week7_quest_service as _get_service
+    return _get_service()
+
 # =============================================================================
 # Constants
 # =============================================================================
@@ -425,6 +431,13 @@ class GamificationService:
             # Calculate XP
             xp_awarded = self.calculate_xp_for_activity(activity_type, activity_data)
 
+            # Apply Week 7 double XP if quest is active
+            week7_bonus = 0
+            if stats.week7_quest.active and xp_awarded > 0:
+                week7_bonus = xp_awarded  # Double the XP
+                xp_awarded = xp_awarded * 2
+                logger.info(f"Week 7 quest active - doubled XP from {xp_awarded//2} to {xp_awarded}")
+
             if xp_awarded == 0:
                 logger.info(f"No XP awarded for {activity_type} (did not meet criteria)")
                 # Still log the activity but don't update stats
@@ -542,6 +555,14 @@ class GamificationService:
                 updates["activities.evaluations_submitted"] = Increment(1)
 
             doc_ref.update(updates)
+
+            # Update Week 7 quest progress if active
+            if stats.week7_quest.active and week7_bonus > 0:
+                quest_service = get_week7_quest_service()
+                # Refresh stats to get updated activity counts
+                updated_stats = self.get_or_create_user_stats(user_id, user_email, course_id)
+                if updated_stats:
+                    quest_service.update_quest_progress(user_id, week7_bonus, updated_stats)
 
             logger.info(f"Logged activity {activity_type} for {user_id}, awarded {xp_awarded} XP, streak: {new_streak_count}")
 
