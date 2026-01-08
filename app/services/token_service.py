@@ -41,19 +41,30 @@ if not TOKEN_SECRET:
     else:
         # Development fallback: use persistent secret file
         # This prevents token invalidation on restart
+        # SECURITY NOTE: This is only for development. Production MUST use environment variables.
         try:
             if os.path.exists(DEV_SECRET_FILE):
+                # Read existing secret
                 with open(DEV_SECRET_FILE, 'r') as f:
                     TOKEN_SECRET = f.read().strip()
                 logger.info("Loaded development token secret from .dev_token_secret file")
             else:
-                # Generate new secret and save it
+                # Generate new secret and save it with restricted permissions
                 TOKEN_SECRET = secrets.token_hex(32)
-                with open(DEV_SECRET_FILE, 'w') as f:
-                    f.write(TOKEN_SECRET)
+
+                # SECURITY: Create file with restricted permissions (owner read/write only)
+                # This mitigates the CodeQL alert about clear-text storage
+                import stat
+                fd = os.open(DEV_SECRET_FILE, os.O_CREAT | os.O_WRONLY | os.O_EXCL, stat.S_IRUSR | stat.S_IWUSR)
+                try:
+                    os.write(fd, TOKEN_SECRET.encode('utf-8'))
+                finally:
+                    os.close(fd)
+
                 logger.warning(
                     "GDPR_TOKEN_SECRET not set in environment. Generated new development secret "
-                    "and saved to .dev_token_secret file. This secret will persist across restarts. "
+                    "and saved to .dev_token_secret file with restricted permissions (0600). "
+                    "This secret will persist across restarts. "
                     "For production, set GDPR_TOKEN_SECRET environment variable."
                 )
         except Exception as e:
