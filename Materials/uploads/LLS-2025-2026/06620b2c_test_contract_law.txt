@@ -1,0 +1,19 @@
+Contract Law - Formation
+
+A contract is a legally binding agreement between two or more parties.
+
+Essential Elements:
+1. Offer - A clear proposal made by one party to another
+2. Acceptance - Unqualified agreement to the terms of the offer
+3. Consideration - Something of value exchanged between parties
+4. Intention to create legal relations
+5. Capacity - Parties must have legal capacity to contract
+
+Offer and Acceptance:
+An offer must be communicated to the offeree and can be accepted
+by conduct or express words. Acceptance must mirror the offer
+(mirror image rule).
+
+Consideration:
+Consideration is the price paid for a promise. It must be sufficient
+but need not be adequate. Past consideration is generally not valid.

@@ -49,7 +49,139 @@ body { font-family: Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-ser
 .progress-fill { background: linear-gradient(90deg, var(--gold) 0%, var(--gold-light) 100%); height: 100%; transition: width 0.3s; }
 .progress-text { font-size: 0.8em; color: var(--text-secondary); }
 
-/* Week card specific styles */
+/* ========== Week Cards Grid (Enhanced) ========== */
+.week-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.week-card {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 15px;
+    padding: 25px;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.week-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, #3b82f6 0%, #8b5cf6 100%);
+    transform: scaleX(0);
+    transition: transform 0.3s;
+}
+
+.week-card:hover {
+    transform: translateY(-5px);
+    border-color: #3b82f6;
+    box-shadow: 0 10px 30px rgba(59, 130, 246, 0.2);
+}
+
+.week-card:hover::before {
+    transform: scaleX(1);
+}
+
+.week-label {
+    display: inline-block;
+    padding: 4px 12px;
+    background: rgba(59, 130, 246, 0.2);
+    border-radius: 20px;
+    font-size: 0.85em;
+    color: #3b82f6;
+    margin-bottom: 10px;
+    font-weight: 600;
+}
+
+.week-card h3 {
+    font-size: 1.2em;
+    margin-bottom: 10px;
+    color: #e0e6ed;
+}
+
+.week-card .week-description {
+    color: #a0aec0;
+    font-size: 0.95em;
+    margin-bottom: 15px;
+    line-height: 1.5;
+}
+
+.week-card .week-topics {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 15px;
+}
+
+.week-card .topic-tag {
+    background: rgba(139, 92, 246, 0.15);
+    color: #a78bfa;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 0.8em;
+}
+
+.week-progress-bar {
+    width: 100%;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+    overflow: hidden;
+    margin: 15px 0;
+}
+
+.week-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #3b82f6 0%, #8b5cf6 100%);
+    transition: width 0.5s ease;
+}
+
+.week-card-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 15px;
+}
+
+.week-card-actions button {
+    flex: 1;
+    padding: 12px;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    font-size: 0.9em;
+}
+
+.btn-study {
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    color: white;
+}
+
+.btn-study:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(59, 130, 246, 0.4);
+}
+
+.btn-ask-ai {
+    background: rgba(255, 255, 255, 0.1);
+    color: #e0e6ed;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.btn-ask-ai:hover {
+    background: rgba(255, 255, 255, 0.15);
+    transform: translateY(-2px);
+}
+
+/* Week card specific styles (legacy) */
 .week-card .week-topics-list { list-style: none; padding: 0; margin: 10px 0 0 0; font-size: 0.85em; }
 .week-card .week-topics-list li { padding: 4px 0; color: var(--text-secondary); border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
 .week-card .week-topics-list li:last-child { border-bottom: none; }
@@ -57,6 +189,120 @@ body { font-family: Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-ser
 .no-weeks-message, .error-message { text-align: center; padding: 40px 20px; color: var(--text-secondary); font-size: 1.1em; }
 .error-message { color: #ff6b6b; }
 .loading-placeholder { text-align: center; padding: 40px 20px; color: var(--text-secondary); }
+
+/* ========== Week Content Modal ========== */
+#week-content-modal.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.8);
+    z-index: 1000;
+    padding: 20px;
+    overflow-y: auto;
+}
+
+#week-content-modal.modal.show {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#week-content-modal .modal-content {
+    background: #1a1f35;
+    border-radius: 20px;
+    max-width: 900px;
+    width: 100%;
+    max-height: 85vh;
+    overflow-y: auto;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+#week-content-modal .modal-header {
+    padding: 25px 30px;
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    border-radius: 20px 20px 0 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+#week-content-modal .modal-header h2 {
+    color: white;
+    margin: 0;
+}
+
+#week-content-modal .close-btn {
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    color: white;
+    width: 35px;
+    height: 35px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 1.5em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s;
+}
+
+#week-content-modal .close-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: rotate(90deg);
+}
+
+#week-content-modal .modal-body {
+    padding: 30px;
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+#week-content-modal .modal-body h3 {
+    color: #3b82f6;
+    margin: 25px 0 15px 0;
+    font-size: 1.2em;
+}
+
+#week-content-modal .modal-body h3:first-child {
+    margin-top: 0;
+}
+
+#week-content-modal .modal-body ul {
+    margin-left: 20px;
+    margin-bottom: 15px;
+}
+
+#week-content-modal .modal-body li {
+    margin-bottom: 10px;
+    color: #a0aec0;
+    line-height: 1.6;
+}
+
+#week-content-modal .modal-body .case-reference {
+    background: rgba(59, 130, 246, 0.1);
+    border-left: 3px solid #3b82f6;
+    padding: 10px 15px;
+    margin: 15px 0;
+    border-radius: 0 8px 8px 0;
+}
+
+#week-content-modal .modal-body .key-concept {
+    background: rgba(139, 92, 246, 0.1);
+    padding: 15px;
+    border-radius: 8px;
+    margin: 10px 0;
+}
+
+#week-content-modal .modal-footer {
+    padding: 20px 30px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+}
 
 /* Modern Chatbot Interface */
 .chat-container {
