@@ -167,16 +167,24 @@ class StreakMaintenanceService:
                     result["freeze_applied"] = True
                     result["notification_sent"] = self._send_freeze_notification(user_stats)
 
-                    # Log freeze application
+                    # Get updated freeze count AFTER application for accurate logging
+                    # CRITICAL: Prevents logging inaccuracy that confuses users
+                    updated_stats = self._get_user_stats(user_stats.user_id)
+                    actual_freezes_remaining = updated_stats.streak.freezes_available if updated_stats else 0
+
+                    # Log freeze application with ACCURATE freeze count
                     self._log_streak_event(
                         user_stats.user_id,
                         "freeze_applied",
                         user_stats.streak.current_count,
                         {
-                            "freezes_remaining": max(0, user_stats.streak.freezes_available - 1),
-                            "days_missed": 1
+                            "freezes_remaining": actual_freezes_remaining,
+                            "days_missed": 1,
+                            "freeze_applied_at": datetime.now(timezone.utc).isoformat()
                         }
                     )
+
+                    logger.info(f"Freeze applied for {user_stats.user_id}. Freezes remaining: {actual_freezes_remaining}")
                 else:
                     # Freeze application failed (race condition or no freezes left)
                     # Break the streak instead
@@ -206,6 +214,31 @@ class StreakMaintenanceService:
         except Exception as e:
             logger.error(f"Error checking streak for user {user_stats.user_id}: {e}", exc_info=True)
             return result
+
+    def _get_user_stats(self, user_id: str) -> Optional[UserStats]:
+        """Get current user stats from Firestore.
+
+        Args:
+            user_id: User's IAP user ID
+
+        Returns:
+            UserStats or None if not found
+        """
+        if not self.db:
+            return None
+
+        try:
+            doc_ref = self.db.collection(USER_STATS_COLLECTION).document(user_id)
+            doc = doc_ref.get()
+
+            if not doc.exists:
+                return None
+
+            return UserStats(**doc.to_dict())
+
+        except Exception as e:
+            logger.error(f"Error getting user stats for {user_id}: {e}", exc_info=True)
+            return None
 
     def _apply_freeze(self, user_id: str) -> bool:
         """Apply a streak freeze for a user.

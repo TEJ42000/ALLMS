@@ -748,21 +748,62 @@ class GamificationService:
                 elif not isinstance(stored_week_start, datetime):
                     stored_week_start = None
 
-            # Reset if new week
+            # Reset if new week - use transaction to prevent data loss
             if not stored_week_start or week_start > stored_week_start:
-                # New week - reset all categories
+                # New week - reset all categories atomically
                 if not self.db:
                     return False, False
 
+                from google.cloud import firestore
+
                 doc_ref = self.db.collection(USER_STATS_COLLECTION).document(user_id)
-                doc_ref.update({
-                    "streak.weekly_consistency.flashcards": False,
-                    "streak.weekly_consistency.quiz": False,
-                    "streak.weekly_consistency.evaluation": False,
-                    "streak.weekly_consistency.guide": False,
-                    "streak.week_start": week_start.isoformat(),
-                    "streak.bonus_active": False
-                })
+
+                @firestore.transactional
+                def reset_week_transaction(transaction):
+                    """Transaction to safely reset weekly consistency.
+
+                    CRITICAL: Prevents data loss from concurrent resets.
+                    """
+                    snapshot = doc_ref.get(transaction=transaction)
+
+                    if not snapshot.exists:
+                        return False
+
+                    data = snapshot.to_dict()
+                    current_week_start = data.get("streak", {}).get("week_start")
+
+                    # Parse stored week start
+                    if current_week_start:
+                        if isinstance(current_week_start, str):
+                            current_week_start = datetime.fromisoformat(current_week_start)
+
+                    # Double-check we still need to reset (race condition check)
+                    if current_week_start and week_start <= current_week_start:
+                        # Another thread already reset, skip
+                        return False
+
+                    # Perform atomic reset
+                    transaction.update(doc_ref, {
+                        "streak.weekly_consistency.flashcards": False,
+                        "streak.weekly_consistency.quiz": False,
+                        "streak.weekly_consistency.evaluation": False,
+                        "streak.weekly_consistency.guide": False,
+                        "streak.week_start": week_start.isoformat(),
+                        "streak.bonus_active": False,
+                        "updated_at": datetime.now(timezone.utc)
+                    })
+
+                    logger.info(f"Weekly consistency reset for {user_id} (new week: {week_start.isoformat()})")
+                    return True
+
+                # Execute transaction
+                transaction = self.db.transaction()
+                reset_performed = reset_week_transaction(transaction)
+
+                if not reset_performed:
+                    # Another thread already reset, continue with current stats
+                    logger.debug(f"Weekly reset skipped for {user_id} (already reset by another thread)")
+
                 # Refresh stats after reset
                 stats = self.get_or_create_user_stats(user_id, stats.user_email)
                 if not stats:

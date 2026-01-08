@@ -21,6 +21,28 @@ class StreakTracker {
     }
 
     /**
+     * Sanitize HTML to prevent XSS attacks
+     * CRITICAL: Security best practice - always sanitize user input
+     */
+    sanitizeHTML(str) {
+        if (typeof str !== 'string') {
+            return String(str);
+        }
+
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+
+    /**
+     * Safely parse integer to prevent injection
+     */
+    safeParseInt(value, defaultValue = 0) {
+        const parsed = parseInt(value, 10);
+        return isNaN(parsed) ? defaultValue : parsed;
+    }
+
+    /**
      * Load streak calendar and consistency data
      */
     async loadStreakData() {
@@ -52,22 +74,27 @@ class StreakTracker {
 
         const { days, current_streak, longest_streak, freezes_available } = this.calendarData;
 
+        // CRITICAL: Sanitize all user-controlled data to prevent XSS
+        const safeCurrentStreak = this.safeParseInt(current_streak, 0);
+        const safeLongestStreak = this.safeParseInt(longest_streak, 0);
+        const safeFreezesAvailable = this.safeParseInt(freezes_available, 0);
+
         // Create calendar HTML
         let html = `
             <div class="streak-calendar-header">
                 <div class="streak-stat">
                     <span class="streak-icon">🔥</span>
-                    <span class="streak-count">${current_streak}</span>
+                    <span class="streak-count">${safeCurrentStreak}</span>
                     <span class="streak-label">Day Streak</span>
                 </div>
                 <div class="streak-stat">
                     <span class="streak-icon">❄️</span>
-                    <span class="streak-count">${freezes_available}</span>
+                    <span class="streak-count">${safeFreezesAvailable}</span>
                     <span class="streak-label">Freezes</span>
                 </div>
                 <div class="streak-stat">
                     <span class="streak-icon">🏆</span>
-                    <span class="streak-count">${longest_streak}</span>
+                    <span class="streak-count">${safeLongestStreak}</span>
                     <span class="streak-label">Best Streak</span>
                 </div>
             </div>
@@ -78,14 +105,20 @@ class StreakTracker {
         days.forEach((day, index) => {
             const dayClass = this.getDayClass(day);
             const tooltip = this.getDayTooltip(day);
-            
+
+            // CRITICAL: Sanitize date and counts to prevent XSS
+            const safeDate = this.sanitizeHTML(day.date);
+            const safeTooltip = this.sanitizeHTML(tooltip);
+            const safeDayNumber = this.safeParseInt(new Date(day.date).getDate(), 1);
+            const safeActivityCount = this.safeParseInt(day.activity_count, 0);
+
             html += `
-                <div class="calendar-day ${dayClass}" 
-                     data-date="${day.date}"
-                     title="${tooltip}">
-                    <div class="day-number">${new Date(day.date).getDate()}</div>
+                <div class="calendar-day ${dayClass}"
+                     data-date="${safeDate}"
+                     title="${safeTooltip}">
+                    <div class="day-number">${safeDayNumber}</div>
                     ${day.freeze_used ? '<div class="freeze-indicator">❄️</div>' : ''}
-                    ${day.activity_count > 0 ? `<div class="activity-count">${day.activity_count}</div>` : ''}
+                    ${safeActivityCount > 0 ? `<div class="activity-count">${safeActivityCount}</div>` : ''}
                 </div>
             `;
         });
@@ -147,6 +180,12 @@ class StreakTracker {
 
         const { categories, bonus_active, bonus_multiplier, progress, completed_count, total_count } = this.consistencyData;
 
+        // CRITICAL: Sanitize all numeric values to prevent XSS
+        const safeProgress = Math.min(Math.max(this.safeParseInt(progress, 0), 0), 100);
+        const safeCompletedCount = this.safeParseInt(completed_count, 0);
+        const safeTotalCount = this.safeParseInt(total_count, 4);
+        const safeBonusMultiplier = parseFloat(bonus_multiplier) || 1.0;
+
         const categoryIcons = {
             flashcards: '📇',
             quiz: '📝',
@@ -166,9 +205,9 @@ class StreakTracker {
                 <h3>Weekly Consistency Bonus</h3>
                 <div class="consistency-progress">
                     <div class="progress-bar">
-                        <div class="progress-fill" style="width: ${progress}%"></div>
+                        <div class="progress-fill" style="width: ${safeProgress}%"></div>
                     </div>
-                    <span class="progress-text">${completed_count}/${total_count} Complete</span>
+                    <span class="progress-text">${safeCompletedCount}/${safeTotalCount} Complete</span>
                 </div>
             </div>
             <div class="consistency-categories">
