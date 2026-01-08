@@ -148,31 +148,38 @@ The quiz UI currently has:
 
 **Implementation:**
 ```javascript
-// Question Navigation Sidebar
-function createQuestionNav() {
+// Question Navigation Sidebar (XSS-safe)
+function createQuestionNav(quizState) {
     const nav = document.createElement('div');
     nav.className = 'question-nav-sidebar';
-    nav.innerHTML = `
-        <h4>Questions</h4>
-        <div class="question-nav-grid">
-            ${quizState.questions.map((q, index) => `
-                <button 
-                    class="question-nav-btn ${getQuestionStatus(index)}"
-                    data-question-index="${index}"
-                    aria-label="Go to question ${index + 1}"
-                >
-                    ${index + 1}
-                </button>
-            `).join('')}
-        </div>
-    `;
+
+    // Create title
+    const title = document.createElement('h4');
+    title.textContent = 'Questions';
+    nav.appendChild(title);
+
+    // Create grid container
+    const grid = document.createElement('div');
+    grid.className = 'question-nav-grid';
+
+    // Create buttons using DOM methods (XSS-safe)
+    quizState.questions.forEach((q, index) => {
+        const button = document.createElement('button');
+        button.className = `question-nav-btn ${getQuestionStatus(index, quizState)}`;
+        button.setAttribute('data-question-index', index);
+        button.setAttribute('aria-label', `Go to question ${index + 1}`);
+        button.textContent = index + 1;  // Automatically escapes
+        grid.appendChild(button);
+    });
+
+    nav.appendChild(grid);
     return nav;
 }
 
-function getQuestionStatus(index) {
+function getQuestionStatus(index, quizState) {
     const classes = [];
     if (index === quizState.currentQuestionIndex) classes.push('current');
-    if (quizState.userAnswers[index] !== null) classes.push('answered');
+    if (quizState.userAnswers && quizState.userAnswers[index] !== null) classes.push('answered');
     if (quizState.flaggedQuestions?.includes(index)) classes.push('flagged');
     return classes.join(' ');
 }
@@ -346,146 +353,186 @@ function getQuestionStatus(index) {
 
 ### Unit Tests
 
-**Test Framework:** pytest
+**Test Framework:** Jest or Vitest
 **Coverage Target:** 80%+ for new code
 
 **Test Files:**
-- `tests/test_quiz_ui_components.py` - Component rendering tests
-- `tests/test_quiz_navigation.py` - Navigation logic tests
-- `tests/test_quiz_accessibility.py` - Accessibility compliance tests
-- `tests/test_quiz_state_management.py` - State management tests
+- `tests/quiz-ui-components.test.js` - Component rendering tests
+- `tests/quiz-navigation.test.js` - Navigation logic tests
+- `tests/quiz-accessibility.test.js` - Accessibility compliance tests
+- `tests/quiz-state-management.test.js` - State management tests
 
-**Example Unit Test:**
-```python
-import pytest
-from unittest.mock import Mock, patch
-from app.static.js import quiz_navigation
+**Example Unit Test (Jest):**
+```javascript
+// tests/quiz-navigation.test.js
+import { createQuestionNav, getQuestionStatus, flagQuestion } from '../app/static/js/quiz-navigation';
 
-class TestQuestionNavigation:
-    """Test question navigation functionality."""
+describe('Question Navigation', () => {
+    describe('createQuestionNav', () => {
+        test('creates navigation with valid questions', () => {
+            const quizState = {
+                questions: [
+                    { id: 1, text: 'Question 1' },
+                    { id: 2, text: 'Question 2' },
+                    { id: 3, text: 'Question 3' }
+                ],
+                currentQuestionIndex: 0,
+                userAnswers: [null, null, null],
+                flaggedQuestions: []
+            };
 
-    def test_create_question_nav_with_valid_questions(self):
-        """Test navigation sidebar creation with valid questions."""
-        questions = [
-            {"id": 1, "text": "Question 1"},
-            {"id": 2, "text": "Question 2"},
-            {"id": 3, "text": "Question 3"}
-        ]
+            const nav = createQuestionNav(quizState);
 
-        nav = quiz_navigation.createQuestionNav(questions)
+            expect(nav).not.toBeNull();
+            expect(nav.querySelectorAll('.question-nav-btn')).toHaveLength(3);
+        });
+    });
 
-        assert nav is not None
-        assert len(nav.querySelectorAll('.question-nav-btn')) == 3
+    describe('getQuestionStatus', () => {
+        test('returns current class for current question', () => {
+            const quizState = {
+                currentQuestionIndex: 1,
+                userAnswers: [null, null, null],
+                flaggedQuestions: []
+            };
 
-    def test_get_question_status_current(self):
-        """Test question status for current question."""
-        quiz_state = {
-            'currentQuestionIndex': 1,
-            'userAnswers': [None, None, None],
-            'flaggedQuestions': []
-        }
+            const status = getQuestionStatus(1, quizState);
 
-        status = quiz_navigation.getQuestionStatus(1, quiz_state)
+            expect(status).toContain('current');
+            expect(status).not.toContain('answered');
+        });
+    });
 
-        assert 'current' in status
-        assert 'answered' not in status
+    describe('flagQuestion', () => {
+        test('flags a valid question', () => {
+            const quizState = {
+                questions: [{}, {}, {}],
+                flaggedQuestions: []
+            };
 
-    def test_flag_question_validation(self):
-        """Test question flagging with bounds checking."""
-        quiz_state = {'questions': [1, 2, 3], 'flaggedQuestions': []}
+            const result = flagQuestion(1, quizState);
 
-        # Valid index
-        result = quiz_navigation.flagQuestion(1, quiz_state)
-        assert result is True
-        assert 1 in quiz_state['flaggedQuestions']
+            expect(result).toBe(true);
+            expect(quizState.flaggedQuestions).toContain(1);
+        });
 
-        # Invalid index (out of bounds)
-        result = quiz_navigation.flagQuestion(10, quiz_state)
-        assert result is False
+        test('rejects out of bounds index', () => {
+            const quizState = {
+                questions: [{}, {}, {}],
+                flaggedQuestions: []
+            };
 
-        # Invalid index (negative)
-        result = quiz_navigation.flagQuestion(-1, quiz_state)
-        assert result is False
+            const result = flagQuestion(10, quizState);
+
+            expect(result).toBe(false);
+        });
+
+        test('rejects negative index', () => {
+            const quizState = {
+                questions: [{}, {}, {}],
+                flaggedQuestions: []
+            };
+
+            const result = flagQuestion(-1, quizState);
+
+            expect(result).toBe(false);
+        });
+    });
+});
 ```
 
 ### Integration Tests
 
+**Test Framework:** Playwright or Cypress
 **Test Files:**
-- `tests/integration/test_quiz_flow.py` - End-to-end quiz flow
-- `tests/integration/test_quiz_api.py` - API integration
+- `tests/e2e/quiz-flow.spec.js` - End-to-end quiz flow
+- `tests/e2e/quiz-api.spec.js` - API integration
 
-**Example Integration Test:**
-```python
-class TestQuizFlow:
-    """Test complete quiz flow."""
+**Example Integration Test (Playwright):**
+```javascript
+// tests/e2e/quiz-flow.spec.js
+import { test, expect } from '@playwright/test';
 
-    @patch('app.routes.quiz.get_quiz_questions')
-    def test_complete_quiz_flow(self, mock_get_questions, client):
-        """Test user can complete entire quiz."""
-        # Setup
-        mock_get_questions.return_value = [
-            {"id": 1, "text": "Q1", "options": ["A", "B", "C", "D"]},
-            {"id": 2, "text": "Q2", "options": ["A", "B", "C", "D"]}
-        ]
+test.describe('Quiz Flow', () => {
+    test('user can complete entire quiz', async ({ page }) => {
+        // Navigate to quiz page
+        await page.goto('/courses/echr/study-portal');
 
-        # Start quiz
-        response = client.post('/api/quiz/start', json={'topic': 'test'})
-        assert response.status_code == 200
-        quiz_id = response.json()['quiz_id']
+        // Click quiz tab
+        await page.click('[data-tab="quiz"]');
 
-        # Answer questions
-        response = client.post(f'/api/quiz/{quiz_id}/answer',
-                              json={'question_id': 1, 'answer': 'A'})
-        assert response.status_code == 200
+        // Start quiz
+        await page.click('#start-quiz-btn');
 
-        # Submit quiz
-        response = client.post(f'/api/quiz/{quiz_id}/submit')
-        assert response.status_code == 200
-        assert 'score' in response.json()
-        assert 'xp_earned' in response.json()
+        // Wait for quiz to load
+        await page.waitForSelector('.quiz-question-card');
+
+        // Get total questions
+        const totalText = await page.locator('#quiz-total').textContent();
+        const totalQuestions = parseInt(totalText);
+
+        // Answer all questions
+        for (let i = 0; i < totalQuestions; i++) {
+            // Select first option
+            await page.click('.quiz-option:first-child');
+
+            // Click next (or finish on last question)
+            if (i < totalQuestions - 1) {
+                await page.click('#next-question-btn');
+            }
+        }
+
+        // Verify results displayed
+        await expect(page.locator('.quiz-results')).toBeVisible();
+        await expect(page.locator('.score-display')).toContainText('%');
+    });
+});
 ```
 
 ### Accessibility Tests
 
-**Tools:** axe-core, pa11y
+**Tools:** axe-core with Playwright, jest-axe
 **Standards:** WCAG 2.1 AA
 
-**Example Accessibility Test:**
-```python
-from selenium import webdriver
-from axe_selenium_python import Axe
+**Example Accessibility Test (Playwright + axe):**
+```javascript
+// tests/e2e/quiz-accessibility.spec.js
+import { test, expect } from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
 
-class TestQuizAccessibility:
-    """Test quiz UI accessibility."""
+test.describe('Quiz Accessibility', () => {
+    test('quiz page meets WCAG AA standards', async ({ page }) => {
+        await page.goto('/courses/echr/study-portal');
+        await page.click('[data-tab="quiz"]');
+        await page.click('#start-quiz-btn');
 
-    def test_quiz_page_wcag_compliance(self):
-        """Test quiz page meets WCAG AA standards."""
-        driver = webdriver.Chrome()
-        driver.get('http://localhost:8000/quiz')
+        // Run axe accessibility scan
+        const accessibilityScanResults = await new AxeBuilder({ page }).analyze();
 
-        axe = Axe(driver)
-        axe.inject()
-        results = axe.run()
+        // Should have no violations
+        expect(accessibilityScanResults.violations).toEqual([]);
+    });
 
-        # Should have no violations
-        assert len(results['violations']) == 0
+    test('keyboard navigation works throughout quiz', async ({ page }) => {
+        await page.goto('/courses/echr/study-portal');
+        await page.click('[data-tab="quiz"]');
+        await page.click('#start-quiz-btn');
 
-        driver.quit()
+        // Tab through interactive elements
+        for (let i = 0; i < 10; i++) {
+            await page.keyboard.press('Tab');
 
-    def test_keyboard_navigation(self):
-        """Test all quiz functions accessible via keyboard."""
-        driver = webdriver.Chrome()
-        driver.get('http://localhost:8000/quiz')
+            // Get focused element
+            const focusedElement = await page.evaluateHandle(() => document.activeElement);
 
-        # Tab through all interactive elements
-        body = driver.find_element_by_tag_name('body')
-        for _ in range(20):
-            body.send_keys(Keys.TAB)
-            active = driver.switch_to.active_element
-            # Verify focus is visible
-            assert active.value_of_css_property('outline') != 'none'
-
-        driver.quit()
+            // Verify focus is visible
+            const outline = await focusedElement.evaluate(el =>
+                window.getComputedStyle(el).outline
+            );
+            expect(outline).not.toBe('none');
+        }
+    });
+});
 ```
 
 ### Performance Tests
@@ -496,34 +543,46 @@ class TestQuizAccessibility:
 - Animation frame rate: 60fps
 - Memory usage < 50MB
 
-**Example Performance Test:**
-```python
-import time
-from selenium import webdriver
+**Example Performance Test (Playwright):**
+```javascript
+// tests/e2e/quiz-performance.spec.js
+import { test, expect } from '@playwright/test';
 
-class TestQuizPerformance:
-    """Test quiz UI performance."""
+test.describe('Quiz Performance', () => {
+    test('quiz loads within performance budget', async ({ page }) => {
+        // Start performance measurement
+        const startTime = Date.now();
 
-    def test_quiz_load_time(self):
-        """Test quiz loads within performance budget."""
-        driver = webdriver.Chrome()
+        await page.goto('/courses/echr/study-portal');
+        await page.click('[data-tab="quiz"]');
+        await page.click('#start-quiz-btn');
 
-        start_time = time.time()
-        driver.get('http://localhost:8000/quiz')
+        // Wait for quiz to be interactive
+        await page.waitForSelector('.quiz-container');
 
-        # Wait for quiz to be interactive
-        driver.find_element_by_class_name('quiz-container')
-        load_time = time.time() - start_time
+        const loadTime = Date.now() - startTime;
 
-        assert load_time < 3.5  # TTI < 3.5s
+        // TTI should be < 3.5s
+        expect(loadTime).toBeLessThan(3500);
+    });
 
-        driver.quit()
+    test('measures Core Web Vitals', async ({ page }) => {
+        await page.goto('/courses/echr/study-portal');
 
-    def test_animation_performance(self):
-        """Test animations run at 60fps."""
-        # Use Chrome DevTools Protocol to measure FPS
-        # Implementation depends on specific animation
-        pass
+        // Get performance metrics
+        const metrics = await page.evaluate(() => {
+            const paint = performance.getEntriesByType('paint');
+            const fcp = paint.find(entry => entry.name === 'first-contentful-paint');
+
+            return {
+                fcp: fcp ? fcp.startTime : null
+            };
+        });
+
+        // FCP should be < 1.5s
+        expect(metrics.fcp).toBeLessThan(1500);
+    });
+});
 ```
 
 ---
@@ -532,88 +591,105 @@ class TestQuizPerformance:
 
 ### API Endpoints
 
-**Required Endpoints:**
+**Existing Endpoints (from app.js):**
 
-1. **Start Quiz**
+1. **List Saved Quizzes**
    ```
-   POST /api/quiz/start
+   GET /api/quizzes/courses/{courseId}
+   Response: [
+       {
+           "id": "string",
+           "topic": "string",
+           "difficulty": "easy|medium|hard",
+           "numQuestions": number,
+           "createdAt": "timestamp"
+       }
+   ]
+   ```
+
+2. **Create New Quiz**
+   ```
+   POST /api/quizzes/courses/{courseId}
    Request: {
        "topic": "string",
        "difficulty": "easy|medium|hard",
-       "question_count": number,
-       "timed": boolean,
-       "time_limit": number (seconds, optional)
+       "numQuestions": number
    }
    Response: {
-       "quiz_id": "string",
+       "id": "string",
        "questions": [
            {
                "id": "string",
                "text": "string",
-               "type": "multiple_choice|true_false|short_answer",
                "options": ["string"],
-               "difficulty": "easy|medium|hard"
+               "correct_index": number,
+               "difficulty": "string"
            }
-       ],
-       "time_limit": number (optional)
+       ]
    }
    ```
 
-2. **Submit Answer**
+3. **Get Specific Quiz**
    ```
-   POST /api/quiz/{quiz_id}/answer
+   GET /api/quizzes/courses/{courseId}/{quizId}
+   Response: {
+       "id": "string",
+       "questions": [...],
+       "createdAt": "timestamp"
+   }
+   ```
+
+4. **Submit Quiz Results**
+   ```
+   POST /api/quizzes/submit
    Request: {
-       "question_id": "string",
-       "answer": "string|number|boolean"
+       "quizId": "string",
+       "courseId": "string",
+       "userAnswers": number[],
+       "timeTaken": number
    }
    Response: {
-       "success": boolean,
-       "message": "string"
+       "score": number,
+       "totalQuestions": number,
+       "correctAnswers": number,
+       "percentage": number
    }
    ```
 
-3. **Flag Question**
+5. **Get Quiz History**
    ```
-   POST /api/quiz/{quiz_id}/flag
+   GET /api/quizzes/history/{userId}
+   Response: [
+       {
+           "id": "string",
+           "courseId": "string",
+           "score": number,
+           "completedAt": "timestamp"
+       }
+   ]
+   ```
+
+**New Endpoints Needed:**
+
+6. **Save Flagged Questions**
+   ```
+   POST /api/quizzes/{quizId}/flags
    Request: {
-       "question_id": "string",
-       "flagged": boolean
+       "flaggedQuestions": number[]
    }
    Response: {
        "success": boolean
    }
    ```
 
-4. **Submit Quiz**
+7. **Get Quiz State** (for persistence)
    ```
-   POST /api/quiz/{quiz_id}/submit
+   GET /api/quizzes/{quizId}/state
    Response: {
-       "score": number,
-       "total_questions": number,
-       "correct_answers": number,
-       "xp_earned": number,
-       "time_taken": number,
-       "results": [
-           {
-               "question_id": "string",
-               "user_answer": "string",
-               "correct_answer": "string",
-               "is_correct": boolean,
-               "explanation": "string"
-           }
-       ]
-   }
-   ```
-
-5. **Get Quiz State**
-   ```
-   GET /api/quiz/{quiz_id}/state
-   Response: {
-       "quiz_id": "string",
-       "current_question_index": number,
-       "answered_questions": ["string"],
-       "flagged_questions": ["string"],
-       "time_remaining": number (optional)
+       "currentQuestionIndex": number,
+       "userAnswers": number[],
+       "flaggedQuestions": number[],
+       "timeRemaining": number (optional)
    }
    ```
 
@@ -665,34 +741,95 @@ class QuizResult(BaseModel):
     results: List[dict]
 ```
 
-### Database Schema
+### Database Schema (Firestore)
 
-**Tables Required:**
+**Collections:**
 
-1. **quiz_sessions**
-   - id (UUID, primary key)
-   - user_id (UUID, foreign key)
-   - topic (VARCHAR)
-   - difficulty (ENUM)
-   - start_time (TIMESTAMP)
-   - end_time (TIMESTAMP, nullable)
-   - time_limit (INTEGER, nullable)
-   - completed (BOOLEAN)
+1. **quizzes** (Collection)
+   ```javascript
+   // Document ID: {quizId}
+   {
+       id: string,
+       courseId: string,
+       userId: string,
+       topic: string,
+       difficulty: 'easy' | 'medium' | 'hard',
+       numQuestions: number,
+       questions: [
+           {
+               id: string,
+               text: string,
+               options: string[],
+               correct_index: number,
+               difficulty: string,
+               explanation: string (optional)
+           }
+       ],
+       createdAt: Timestamp,
+       updatedAt: Timestamp
+   }
+   ```
 
-2. **quiz_answers**
-   - id (UUID, primary key)
-   - quiz_session_id (UUID, foreign key)
-   - question_id (UUID, foreign key)
-   - user_answer (TEXT)
-   - is_correct (BOOLEAN)
-   - answered_at (TIMESTAMP)
+2. **quiz_results** (Collection)
+   ```javascript
+   // Document ID: {resultId}
+   {
+       id: string,
+       quizId: string,
+       userId: string,
+       courseId: string,
+       score: number,
+       totalQuestions: number,
+       correctAnswers: number,
+       userAnswers: number[],
+       flaggedQuestions: number[],
+       timeTaken: number,  // seconds
+       completedAt: Timestamp,
+       percentage: number
+   }
+   ```
 
-3. **quiz_flags**
-   - id (UUID, primary key)
-   - quiz_session_id (UUID, foreign key)
-   - question_id (UUID, foreign key)
-   - flagged (BOOLEAN)
-   - flagged_at (TIMESTAMP)
+3. **quiz_flags** (Collection)
+   ```javascript
+   // Document ID: {quizId}_{userId}
+   {
+       quizId: string,
+       userId: string,
+       flaggedQuestions: number[],
+       updatedAt: Timestamp
+   }
+   ```
+
+**Firestore Security Rules:**
+```javascript
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Quiz documents
+    match /quizzes/{quizId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null &&
+                      request.resource.data.userId == request.auth.uid;
+      allow update, delete: if request.auth != null &&
+                              resource.data.userId == request.auth.uid;
+    }
+
+    // Quiz results
+    match /quiz_results/{resultId} {
+      allow read: if request.auth != null &&
+                    resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null &&
+                      request.resource.data.userId == request.auth.uid;
+    }
+
+    // Quiz flags
+    match /quiz_flags/{flagId} {
+      allow read, write: if request.auth != null &&
+                           resource.data.userId == request.auth.uid;
+    }
+  }
+}
+```
 
 ---
 
