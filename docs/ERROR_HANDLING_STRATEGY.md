@@ -193,11 +193,15 @@ if (minorIssue) {
 **Critical Errors (Fail Fast):**
 1. originalFlashcards is null/undefined/not array
 2. originalFlashcards is empty
-3. All Sets are missing
 
 **Minor Issues (Recover):**
 1. Individual Set is null/undefined → create new Set
 2. Individual Set is not a Set → create new Set
+
+**Rationale for Set Recovery:**
+Sets are metadata (reviewed, known, starred status). Losing them is acceptable.
+Core data (originalFlashcards) must be valid, but Sets can always be recreated as empty Sets.
+This allows users to continue using the app even if metadata is corrupted.
 
 ---
 

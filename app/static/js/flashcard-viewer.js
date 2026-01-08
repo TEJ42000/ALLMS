@@ -972,6 +972,9 @@ class FlashcardViewer {
      * HIGH FIX: Don't lose original flashcards - store them for restoration
      * HIGH FIX: Validate starred indices to prevent corruption
      * ISSUE #168: Add defensive checks for originalFlashcards
+     *
+     * @returns {void}
+     * @throws {Error} Never throws - all errors are handled internally
      */
     reviewStarredCards() {
         // CRITICAL ERROR: No starred cards (fail fast)
@@ -983,6 +986,19 @@ class FlashcardViewer {
 
         // HIGH FIX: Store original flashcards if not already stored
         if (!this.isFilteredView) {
+            // CRITICAL FIX: Validate this.flashcards before storing
+            if (!this.flashcards || !Array.isArray(this.flashcards)) {
+                console.error('[FlashcardViewer] CRITICAL: this.flashcards is not valid:', this.flashcards);
+                this.showError('Unable to review starred cards. Please refresh the page.');
+                return;
+            }
+
+            if (this.flashcards.length === 0) {
+                console.error('[FlashcardViewer] CRITICAL: this.flashcards is empty');
+                this.showError('No flashcards available to review. Please refresh the page.');
+                return;
+            }
+
             this.originalFlashcards = [...this.flashcards];
             this.originalReviewedCards = new Set(this.reviewedCards);
             this.originalKnownCards = new Set(this.knownCards);
@@ -1008,9 +1024,9 @@ class FlashcardViewer {
 
         // ISSUE #168: Validate index types and bounds (filter out invalid, don't fail)
         const validIndices = starredIndices.filter(index => {
-            // Check if index is a number
-            if (typeof index !== 'number') {
-                console.warn('[FlashcardViewer] RECOVERY: Invalid index type:', typeof index, index);
+            // CRITICAL FIX: Check if index is an integer (not just a number)
+            if (!Number.isInteger(index)) {
+                console.warn('[FlashcardViewer] RECOVERY: Invalid index type (not an integer):', typeof index, index);
                 return false;
             }
 
@@ -1047,15 +1063,21 @@ class FlashcardViewer {
             console.warn(`[FlashcardViewer] ${filteredCount} starred cards were filtered out (invalid or null)`);
 
             // CRITICAL FIX: Check if showNotification exists before calling
-            if (typeof showNotification === 'function') {
-                showNotification(
-                    `${filteredCount} starred card${filteredCount > 1 ? 's were' : ' was'} filtered out due to invalid data. Showing ${validCards.length} valid card${validCards.length > 1 ? 's' : ''}.`,
-                    'warning',
-                    5000
-                );
-            } else {
-                // Fallback to showError if showNotification is not available
-                this.showError(`${filteredCount} card${filteredCount > 1 ? 's were' : ' was'} filtered out. Showing ${validCards.length} valid card${validCards.length > 1 ? 's' : ''}.`);
+            try {
+                if (typeof showNotification === 'function') {
+                    showNotification(
+                        `${filteredCount} starred card${filteredCount > 1 ? 's were' : ' was'} filtered out due to invalid data. Showing ${validCards.length} valid card${validCards.length > 1 ? 's' : ''}.`,
+                        'warning',
+                        5000
+                    );
+                } else {
+                    // Fallback to showError if showNotification is not available
+                    this.showError(`${filteredCount} card${filteredCount > 1 ? 's were' : ' was'} filtered out. Showing ${validCards.length} valid card${validCards.length > 1 ? 's' : ''}.`);
+                }
+            } catch (notificationError) {
+                // MEDIUM FIX: Catch any errors in notification to prevent crashes
+                console.error('[FlashcardViewer] Error showing notification:', notificationError);
+                // Continue execution even if notification fails
             }
         }
 
@@ -1079,14 +1101,17 @@ class FlashcardViewer {
      * Restore full deck from filtered view
      *
      * Error Handling Strategy (CONSISTENT):
-     * - Fail fast for critical errors (null/empty originalFlashcards, all Sets missing)
-     * - Recover gracefully for minor issues (individual Set corruption)
+     * - Fail fast for critical errors (null/empty originalFlashcards)
+     * - Recover gracefully for Set corruption (Sets are metadata, can be recreated)
      * - Always log errors for debugging
      * - Always show user-friendly messages
      *
      * HIGH FIX: Allow users to return to full deck
      * CRITICAL FIX: Remove old listeners before re-rendering
      * ISSUE #168: Add defensive checks for originalFlashcards
+     *
+     * @returns {void}
+     * @throws {Error} Never throws - all errors are handled internally
      */
     restoreFullDeck() {
         // Early return if not in filtered view (not an error)
@@ -1109,16 +1134,10 @@ class FlashcardViewer {
             return;
         }
 
-        // CRITICAL ERROR: All Sets are missing (fail fast)
-        const allSetsMissing = !this.originalReviewedCards && !this.originalKnownCards && !this.originalStarredCards;
+        // CONSISTENT STRATEGY: Always recover gracefully from Set corruption
+        // Rationale: Sets are metadata, not core data. Losing them is acceptable.
+        // Core data (originalFlashcards) must be valid, but Sets can be recreated.
 
-        if (allSetsMissing) {
-            console.error('[FlashcardViewer] CRITICAL: All original Sets are missing - critical data corruption');
-            this.showError('Unable to restore full deck due to data corruption. Please refresh the page.');
-            return;
-        }
-
-        // MINOR ISSUE: Individual Set corruption (recover gracefully)
         if (!this.originalReviewedCards || !(this.originalReviewedCards instanceof Set)) {
             console.warn('[FlashcardViewer] RECOVERY: originalReviewedCards is not a Set, creating new Set');
             this.originalReviewedCards = new Set();
