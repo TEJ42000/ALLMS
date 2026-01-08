@@ -29,19 +29,34 @@ class FlashcardViewer {
             throw new Error('flashcards parameter must be an array');
         }
 
-        // Filter out invalid cards
-        this.flashcards = flashcards.filter(card => {
+        // HIGH FIX: Enhanced input validation with comprehensive checks
+        this.flashcards = flashcards.filter((card, index) => {
             if (!card || typeof card !== 'object') {
-                console.warn('[FlashcardViewer] Skipping invalid card:', card);
+                console.warn(`[FlashcardViewer] Skipping invalid card at index ${index}:`, card);
                 return false;
             }
 
-            // Card must have either question/answer OR term/definition
-            const hasQuestionAnswer = card.question && card.answer;
-            const hasTermDefinition = card.term && card.definition;
+            // HIGH FIX: Validate string types and non-empty content
+            const hasQuestionAnswer =
+                typeof card.question === 'string' && card.question.trim().length > 0 &&
+                typeof card.answer === 'string' && card.answer.trim().length > 0;
+
+            const hasTermDefinition =
+                typeof card.term === 'string' && card.term.trim().length > 0 &&
+                typeof card.definition === 'string' && card.definition.trim().length > 0;
 
             if (!hasQuestionAnswer && !hasTermDefinition) {
-                console.warn('[FlashcardViewer] Skipping card without valid content:', card);
+                console.warn(`[FlashcardViewer] Skipping card at index ${index} without valid content:`, card);
+                return false;
+            }
+
+            // HIGH FIX: Validate content length (prevent extremely long cards)
+            const maxLength = 5000;
+            const content = card.question || card.term || '';
+            const answer = card.answer || card.definition || '';
+
+            if (content.length > maxLength || answer.length > maxLength) {
+                console.warn(`[FlashcardViewer] Skipping card at index ${index} with content exceeding ${maxLength} characters`);
                 return false;
             }
 
@@ -67,6 +82,9 @@ class FlashcardViewer {
 
         // Event listeners for cleanup
         this.eventListeners = [];
+
+        // HIGH FIX: Prevent keyboard shortcut race conditions
+        this.isNavigating = false;
 
         // CRITICAL FIX: Store beforeunload handler as instance property
         this.beforeUnloadHandler = () => {
@@ -427,25 +445,53 @@ class FlashcardViewer {
 
     /**
      * Navigate to previous card
+     * CRITICAL FIX: Remove old listeners before adding new ones
+     * HIGH FIX: Prevent race conditions with navigation lock
      */
     previousCard() {
+        // HIGH FIX: Prevent race condition from rapid key presses
+        if (this.isNavigating) {
+            return;
+        }
+
         if (this.currentIndex > 0) {
+            this.isNavigating = true;
             this.currentIndex--;
             this.isFlipped = false;
+            this.cleanupEventListeners();  // CRITICAL: Remove old listeners first
             this.render();
             this.setupEventListeners();
+
+            // Release lock after render completes
+            setTimeout(() => {
+                this.isNavigating = false;
+            }, 50);
         }
     }
 
     /**
      * Navigate to next card
+     * CRITICAL FIX: Remove old listeners before adding new ones
+     * HIGH FIX: Prevent race conditions with navigation lock
      */
     nextCard() {
+        // HIGH FIX: Prevent race condition from rapid key presses
+        if (this.isNavigating) {
+            return;
+        }
+
         if (this.currentIndex < this.flashcards.length - 1) {
+            this.isNavigating = true;
             this.currentIndex++;
             this.isFlipped = false;
+            this.cleanupEventListeners();  // CRITICAL: Remove old listeners first
             this.render();
             this.setupEventListeners();
+
+            // Release lock after render completes
+            setTimeout(() => {
+                this.isNavigating = false;
+            }, 50);
         } else {
             // Completed all cards
             this.showCompletionMessage();
@@ -454,6 +500,7 @@ class FlashcardViewer {
 
     /**
      * Toggle star on current card
+     * CRITICAL FIX: Remove old listeners before re-rendering
      */
     toggleStar() {
         if (this.starredCards.has(this.currentIndex)) {
@@ -461,12 +508,14 @@ class FlashcardViewer {
         } else {
             this.starredCards.add(this.currentIndex);
         }
+        this.cleanupEventListeners();  // CRITICAL: Remove old listeners first
         this.render();
         this.setupEventListeners();
     }
 
     /**
      * Toggle known status on current card
+     * CRITICAL FIX: Remove old listeners before re-rendering
      */
     toggleKnown() {
         if (this.knownCards.has(this.currentIndex)) {
@@ -474,6 +523,7 @@ class FlashcardViewer {
         } else {
             this.knownCards.add(this.currentIndex);
         }
+        this.cleanupEventListeners();  // CRITICAL: Remove old listeners first
         this.render();
         this.setupEventListeners();
     }
@@ -506,18 +556,21 @@ class FlashcardViewer {
 
         this.currentIndex = 0;
         this.isFlipped = false;
+        this.cleanupEventListeners();  // CRITICAL: Remove old listeners first
         this.render();
         this.setupEventListeners();
     }
 
     /**
      * Restart from the beginning
+     * CRITICAL FIX: Remove old listeners before re-rendering
      */
     restart() {
         this.currentIndex = 0;
         this.isFlipped = false;
         this.reviewedCards.clear();
         this.knownCards.clear();
+        this.cleanupEventListeners();  // CRITICAL: Remove old listeners first
         this.render();
         this.setupEventListeners();
     }
@@ -591,6 +644,7 @@ class FlashcardViewer {
     /**
      * Review only starred cards
      * HIGH FIX: Don't lose original flashcards - store them for restoration
+     * HIGH FIX: Validate starred indices to prevent corruption
      */
     reviewStarredCards() {
         if (this.starredCards.size === 0) {
@@ -606,9 +660,18 @@ class FlashcardViewer {
             this.originalStarredCards = new Set(this.starredCards);
         }
 
-        // Filter to only starred cards
+        // HIGH FIX: Filter to only starred cards with index validation
         const starredIndices = Array.from(this.starredCards);
-        this.flashcards = starredIndices.map(index => this.originalFlashcards[index]);
+        const validIndices = starredIndices.filter(index => {
+            return index >= 0 && index < this.originalFlashcards.length;
+        });
+
+        if (validIndices.length === 0) {
+            alert('No valid starred cards found!');
+            return;
+        }
+
+        this.flashcards = validIndices.map(index => this.originalFlashcards[index]);
 
         this.isFilteredView = true;
         this.currentIndex = 0;
@@ -617,6 +680,7 @@ class FlashcardViewer {
         this.knownCards.clear();
         this.starredCards.clear();
 
+        this.cleanupEventListeners();  // CRITICAL: Remove old listeners first
         this.render();
         this.setupEventListeners();
     }
@@ -624,6 +688,7 @@ class FlashcardViewer {
     /**
      * Restore full deck from filtered view
      * HIGH FIX: Allow users to return to full deck
+     * CRITICAL FIX: Remove old listeners before re-rendering
      */
     restoreFullDeck() {
         if (!this.isFilteredView || !this.originalFlashcards) {
@@ -639,6 +704,7 @@ class FlashcardViewer {
         this.currentIndex = 0;
         this.isFlipped = false;
 
+        this.cleanupEventListeners();  // CRITICAL: Remove old listeners first
         this.render();
         this.setupEventListeners();
     }
@@ -689,15 +755,25 @@ class FlashcardViewer {
     }
 
     /**
-     * Cleanup event listeners
-     * CRITICAL FIX: Also remove beforeunload handler
+     * Cleanup event listeners (internal use for re-rendering)
+     * CRITICAL FIX: Remove only DOM event listeners, not beforeunload
      */
-    cleanup() {
-        console.log('[FlashcardViewer] Cleaning up event listeners...');
+    cleanupEventListeners() {
         this.eventListeners.forEach(({ element, event, handler }) => {
             element.removeEventListener(event, handler);
         });
         this.eventListeners = [];
+    }
+
+    /**
+     * Cleanup all resources including beforeunload handler
+     * CRITICAL FIX: Full cleanup when destroying viewer
+     */
+    cleanup() {
+        console.log('[FlashcardViewer] Cleaning up all resources...');
+
+        // Remove DOM event listeners
+        this.cleanupEventListeners();
 
         // CRITICAL FIX: Remove beforeunload handler
         if (this.beforeUnloadHandler) {

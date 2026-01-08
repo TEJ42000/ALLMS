@@ -365,6 +365,52 @@ class TestStatistics:
         assert new_count == initial_count + 1
 
 
+class TestMemoryLeaks:
+    """Test memory leak prevention."""
+
+    @pytest.fixture(autouse=True)
+    def setup_viewer(self, flashcard_page):
+        """Start a flashcard set before each test."""
+        btn_study = flashcard_page.find_element(By.CLASS_NAME, 'btn-study')
+        btn_study.click()
+
+        wait = WebDriverWait(flashcard_page, 10)
+        wait.until(EC.presence_of_element_located((By.CLASS_NAME, 'flashcard')))
+
+        self.driver = flashcard_page
+
+    def test_navigation_cleanup(self):
+        """Test that navigation properly cleans up event listeners."""
+        # Navigate multiple times rapidly
+        for _ in range(10):
+            btn_next = self.driver.find_element(By.ID, 'btn-next')
+            btn_next.click()
+            time.sleep(0.1)
+
+        # Check that we can still navigate (no errors from duplicate listeners)
+        btn_previous = self.driver.find_element(By.ID, 'btn-previous')
+        btn_previous.click()
+        time.sleep(0.3)
+
+        # Should still be functional
+        progress_text = self.driver.find_element(By.CLASS_NAME, 'progress-text')
+        assert 'Card' in progress_text.text
+
+    def test_rapid_keyboard_navigation(self):
+        """Test that rapid keyboard navigation doesn't cause race conditions."""
+        # Rapidly press arrow keys
+        actions = ActionChains(self.driver)
+        for _ in range(5):
+            actions.send_keys(Keys.ARROW_RIGHT).perform()
+            time.sleep(0.05)  # Very rapid
+
+        time.sleep(0.5)  # Wait for all navigation to complete
+
+        # Should still be functional
+        progress_text = self.driver.find_element(By.CLASS_NAME, 'progress-text')
+        assert 'Card' in progress_text.text
+
+
 class TestNumericValidation:
     """Test numeric value validation."""
 
@@ -415,4 +461,67 @@ class TestNumericValidation:
         assert current >= 1, "Current card number should be at least 1"
         assert current <= total, "Current card number should not exceed total"
         assert total >= 1, "Total cards should be at least 1"
+
+
+class TestStarredCardsValidation:
+    """Test starred cards index validation."""
+
+    @pytest.fixture(autouse=True)
+    def setup_viewer(self, flashcard_page):
+        """Start a flashcard set before each test."""
+        btn_study = flashcard_page.find_element(By.CLASS_NAME, 'btn-study')
+        btn_study.click()
+
+        wait = WebDriverWait(flashcard_page, 10)
+        wait.until(EC.presence_of_element_located((By.CLASS_NAME, 'flashcard')))
+
+        self.driver = flashcard_page
+
+    def test_starred_cards_persist_after_navigation(self):
+        """Test that starred cards remain valid after navigation."""
+        # Star first card
+        btn_star = self.driver.find_element(By.ID, 'btn-star')
+        btn_star.click()
+        time.sleep(0.3)
+
+        # Navigate to next card
+        btn_next = self.driver.find_element(By.ID, 'btn-next')
+        btn_next.click()
+        time.sleep(0.3)
+
+        # Star second card
+        btn_star = self.driver.find_element(By.ID, 'btn-star')
+        btn_star.click()
+        time.sleep(0.3)
+
+        # Check starred count
+        stats = self.driver.find_elements(By.CLASS_NAME, 'stat')
+        starred_stat = stats[2]
+        starred_count = int(starred_stat.find_element(By.CLASS_NAME, 'stat-value').text)
+
+        assert starred_count == 2, "Should have 2 starred cards"
+
+    def test_shuffle_clears_starred_cards(self):
+        """Test that shuffle clears starred cards to prevent index corruption."""
+        # Star a card
+        btn_star = self.driver.find_element(By.ID, 'btn-star')
+        btn_star.click()
+        time.sleep(0.3)
+
+        # Click shuffle and accept confirmation
+        btn_shuffle = self.driver.find_element(By.ID, 'btn-shuffle')
+        btn_shuffle.click()
+
+        # Accept alert
+        wait = WebDriverWait(self.driver, 3)
+        alert = wait.until(EC.alert_is_present())
+        alert.accept()
+        time.sleep(0.5)
+
+        # Check starred count is 0
+        stats = self.driver.find_elements(By.CLASS_NAME, 'stat')
+        starred_stat = stats[2]
+        starred_count = int(starred_stat.find_element(By.CLASS_NAME, 'stat-value').text)
+
+        assert starred_count == 0, "Starred cards should be cleared after shuffle"
 
