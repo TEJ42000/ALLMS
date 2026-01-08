@@ -33,7 +33,23 @@ from app.models.gdpr_models import (
 
 logger = logging.getLogger(__name__)
 
-# Rate limiting storage (in production, use Redis or similar)
+# ⚠️ WARNING: In-memory rate limiting - NOT suitable for production with multiple instances
+# This implementation has the following limitations:
+# 1. Rate limits are per-instance (not shared across multiple Cloud Run instances)
+# 2. Rate limits reset on application restart
+# 3. No persistence across deployments
+# 4. Memory usage grows unbounded without cleanup
+#
+# For production deployments:
+# - Option A (RECOMMENDED): Use Redis-based rate limiting (see Issue #148)
+#   Set RATE_LIMIT_BACKEND=redis and configure Redis connection
+# - Option B (LIMITED): Deploy with max-instances=1 (single worker only)
+#   See docs/GDPR_DEPLOYMENT.md for single-worker deployment instructions
+#
+# Current implementation is suitable for:
+# - Development and testing environments
+# - Single-instance deployments with low traffic
+# - Temporary deployments while setting up Redis
 _rate_limit_storage: Dict[str, Dict[str, Any]] = defaultdict(lambda: {"count": 0, "reset_time": datetime.utcnow()})
 
 router = APIRouter(prefix="/api/gdpr", tags=["gdpr"])
@@ -41,23 +57,12 @@ router = APIRouter(prefix="/api/gdpr", tags=["gdpr"])
 
 # Request models with validation
 class ConsentRequest(BaseModel):
-    """Request model for consent recording."""
+    """Request model for consent recording.
+
+    Note: Pydantic automatically validates enum types, so no custom validators needed.
+    """
     consent_type: ConsentType
     status: ConsentStatus
-
-    @validator('consent_type')
-    def validate_consent_type(cls, v):
-        """Validate consent type is a valid enum value."""
-        if v not in ConsentType.__members__.values():
-            raise ValueError(f"Invalid consent type: {v}")
-        return v
-
-    @validator('status')
-    def validate_status(cls, v):
-        """Validate status is a valid enum value."""
-        if v not in ConsentStatus.__members__.values():
-            raise ValueError(f"Invalid consent status: {v}")
-        return v
 
 
 class DeleteAccountRequest(BaseModel):
@@ -536,7 +541,3 @@ async def update_privacy_settings(
     except Exception as e:
         logger.error(f"Error updating privacy settings: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Internal server error")
-
-
-from datetime import timedelta
-

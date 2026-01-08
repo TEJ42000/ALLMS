@@ -116,20 +116,60 @@ gcloud secrets create gdpr-token-secret \
 
 ### 3. Configure Firestore
 
-```bash
-# Create Firestore collections (if not exists)
-# Collections will be auto-created on first use:
-# - consent_records
-# - audit_logs
-# - privacy_settings
-# - data_subject_requests
-# - rate_limits (if using database backend)
+**Collections:**
 
-# Set up Firestore indexes (if needed)
-gcloud firestore indexes create --collection=consent_records \
-    --field-config field-path=user_id,order=ASCENDING \
-    --field-config field-path=timestamp,order=DESCENDING
+Firestore collections will be auto-created on first use:
+- `consent_records` - User consent history
+- `audit_logs` - GDPR action audit trail
+- `privacy_settings` - User privacy preferences
+- `data_subject_requests` - GDPR request tracking
+- `rate_limits` - Rate limiting (if using database backend)
+
+**Indexes (REQUIRED):**
+
+Firestore requires composite indexes for GDPR queries. Create indexes **before** deploying:
+
+**Option A: Using firestore.indexes.json (Recommended)**
+```bash
+# Copy firestore.indexes.json to project root
+# See docs/FIRESTORE_INDEXES.md for complete file
+
+firebase deploy --only firestore:indexes
 ```
+
+**Option B: Using gcloud CLI**
+```bash
+# Consent records - user history
+gcloud firestore indexes composite create \
+    --collection-group=consent_records \
+    --field-config field-path=user_id,order=ascending \
+    --field-config field-path=timestamp,order=descending
+
+# Audit logs - user history
+gcloud firestore indexes composite create \
+    --collection-group=audit_logs \
+    --field-config field-path=user_id,order=ascending \
+    --field-config field-path=timestamp,order=descending
+
+# Data subject requests - user requests
+gcloud firestore indexes composite create \
+    --collection-group=data_subject_requests \
+    --field-config field-path=user_id,order=ascending \
+    --field-config field-path=created_at,order=descending
+
+# See docs/FIRESTORE_INDEXES.md for complete list (10 indexes total)
+```
+
+**Option C: Firebase Console**
+1. Go to Firebase Console → Firestore Database → Indexes
+2. Create indexes manually
+3. See docs/FIRESTORE_INDEXES.md for required indexes
+
+**⚠️ Important:**
+- Indexes can take hours to build for large collections
+- Queries will fail until indexes are READY
+- Create indexes before deploying to production
+- See [FIRESTORE_INDEXES.md](FIRESTORE_INDEXES.md) for complete documentation
 
 ### 4. Set Up Redis
 
