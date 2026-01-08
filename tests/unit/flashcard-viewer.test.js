@@ -40,12 +40,13 @@ describe('Defensive Check Logic - reviewStarredCards()', () => {
     });
 
     describe('Index Validation Logic', () => {
-        test('should filter out invalid index types', () => {
+        test('should filter out invalid index types (strings)', () => {
             const starredIndices = ['0', '1', 2]; // Mix of strings and numbers
             const originalFlashcards = [{ q: 'Q1' }, { q: 'Q2' }, { q: 'Q3' }];
 
+            // MEDIUM FIX: Use Number.isInteger() instead of typeof === 'number'
             const validIndices = starredIndices.filter(index => {
-                return typeof index === 'number' &&
+                return Number.isInteger(index) &&
                        index >= 0 &&
                        index < originalFlashcards.length;
             });
@@ -54,12 +55,44 @@ describe('Defensive Check Logic - reviewStarredCards()', () => {
             expect(validIndices.length).toBe(1);
         });
 
+        test('should filter out NaN and Infinity', () => {
+            const starredIndices = [0, NaN, Infinity, -Infinity, 1];
+            const originalFlashcards = [{ q: 'Q1' }, { q: 'Q2' }];
+
+            // MEDIUM FIX: Number.isInteger() filters out NaN and Infinity
+            const validIndices = starredIndices.filter(index => {
+                return Number.isInteger(index) &&
+                       index >= 0 &&
+                       index < originalFlashcards.length;
+            });
+
+            expect(validIndices).toEqual([0, 1]);
+            expect(validIndices).not.toContain(NaN);
+            expect(validIndices).not.toContain(Infinity);
+        });
+
+        test('should filter out floating point numbers', () => {
+            const starredIndices = [0, 1.5, 2.7, 1];
+            const originalFlashcards = [{ q: 'Q1' }, { q: 'Q2' }];
+
+            // MEDIUM FIX: Number.isInteger() filters out floats
+            const validIndices = starredIndices.filter(index => {
+                return Number.isInteger(index) &&
+                       index >= 0 &&
+                       index < originalFlashcards.length;
+            });
+
+            expect(validIndices).toEqual([0, 1]);
+            expect(validIndices).not.toContain(1.5);
+            expect(validIndices).not.toContain(2.7);
+        });
+
         test('should filter out negative indices', () => {
             const starredIndices = [-1, 0, 1];
             const originalFlashcards = [{ q: 'Q1' }, { q: 'Q2' }];
 
             const validIndices = starredIndices.filter(index => {
-                return typeof index === 'number' &&
+                return Number.isInteger(index) &&
                        index >= 0 &&
                        index < originalFlashcards.length;
             });
@@ -74,7 +107,7 @@ describe('Defensive Check Logic - reviewStarredCards()', () => {
             const originalFlashcards = [{ q: 'Q1' }, { q: 'Q2' }];
 
             const validIndices = starredIndices.filter(index => {
-                return typeof index === 'number' &&
+                return Number.isInteger(index) &&
                        index >= 0 &&
                        index < originalFlashcards.length;
             });

@@ -285,7 +285,7 @@ test.describe('Defensive Checks - Real Browser Tests', () => {
                 consoleLogs.push(msg.text());
             }
         });
-        
+
         await page.evaluate(() => {
             const viewer = window.flashcardViewer;
             viewer.isFilteredView = true;
@@ -293,11 +293,73 @@ test.describe('Defensive Checks - Real Browser Tests', () => {
             viewer.originalReviewedCards = null; // Will trigger recovery
             viewer.restoreFullDeck();
         });
-        
-        const hasRecoveryLog = consoleLogs.some(log => 
+
+        const hasRecoveryLog = consoleLogs.some(log =>
             log.includes('[FlashcardViewer]') && log.includes('RECOVERY')
         );
         expect(hasRecoveryLog).toBe(true);
+    });
+
+    test('Notification fallback: should use console.warn if showNotification fails', async ({ page }) => {
+        const consoleLogs = [];
+        page.on('console', msg => {
+            if (msg.type() === 'warn') {
+                consoleLogs.push(msg.text());
+            }
+        });
+
+        await page.evaluate(() => {
+            const viewer = window.flashcardViewer;
+
+            // Make showNotification throw an error
+            window.showNotification = () => {
+                throw new Error('Notification failed');
+            };
+
+            // Star cards including one that will be null
+            viewer.starredCards = new Set([0, 1, 2]);
+            viewer.originalFlashcards = [
+                { question: 'Q1', answer: 'A1' },
+                null, // This will be filtered out
+                { question: 'Q3', answer: 'A3' }
+            ];
+
+            viewer.reviewStarredCards();
+        });
+
+        // Check if console.warn fallback was used
+        const hasFallbackLog = consoleLogs.some(log =>
+            log.includes('[FlashcardViewer]') && log.includes('filtered out')
+        );
+        expect(hasFallbackLog).toBe(true);
+    });
+
+    test('Notification fallback: should use showError if showNotification undefined', async ({ page }) => {
+        const result = await page.evaluate(() => {
+            const viewer = window.flashcardViewer;
+
+            // Remove showNotification
+            delete window.showNotification;
+
+            // Star cards including one that will be null
+            viewer.starredCards = new Set([0, 1, 2]);
+            viewer.originalFlashcards = [
+                { question: 'Q1', answer: 'A1' },
+                null, // This will be filtered out
+                { question: 'Q3', answer: 'A3' }
+            ];
+
+            viewer.reviewStarredCards();
+
+            return {
+                flashcardsLength: viewer.flashcards.length,
+                isFilteredView: viewer.isFilteredView
+            };
+        });
+
+        // Should still work even without showNotification
+        expect(result.flashcardsLength).toBe(2);
+        expect(result.isFilteredView).toBe(true);
     });
 });
 

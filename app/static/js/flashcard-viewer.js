@@ -1077,6 +1077,10 @@ class FlashcardViewer {
             } catch (notificationError) {
                 // MEDIUM FIX: Catch any errors in notification to prevent crashes
                 console.error('[FlashcardViewer] Error showing notification:', notificationError);
+
+                // MEDIUM FIX: Fallback to console.warn if all else fails
+                console.warn(`[FlashcardViewer] ${filteredCount} starred card${filteredCount > 1 ? 's were' : ' was'} filtered out. Showing ${validCards.length} valid card${validCards.length > 1 ? 's' : ''}.`);
+
                 // Continue execution even if notification fails
             }
         }
