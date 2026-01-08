@@ -117,10 +117,21 @@ class FlashcardViewer {
         this.gamificationEnabled = false;
         this.userStats = null;
         this.timeTrackerInterval = null;
+        this.gamificationInitialized = false;
 
+        // CRITICAL FIX: Initialize asynchronously to avoid race conditions
+        this.initializeAsync();
+    }
+
+    /**
+     * CRITICAL FIX: Async initialization to prevent race conditions
+     */
+    async initializeAsync() {
         // Check if user is authenticated for gamification
-        this.checkGamificationStatus();
+        await this.checkGamificationStatus();
+        this.gamificationInitialized = true;
 
+        // Initialize the viewer
         this.init();
     }
 
@@ -1077,20 +1088,24 @@ class FlashcardViewer {
     /**
      * Cleanup all resources including beforeunload handler
      * CRITICAL FIX: Full cleanup when destroying viewer
+     * CRITICAL FIX: Prevent memory leaks from timers and event listeners
      * PHASE 2A: End gamification session on cleanup
      */
     cleanup() {
         console.log('[FlashcardViewer] Cleaning up all resources...');
 
-        // PHASE 2A: Stop time tracker
+        // CRITICAL FIX: Stop time tracker to prevent memory leak
         if (this.timeTrackerInterval) {
             clearInterval(this.timeTrackerInterval);
             this.timeTrackerInterval = null;
+            console.log('[FlashcardViewer] Time tracker stopped');
         }
 
         // PHASE 2A: End gamification session
         if (this.gamificationEnabled && this.sessionId) {
-            this.endGamificationSession();
+            this.endGamificationSession().catch(error => {
+                console.error('[FlashcardViewer] Error ending gamification session:', error);
+            });
         }
 
         // Remove DOM event listeners
@@ -1101,6 +1116,18 @@ class FlashcardViewer {
             window.removeEventListener('beforeunload', this.beforeUnloadHandler);
             this.beforeUnloadHandler = null;
         }
+
+        // CRITICAL FIX: Clear all references to prevent memory leaks
+        this.flashcards = null;
+        this.originalFlashcards = null;
+        this.reviewedCards = null;
+        this.knownCards = null;
+        this.starredCards = null;
+        this.cardNotes = null;
+        this.spacedRepetition = null;
+        this.userStats = null;
+
+        console.log('[FlashcardViewer] Cleanup complete');
     }
 
     // =========================================================================
@@ -1611,9 +1638,18 @@ class FlashcardViewer {
 
     /**
      * Award XP for completing flashcard set
+     * CRITICAL FIX: Enhanced error handling for XP award failures
      */
     async awardFlashcardXP() {
-        if (!this.gamificationEnabled) return 0;
+        if (!this.gamificationEnabled) {
+            console.log('[FlashcardViewer] Gamification not enabled, skipping XP award');
+            return 0;
+        }
+
+        if (!this.gamificationInitialized) {
+            console.warn('[FlashcardViewer] Gamification not initialized, skipping XP award');
+            return 0;
+        }
 
         try {
             const cardsReviewed = this.reviewedCards.size;
@@ -1624,37 +1660,57 @@ class FlashcardViewer {
             // XP is awarded per 10 cards reviewed correctly
             const setsCompleted = Math.floor(cardsKnown / 10);
 
-            if (setsCompleted > 0) {
-                const response = await fetch('/api/gamification/activity', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    credentials: 'include',
-                    body: JSON.stringify({
-                        activity_type: 'flashcard_set_completed',
-                        activity_data: {
-                            cards_reviewed: cardsReviewed,
-                            cards_known: cardsKnown,
-                            accuracy: accuracy,
-                            sets_completed: setsCompleted,
-                            session_id: this.sessionId
-                        }
-                    })
-                });
-
-                if (response.ok) {
-                    const data = await response.json();
-                    this.xpEarned = data.xp_awarded || 0;
-                    console.log('[FlashcardViewer] XP awarded:', this.xpEarned);
-                    return this.xpEarned;
-                }
+            if (setsCompleted <= 0) {
+                console.log('[FlashcardViewer] No complete sets, no XP awarded');
+                return 0;
             }
+
+            console.log('[FlashcardViewer] Attempting to award XP for', setsCompleted, 'sets');
+
+            const response = await fetch('/api/gamification/activity', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                credentials: 'include',
+                body: JSON.stringify({
+                    activity_type: 'flashcard_set_completed',
+                    activity_data: {
+                        cards_reviewed: cardsReviewed,
+                        cards_known: cardsKnown,
+                        accuracy: accuracy,
+                        sets_completed: setsCompleted,
+                        session_id: this.sessionId
+                    }
+                })
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('[FlashcardViewer] XP award failed with status:', response.status, errorText);
+
+                // Show user-friendly error message
+                this.showError('Failed to award XP. Your progress is still saved locally.');
+                return 0;
+            }
+
+            const data = await response.json();
+            this.xpEarned = data.xp_awarded || 0;
+            console.log('[FlashcardViewer] XP awarded successfully:', this.xpEarned);
+            return this.xpEarned;
+
         } catch (error) {
             console.error('[FlashcardViewer] Failed to award XP:', error);
-        }
 
-        return 0;
+            // Network error or other exception
+            if (error.name === 'TypeError' && error.message.includes('fetch')) {
+                this.showError('Network error: Unable to award XP. Please check your connection.');
+            } else {
+                this.showError('An error occurred while awarding XP. Your progress is still saved.');
+            }
+
+            return 0;
+        }
     }
 
     /**
