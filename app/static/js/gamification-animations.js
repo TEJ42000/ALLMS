@@ -13,10 +13,75 @@ class GamificationAnimations {
     constructor() {
         this.animationQueue = [];
         this.isAnimating = false;
-        this.soundEnabled = localStorage.getItem('gamification_sound') !== 'false';
+        this.soundEnabled = this.safeGetLocalStorage('gamification_sound') !== 'false';
         this.isSharing = false; // Prevent race conditions in share functionality
         this.eventListeners = []; // Track event listeners for cleanup
         this.init();
+    }
+
+    /**
+     * Safe localStorage getter with error handling
+     */
+    safeGetLocalStorage(key, defaultValue = null) {
+        try {
+            return localStorage.getItem(key);
+        } catch (error) {
+            console.warn('[GamificationAnimations] localStorage.getItem failed:', error.message);
+            return defaultValue;
+        }
+    }
+
+    /**
+     * Safe localStorage setter with QuotaExceededError handling
+     */
+    safeSetLocalStorage(key, value) {
+        try {
+            localStorage.setItem(key, value);
+            return true;
+        } catch (error) {
+            if (error.name === 'QuotaExceededError') {
+                console.warn('[GamificationAnimations] localStorage quota exceeded, clearing old data');
+                // Try to clear some space by removing old items
+                this.clearOldLocalStorageData();
+                // Try again
+                try {
+                    localStorage.setItem(key, value);
+                    return true;
+                } catch (retryError) {
+                    console.error('[GamificationAnimations] localStorage.setItem failed after cleanup:', retryError.message);
+                    return false;
+                }
+            } else {
+                console.error('[GamificationAnimations] localStorage.setItem failed:', error.message);
+                return false;
+            }
+        }
+    }
+
+    /**
+     * Clear old localStorage data to free up space
+     */
+    clearOldLocalStorageData() {
+        try {
+            // List of non-essential keys that can be cleared
+            const clearableKeys = [
+                'lls-practice-count',
+                'lls-last-visit',
+                'temp-',
+                'cache-'
+            ];
+
+            // Remove items matching clearable patterns
+            for (let i = localStorage.length - 1; i >= 0; i--) {
+                const key = localStorage.key(i);
+                if (key && clearableKeys.some(pattern => key.startsWith(pattern))) {
+                    localStorage.removeItem(key);
+                    console.log('[GamificationAnimations] Cleared localStorage key:', key);
+                }
+            }
+        } catch (error) {
+            console.error('[GamificationAnimations] Error clearing localStorage:', error.message);
+        }
     }
 
     init() {
@@ -246,7 +311,27 @@ class GamificationAnimations {
     }
 
     /**
-     * Show XP gain animation
+     * Validate position coordinates
+     */
+    validatePosition(position) {
+        if (!position || typeof position !== 'object') {
+            return null;
+        }
+
+        // Validate x coordinate
+        const x = this.sanitizeNumber(position.x, null, 0, window.innerWidth);
+        const y = this.sanitizeNumber(position.y, null, 0, window.innerHeight);
+
+        // Return null if either coordinate is invalid
+        if (x === null || y === null) {
+            return null;
+        }
+
+        return { x, y };
+    }
+
+    /**
+     * Show XP gain animation with validated position
      */
     showXPGainAnimation(data) {
         const { xpGained, activityType, position } = data;
@@ -267,10 +352,11 @@ class GamificationAnimations {
             </div>
         `;
 
-        // Position near the action (if provided)
-        if (position) {
-            indicator.style.left = `${position.x}px`;
-            indicator.style.top = `${position.y}px`;
+        // Validate and position near the action (if provided)
+        const validatedPosition = this.validatePosition(position);
+        if (validatedPosition) {
+            indicator.style.left = `${validatedPosition.x}px`;
+            indicator.style.top = `${validatedPosition.y}px`;
         }
 
         document.body.appendChild(indicator);
@@ -594,11 +680,11 @@ class GamificationAnimations {
     }
 
     /**
-     * Toggle sound effects
+     * Toggle sound effects with safe localStorage
      */
     toggleSound() {
         this.soundEnabled = !this.soundEnabled;
-        localStorage.setItem('gamification_sound', this.soundEnabled);
+        this.safeSetLocalStorage('gamification_sound', this.soundEnabled);
         return this.soundEnabled;
     }
 }

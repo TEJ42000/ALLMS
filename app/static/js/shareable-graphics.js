@@ -44,6 +44,27 @@ class ShareableGraphics {
     }
 
     /**
+     * Sanitize text for canvas rendering
+     * Canvas doesn't interpret HTML, so we just need to ensure safe strings
+     */
+    sanitizeCanvasText(text, maxLength = 100) {
+        if (text === null || text === undefined) return '';
+
+        // Convert to string and trim
+        let sanitized = String(text).trim();
+
+        // Remove control characters and non-printable characters
+        sanitized = sanitized.replace(/[\x00-\x1F\x7F-\x9F]/g, '');
+
+        // Limit length to prevent canvas overflow
+        if (sanitized.length > maxLength) {
+            sanitized = sanitized.substring(0, maxLength) + '...';
+        }
+
+        return sanitized;
+    }
+
+    /**
      * Validate stats response data
      */
     validateStatsData(data) {
@@ -177,7 +198,7 @@ class ShareableGraphics {
     }
 
     /**
-     * Generate and share graphic with race condition prevention
+     * Generate and share graphic with race condition prevention and button disabling
      */
     async generateAndShare(type) {
         // Prevent race condition - only one generation at a time
@@ -188,6 +209,13 @@ class ShareableGraphics {
 
         this.isGenerating = true;
         console.log('[ShareableGraphics] Generating:', type);
+
+        // Disable all share buttons
+        const shareButtons = document.querySelectorAll('.share-btn');
+        shareButtons.forEach(btn => {
+            btn.disabled = true;
+            btn.classList.add('disabled');
+        });
 
         try {
             // Fetch user stats
@@ -220,8 +248,15 @@ class ShareableGraphics {
         } catch (error) {
             console.error('[ShareableGraphics] Error generating graphic:', error);
         } finally {
-            // Always reset flag
+            // Always reset flag and re-enable buttons
             this.isGenerating = false;
+
+            // Re-enable all share buttons
+            const shareButtons = document.querySelectorAll('.share-btn');
+            shareButtons.forEach(btn => {
+                btn.disabled = false;
+                btn.classList.remove('disabled');
+            });
         }
     }
 
@@ -307,17 +342,18 @@ class ShareableGraphics {
             ctx.fillText(stat.label, x, y + 115);
         });
 
-        // Level title
+        // Level title (sanitized)
         ctx.fillStyle = '#e0e6ed';
         ctx.font = 'bold 36px Inter, sans-serif';
-        ctx.fillText(stats.level_title || 'Junior Clerk', 600, 400);
+        const safeLevelTitle = this.sanitizeCanvasText(stats.level_title || 'Junior Clerk', 50);
+        ctx.fillText(safeLevelTitle, 600, 400);
 
         // Activities summary
         ctx.fillStyle = '#a0aec0';
         ctx.font = '24px Inter, sans-serif';
         const activities = stats.activities || {};
-        const quizzes = (activities.quiz_easy_passed || 0) + (activities.quiz_hard_passed || 0);
-        const evaluations = (activities.evaluation_low || 0) + (activities.evaluation_high || 0);
+        const quizzes = this.sanitizeNumber(activities.quiz_easy_passed, 0) + this.sanitizeNumber(activities.quiz_hard_passed, 0);
+        const evaluations = this.sanitizeNumber(activities.evaluation_low, 0) + this.sanitizeNumber(activities.evaluation_high, 0);
         ctx.fillText(`${quizzes} Quizzes Passed • ${evaluations} Evaluations Completed`, 600, 460);
 
         // Footer
@@ -377,19 +413,22 @@ class ShareableGraphics {
                 ctx.arc(x, y, 60, 0, Math.PI * 2);
                 ctx.fill();
 
-                // Badge icon
+                // Badge icon (sanitized)
                 ctx.font = '60px Inter, sans-serif';
-                ctx.fillText(badge.icon || '🏆', x, y + 20);
+                const safeIcon = this.sanitizeCanvasText(badge.icon || '🏆', 10);
+                ctx.fillText(safeIcon, x, y + 20);
 
-                // Badge name
+                // Badge name (sanitized)
                 ctx.fillStyle = '#e0e6ed';
                 ctx.font = '18px Inter, sans-serif';
-                ctx.fillText(badge.name, x, y + 90);
+                const safeName = this.sanitizeCanvasText(badge.name, 30);
+                ctx.fillText(safeName, x, y + 90);
 
-                // Tier
+                // Tier (sanitized)
                 ctx.fillStyle = this.getTierColor(badge.tier);
                 ctx.font = 'bold 16px Inter, sans-serif';
-                ctx.fillText(badge.tier.toUpperCase(), x, y + 115);
+                const safeTier = this.sanitizeCanvasText(badge.tier, 20).toUpperCase();
+                ctx.fillText(safeTier, x, y + 115);
             }
         }
 
@@ -427,20 +466,23 @@ class ShareableGraphics {
         ctx.textAlign = 'center';
         ctx.fillText('🎉 Level Achievement', 600, 150);
 
-        // Level number
+        // Level number (sanitized)
         ctx.fillStyle = '#e0e6ed';
         ctx.font = 'bold 120px Inter, sans-serif';
-        ctx.fillText(`Level ${stats.current_level}`, 600, 310);
+        const safeLevel = this.sanitizeNumber(stats.current_level, 1);
+        ctx.fillText(`Level ${safeLevel}`, 600, 310);
 
-        // Level title
+        // Level title (sanitized)
         ctx.fillStyle = '#d4af37';
         ctx.font = 'bold 48px Inter, sans-serif';
-        ctx.fillText(stats.level_title || 'Junior Clerk', 600, 380);
+        const safeLevelTitle2 = this.sanitizeCanvasText(stats.level_title || 'Junior Clerk', 50);
+        ctx.fillText(safeLevelTitle2, 600, 380);
 
-        // XP info
+        // XP info (sanitized)
         ctx.fillStyle = '#a0aec0';
         ctx.font = '28px Inter, sans-serif';
-        ctx.fillText(`${stats.total_xp} Total XP Earned`, 600, 480);
+        const safeTotalXP = this.sanitizeNumber(stats.total_xp, 0);
+        ctx.fillText(`${safeTotalXP} Total XP Earned`, 600, 480);
 
         // Footer
         ctx.fillStyle = '#d4af37';

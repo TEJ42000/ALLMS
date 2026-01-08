@@ -2529,6 +2529,20 @@ textarea { resize: vertical; font-family: inherit; }
     transform: translateY(-1px);
 }
 
+.share-btn:disabled,
+.share-btn.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+    pointer-events: none;
+}
+
+.share-btn:disabled:hover,
+.share-btn.disabled:hover {
+    transform: none;
+    box-shadow: none;
+}
+
 /* Download Notification */
 .download-notification {
     position: fixed;

@@ -61,15 +61,58 @@ class OnboardingTour {
             .replace(/'/g, "&#039;");
     }
 
+    /**
+     * Safe localStorage getter with error handling
+     */
+    safeGetLocalStorage(key, defaultValue = null) {
+        try {
+            return localStorage.getItem(key);
+        } catch (error) {
+            console.warn('[OnboardingTour] localStorage.getItem failed:', error.message);
+            return defaultValue;
+        }
+    }
+
+    /**
+     * Safe localStorage setter with QuotaExceededError handling
+     */
+    safeSetLocalStorage(key, value) {
+        try {
+            localStorage.setItem(key, value);
+            return true;
+        } catch (error) {
+            if (error.name === 'QuotaExceededError') {
+                console.warn('[OnboardingTour] localStorage quota exceeded');
+                return false;
+            } else {
+                console.error('[OnboardingTour] localStorage.setItem failed:', error.message);
+                return false;
+            }
+        }
+    }
+
+    /**
+     * Safe localStorage remover with error handling
+     */
+    safeRemoveLocalStorage(key) {
+        try {
+            localStorage.removeItem(key);
+            return true;
+        } catch (error) {
+            console.error('[OnboardingTour] localStorage.removeItem failed:', error.message);
+            return false;
+        }
+    }
+
     init() {
         // Check if user has completed tour
-        if (localStorage.getItem('onboarding_completed') === 'true') {
+        if (this.safeGetLocalStorage('onboarding_completed') === 'true') {
             return;
         }
 
         // Check if this is first visit
-        const visitCount = parseInt(localStorage.getItem('visit_count') || '0');
-        localStorage.setItem('visit_count', (visitCount + 1).toString());
+        const visitCount = parseInt(this.safeGetLocalStorage('visit_count') || '0');
+        this.safeSetLocalStorage('visit_count', (visitCount + 1).toString());
 
         if (visitCount === 0) {
             // Show tour on first visit
@@ -353,7 +396,7 @@ class OnboardingTour {
         });
 
         // Mark as completed
-        localStorage.setItem('onboarding_completed', 'true');
+        this.safeSetLocalStorage('onboarding_completed', 'true');
 
         // Show completion message
         this.showCompletionMessage();
@@ -385,7 +428,7 @@ class OnboardingTour {
      * Restart tour (can be called from settings)
      */
     restart() {
-        localStorage.removeItem('onboarding_completed');
+        this.safeRemoveLocalStorage('onboarding_completed');
         this.start();
     }
 }
