@@ -8,15 +8,26 @@ account deletion, email verification, and password resets.
 import hashlib
 import hmac
 import logging
+import os
 import secrets
 from datetime import datetime, timedelta
 from typing import Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
-# Secret key for token generation (in production, load from environment/secrets)
-# This should be a long, random string stored securely
-TOKEN_SECRET = secrets.token_hex(32)  # Generate a random secret on startup
+# Secret key for token generation
+# IMPORTANT: In production, set GDPR_TOKEN_SECRET environment variable
+# This should be a long, random string stored securely (e.g., in Google Secret Manager)
+TOKEN_SECRET = os.getenv('GDPR_TOKEN_SECRET')
+
+if not TOKEN_SECRET:
+    # Development fallback: generate a random secret
+    # WARNING: This will change on every restart, invalidating all tokens
+    TOKEN_SECRET = secrets.token_hex(32)
+    logger.warning(
+        "GDPR_TOKEN_SECRET not set in environment. Using randomly generated secret. "
+        "This is NOT suitable for production. All tokens will be invalidated on restart."
+    )
 
 # Token expiration times
 TOKEN_EXPIRY_MINUTES = {

@@ -9,7 +9,7 @@ import json
 import logging
 import re
 from datetime import datetime, timedelta
-from typing import Optional, Dict
+from typing import Optional, Dict, Any
 from collections import defaultdict
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
@@ -34,7 +34,7 @@ from app.models.gdpr_models import (
 logger = logging.getLogger(__name__)
 
 # Rate limiting storage (in production, use Redis or similar)
-_rate_limit_storage: Dict[str, Dict[str, any]] = defaultdict(lambda: {"count": 0, "reset_time": datetime.utcnow()})
+_rate_limit_storage: Dict[str, Dict[str, Any]] = defaultdict(lambda: {"count": 0, "reset_time": datetime.utcnow()})
 
 router = APIRouter(prefix="/api/gdpr", tags=["gdpr"])
 

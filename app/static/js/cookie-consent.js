@@ -95,7 +95,7 @@
 
     // Send consent to backend
     async function sendConsentToBackend(preferences) {
-        try:
+        try {
             // Only send if user is logged in
             const userId = getUserId();
             if (!userId) return;
