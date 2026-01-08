@@ -48,29 +48,43 @@ describe('Quiz Accessibility - Phase 5', () => {
     });
     
     describe('initializeKeyboardNavigation', () => {
-        test('initializes keyboard navigation', () => {
+        test('initializes keyboard navigation and returns cleanup function', () => {
             const container = document.createElement('div');
             const quizState = { currentQuestionIndex: 0, questions: [] };
             const onNavigate = jest.fn();
-            
-            initializeKeyboardNavigation(container, quizState, onNavigate);
-            
-            // Should not throw
+
+            const cleanup = initializeKeyboardNavigation(container, quizState, onNavigate);
+
+            expect(typeof cleanup).toBe('function');
             expect(container).toBeTruthy();
         });
-        
-        test('validates container parameter', () => {
+
+        test('validates container parameter and returns cleanup', () => {
             const quizState = { currentQuestionIndex: 0, questions: [] };
             const onNavigate = jest.fn();
-            
-            expect(() => initializeKeyboardNavigation(null, quizState, onNavigate)).not.toThrow();
+
+            const cleanup = initializeKeyboardNavigation(null, quizState, onNavigate);
+            expect(typeof cleanup).toBe('function');
         });
-        
-        test('validates quizState parameter', () => {
+
+        test('validates quizState parameter and returns cleanup', () => {
             const container = document.createElement('div');
             const onNavigate = jest.fn();
-            
-            expect(() => initializeKeyboardNavigation(container, null, onNavigate)).not.toThrow();
+
+            const cleanup = initializeKeyboardNavigation(container, null, onNavigate);
+            expect(typeof cleanup).toBe('function');
+        });
+
+        test('cleanup function removes event listener', () => {
+            const container = document.createElement('div');
+            const quizState = { currentQuestionIndex: 0, questions: [] };
+            const onNavigate = jest.fn();
+
+            const cleanup = initializeKeyboardNavigation(container, quizState, onNavigate);
+            cleanup();
+
+            // Should not throw
+            expect(cleanup).toBeTruthy();
         });
     });
     

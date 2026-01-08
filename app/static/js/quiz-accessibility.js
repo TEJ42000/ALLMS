@@ -16,23 +16,32 @@
  * @param {HTMLElement} container - Quiz container element
  * @param {Object} quizState - Quiz state object
  * @param {Function} onNavigate - Callback when navigation occurs
+ * @returns {Function} - Cleanup function to remove event listener
  */
 function initializeKeyboardNavigation(container, quizState, onNavigate) {
     // Input validation
     if (!container || !(container instanceof HTMLElement)) {
         console.error('initializeKeyboardNavigation: container must be an HTMLElement');
-        return;
+        return () => {};
     }
-    
+
     if (!quizState || typeof quizState !== 'object') {
         console.error('initializeKeyboardNavigation: quizState must be an object');
-        return;
+        return () => {};
     }
-    
-    // Add keyboard event listener
-    container.addEventListener('keydown', (event) => {
+
+    // Create handler function
+    const handler = (event) => {
         handleQuizKeydown(event, quizState, onNavigate);
-    });
+    };
+
+    // Add keyboard event listener
+    container.addEventListener('keydown', handler);
+
+    // Return cleanup function
+    return () => {
+        container.removeEventListener('keydown', handler);
+    };
 }
 
 /**
@@ -277,7 +286,14 @@ function createSkipLinks() {
             if (target) {
                 target.setAttribute('tabindex', '-1');
                 target.focus();
-                target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                // Use smooth scrolling if supported, otherwise fallback to instant
+                if ('scrollBehavior' in document.documentElement.style) {
+                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                } else {
+                    target.scrollIntoView();
+                }
+            } else {
+                console.warn(`Skip link target not found: ${link.target}`);
             }
         });
         
@@ -297,23 +313,21 @@ function ensureVisibleFocus(container) {
         console.error('ensureVisibleFocus: container must be an HTMLElement');
         return;
     }
-    
+
     // Add focus-visible class to container
     container.classList.add('focus-visible-enabled');
-    
-    // Add focus event listeners
-    const focusableElements = container.querySelectorAll(
-        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-    );
-    
-    focusableElements.forEach(element => {
-        element.addEventListener('focus', () => {
-            element.classList.add('has-focus');
-        });
-        
-        element.addEventListener('blur', () => {
-            element.classList.remove('has-focus');
-        });
+
+    // Use event delegation instead of individual listeners to prevent memory leaks
+    container.addEventListener('focusin', (event) => {
+        if (event.target.matches('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')) {
+            event.target.classList.add('has-focus');
+        }
+    });
+
+    container.addEventListener('focusout', (event) => {
+        if (event.target.matches('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')) {
+            event.target.classList.remove('has-focus');
+        }
     });
 }
 
