@@ -50,7 +50,8 @@
     "collectCoverageFrom": [
       "app/static/js/quiz-display-enhancements.js",
       "app/static/js/quiz-answer-enhancements.js",
-      "app/static/js/quiz-navigation-controls.js"
+      "app/static/js/quiz-navigation-controls.js",
+      "app/static/js/quiz-results-display.js"
     ],
     "testMatch": [
       "**/tests/**/*.test.js"
