@@ -83,9 +83,19 @@
         }
     }
 
+    // Get user ID from localStorage or generate new one
+    function getUserId() {
+        let userId = localStorage.getItem('allms_user_id');
+        if (!userId) {
+            userId = 'sim-' + crypto.randomUUID();
+            localStorage.setItem('allms_user_id', userId);
+        }
+        return userId;
+    }
+
     // Send consent to backend
     async function sendConsentToBackend(preferences) {
-        try {
+        try:
             // Only send if user is logged in
             const userId = getUserId();
             if (!userId) return;

@@ -17,8 +17,14 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, EmailStr, validator
 
 from app.dependencies.auth import get_current_user
+from app.models.auth_models import User
 from app.services.gdpr_service import GDPRService
 from app.services.gcp_service import get_firestore_client
+from app.services.token_service import (
+    generate_deletion_token,
+    validate_deletion_token,
+    send_deletion_confirmation_email
+)
 from app.models.gdpr_models import (
     ConsentType, ConsentStatus,
     GDPRExportRequest, GDPRDeleteRequest,
@@ -133,7 +139,7 @@ def get_gdpr_service() -> GDPRService:
 async def record_consent(
     request: Request,
     consent_request: ConsentRequest,
-    current_user: dict = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     gdpr_service: GDPRService = Depends(get_gdpr_service)
 ):
     """Record user consent for data processing.
@@ -151,7 +157,10 @@ async def record_consent(
         HTTPException: If validation fails or operation errors
     """
     try:
-        user_id = current_user.get('uid')
+        if not current_user:
+            raise HTTPException(status_code=401, detail="Authentication required")
+
+        user_id = current_user.user_id
         if not user_id:
             raise HTTPException(status_code=401, detail="User ID not found in session")
 
@@ -190,35 +199,40 @@ async def record_consent(
 
 @router.get("/consent")
 async def get_consents(
-    current_user: dict = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     gdpr_service: GDPRService = Depends(get_gdpr_service)
 ):
     """Get all consent records for current user.
-    
+
     Args:
         current_user: Current authenticated user
         gdpr_service: GDPR service instance
-        
+
     Returns:
         List of consent records
     """
     try:
-        user_id = current_user.get('uid')
+        if not current_user:
+            raise HTTPException(status_code=401, detail="Authentication required")
+
+        user_id = current_user.user_id
         consents = await gdpr_service.get_user_consents(user_id)
-        
+
         return {
             "success": True,
             "consents": [c.dict() for c in consents]
         }
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error getting consents: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error getting consents: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/export")
 async def export_user_data(
     request: Request,
-    current_user: dict = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     gdpr_service: GDPRService = Depends(get_gdpr_service)
 ):
     """Export all user data (GDPR Right to Access).
@@ -235,7 +249,10 @@ async def export_user_data(
         HTTPException: If user not authenticated or export fails
     """
     try:
-        user_id = current_user.get('uid')
+        if not current_user:
+            raise HTTPException(status_code=401, detail="Authentication required")
+
+        user_id = current_user.user_id
         if not user_id:
             raise HTTPException(status_code=401, detail="User ID not found in session")
 
@@ -279,11 +296,65 @@ async def export_user_data(
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
+@router.post("/delete/request")
+async def request_account_deletion(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    gdpr_service: GDPRService = Depends(get_gdpr_service)
+):
+    """Request account deletion - sends confirmation email with token.
+
+    Args:
+        request: FastAPI request object
+        current_user: Current authenticated user
+        gdpr_service: GDPR service instance
+
+    Returns:
+        Confirmation that email was sent
+
+    Raises:
+        HTTPException: If user not authenticated or request fails
+    """
+    try:
+        if not current_user:
+            raise HTTPException(status_code=401, detail="Authentication required")
+
+        user_id = current_user.user_id
+        user_email = current_user.email
+
+        # Rate limiting: 3 deletion requests per day
+        check_rate_limit(user_id, "delete_request", max_requests=3, window_minutes=1440)
+
+        # Generate secure deletion token
+        token, expiry = generate_deletion_token(user_id, user_email)
+
+        # Send confirmation email
+        email_sent = await send_deletion_confirmation_email(user_email, user_id, token, expiry)
+
+        if not email_sent:
+            raise HTTPException(status_code=500, detail="Failed to send confirmation email")
+
+        logger.info(f"Deletion request initiated for user {user_id}")
+
+        return {
+            "success": True,
+            "message": "Confirmation email sent. Please check your email for the deletion token.",
+            "email": user_email,
+            "expires_at": expiry.isoformat()
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error requesting account deletion: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
 @router.post("/delete")
 async def delete_user_account(
     request: Request,
     delete_request: DeleteAccountRequest,
-    current_user: dict = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     gdpr_service: GDPRService = Depends(get_gdpr_service)
 ):
     """Delete user account and all data (GDPR Right to be Forgotten).
@@ -301,8 +372,11 @@ async def delete_user_account(
         HTTPException: If validation fails or deletion errors
     """
     try:
-        user_id = current_user.get('uid')
-        user_email = current_user.get('email')
+        if not current_user:
+            raise HTTPException(status_code=401, detail="Authentication required")
+
+        user_id = current_user.user_id
+        user_email = current_user.email
 
         if not user_id:
             raise HTTPException(status_code=401, detail="User ID not found in session")
@@ -323,9 +397,16 @@ async def delete_user_account(
             logger.warning(f"Email mismatch in deletion request for user {user_id}")
             raise HTTPException(status_code=403, detail="Email mismatch")
 
-        # Verify confirmation token (in production, this should be a secure token sent via email)
-        if not delete_request.confirmation_token or delete_request.confirmation_token != "confirmed":
-            raise HTTPException(status_code=400, detail="Invalid confirmation token")
+        # Validate secure token
+        is_valid, error_message = validate_deletion_token(
+            delete_request.confirmation_token,
+            user_id,
+            user_email
+        )
+
+        if not is_valid:
+            logger.warning(f"Invalid deletion token for user {user_id}: {error_message}")
+            raise HTTPException(status_code=400, detail=f"Invalid confirmation token: {error_message}")
 
         logger.info(f"Initiating account deletion for user {user_id}")
 
@@ -362,32 +443,35 @@ async def delete_user_account(
 
 @router.get("/privacy-settings")
 async def get_privacy_settings(
-    current_user: dict = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     gdpr_service: GDPRService = Depends(get_gdpr_service)
 ):
     """Get user's privacy settings.
-    
+
     Args:
         current_user: Current authenticated user
         gdpr_service: GDPR service instance
-        
+
     Returns:
         Privacy settings
     """
     try:
-        user_id = current_user.get('uid')
-        
+        if not current_user:
+            raise HTTPException(status_code=401, detail="Authentication required")
+
+        user_id = current_user.user_id
+
         # Get privacy settings from Firestore
         if gdpr_service.db:
             settings_ref = gdpr_service.db.collection('privacy_settings').document(user_id)
             settings_doc = settings_ref.get()
-            
+
             if settings_doc.exists:
                 return {
                     "success": True,
                     "settings": settings_doc.to_dict()
                 }
-        
+
         # Return defaults if not found
         return {
             "success": True,
@@ -400,40 +484,45 @@ async def get_privacy_settings(
                 "updated_at": datetime.utcnow().isoformat()
             }
         }
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error getting privacy settings: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error getting privacy settings: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.put("/privacy-settings")
 async def update_privacy_settings(
     settings: PrivacySettings,
-    current_user: dict = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     gdpr_service: GDPRService = Depends(get_gdpr_service)
 ):
     """Update user's privacy settings.
-    
+
     Args:
         settings: New privacy settings
         current_user: Current authenticated user
         gdpr_service: GDPR service instance
-        
+
     Returns:
         Updated settings
     """
     try:
-        user_id = current_user.get('uid')
-        
+        if not current_user:
+            raise HTTPException(status_code=401, detail="Authentication required")
+
+        user_id = current_user.user_id
+
         # Verify user ID matches
         if settings.user_id != user_id:
             raise HTTPException(status_code=403, detail="User ID mismatch")
-        
+
         # Update settings in Firestore
         if gdpr_service.db:
             settings.updated_at = datetime.utcnow()
             settings_ref = gdpr_service.db.collection('privacy_settings').document(user_id)
             settings_ref.set(settings.dict())
-            
+
             return {
                 "success": True,
                 "settings": settings.dict(),
@@ -441,12 +530,12 @@ async def update_privacy_settings(
             }
         else:
             raise HTTPException(status_code=500, detail="Database unavailable")
-            
+
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error updating privacy settings: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error updating privacy settings: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 from datetime import timedelta
