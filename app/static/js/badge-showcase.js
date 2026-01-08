@@ -414,6 +414,7 @@ class BadgeShowcase {
     /**
      * Show error message to user
      * CRITICAL: User-facing error messages
+     * CRITICAL: CSP compliant - no inline onclick handlers
      */
     showError(message) {
         const container = document.getElementById('badge-showcase');
@@ -426,11 +427,27 @@ class BadgeShowcase {
 
         const errorDiv = document.createElement('div');
         errorDiv.className = 'badge-error-message';
-        errorDiv.innerHTML = `
-            <div class="error-icon">⚠️</div>
-            <div class="error-text">${safeMessage}</div>
-            <button class="error-dismiss" onclick="this.parentElement.remove()">Dismiss</button>
-        `;
+
+        // CRITICAL: Build DOM elements instead of innerHTML to avoid CSP violation
+        const iconDiv = document.createElement('div');
+        iconDiv.className = 'error-icon';
+        iconDiv.textContent = '⚠️';
+
+        const textDiv = document.createElement('div');
+        textDiv.className = 'error-text';
+        textDiv.textContent = safeMessage;
+
+        const dismissBtn = document.createElement('button');
+        dismissBtn.className = 'error-dismiss';
+        dismissBtn.textContent = 'Dismiss';
+        // CRITICAL: Use event listener instead of inline onclick (CSP compliance)
+        dismissBtn.addEventListener('click', () => {
+            errorDiv.remove();
+        });
+
+        errorDiv.appendChild(iconDiv);
+        errorDiv.appendChild(textDiv);
+        errorDiv.appendChild(dismissBtn);
 
         container.insertBefore(errorDiv, container.firstChild);
 
