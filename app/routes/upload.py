@@ -173,7 +173,7 @@ def sanitize_course_id(course_id: str) -> str:
     Sanitize course_id to prevent path traversal attacks.
 
     CRITICAL SECURITY: course_id is user-controlled and used in file paths.
-    Must prevent directory traversal (../, ..\, etc.)
+    Must prevent directory traversal (../, .., etc.)
 
     Args:
         course_id: User-provided course identifier
