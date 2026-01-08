@@ -961,38 +961,156 @@ class FlashcardViewer {
     }
 
     /**
+     * Safely show notification with fallback chain
+     *
+     * HIGH FIX: Simplified notification fallback logic
+     *
+     * Fallback chain:
+     * 1. Try showNotification() (styled toast)
+     * 2. If unavailable or fails, use console.warn()
+     *
+     * @param {string} message - Message to display
+     * @param {string} type - Notification type ('info', 'warning', 'error', 'success')
+     * @returns {void}
+     */
+    safeNotify(message, type = 'info') {
+        try {
+            if (typeof showNotification === 'function') {
+                showNotification(message, type, 5000);
+            } else {
+                // Fallback to console if showNotification not available
+                console.warn(`[FlashcardViewer] ${message}`);
+            }
+        } catch (error) {
+            // Final fallback to console if showNotification throws
+            console.warn(`[FlashcardViewer] ${message}`);
+            console.error('[FlashcardViewer] Notification error:', error);
+        }
+    }
+
+    /**
      * Review only starred cards
+     *
+     * Error Handling Strategy (CONSISTENT):
+     * - Fail fast for critical errors (null/empty data, no starred cards)
+     * - Recover gracefully for minor issues (invalid indices, null cards)
+     * - Always log errors for debugging
+     * - Always show user-friendly messages
+     *
      * HIGH FIX: Don't lose original flashcards - store them for restoration
      * HIGH FIX: Validate starred indices to prevent corruption
+     * ISSUE #168: Add defensive checks for originalFlashcards
+     *
+     * @returns {void}
+     * @throws {Error} Never throws - all errors are handled internally
      */
     reviewStarredCards() {
-        // CRITICAL FIX: Replace alert() with showError()
+        // CRITICAL ERROR: No starred cards (fail fast)
         if (this.starredCards.size === 0) {
-            this.showError('No starred cards to review!');
+            console.warn('[FlashcardViewer] No starred cards to review');
+            // HIGH FIX: More specific error message
+            this.showError('No starred cards to review. Star some cards first by clicking the star icon.');
             return;
         }
 
         // HIGH FIX: Store original flashcards if not already stored
         if (!this.isFilteredView) {
+            // CRITICAL FIX: Validate this.flashcards before storing
+            if (!this.flashcards || !Array.isArray(this.flashcards)) {
+                console.error('[FlashcardViewer] CRITICAL: this.flashcards is not valid:', this.flashcards);
+                this.showError('Unable to review starred cards. Please refresh the page.');
+                return;
+            }
+
+            if (this.flashcards.length === 0) {
+                console.error('[FlashcardViewer] CRITICAL: this.flashcards is empty');
+                this.showError('No flashcards available to review. Please refresh the page.');
+                return;
+            }
+
             this.originalFlashcards = [...this.flashcards];
             this.originalReviewedCards = new Set(this.reviewedCards);
             this.originalKnownCards = new Set(this.knownCards);
             this.originalStarredCards = new Set(this.starredCards);
         }
 
-        // HIGH FIX: Filter to only starred cards with index validation
-        const starredIndices = Array.from(this.starredCards);
-        const validIndices = starredIndices.filter(index => {
-            return index >= 0 && index < this.originalFlashcards.length;
-        });
-
-        // CRITICAL FIX: Replace alert() with showError()
-        if (validIndices.length === 0) {
-            this.showError('No valid starred cards found!');
+        // CRITICAL ERROR: originalFlashcards is null/undefined (fail fast)
+        if (!this.originalFlashcards || !Array.isArray(this.originalFlashcards)) {
+            console.error('[FlashcardViewer] CRITICAL: originalFlashcards is not properly initialized:', this.originalFlashcards);
+            // HIGH FIX: More specific error message
+            this.showError('Data corruption detected. Please refresh the page to reload flashcards.');
             return;
         }
 
-        this.flashcards = validIndices.map(index => this.originalFlashcards[index]);
+        // CRITICAL ERROR: originalFlashcards is empty (fail fast)
+        if (this.originalFlashcards.length === 0) {
+            console.error('[FlashcardViewer] CRITICAL: originalFlashcards is empty');
+            // HIGH FIX: More specific error message
+            this.showError('No flashcards found. Please refresh the page or select a different deck.');
+            return;
+        }
+
+        // MINOR ISSUE: Filter to only starred cards with index validation (recover gracefully)
+        const starredIndices = Array.from(this.starredCards);
+
+        // ISSUE #168: Validate index types and bounds (filter out invalid, don't fail)
+        // HIGH FIX: Batch logging to avoid performance issues with large datasets
+        const invalidIndices = [];
+        const outOfBoundsIndices = [];
+
+        const validIndices = starredIndices.filter(index => {
+            // CRITICAL FIX: Check if index is an integer (not just a number)
+            if (!Number.isInteger(index)) {
+                invalidIndices.push({ type: typeof index, value: index });
+                return false;
+            }
+
+            // Check if index is within bounds
+            if (index < 0 || index >= this.originalFlashcards.length) {
+                outOfBoundsIndices.push(index);
+                return false;
+            }
+
+            return true;
+        });
+
+        // HIGH FIX: Log once with summary instead of per-index
+        if (invalidIndices.length > 0) {
+            console.warn(`[FlashcardViewer] RECOVERY: ${invalidIndices.length} invalid index type(s) filtered out:`, invalidIndices.slice(0, 5));
+        }
+        if (outOfBoundsIndices.length > 0) {
+            console.warn(`[FlashcardViewer] RECOVERY: ${outOfBoundsIndices.length} out-of-bounds index/indices filtered out (length: ${this.originalFlashcards.length}):`, outOfBoundsIndices.slice(0, 5));
+        }
+
+        // CRITICAL ERROR: No valid indices after filtering (fail fast)
+        if (validIndices.length === 0) {
+            console.error('[FlashcardViewer] CRITICAL: No valid starred card indices found');
+            this.showError('No valid starred cards found. Please refresh the page.');
+            return;
+        }
+
+        // MINOR ISSUE: Filter out null/undefined cards (recover gracefully)
+        const starredCards = validIndices.map(index => this.originalFlashcards[index]);
+        const validCards = starredCards.filter(card => card !== null && card !== undefined);
+
+        // CRITICAL ERROR: All cards are null/undefined (fail fast)
+        if (validCards.length === 0) {
+            console.error('[FlashcardViewer] CRITICAL: All starred cards are null or undefined');
+            this.showError('Starred cards are not available. Please refresh the page.');
+            return;
+        }
+
+        // HIGH FIX: Warn user if cards were filtered out (silent card loss)
+        const filteredCount = starredIndices.length - validCards.length;
+        if (filteredCount > 0) {
+            const message = `${filteredCount} starred card${filteredCount > 1 ? 's were' : ' was'} filtered out due to invalid data. Showing ${validCards.length} valid card${validCards.length > 1 ? 's' : ''}.`;
+            console.warn(`[FlashcardViewer] ${message}`);
+
+            // HIGH FIX: Simplified notification fallback logic
+            this.safeNotify(message, 'warning');
+        }
+
+        this.flashcards = validCards;
 
         this.isFilteredView = true;
         this.currentIndex = 0;
@@ -1004,16 +1122,64 @@ class FlashcardViewer {
         this.cleanupEventListeners();  // CRITICAL: Remove old listeners first
         this.render();
         this.setupEventListeners();
+
+        console.log(`[FlashcardViewer] Reviewing ${validCards.length} starred cards`);
     }
 
     /**
      * Restore full deck from filtered view
+     *
+     * Error Handling Strategy (CONSISTENT):
+     * - Fail fast for critical errors (null/empty originalFlashcards)
+     * - Recover gracefully for Set corruption (Sets are metadata, can be recreated)
+     * - Always log errors for debugging
+     * - Always show user-friendly messages
+     *
      * HIGH FIX: Allow users to return to full deck
      * CRITICAL FIX: Remove old listeners before re-rendering
+     * ISSUE #168: Add defensive checks for originalFlashcards
+     *
+     * @returns {void}
+     * @throws {Error} Never throws - all errors are handled internally
      */
     restoreFullDeck() {
-        if (!this.isFilteredView || !this.originalFlashcards) {
+        // Early return if not in filtered view (not an error)
+        if (!this.isFilteredView) {
+            console.log('[FlashcardViewer] Not in filtered view, nothing to restore');
             return;
+        }
+
+        // CRITICAL ERROR: originalFlashcards is null/undefined (fail fast)
+        if (!this.originalFlashcards || !Array.isArray(this.originalFlashcards)) {
+            console.error('[FlashcardViewer] CRITICAL: originalFlashcards is not properly initialized:', this.originalFlashcards);
+            this.showError('Unable to restore full deck. Please refresh the page.');
+            return;
+        }
+
+        // CRITICAL ERROR: originalFlashcards is empty (fail fast)
+        if (this.originalFlashcards.length === 0) {
+            console.error('[FlashcardViewer] CRITICAL: originalFlashcards is empty');
+            this.showError('No flashcards available to restore. Please refresh the page.');
+            return;
+        }
+
+        // CONSISTENT STRATEGY: Always recover gracefully from Set corruption
+        // Rationale: Sets are metadata, not core data. Losing them is acceptable.
+        // Core data (originalFlashcards) must be valid, but Sets can be recreated.
+
+        if (!this.originalReviewedCards || !(this.originalReviewedCards instanceof Set)) {
+            console.warn('[FlashcardViewer] RECOVERY: originalReviewedCards is not a Set, creating new Set');
+            this.originalReviewedCards = new Set();
+        }
+
+        if (!this.originalKnownCards || !(this.originalKnownCards instanceof Set)) {
+            console.warn('[FlashcardViewer] RECOVERY: originalKnownCards is not a Set, creating new Set');
+            this.originalKnownCards = new Set();
+        }
+
+        if (!this.originalStarredCards || !(this.originalStarredCards instanceof Set)) {
+            console.warn('[FlashcardViewer] RECOVERY: originalStarredCards is not a Set, creating new Set');
+            this.originalStarredCards = new Set();
         }
 
         this.flashcards = [...this.originalFlashcards];
@@ -1028,6 +1194,8 @@ class FlashcardViewer {
         this.cleanupEventListeners();  // CRITICAL: Remove old listeners first
         this.render();
         this.setupEventListeners();
+
+        console.log(`[FlashcardViewer] Restored full deck with ${this.flashcards.length} cards`);
     }
 
     /**
