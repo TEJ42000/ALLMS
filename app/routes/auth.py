@@ -156,11 +156,14 @@ async def oauth_callback(
         # Get user info from Google
         user_info = await oauth_service.get_user_info(tokens.access_token)
 
+        # Mask email immediately for logging purposes (CodeQL: prevent PII in logs)
+        masked_email = _mask_email_for_logging(user_info.email)
+
         # Authorize user (domain check or allow list)
         is_authorized, user, reason = await _authorize_oauth_user(user_info, config)
 
         if not is_authorized:
-            logger.warning("User not authorized: %s - %s", _mask_email_for_logging(user_info.email), reason)
+            logger.warning("User not authorized: %s - %s", masked_email, reason)
             return templates.TemplateResponse(
                 "errors/403_access_denied.html",
                 {
@@ -186,7 +189,7 @@ async def oauth_callback(
         response = RedirectResponse(url=redirect_uri or "/", status_code=302)
         _set_session_cookie(response, session.session_id, config)
 
-        logger.info("User logged in: %s (admin=%s)", _mask_email_for_logging(user.email), user.is_admin)
+        logger.info("User logged in: %s (admin=%s)", masked_email, user.is_admin)
         return response
 
     except ValueError as e:
