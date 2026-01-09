@@ -927,10 +927,12 @@ async def process_extraction_task(
             # Update Firestore with results (with retry for transient failures)
             if result.success:
                 # Retry Firestore update in case of transient failures
+                # Only retry network/connection errors, not validation errors
                 retry_config = RetryConfig(
                     max_retries=3,
                     initial_delay=1.0,
-                    max_delay=10.0
+                    max_delay=10.0,
+                    retryable_exceptions=(ConnectionError, TimeoutError, OSError)
                 )
 
                 async def update_firestore():
@@ -952,7 +954,12 @@ async def process_extraction_task(
                 }
             else:
                 # Even for failed extraction, retry Firestore update
-                retry_config = RetryConfig(max_retries=3, initial_delay=1.0)
+                # Only retry network/connection errors, not validation errors
+                retry_config = RetryConfig(
+                    max_retries=3,
+                    initial_delay=1.0,
+                    retryable_exceptions=(ConnectionError, TimeoutError, OSError)
+                )
 
                 async def update_firestore_error():
                     materials_service.update_text_extraction(

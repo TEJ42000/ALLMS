@@ -144,7 +144,15 @@ async def retry_with_backoff(
                 logger.warning(
                     f"Attempt {attempt + 1}/{config.max_retries} failed for {func_name}: "
                     f"{type(e).__name__}: {e}. "
-                    f"Retrying in {actual_delay:.2f}s..."
+                    f"Retrying in {actual_delay:.2f}s...",
+                    extra={
+                        "function": func_name,
+                        "attempt": attempt + 1,
+                        "max_retries": config.max_retries,
+                        "error_type": type(e).__name__,
+                        "error_message": str(e),
+                        "retry_delay": actual_delay
+                    }
                 )
 
                 # Wait before retrying
@@ -158,11 +166,22 @@ async def retry_with_backoff(
                 logger.error(
                     f"All {config.max_retries} attempts failed for {func_name}. "
                     f"Last error: {type(e).__name__}: {e}",
-                    exc_info=True
+                    exc_info=True,
+                    extra={
+                        "function": func_name,
+                        "max_retries": config.max_retries,
+                        "error_type": type(e).__name__,
+                        "error_message": str(e),
+                        "all_attempts_failed": True
+                    }
                 )
     
     # All retries exhausted, raise the last exception
-    raise last_exception
+    if last_exception is not None:
+        raise last_exception
+    else:
+        # Should never happen, but handle gracefully
+        raise RuntimeError(f"Function {getattr(func, '__name__', repr(func))} failed with no exception recorded")
 
 
 def retry_sync(
@@ -245,7 +264,15 @@ def retry_sync(
                 logger.warning(
                     f"Attempt {attempt + 1}/{config.max_retries} failed for {func_name}: "
                     f"{type(e).__name__}: {e}. "
-                    f"Retrying in {actual_delay:.2f}s..."
+                    f"Retrying in {actual_delay:.2f}s...",
+                    extra={
+                        "function": func_name,
+                        "attempt": attempt + 1,
+                        "max_retries": config.max_retries,
+                        "error_type": type(e).__name__,
+                        "error_message": str(e),
+                        "retry_delay": actual_delay
+                    }
                 )
 
                 # Wait before retrying
@@ -259,11 +286,22 @@ def retry_sync(
                 logger.error(
                     f"All {config.max_retries} attempts failed for {func_name}. "
                     f"Last error: {type(e).__name__}: {e}",
-                    exc_info=True
+                    exc_info=True,
+                    extra={
+                        "function": func_name,
+                        "max_retries": config.max_retries,
+                        "error_type": type(e).__name__,
+                        "error_message": str(e),
+                        "all_attempts_failed": True
+                    }
                 )
     
     # All retries exhausted
-    raise last_exception
+    if last_exception is not None:
+        raise last_exception
+    else:
+        # Should never happen, but handle gracefully
+        raise RuntimeError(f"Function {getattr(func, '__name__', repr(func))} failed with no exception recorded")
 
 
 # Convenience function for common retry scenarios
