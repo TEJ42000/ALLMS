@@ -168,15 +168,17 @@ async def check_allow_list(email: str) -> bool:
     try:
         from app.services.allow_list_service import get_allow_list_service
     except ImportError:
-        logger.warning("Allow list service not available, check skipped")
+        logger.error("❌ ALLOW LIST: Import failed - allow_list_service not available")
         return False
 
     try:
         service = get_allow_list_service()
 
         if not service.is_available:
-            logger.warning("Allow list service is not available")
+            logger.error("❌ ALLOW LIST: Service not available (Firestore client is None)")
             return False
+
+        logger.info("✅ ALLOW LIST: Service available, checking user: %s", email)
 
         # Use the service's is_user_allowed method which checks:
         # - User exists
@@ -185,23 +187,23 @@ async def check_allow_list(email: str) -> bool:
         is_allowed = service.is_user_allowed(email)
 
         if is_allowed:
-            logger.info("User found in allow list and has effective access: %s", email)
+            logger.info("✅ ALLOW LIST: User %s is ALLOWED (active and not expired)", email)
         else:
             # Get more details for logging
             entry = service.get_user(email)
             if entry is None:
-                logger.debug("Email not found in allow list: %s", email)
+                logger.error("❌ ALLOW LIST: User %s NOT FOUND in Firestore collection 'allowed_users'", email)
             else:
-                logger.info(
-                    "Allow list entry exists but not effective (active=%s, expired=%s): %s",
-                    entry.active, entry.is_expired, email
+                logger.error(
+                    "❌ ALLOW LIST: User %s found but NOT EFFECTIVE (active=%s, expired=%s, is_effective=%s)",
+                    email, entry.active, entry.is_expired, entry.is_effective
                 )
 
         return is_allowed
 
     except Exception as e:
         # Log unexpected errors with full traceback but don't crash
-        logger.exception("Unexpected error checking allow list for %s: %s", email, str(e))
+        logger.exception("❌ ALLOW LIST: Unexpected exception checking %s: %s", email, str(e))
         return False
 
 
