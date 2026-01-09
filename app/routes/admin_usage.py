@@ -1054,13 +1054,13 @@ async def get_anthropic_cost(
             end_date=end_date,
         )
 
-        # Convert from cents to dollars
-        total_cost_usd = float(report.total_amount) / 100.0
+        # Get total cost - Anthropic API returns amounts already in USD (not cents)
+        total_cost_usd = report.get_total_amount()
 
         return AnthropicCostData(
             total_cost_usd=round(total_cost_usd, 6),
-            start_date=report.start_date,
-            end_date=report.end_date,
+            start_date=start_date.isoformat(),
+            end_date=end_date.isoformat(),
         )
 
     except ValueError as e:
