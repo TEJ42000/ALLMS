@@ -65,7 +65,18 @@ class MemoryRateLimiter(RateLimiter):
         
         # Check if limit exceeded
         if len(self.store[key]) >= RATE_LIMIT_UPLOADS:
-            logger.warning(f"Rate limit exceeded for {key}")
+            logger.warning(
+                f"Rate limit exceeded for {key}",
+                extra={
+                    "event": "rate_limit_exceeded",
+                    "user_id": user_id,
+                    "client_ip": client_ip,
+                    "current_count": len(self.store[key]),
+                    "limit": RATE_LIMIT_UPLOADS,
+                    "window_seconds": RATE_LIMIT_WINDOW,
+                    "backend": "memory"
+                }
+            )
             return False, f"Rate limit exceeded. Maximum {RATE_LIMIT_UPLOADS} uploads per {RATE_LIMIT_WINDOW} seconds."
         
         # Add current request
@@ -108,7 +119,18 @@ class RedisRateLimiter(RateLimiter):
             logger.error("Redis package not installed. Install with: pip install redis")
             raise
         except Exception as e:
-            logger.error(f"Failed to connect to Redis: {e}")
+            # ALERT: Redis connection failure (CRITICAL)
+            logger.error(
+                f"Failed to connect to Redis: {e}",
+                exc_info=True,
+                extra={
+                    "alert": "redis_connection_failure",
+                    "severity": "CRITICAL",
+                    "redis_host": redis_host,
+                    "redis_port": redis_port,
+                    "error_type": type(e).__name__
+                }
+            )
             raise
     
     def check_rate_limit(self, user_id: str, client_ip: str) -> tuple[bool, Optional[str]]:
@@ -133,7 +155,18 @@ class RedisRateLimiter(RateLimiter):
             
             # Check if limit exceeded
             if current_count >= RATE_LIMIT_UPLOADS:
-                logger.warning(f"Rate limit exceeded for {key}")
+                # ALERT: Rate limit hit (for capacity monitoring)
+                logger.warning(
+                    f"Rate limit exceeded for {key}",
+                    extra={
+                        "event": "rate_limit_exceeded",
+                        "user_id": user_id,
+                        "client_ip": client_ip,
+                        "current_count": current_count,
+                        "limit": RATE_LIMIT_UPLOADS,
+                        "window_seconds": RATE_LIMIT_WINDOW
+                    }
+                )
                 return False, f"Rate limit exceeded. Maximum {RATE_LIMIT_UPLOADS} uploads per {RATE_LIMIT_WINDOW} seconds."
             
             # Add current request
@@ -145,9 +178,27 @@ class RedisRateLimiter(RateLimiter):
             return True, None
             
         except Exception as e:
-            logger.error(f"Redis rate limit check failed: {e}")
+            # ALERT: Rate limiter backend failure (HIGH)
+            logger.error(
+                f"Redis rate limit check failed: {e}",
+                exc_info=True,
+                extra={
+                    "alert": "rate_limiter_backend_failure",
+                    "severity": "HIGH",
+                    "user_id": user_id,
+                    "client_ip": client_ip,
+                    "error_type": type(e).__name__,
+                    "fail_open": True
+                }
+            )
             # Fail open - allow request if Redis is down
-            logger.warning("Allowing request due to Redis failure (fail-open)")
+            logger.warning(
+                "Allowing request due to Redis failure (fail-open)",
+                extra={
+                    "user_id": user_id,
+                    "client_ip": client_ip
+                }
+            )
             return True, None
 
 
@@ -169,8 +220,21 @@ def get_rate_limiter() -> RateLimiter:
             _rate_limiter = RedisRateLimiter()
             logger.info("Using Redis rate limiter (production mode)")
         except Exception as e:
-            logger.error(f"Failed to initialize Redis rate limiter: {e}")
-            logger.warning("Falling back to in-memory rate limiter")
+            # ALERT: Redis initialization failure (HIGH)
+            logger.error(
+                f"Failed to initialize Redis rate limiter: {e}",
+                exc_info=True,
+                extra={
+                    "alert": "redis_initialization_failure",
+                    "severity": "HIGH",
+                    "error_type": type(e).__name__,
+                    "fallback": "memory"
+                }
+            )
+            logger.warning(
+                "Falling back to in-memory rate limiter",
+                extra={"backend": "memory", "production_ready": False}
+            )
             _rate_limiter = MemoryRateLimiter()
     else:
         _rate_limiter = MemoryRateLimiter()

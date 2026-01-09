@@ -1,0 +1,120 @@
+# Cloud Monitoring Alert Policy: Redis Connection Failure
+#
+# Triggers when the application cannot connect to Redis,
+# indicating a critical infrastructure issue.
+#
+# Severity: CRITICAL
+# Impact: Rate limiting degraded, using in-memory fallback
+# Action: Immediate investigation and remediation required
+#
+# Deploy with:
+#   gcloud alpha monitoring policies create \
+#     --notification-channels=CHANNEL_ID \
+#     --policy-from-file=monitoring/alert-redis-connection.yaml
+
+displayName: "Redis Connection Failure (CRITICAL)"
+documentation:
+  content: |
+    ## Redis Connection Failure Alert
+    
+    **Severity:** CRITICAL
+    **Impact:** Rate limiting degraded, infrastructure issue
+    
+    ### Symptoms
+    - Cannot connect to Redis instance
+    - Logs show "Failed to connect to Redis" errors
+    - Application falling back to in-memory rate limiter
+    - Rate limiting not working across multiple instances
+    
+    ### Impact
+    - **HIGH:** Rate limiting degraded
+    - **MEDIUM:** Using in-memory fallback (not distributed)
+    - **LOW:** Service still operational (fail-open design)
+    
+    ### Immediate Actions (Priority Order)
+    
+    1. **Check Redis Instance Health**
+       ```bash
+       gcloud redis instances describe INSTANCE_NAME \
+         --region=europe-west4
+       ```
+    
+    2. **Check VPC Connectivity**
+       - Verify VPC peering is active
+       - Check firewall rules allow Redis port (6379)
+       - Test connectivity from Cloud Run
+    
+    3. **Check Redis Logs**
+       ```bash
+       gcloud logging read "resource.type=redis_instance" \
+         --limit=50 --format=json
+       ```
+    
+    4. **Check Redis Authentication**
+       - Verify AUTH password is correct
+       - Check if password was rotated
+       - Verify environment variables
+    
+    5. **Restart Redis (if needed)**
+       ```bash
+       gcloud redis instances failover INSTANCE_NAME \
+         --region=europe-west4
+       ```
+    
+    6. **Escalate if Persistent**
+       - Contact GCP support
+       - Check for regional outages
+       - Consider failover to backup region
+    
+    ### Recovery Steps
+    
+    1. Once Redis is back online:
+       - Monitor connection success
+       - Verify rate limiting working
+       - Check for backlog of requests
+    
+    2. Post-incident:
+       - Review root cause
+       - Update runbook if needed
+       - Consider Redis HA configuration
+    
+    ### Prevention
+    - Enable Redis high availability
+    - Set up Redis replica
+    - Configure connection pooling
+    - Implement circuit breaker pattern
+    - Add Redis health checks
+    
+    ### Runbook
+    See: docs/runbooks/rate-limiter-alerts.md
+  mimeType: text/markdown
+
+conditions:
+  - displayName: "Redis connection failures"
+    conditionThreshold:
+      filter: |
+        resource.type="cloud_run_revision"
+        severity="ERROR"
+        (jsonPayload.message=~"Failed to connect to Redis" OR
+         jsonPayload.message=~"Redis.*connection.*failed")
+      comparison: COMPARISON_GT
+      thresholdValue: 3
+      duration: 180s
+      aggregations:
+        - alignmentPeriod: 60s
+          perSeriesAligner: ALIGN_RATE
+          crossSeriesReducer: REDUCE_SUM
+
+alertStrategy:
+  autoClose: 1800s  # Auto-close after 30 minutes
+  notificationRateLimit:
+    period: 180s  # Don't send more than 1 notification per 3 minutes
+
+# Notification channels will be added during deployment
+# For critical alerts, consider PagerDuty integration
+# Example:
+# notificationChannels:
+#   - projects/vigilant-axis-483119-r8/notificationChannels/pagerduty-critical
+#   - projects/vigilant-axis-483119-r8/notificationChannels/email-ops
+#   - projects/vigilant-axis-483119-r8/notificationChannels/slack-alerts
+

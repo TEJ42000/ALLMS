@@ -39,9 +39,11 @@ from app.services.rate_limiter import check_upload_rate_limit
 from app.services.storage_service import get_storage_backend, LocalStorageBackend
 from app.services.background_tasks import enqueue_text_extraction, is_background_processing_enabled
 from app.services.upload_metrics import get_upload_metrics, UploadStatus, ExtractionStatus
+from app.services.retry_logic import retry_with_backoff, RetryConfig
 from app.models.course_models import CourseMaterial
 from app.models.auth_models import User
 from app.dependencies.auth import require_allowed_user
+from google.api_core import exceptions as google_exceptions
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -917,41 +919,86 @@ async def process_extraction_task(
         materials_base = Path("Materials").resolve()
         file_path = validate_path_within_base(file_path, materials_base)
 
-        # Extract text
-        result = extract_text(file_path)
+        # Define extraction function with retry logic
+        async def extract_and_update():
+            """Extract text and update Firestore with retry logic."""
+            # Extract text (synchronous operation)
+            result = extract_text(file_path)
 
-        # Update Firestore with results
-        if result.success:
-            materials_service.update_text_extraction(
-                course_id=course_id,
-                material_id=material_id,
-                extracted_text=result.text,
-                text_length=len(result.text)
-            )
-            logger.info(f"Extraction successful: {len(result.text)} characters")
+            # Update Firestore with results (with retry for transient failures)
+            if result.success:
+                # Retry Firestore update in case of transient failures
+                # Only retry network/connection errors and transient Firestore errors
+                retry_config = RetryConfig(
+                    max_retries=3,
+                    initial_delay=1.0,
+                    max_delay=10.0,
+                    retryable_exceptions=(
+                        ConnectionError,
+                        TimeoutError,
+                        OSError,
+                        google_exceptions.ServiceUnavailable,
+                        google_exceptions.DeadlineExceeded,
+                        google_exceptions.ResourceExhausted,
+                        google_exceptions.Aborted,
+                    )
+                )
 
-            return {
-                "status": "success",
-                "material_id": material_id,
-                "text_length": len(result.text),
-                "message": "Text extraction completed"
-            }
-        else:
-            materials_service.update_text_extraction(
-                course_id=course_id,
-                material_id=material_id,
-                extracted_text="",
-                text_length=0,
-                error=result.error
-            )
-            logger.error(f"Extraction failed: {result.error}")
+                async def update_firestore():
+                    materials_service.update_text_extraction(
+                        course_id=course_id,
+                        material_id=material_id,
+                        extracted_text=result.text,
+                        text_length=len(result.text)
+                    )
 
-            return {
-                "status": "error",
-                "material_id": material_id,
-                "error": result.error,
-                "message": "Text extraction failed"
-            }
+                await retry_with_backoff(update_firestore, config=retry_config)
+                logger.info(f"Extraction successful: {len(result.text)} characters")
+
+                return {
+                    "status": "success",
+                    "material_id": material_id,
+                    "text_length": len(result.text),
+                    "message": "Text extraction completed"
+                }
+            else:
+                # Even for failed extraction, retry Firestore update
+                # Only retry network/connection errors and transient Firestore errors
+                retry_config = RetryConfig(
+                    max_retries=3,
+                    initial_delay=1.0,
+                    retryable_exceptions=(
+                        ConnectionError,
+                        TimeoutError,
+                        OSError,
+                        google_exceptions.ServiceUnavailable,
+                        google_exceptions.DeadlineExceeded,
+                        google_exceptions.ResourceExhausted,
+                        google_exceptions.Aborted,
+                    )
+                )
+
+                async def update_firestore_error():
+                    materials_service.update_text_extraction(
+                        course_id=course_id,
+                        material_id=material_id,
+                        extracted_text="",
+                        text_length=0,
+                        error=result.error
+                    )
+
+                await retry_with_backoff(update_firestore_error, config=retry_config)
+                logger.error(f"Extraction failed: {result.error}")
+
+                return {
+                    "status": "error",
+                    "material_id": material_id,
+                    "error": result.error,
+                    "message": "Text extraction failed"
+                }
+
+        # Execute with retry logic
+        return await extract_and_update()
 
     except HTTPException:
         raise

@@ -1,0 +1,87 @@
+# Cloud Monitoring Alert Policy: High Rate Limit Hits
+#
+# Triggers when many users are hitting rate limits, indicating
+# either an attack or legitimate traffic spike requiring capacity increase.
+#
+# Severity: MEDIUM
+# Impact: Legitimate users may be blocked
+# Action: Investigate traffic patterns, consider increasing limits
+#
+# Deploy with:
+#   gcloud alpha monitoring policies create \
+#     --notification-channels=CHANNEL_ID \
+#     --policy-from-file=monitoring/alert-rate-limit-capacity.yaml
+
+displayName: "High Rate Limit Hits"
+documentation:
+  content: |
+    ## High Rate Limit Hits Alert
+    
+    **Severity:** MEDIUM
+    **Impact:** Many users hitting rate limits
+    
+    ### Symptoms
+    - High volume of "Rate limit exceeded" log entries
+    - Multiple users being blocked
+    - Increased 429 (Too Many Requests) responses
+    
+    ### Possible Causes
+    1. **Attack:** Coordinated upload abuse attempt
+    2. **Traffic Spike:** Legitimate increase in usage
+    3. **Misconfiguration:** Rate limits set too low
+    4. **Bug:** Application making excessive requests
+    
+    ### Immediate Actions
+    1. Check if attack or legitimate traffic spike
+       - Review user IDs hitting limits
+       - Check IP addresses for patterns
+       - Look for suspicious behavior
+    
+    2. Review rate limit configuration
+       - Current: 10 uploads per 60 seconds
+       - Check if appropriate for current usage
+    
+    3. Consider temporary adjustments
+       - Increase limits if legitimate spike
+       - Block IPs if attack detected
+       - Scale up infrastructure if needed
+    
+    4. Identify top users hitting limits
+       - Contact users if necessary
+       - Investigate their use case
+    
+    ### Long-term Actions
+    - Review and adjust rate limit thresholds
+    - Implement tiered rate limits (free vs paid)
+    - Add user-specific overrides
+    - Improve capacity planning
+    
+    ### Runbook
+    See: docs/runbooks/rate-limiter-alerts.md
+  mimeType: text/markdown
+
+conditions:
+  - displayName: "Too many rate limit blocks"
+    conditionThreshold:
+      filter: |
+        resource.type="cloud_run_revision"
+        jsonPayload.message=~"Rate limit exceeded"
+      comparison: COMPARISON_GT
+      thresholdValue: 100
+      duration: 300s
+      aggregations:
+        - alignmentPeriod: 60s
+          perSeriesAligner: ALIGN_RATE
+          crossSeriesReducer: REDUCE_SUM
+
+alertStrategy:
+  autoClose: 1800s  # Auto-close after 30 minutes
+  notificationRateLimit:
+    period: 600s  # Don't send more than 1 notification per 10 minutes
+
+# Notification channels will be added during deployment
+# Example:
+# notificationChannels:
+#   - projects/vigilant-axis-483119-r8/notificationChannels/email-ops
+#   - projects/vigilant-axis-483119-r8/notificationChannels/slack-alerts
+
