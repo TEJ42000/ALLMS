@@ -13,8 +13,33 @@ from typing import Any, Dict, List, Optional
 from anthropic import AsyncAnthropic
 
 from app.services.gcp_service import get_anthropic_api_key
+from app.services.usage_tracking_service import get_usage_tracking_service
 
 logger = logging.getLogger(__name__)
+
+
+async def _track_system_usage(
+    response,
+    model: str,
+    operation_type: str,
+) -> None:
+    """Track usage for system operations (no user context)."""
+    try:
+        usage = response.usage
+        await get_usage_tracking_service().record_usage(
+            user_email="system@internal",
+            user_id="system",
+            model=model,
+            operation_type=operation_type,
+            input_tokens=getattr(usage, 'input_tokens', 0) or 0,
+            output_tokens=getattr(usage, 'output_tokens', 0) or 0,
+            cache_creation_tokens=getattr(usage, 'cache_creation_input_tokens', 0) or 0,
+            cache_read_tokens=getattr(usage, 'cache_read_input_tokens', 0) or 0,
+            course_id=None,
+            request_metadata={"source": "syllabus_extractor"},
+        )
+    except Exception as e:
+        logger.warning("Failed to track system usage: %s", e)
 
 # Initialize Anthropic client
 client = AsyncAnthropic(api_key=get_anthropic_api_key())
@@ -137,6 +162,13 @@ async def extract_course_data(syllabus_text: str) -> Dict[str, Any]:
             }]
         )
         
+        # Track system usage
+        await _track_system_usage(
+            response=response,
+            model="claude-sonnet-4-20250514",
+            operation_type="syllabus_extraction",
+        )
+        
         response_text = response.content[0].text
         
         # Parse JSON from response
@@ -239,6 +271,13 @@ async def extract_topics_from_syllabus(
                 "role": "user",
                 "content": f"Extract all topics{context} from this syllabus:\n\n{syllabus_text}"
             }]
+        )
+
+        # Track system usage
+        await _track_system_usage(
+            response=response,
+            model="claude-sonnet-4-20250514",
+            operation_type="topic_extraction",
         )
 
         response_text = response.content[0].text

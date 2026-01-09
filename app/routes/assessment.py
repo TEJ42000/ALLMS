@@ -330,7 +330,8 @@ async def get_sample_answers():
 @router.post("/essay/generate")
 async def generate_essay_assessment(
     request: GenerateEssayQuestionRequest,
-    x_user_id: Optional[str] = Header(None, alias="X-User-ID")
+    x_user_id: Optional[str] = Header(None, alias="X-User-ID"),
+    user: Optional[User] = Depends(get_optional_user),
 ):
     """
     Generate a new essay question for a topic.
@@ -344,13 +345,22 @@ async def generate_essay_assessment(
         user_id = get_or_create_user_id(x_user_id)
         topic = request.topic or "Law & Legal Skills"
 
+        # Build user context for usage tracking
+        user_context = None
+        if user:
+            user_context = UserContext(
+                email=user.email,
+                user_id=user.user_id,
+                course_id=request.course_id,
+            )
+
         logger.info(
             "Generating essay question - Course: %s, Topic: %s",
             request.course_id, topic
         )
 
         # Generate question using AI
-        question_data = await generate_essay_question(topic=topic)
+        question_data = await generate_essay_question(topic=topic, user_context=user_context)
 
         # Save assessment to database
         persistence = get_assessment_persistence_service()
@@ -385,7 +395,8 @@ async def generate_essay_assessment(
 @router.post("/essay/submit")
 async def submit_essay_answer(
     request: SubmitEssayAnswerRequest,
-    x_user_id: Optional[str] = Header(None, alias="X-User-ID")
+    x_user_id: Optional[str] = Header(None, alias="X-User-ID"),
+    user: Optional[User] = Depends(get_optional_user),
 ):
     """
     Submit an essay answer for evaluation.
@@ -401,6 +412,15 @@ async def submit_essay_answer(
     """
     try:
         user_id = get_or_create_user_id(x_user_id)
+
+        # Build user context for usage tracking
+        user_context = None
+        if user:
+            user_context = UserContext(
+                email=user.email,
+                user_id=user.user_id,
+                course_id=request.course_id,
+            )
 
         logger.info(
             "Essay submission - Assessment: %s, Answer length: %d",
@@ -426,7 +446,8 @@ async def submit_essay_answer(
             question=assessment.get("question", ""),
             answer=request.answer,
             topic=assessment.get("topic", ""),
-            key_concepts=assessment.get("keyConcepts", [])
+            key_concepts=assessment.get("keyConcepts", []),
+            user_context=user_context,
         )
 
         # Save the attempt

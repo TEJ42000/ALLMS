@@ -42,7 +42,9 @@ from app.services.upload_metrics import get_upload_metrics, UploadStatus, Extrac
 from app.services.retry_logic import retry_with_backoff, RetryConfig
 from app.models.course_models import CourseMaterial
 from app.models.auth_models import User
+from app.models.usage_models import UserContext
 from app.dependencies.auth import require_allowed_user
+from app.services.usage_tracking_service import track_llm_usage_from_response
 from google.api_core import exceptions as google_exceptions
 
 # Configure logging
@@ -743,6 +745,20 @@ Return JSON with this exact structure:
                 500,
                 "Failed to analyze content after multiple attempts. Please try again later."
             )
+
+        # Track usage
+        user_context = UserContext(
+            email=current_user.email,
+            user_id=current_user.user_id,
+            course_id=course_id,
+        )
+        await track_llm_usage_from_response(
+            response=response,
+            user_context=user_context,
+            operation_type="content_analysis",
+            model="claude-sonnet-4-20250514",
+            request_metadata={"material_id": material_id},
+        )
 
         # Parse JSON response
         text = response.content[0].text

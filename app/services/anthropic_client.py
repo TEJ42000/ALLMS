@@ -400,7 +400,8 @@ async def get_simple_response(
 
 async def generate_essay_question(
     topic: str,
-    course_context: Optional[str] = None
+    course_context: Optional[str] = None,
+    user_context: Optional[UserContext] = None,
 ) -> Dict:
     """
     Generate an essay question for a given topic.
@@ -408,6 +409,7 @@ async def generate_essay_question(
     Args:
         topic: The topic to generate a question about
         course_context: Optional course material context
+        user_context: User context for usage tracking
 
     Returns:
         Dictionary with question, topic, key_concepts, guidance
@@ -427,6 +429,15 @@ async def generate_essay_question(
                 "role": "user",
                 "content": user_message
             }]
+        )
+
+        # Track usage
+        await _track_llm_usage(
+            response=response,
+            user_context=user_context,
+            model="claude-sonnet-4-20250514",
+            operation_type="essay_question",
+            request_metadata={"topic": topic},
         )
 
         response_text = response.content[0].text
@@ -464,7 +475,8 @@ async def evaluate_essay_answer(
     answer: str,
     topic: str,
     key_concepts: Optional[List[str]] = None,
-    course_context: Optional[str] = None
+    course_context: Optional[str] = None,
+    user_context: Optional[UserContext] = None,
 ) -> Dict:
     """
     Evaluate a student's essay answer.
@@ -475,6 +487,7 @@ async def evaluate_essay_answer(
         topic: The topic being assessed
         key_concepts: Optional list of concepts that should be addressed
         course_context: Optional course material for reference
+        user_context: User context for usage tracking
 
     Returns:
         Dictionary with grade, feedback, strengths, improvements
@@ -504,6 +517,15 @@ async def evaluate_essay_answer(
                 "role": "user",
                 "content": user_message
             }]
+        )
+
+        # Track usage
+        await _track_llm_usage(
+            response=response,
+            user_context=user_context,
+            model="claude-sonnet-4-20250514",
+            operation_type="essay_evaluation",
+            request_metadata={"topic": topic},
         )
 
         response_text = response.content[0].text

@@ -448,6 +448,19 @@ Return ONLY valid JSON:
             }]
         )
 
+        # Track usage if user context provided
+        await track_llm_usage_from_response(
+            response=response,
+            user_context=user_context,
+            operation_type="quiz_files_api",
+            model="claude-sonnet-4-20250514",
+            request_metadata={
+                "topic": topic,
+                "num_questions": num_questions,
+                "difficulty": difficulty,
+            },
+        )
+
         # Parse response
         text = response.content[0].text
         quiz_data = self._parse_json(text)
@@ -852,7 +865,8 @@ OUTPUT QUALITY:
         self,
         article: str,
         code: str = "DCC",
-        use_reader: bool = True
+        use_reader: bool = True,
+        user_context: Optional["UserContext"] = None,
     ) -> str:
         """
         Explain a legal article using course materials.
@@ -861,6 +875,7 @@ OUTPUT QUALITY:
             article: Article number (e.g., "6:74")
             code: Legal code
             use_reader: Whether to include LLS Reader
+            user_context: User context for usage tracking
 
         Returns:
             Detailed explanation
@@ -907,13 +922,23 @@ Cite page numbers if available.""" % (article, code)
             messages=[{"role": "user", "content": content_blocks}]
         )
 
+        # Track usage if user context provided
+        await track_llm_usage_from_response(
+            response=response,
+            user_context=user_context,
+            operation_type="article_explanation",
+            model="claude-sonnet-4-20250514",
+            request_metadata={"article": article, "code": code},
+        )
+
         return response.content[0].text
 
     async def generate_case_analysis(
         self,
         case_facts: str,
         topic: str,
-        relevant_files: Optional[List[str]] = None
+        relevant_files: Optional[List[str]] = None,
+        user_context: Optional["UserContext"] = None,
     ) -> str:
         """
         Analyze a case using course materials.
@@ -922,6 +947,7 @@ Cite page numbers if available.""" % (article, code)
             case_facts: Description of case
             topic: Legal topic
             relevant_files: Optional specific files to use
+            user_context: User context for usage tracking
 
         Returns:
             Case analysis
@@ -984,6 +1010,15 @@ Use proper legal analysis method and cite articles.""" % (topic, case_facts)
             max_tokens=2500,
             betas=[self.beta_header],
             messages=[{"role": "user", "content": content_blocks}]
+        )
+
+        # Track usage if user context provided
+        await track_llm_usage_from_response(
+            response=response,
+            user_context=user_context,
+            operation_type="case_analysis",
+            model="claude-sonnet-4-20250514",
+            request_metadata={"topic": topic},
         )
 
         return response.content[0].text
@@ -1066,7 +1101,8 @@ Use proper legal analysis method and cite articles.""" % (topic, case_facts)
         self,
         topic: str,
         file_keys: List[str],
-        num_cards: int = 20
+        num_cards: int = 20,
+        user_context: Optional["UserContext"] = None,
     ) -> List[Dict]:
         """
         Generate flashcards from files (legacy method).
@@ -1075,6 +1111,7 @@ Use proper legal analysis method and cite articles.""" % (topic, case_facts)
             topic: Topic name
             file_keys: Files to use
             num_cards: Number of flashcards to generate (5-50)
+            user_context: User context for usage tracking
 
         Returns:
             List of flashcard dictionaries
@@ -1140,6 +1177,15 @@ Include:
             messages=[{"role": "user", "content": content_blocks}]
         )
 
+        # Track usage if user context provided
+        await track_llm_usage_from_response(
+            response=response,
+            user_context=user_context,
+            operation_type="flashcard_files_api",
+            model="claude-sonnet-4-20250514",
+            request_metadata={"topic": topic, "num_cards": num_cards},
+        )
+
         data = self._parse_json(response.content[0].text)
         return data.get("flashcards", [])
 
@@ -1148,7 +1194,8 @@ Include:
         course_id: str,
         topic: str,
         num_cards: int = 20,
-        week_number: Optional[int] = None
+        week_number: Optional[int] = None,
+        user_context: Optional["UserContext"] = None,
     ) -> List[Dict]:
         """Generate flashcards using Firestore materials with text extraction.
 
@@ -1160,6 +1207,7 @@ Include:
             topic: Topic name for the flashcards
             num_cards: Number of flashcards to generate (5-50)
             week_number: Optional week filter
+            user_context: User context for usage tracking
 
         Returns:
             List of flashcard dictionaries with 'front' and 'back' keys
@@ -1253,6 +1301,20 @@ Make flashcards clear, concise, and exam-focused.""" % (num_cards, topic)
                 "role": "user",
                 "content": content_blocks
             }]
+        )
+
+        # Track usage if user context provided
+        await track_llm_usage_from_response(
+            response=response,
+            user_context=user_context,
+            operation_type="flashcard_course",
+            model="claude-sonnet-4-20250514",
+            request_metadata={
+                "course_id": course_id,
+                "topic": topic,
+                "num_cards": num_cards,
+                "week_number": week_number,
+            },
         )
 
         # Parse response
