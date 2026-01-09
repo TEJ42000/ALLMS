@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Access Denied - LLS Study Portal</title>
+    <link rel="icon" type="image/svg+xml" href="/static/images/favicon.svg">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #e4e4e7;
+        }
+        .container {
+            text-align: center;
+            padding: 2rem;
+            max-width: 500px;
+        }
+        .error-code {
+            font-size: 6rem;
+            font-weight: 700;
+            color: #f97316;
+            line-height: 1;
+            margin-bottom: 1rem;
+        }
+        .error-title {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            color: #fbbf24;
+        }
+        .error-message {
+            color: #a1a1aa;
+            margin-bottom: 1.5rem;
+            line-height: 1.6;
+        }
+        .icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+        }
+        .user-email {
+            display: inline-block;
+            background: rgba(239, 68, 68, 0.2);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: #fca5a5;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            font-family: monospace;
+            font-size: 0.9rem;
+            margin-bottom: 1.5rem;
+        }
+        .domain-badge {
+            display: inline-block;
+            background: #3b82f6;
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+        .info-box {
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-radius: 0.75rem;
+            padding: 1.25rem;
+            margin-bottom: 1.5rem;
+            text-align: left;
+        }
+        .info-box h3 {
+            color: #60a5fa;
+            font-size: 0.875rem;
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+        }
+        .info-box ul {
+            color: #a1a1aa;
+            font-size: 0.875rem;
+            line-height: 1.6;
+            list-style: none;
+        }
+        .info-box li {
+            margin-bottom: 0.5rem;
+            padding-left: 1.25rem;
+            position: relative;
+        }
+        .info-box li::before {
+            content: '→';
+            position: absolute;
+            left: 0;
+            color: #60a5fa;
+        }
+        .actions {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            text-decoration: none;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        .btn-primary {
+            background: #3b82f6;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #2563eb;
+        }
+        .btn-secondary {
+            background: transparent;
+            border: 1px solid #52525b;
+            color: #a1a1aa;
+        }
+        .btn-secondary:hover {
+            border-color: #71717a;
+            color: #e4e4e7;
+        }
+        .help-text {
+            margin-top: 2rem;
+            font-size: 0.875rem;
+            color: #71717a;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="icon">⛔</div>
+        <div class="error-code">403</div>
+        <h1 class="error-title">Access Denied</h1>
+
+        {% if user_email %}
+        <div class="user-email">{{ user_email }}</div>
+        {% endif %}
+
+        <p class="error-message">
+            {{ error_message or "Your account is not authorized to access this application." }}
+        </p>
+
+        <div class="info-box">
+            <h3>How to get access:</h3>
+            <ul>
+                <li>Users with <span class="domain-badge">@mgms.eu</span> email addresses are automatically granted access</li>
+                <li>External users must be added to the allow list by an administrator</li>
+                <li>Contact the system administrator with your email address and reason for access</li>
+            </ul>
+        </div>
+
+        <div class="actions">
+            <a href="/auth/login" class="btn btn-primary">Try Different Account</a>
+            <a href="mailto:admin@mgms.eu?subject=Access%20Request%20-%20LLS%20Study%20Portal{% if user_email %}&body=Email:%20{{ user_email }}%0A%0AReason%20for%20access:%20{% endif %}" class="btn btn-secondary">Contact Admin</a>
+        </div>
+
+        <p class="help-text">
+            If you believe this is an error, please contact the system administrator.
+        </p>
+    </div>
+</body>
+</html>
+
