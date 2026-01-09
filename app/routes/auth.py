@@ -7,6 +7,7 @@ Provides endpoints for Google OAuth authentication including:
 - Current user info endpoint
 """
 
+import hashlib
 import logging
 from typing import Optional
 
@@ -26,22 +27,15 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 templates = Jinja2Templates(directory="templates")
 
 
-def _mask_email_for_logging(email: str) -> str:
-    """Mask email address for safe logging (PII protection).
+def _hash_identifier_for_logging(value: str) -> str:
+    """Create a short hash of a value for safe logging (no PII).
 
-    Example: user@example.com -> u***@e***.com
+    Uses SHA256 to create a non-reversible identifier for log correlation.
+    Example: user@example.com -> "a1b2c3d4e5f6"
     """
-    if not email or "@" not in email:
-        return "***"
-    local, domain = email.split("@", 1)
-    masked_local = local[0] + "***" if local else "***"
-    # Mask domain but keep TLD
-    domain_parts = domain.rsplit(".", 1)
-    if len(domain_parts) == 2:
-        masked_domain = domain_parts[0][0] + "***." + domain_parts[1] if domain_parts[0] else "***." + domain_parts[1]
-    else:
-        masked_domain = "***"
-    return f"{masked_local}@{masked_domain}"
+    if not value:
+        return "unknown"
+    return hashlib.sha256(value.encode()).hexdigest()[:12]
 
 
 def _get_user_from_request(request: Request) -> Optional[User]:
@@ -156,14 +150,12 @@ async def oauth_callback(
         # Get user info from Google
         user_info = await oauth_service.get_user_info(tokens.access_token)
 
-        # Mask email immediately for logging purposes (CodeQL: prevent PII in logs)
-        masked_email = _mask_email_for_logging(user_info.email)
-
         # Authorize user (domain check or allow list)
         is_authorized, user, reason = await _authorize_oauth_user(user_info, config)
 
         if not is_authorized:
-            logger.warning("User not authorized: %s - %s", masked_email, reason)
+            # Log with hashed identifier - no PII (CodeQL safe)
+            logger.warning("User not authorized: %s - %s", _hash_identifier_for_logging(user_info.email), reason)
             return templates.TemplateResponse(
                 "errors/403_access_denied.html",
                 {
@@ -189,7 +181,8 @@ async def oauth_callback(
         response = RedirectResponse(url=redirect_uri or "/", status_code=302)
         _set_session_cookie(response, session.session_id, config)
 
-        logger.info("User logged in: %s (admin=%s)", masked_email, user.is_admin)
+        # Log with hashed identifier - no PII (CodeQL safe)
+        logger.info("User logged in: %s (admin=%s)", _hash_identifier_for_logging(user.email), user.is_admin)
         return response
 
     except ValueError as e:

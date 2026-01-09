@@ -8,6 +8,7 @@ Provides OAuth authentication functionality including:
 - State token management for CSRF protection
 """
 
+import hashlib
 import logging
 import secrets
 from datetime import datetime, timedelta, timezone
@@ -24,24 +25,18 @@ logger = logging.getLogger(__name__)
 
 # Google OAuth 2.0 endpoints
 GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
-
-
-def _mask_email_for_logging(email: str) -> str:
-    """Mask email address for safe logging (PII protection).
-
-    Example: user@example.com -> u***@e***.com
-    """
-    if not email or "@" not in email:
-        return "***"
-    local, domain = email.split("@", 1)
-    masked_local = local[0] + "***" if local else "***"
-    domain_parts = domain.rsplit(".", 1)
-    if len(domain_parts) == 2:
-        masked_domain = domain_parts[0][0] + "***." + domain_parts[1] if domain_parts[0] else "***." + domain_parts[1]
-    else:
-        masked_domain = "***"
-    return f"{masked_local}@{masked_domain}"
 GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
+
+
+def _hash_identifier_for_logging(value: str) -> str:
+    """Create a short hash of a value for safe logging (no PII).
+
+    Uses SHA256 to create a non-reversible identifier for log correlation.
+    Example: user@example.com -> "a1b2c3d4e5f6"
+    """
+    if not value:
+        return "unknown"
+    return hashlib.sha256(value.encode()).hexdigest()[:12]
 GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v3/userinfo"
 GOOGLE_REVOKE_URL = "https://oauth2.googleapis.com/revoke"
 
@@ -213,7 +208,7 @@ class OAuthService:
                 raise ValueError(f"User info retrieval failed: {response.status_code}")
 
             data = response.json()
-            logger.info("Retrieved user info for: %s", _mask_email_for_logging(data.get("email", "")))
+            logger.info("Retrieved user info for: %s", _hash_identifier_for_logging(data.get("email", "")))
             return GoogleUserInfo(**data)
 
     async def refresh_access_token(self, refresh_token: str) -> OAuthTokens:

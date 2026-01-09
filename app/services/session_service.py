@@ -9,6 +9,7 @@ Provides session management functionality including:
 """
 
 import base64
+import hashlib
 import logging
 from datetime import datetime, timedelta, timezone
 from functools import lru_cache
@@ -28,21 +29,15 @@ logger = logging.getLogger(__name__)
 SESSIONS_COLLECTION = "sessions"
 
 
-def _mask_email_for_logging(email: str) -> str:
-    """Mask email address for safe logging (PII protection).
+def _hash_identifier_for_logging(value: str) -> str:
+    """Create a short hash of a value for safe logging (no PII).
 
-    Example: user@example.com -> u***@e***.com
+    Uses SHA256 to create a non-reversible identifier for log correlation.
+    Example: user@example.com -> "a1b2c3d4e5f6"
     """
-    if not email or "@" not in email:
-        return "***"
-    local, domain = email.split("@", 1)
-    masked_local = local[0] + "***" if local else "***"
-    domain_parts = domain.rsplit(".", 1)
-    if len(domain_parts) == 2:
-        masked_domain = domain_parts[0][0] + "***." + domain_parts[1] if domain_parts[0] else "***." + domain_parts[1]
-    else:
-        masked_domain = "***"
-    return f"{masked_local}@{masked_domain}"
+    if not value:
+        return "unknown"
+    return hashlib.sha256(value.encode()).hexdigest()[:12]
 
 # Salt for key derivation (constant, but secret key provides security)
 _KEY_DERIVATION_SALT = b"lls_session_encryption_v1"
@@ -182,7 +177,7 @@ class SessionService:
             self._collection.document(session.session_id).set(
                 session.to_firestore_dict()
             )
-            logger.info("Created session for user: %s", _mask_email_for_logging(user.email))
+            logger.info("Created session for user: %s", _hash_identifier_for_logging(user.email))
             return session
         except Exception as e:
             logger.error("Failed to create session: %s", e)
