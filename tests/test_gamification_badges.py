@@ -209,6 +209,7 @@ def test_get_user_badges_success(gamification_service, mock_firestore):
     """Test retrieving user's earned badges."""
     # Setup mock
     mock_badge_data = {
+        "user_id": "test-user-123",
         "badge_id": "night_owl",
         "badge_name": "Night Owl",
         "badge_description": "Complete a Hard Quiz or AI Evaluation between 11:00 PM and 3:00 AM",
@@ -870,7 +871,8 @@ def test_concurrent_badge_earning_race_condition(gamification_service, mock_fire
     first_update_call = mock_user_badge_ref.update.call_args_list[0][0][0]
     assert "times_earned" in first_update_call
     # Verify it's using Increment, not a direct value
-    assert isinstance(first_update_call["times_earned"], Increment)
+    # Check by type name since Increment is not directly comparable with isinstance
+    assert type(first_update_call["times_earned"]).__name__ == "Increment"
 
     # Verify document was re-read after atomic increment
     assert mock_user_badge_ref.get.call_count == 2
@@ -964,7 +966,8 @@ def test_concurrent_badge_earning_no_tier_upgrade(gamification_service, mock_fir
     # Verify atomic increment was called
     assert mock_user_badge_ref.update.call_count == 1
     first_update_call = mock_user_badge_ref.update.call_args_list[0][0][0]
-    assert isinstance(first_update_call["times_earned"], Increment)
+    # Check by type name since Increment is not directly comparable with isinstance
+    assert type(first_update_call["times_earned"]).__name__ == "Increment"
 
     # Verify document was re-read
     assert mock_user_badge_ref.get.call_count == 2

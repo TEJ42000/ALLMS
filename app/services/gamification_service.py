@@ -1555,6 +1555,7 @@ class GamificationService:
             else:
                 # Create new badge
                 user_badge = UserBadge(
+                    user_id=user_id,
                     badge_id=badge_id,
                     badge_name=badge_def.name,
                     badge_description=badge_def.description,

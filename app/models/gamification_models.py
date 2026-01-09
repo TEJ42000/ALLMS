@@ -259,6 +259,16 @@ class BadgeDefinition(BaseModel):
         description="Points awarded for earning this badge"
     )
 
+    tiers: List[str] = Field(
+        default_factory=lambda: ["bronze", "silver", "gold"],
+        description="Available tiers for this badge"
+    )
+
+    tier_requirements: Dict[str, int] = Field(
+        default_factory=lambda: {"bronze": 1, "silver": 5, "gold": 10},
+        description="Number of times badge must be earned to reach each tier"
+    )
+
     active: bool = Field(default=True, description="Whether badge is active")
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
@@ -269,17 +279,41 @@ class BadgeDefinition(BaseModel):
 class UserBadge(BaseModel):
     """User-earned badge.
 
-    Stored in Firestore: user_badges/{user_id}_{badge_id}
+    Stored in Firestore: user_achievements/{user_id}/badges/{badge_id}
 
     CRITICAL: Updated to match Phase 4 implementation
     """
 
     user_id: str = Field(..., description="User's IAP user ID")
     badge_id: str = Field(..., description="Badge ID")
+    badge_name: str = Field(..., description="Badge name (denormalized)")
+    badge_description: str = Field(..., description="Badge description (denormalized)")
+    badge_icon: str = Field(..., description="Badge icon (denormalized)")
+
+    tier: str = Field(
+        default="bronze",
+        description="Current tier: bronze, silver, or gold"
+    )
 
     earned_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
-        description="When badge was earned"
+        description="When badge was first earned"
+    )
+
+    last_earned_at: Optional[datetime] = Field(
+        None,
+        description="When badge was most recently earned (for repeat badges)"
+    )
+
+    times_earned: int = Field(
+        default=1,
+        ge=1,
+        description="Number of times this badge has been earned"
+    )
+
+    course_id: Optional[str] = Field(
+        None,
+        description="Course ID if badge is course-specific"
     )
 
     progress: Optional[Dict[str, Any]] = Field(
