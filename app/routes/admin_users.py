@@ -106,9 +106,20 @@ async def add_allowed_user(
         logger.info("User %s added %s to allow list", user.email, request.email)
         return AllowListResponse.from_entry(entry)
     except ValueError as e:
+        # Provide helpful error message
+        error_msg = str(e)
+        logger.warning(
+            "Failed to add user %s to allow list: %s",
+            request.email, error_msg,
+            extra={
+                "admin_user": user.email,
+                "target_email": request.email,
+                "error": error_msg
+            }
+        )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
+            detail=error_msg
         )
 
 

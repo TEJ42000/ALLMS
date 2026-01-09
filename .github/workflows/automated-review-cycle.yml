@@ -1,0 +1,109 @@
+name: Automated Review Cycle
+
+# This workflow automates the review-fix-iterate cycle
+# It triggers on PR pushes and waits for Claude Code Review to complete
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'PR number to review'
+        required: true
+        type: number
+
+jobs:
+  wait-for-review:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+      actions: read
+    
+    steps:
+      - name: Wait for Claude Code Review
+        uses: fountainhead/action-wait-for-check@v1.1.0
+        id: wait-for-review
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          checkName: claude-review
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          timeoutSeconds: 600
+          intervalSeconds: 10
+      
+      - name: Get Review Comments
+        id: get-review
+        if: steps.wait-for-review.outputs.conclusion == 'success'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              per_page: 100
+            });
+            
+            // Find Claude Code Review comments
+            const reviewComments = comments.filter(comment => 
+              comment.user.login === 'github-actions[bot]' &&
+              comment.body.includes('Claude Code Review')
+            );
+            
+            if (reviewComments.length > 0) {
+              const latestReview = reviewComments[reviewComments.length - 1];
+              core.setOutput('review_body', latestReview.body);
+              core.setOutput('has_review', 'true');
+            } else {
+              core.setOutput('has_review', 'false');
+            }
+      
+      - name: Parse Review Feedback
+        if: steps.wait-for-review.outputs.conclusion == 'success'
+        id: parse-review
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const reviewBody = '${{ steps.get-review.outputs.review_body }}';
+            
+            // Parse CRITICAL, HIGH, MEDIUM issues
+            const criticalMatch = reviewBody.match(/CRITICAL.*?(?=HIGH|MEDIUM|LOW|$)/s);
+            const highMatch = reviewBody.match(/HIGH.*?(?=MEDIUM|LOW|$)/s);
+            const mediumMatch = reviewBody.match(/MEDIUM.*?(?=LOW|$)/s);
+            
+            const hasCritical = criticalMatch && criticalMatch[0].length > 50;
+            const hasHigh = highMatch && highMatch[0].length > 50;
+            const hasMedium = mediumMatch && mediumMatch[0].length > 50;
+            
+            core.setOutput('has_critical', hasCritical);
+            core.setOutput('has_high', hasHigh);
+            core.setOutput('has_medium', hasMedium);
+            core.setOutput('needs_fixes', hasCritical || hasHigh || hasMedium);
+      
+      - name: Comment Review Summary
+        if: steps.parse-review.outputs.needs_fixes == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const critical = '${{ steps.parse-review.outputs.has_critical }}' === 'true';
+            const high = '${{ steps.parse-review.outputs.has_high }}' === 'true';
+            const medium = '${{ steps.parse-review.outputs.has_medium }}' === 'true';
+            
+            let message = '## 🤖 Automated Review Cycle\n\n';
+            message += 'Claude Code Review has completed. Issues found:\n\n';
+            
+            if (critical) message += '- ❌ **CRITICAL** issues detected\n';
+            if (high) message += '- ⚠️ **HIGH** priority issues detected\n';
+            if (medium) message += '- ℹ️ **MEDIUM** priority issues detected\n';
+            
+            message += '\n**Action Required:** Please review the feedback above and implement fixes.\n';
+            message += '\nOnce fixes are committed, the review cycle will run again automatically.';
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: message
+            });
+
