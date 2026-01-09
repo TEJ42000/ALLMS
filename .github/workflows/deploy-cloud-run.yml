@@ -114,12 +114,12 @@ jobs:
 
       - name: Grant Cloud Run invoker access
         run: |
-          echo "Granting Cloud Run invoker access to authorized users..."
+          echo "Granting Cloud Run invoker access to all users (application handles auth)..."
           gcloud run services add-iam-policy-binding ${{ env.SERVICE_NAME }} \
             --region=${{ env.REGION }} \
-            --member='user:matej@mgms.eu' \
+            --member='allUsers' \
             --role='roles/run.invoker' \
-            --quiet || echo "Warning: Failed to add matej@mgms.eu (may already exist)"
+            --quiet || echo "Warning: Failed to add allUsers (may already exist)"
 
       - name: Output deployment URL
         run: |
