@@ -112,6 +112,15 @@ jobs:
             SESSION_COOKIE_NAME=lls_session
             SESSION_EXPIRY_DAYS=7
 
+      - name: Grant Cloud Run invoker access
+        run: |
+          echo "Granting Cloud Run invoker access to authorized users..."
+          gcloud run services add-iam-policy-binding ${{ env.SERVICE_NAME }} \
+            --region=${{ env.REGION }} \
+            --member='user:matej@mgms.eu' \
+            --role='roles/run.invoker' \
+            --quiet || echo "Warning: Failed to add matej@mgms.eu (may already exist)"
+
       - name: Output deployment URL
         run: |
           echo "## 🚀 Deployment Successful!" >> $GITHUB_STEP_SUMMARY
