@@ -25,9 +25,9 @@ from app.models.flashcard_models import (
     FlashcardIssuesList
 )
 from app.services.gcp_service import get_firestore_client
-from app.services.auth_service import get_current_user
 from app.services.rate_limiter import check_flashcard_rate_limit
-from app.models.schemas import User
+from app.dependencies.auth import get_current_user
+from app.models.auth_models import User
 
 router = APIRouter(prefix="/api/flashcards/issues", tags=["Flashcard Issues"])
 
