@@ -15,48 +15,80 @@ class WeekContentManager {
     }
     
     async init() {
+        console.log('[WeekContentManager] Initializing...');
+        console.log('[WeekContentManager] Course ID:', this.courseId);
+        console.log('[WeekContentManager] Weeks grid element:', this.weeksGrid);
+
         if (!this.weeksGrid) {
-            console.warn('[WeekContentManager] weeks-grid element not found');
+            console.error('[WeekContentManager] weeks-grid element not found!');
+            console.log('[WeekContentManager] Available elements:', {
+                'weeks-section': document.getElementById('weeks-section'),
+                'weeks-grid': document.getElementById('weeks-grid')
+            });
             return;
         }
+
+        console.log('[WeekContentManager] Loading weeks...');
         await this.loadWeeks();
     }
     
     async loadWeeks() {
         try {
-            console.log('[WeekContentManager] Loading weeks for course:', this.courseId);
-            
+            console.log('[WeekContentManager] Fetching weeks from API...');
+            console.log('[WeekContentManager] URL:', `/api/admin/courses/${this.courseId}?include_weeks=true`);
+
             // Fetch weeks from existing admin API
             const response = await fetch(`/api/admin/courses/${this.courseId}?include_weeks=true`);
-            if (!response.ok) throw new Error(`Failed to load weeks: ${response.status}`);
-            
+            console.log('[WeekContentManager] Response status:', response.status);
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('[WeekContentManager] API error:', errorText);
+                throw new Error(`Failed to load weeks: ${response.status}`);
+            }
+
             const course = await response.json();
+            console.log('[WeekContentManager] Course data:', course);
+
             const weeks = course.weeks || [];
-            
-            console.log('[WeekContentManager] Loaded', weeks.length, 'weeks');
+            console.log('[WeekContentManager] Weeks found:', weeks.length);
+
+            if (weeks.length > 0) {
+                console.log('[WeekContentManager] First week:', weeks[0]);
+            }
+
             this.renderWeeks(weeks);
         } catch (error) {
             console.error('[WeekContentManager] Error loading weeks:', error);
+            console.error('[WeekContentManager] Error stack:', error.stack);
             // Fallback: render placeholder weeks
             this.renderFallbackWeeks();
         }
     }
     
     renderWeeks(weeks) {
+        console.log('[WeekContentManager] renderWeeks called with:', weeks);
+
         if (!weeks || weeks.length === 0) {
+            console.warn('[WeekContentManager] No weeks to render, showing fallback');
             this.renderFallbackWeeks();
             return;
         }
-        
+
+        console.log('[WeekContentManager] Clearing grid and rendering', weeks.length, 'weeks');
         this.weeksGrid.innerHTML = '';
-        
+
         // Sort by week number
         weeks.sort((a, b) => (a.weekNumber || 0) - (b.weekNumber || 0));
-        
-        weeks.forEach(week => {
+        console.log('[WeekContentManager] Sorted weeks:', weeks.map(w => `Week ${w.weekNumber}`));
+
+        weeks.forEach((week, index) => {
+            console.log(`[WeekContentManager] Creating card ${index + 1}/${weeks.length}:`, week);
             const card = this.createWeekCard(week);
             this.weeksGrid.appendChild(card);
         });
+
+        console.log('[WeekContentManager] ✅ All week cards rendered successfully');
     }
     
     renderFallbackWeeks() {
