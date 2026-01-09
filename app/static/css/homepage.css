@@ -93,7 +93,7 @@
     background: linear-gradient(135deg, var(--gold-primary), var(--gold-light));
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
-    background-clip: text;
+    /* background-clip: text; - Non-standard value, using -webkit prefix for compatibility */
     letter-spacing: -0.5px;
 }
 
@@ -186,7 +186,7 @@
     background: linear-gradient(135deg, var(--gold-primary), var(--gold-light));
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
-    background-clip: text;
+    /* background-clip: text; - Non-standard value, using -webkit prefix for compatibility */
 }
 
 .hero-description {
