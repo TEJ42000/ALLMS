@@ -22,16 +22,78 @@ from app.services.retry_logic import (
 )
 
 
+class TestRetryConfigValidation:
+    """Tests for RetryConfig validation."""
+
+    def test_valid_config(self):
+        """Test that valid config is accepted."""
+        config = RetryConfig(
+            max_retries=5,
+            initial_delay=1.0,
+            max_delay=60.0,
+            exponential_base=2.0,
+            jitter=True
+        )
+        assert config.max_retries == 5
+
+    def test_negative_max_retries(self):
+        """Test that negative max_retries raises ValueError."""
+        with pytest.raises(ValueError, match="max_retries must be >= 0"):
+            RetryConfig(max_retries=-1)
+
+    def test_negative_initial_delay(self):
+        """Test that negative initial_delay raises ValueError."""
+        with pytest.raises(ValueError, match="initial_delay must be >= 0"):
+            RetryConfig(initial_delay=-1.0)
+
+    def test_negative_max_delay(self):
+        """Test that negative max_delay raises ValueError."""
+        with pytest.raises(ValueError, match="max_delay must be >= 0"):
+            RetryConfig(max_delay=-1.0)
+
+    def test_max_delay_less_than_initial_delay(self):
+        """Test that max_delay < initial_delay raises ValueError."""
+        with pytest.raises(ValueError, match="max_delay .* must be >= initial_delay"):
+            RetryConfig(initial_delay=10.0, max_delay=5.0)
+
+    def test_zero_exponential_base(self):
+        """Test that exponential_base <= 0 raises ValueError."""
+        with pytest.raises(ValueError, match="exponential_base must be > 0"):
+            RetryConfig(exponential_base=0)
+
+    def test_negative_exponential_base(self):
+        """Test that negative exponential_base raises ValueError."""
+        with pytest.raises(ValueError, match="exponential_base must be > 0"):
+            RetryConfig(exponential_base=-1.0)
+
+    def test_retryable_exceptions_not_tuple(self):
+        """Test that retryable_exceptions must be a tuple."""
+        with pytest.raises(TypeError, match="retryable_exceptions must be a tuple"):
+            RetryConfig(retryable_exceptions=[ValueError])
+
+    def test_retryable_exceptions_invalid_type(self):
+        """Test that retryable_exceptions must contain exception types."""
+        with pytest.raises(TypeError, match="retryable_exceptions must contain exception types"):
+            RetryConfig(retryable_exceptions=("not an exception",))
+
+    def test_retryable_exceptions_valid(self):
+        """Test that valid retryable_exceptions is accepted."""
+        config = RetryConfig(
+            retryable_exceptions=(ValueError, TypeError, ConnectionError)
+        )
+        assert config.retryable_exceptions == (ValueError, TypeError, ConnectionError)
+
+
 class TestRetryWithBackoff:
     """Tests for async retry_with_backoff function."""
-    
+
     @pytest.mark.asyncio
     async def test_success_on_first_attempt(self):
         """Test that successful function doesn't retry."""
         mock_func = AsyncMock(return_value="success")
-        
+
         result = await retry_with_backoff(mock_func, "arg1", kwarg1="value1")
-        
+
         assert result == "success"
         assert mock_func.call_count == 1
         mock_func.assert_called_once_with("arg1", kwarg1="value1")
@@ -92,24 +154,26 @@ class TestRetryWithBackoff:
         mock_func = AsyncMock(side_effect=[
             Exception("Error 1"),
             Exception("Error 2"),
+            Exception("Error 3"),
             "success"
         ])
-        
+
         config = RetryConfig(
-            max_retries=3,
-            initial_delay=10.0,
+            max_retries=4,
+            initial_delay=0.1,
             max_delay=0.2,  # Cap at 0.2s
             exponential_base=2.0,
             jitter=False
         )
-        
+
         start_time = time.time()
         result = await retry_with_backoff(mock_func, config=config)
         elapsed = time.time() - start_time
-        
-        # Both delays should be capped at 0.2s: 0.2s + 0.2s = 0.4s
+
+        # Expected delays: 0.1s, 0.2s (capped), 0.2s (capped) = 0.5s
+        # Allow some tolerance for execution time
         assert result == "success"
-        assert 0.35 < elapsed < 0.55, f"Expected ~0.4s, got {elapsed:.3f}s"
+        assert 0.45 < elapsed < 0.65, f"Expected ~0.5s, got {elapsed:.3f}s"
     
     @pytest.mark.asyncio
     async def test_jitter_adds_randomness(self):

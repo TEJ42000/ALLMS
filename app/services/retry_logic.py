@@ -44,7 +44,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class RetryConfig:
     """Configuration for retry behavior.
-    
+
     Attributes:
         max_retries: Maximum number of retry attempts (default: 3)
         initial_delay: Initial delay in seconds before first retry (default: 1.0)
@@ -59,6 +59,37 @@ class RetryConfig:
     exponential_base: float = 2.0
     jitter: bool = True
     retryable_exceptions: Optional[Tuple[Type[Exception], ...]] = None
+
+    def __post_init__(self):
+        """Validate configuration parameters."""
+        if self.max_retries < 0:
+            raise ValueError(f"max_retries must be >= 0, got {self.max_retries}")
+
+        if self.initial_delay < 0:
+            raise ValueError(f"initial_delay must be >= 0, got {self.initial_delay}")
+
+        if self.max_delay < 0:
+            raise ValueError(f"max_delay must be >= 0, got {self.max_delay}")
+
+        if self.max_delay < self.initial_delay:
+            raise ValueError(
+                f"max_delay ({self.max_delay}) must be >= initial_delay ({self.initial_delay})"
+            )
+
+        if self.exponential_base <= 0:
+            raise ValueError(f"exponential_base must be > 0, got {self.exponential_base}")
+
+        if self.retryable_exceptions is not None:
+            if not isinstance(self.retryable_exceptions, tuple):
+                raise TypeError(
+                    f"retryable_exceptions must be a tuple, got {type(self.retryable_exceptions).__name__}"
+                )
+
+            for exc_type in self.retryable_exceptions:
+                if not isinstance(exc_type, type) or not issubclass(exc_type, BaseException):
+                    raise TypeError(
+                        f"retryable_exceptions must contain exception types, got {exc_type}"
+                    )
 
 
 async def retry_with_backoff(
