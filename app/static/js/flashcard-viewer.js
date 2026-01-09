@@ -42,6 +42,7 @@ class FlashcardViewer {
         this.studyMode = options.studyMode || 'standard'; // 'standard', 'quiz', 'spaced'
         this.showXP = options.showXP !== false; // Show XP by default
         this.onComplete = options.onComplete || null; // Callback when set completed
+        this.xpPerCard = options.xpPerCard || 1; // MEDIUM FIX: Configurable XP per card
 
         // HIGH FIX: Enhanced input validation with comprehensive checks
         this.flashcards = flashcards.filter((card, index) => {
@@ -99,7 +100,7 @@ class FlashcardViewer {
 
         // NEW: XP tracking
         this.xpEarned = 0;
-        this.xpPerCard = 1; // Base XP per card reviewed
+        // xpPerCard is now configured in options (line 45)
 
         // NEW: Auto-advance timeout tracking for cleanup
         this.autoAdvanceTimeout = null;
