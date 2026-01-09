@@ -142,7 +142,7 @@ async def oauth_callback(
         is_authorized, user, reason = await _authorize_oauth_user(user_info, config)
 
         if not is_authorized:
-            logger.warning("User not authorized, reason: %s", reason)
+            logger.warning("User not authorized")
             return templates.TemplateResponse(
                 "errors/403_access_denied.html",
                 {
