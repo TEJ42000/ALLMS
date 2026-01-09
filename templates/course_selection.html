@@ -3,66 +3,186 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Select Your Course - LLS Study Portal</title>
+    <title>LLMRMS - AI-Powered Legal Education Platform</title>
     <link rel="icon" type="image/svg+xml" href="/static/images/favicon.svg">
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Playfair+Display:wght@600;700;800&display=swap" rel="stylesheet">
+
+    <!-- Stylesheets -->
     <link rel="stylesheet" href="/static/css/styles.css">
-    <link rel="stylesheet" href="/static/css/course-selection.css">
+    <link rel="stylesheet" href="/static/css/homepage.css">
 </head>
-<body>
-    <div class="container">
-        <header class="landing-header">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; width: 100%;">
-                <div>
-                    <h1 class="landing-title">⚖️ LLS Study Portal</h1>
-                    <p class="landing-subtitle">Select your course to begin studying</p>
-                </div>
+<body class="homepage-body">
+    <!-- Navigation -->
+    <nav class="homepage-nav">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <span class="brand-icon">⚖️</span>
+                <span class="brand-name">LLMRMS</span>
+            </div>
+            <div class="nav-links">
                 {% if user %}
-                {% include "partials/user_header.html" %}
+                    {% include "partials/user_header.html" %}
+                {% else %}
+                    <a href="/admin/courses" class="nav-link">Admin</a>
+                    <a href="/api/docs" class="nav-link">API Docs</a>
                 {% endif %}
             </div>
-        </header>
+        </div>
+    </nav>
 
-        <main class="landing-main">
-            <div class="course-selection-container">
-                <div class="selection-header">
-                    <h2>📚 Available Courses</h2>
-                    <p>Choose a course to access study materials, AI tutor, quizzes, and more</p>
+    <!-- Hero Section -->
+    <section class="hero-section">
+        <div class="hero-container">
+            <div class="hero-content">
+                <h1 class="hero-title">
+                    <span class="hero-title-main">Master Legal Studies</span>
+                    <span class="hero-title-sub">with AI-Powered Learning</span>
+                </h1>
+                <p class="hero-description">
+                    Transform your legal education with intelligent study tools, personalized AI tutoring,
+                    and comprehensive course materials designed for excellence.
+                </p>
+                <div class="hero-cta">
+                    <a href="#courses" class="btn-primary">Explore Courses</a>
+                    <a href="/api/docs" class="btn-secondary">Learn More</a>
                 </div>
-
-                <div id="loading-indicator" class="loading-indicator">
-                    <div class="spinner"></div>
-                    <p>Loading courses...</p>
+            </div>
+            <div class="hero-visual">
+                <div class="hero-card hero-card-1">
+                    <div class="card-icon">🎓</div>
+                    <div class="card-text">AI Tutor</div>
                 </div>
-
-                <div id="error-message" class="error-message" style="display: none;">
-                    <p>⚠️ Failed to load courses. Please try again later.</p>
-                    <button onclick="loadCourses()" class="retry-button">Retry</button>
+                <div class="hero-card hero-card-2">
+                    <div class="card-icon">📚</div>
+                    <div class="card-text">Smart Quizzes</div>
                 </div>
-
-                <div id="courses-grid" class="courses-grid">
-                    <!-- Courses will be loaded dynamically -->
+                <div class="hero-card hero-card-3">
+                    <div class="card-icon">⚡</div>
+                    <div class="card-text">Flashcards</div>
                 </div>
+            </div>
+        </div>
+    </section>
 
-                <div id="no-courses-message" class="no-courses-message" style="display: none;">
-                    <div class="empty-state">
-                        <div class="empty-icon">📚</div>
-                        <h3>No Courses Available</h3>
-                        <p>There are currently no active courses. Please check back later or contact your administrator.</p>
+    <!-- Features Section -->
+    <section class="features-section">
+        <div class="features-container">
+            <div class="section-header">
+                <h2 class="section-title">Powerful Learning Tools</h2>
+                <p class="section-subtitle">Everything you need to excel in your legal studies</p>
+            </div>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">🤖</div>
+                    <h3 class="feature-title">AI Tutor</h3>
+                    <p class="feature-description">
+                        Get instant, context-aware answers to your legal questions powered by advanced AI
+                    </p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">📝</div>
+                    <h3 class="feature-title">Smart Assessments</h3>
+                    <p class="feature-description">
+                        AI-graded essays and quizzes with detailed feedback to improve your understanding
+                    </p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🗂️</div>
+                    <h3 class="feature-title">Flashcard System</h3>
+                    <p class="feature-description">
+                        Spaced repetition learning with AI-generated flashcards for optimal retention
+                    </p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">📊</div>
+                    <h3 class="feature-title">Progress Tracking</h3>
+                    <p class="feature-description">
+                        Monitor your learning journey with detailed analytics and achievement badges
+                    </p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">📚</div>
+                    <h3 class="feature-title">Study Guides</h3>
+                    <p class="feature-description">
+                        AI-generated study materials with visual diagrams and comprehensive notes
+                    </p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🎯</div>
+                    <h3 class="feature-title">Personalized Learning</h3>
+                    <p class="feature-description">
+                        Adaptive content that adjusts to your learning pace and knowledge level
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Courses Section -->
+    <section id="courses" class="courses-section">
+        <div class="courses-container">
+            <div class="section-header">
+                <h2 class="section-title">Available Courses</h2>
+                <p class="section-subtitle">Choose your course to begin your learning journey</p>
+            </div>
+
+            <div id="loading-indicator" class="loading-indicator">
+                <div class="spinner"></div>
+                <p>Loading courses...</p>
+            </div>
+
+            <div id="error-message" class="error-message" style="display: none;">
+                <p>⚠️ Failed to load courses. Please try again later.</p>
+                <button onclick="loadCourses()" class="retry-button">Retry</button>
+            </div>
+
+            <div id="courses-grid" class="courses-grid">
+                <!-- Courses will be loaded dynamically -->
+            </div>
+
+            <div id="no-courses-message" class="no-courses-message" style="display: none;">
+                <div class="empty-state">
+                    <div class="empty-icon">📚</div>
+                    <h3>No Courses Available</h3>
+                    <p>There are currently no active courses. Please check back later or contact your administrator.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="homepage-footer">
+        <div class="footer-container">
+            <div class="footer-content">
+                <div class="footer-brand">
+                    <span class="brand-icon">⚖️</span>
+                    <span class="brand-name">LLMRMS</span>
+                    <p class="footer-tagline">AI-Powered Legal Education</p>
+                </div>
+                <div class="footer-links">
+                    <div class="footer-column">
+                        <h4>Platform</h4>
+                        <a href="/admin/courses">Admin Dashboard</a>
+                        <a href="/api/docs">API Documentation</a>
+                    </div>
+                    <div class="footer-column">
+                        <h4>Legal</h4>
+                        <a href="/privacy-policy">Privacy Policy</a>
+                        <a href="/terms-of-service">Terms of Service</a>
                     </div>
                 </div>
             </div>
-        </main>
+            <div class="footer-bottom">
+                <p>&copy; 2026 LLMRMS. All rights reserved. | Version {{ version }}</p>
+            </div>
+        </div>
+    </footer>
 
-        <footer class="landing-footer">
-            <p>&copy; 2026 LLS Study Portal | Version {{ version }}</p>
-            <p>
-                <a href="/admin/courses" class="admin-link">Admin Dashboard</a> |
-                <a href="/api/docs" class="docs-link">API Documentation</a>
-            </p>
-        </footer>
-    </div>
-
-    <script src="/static/js/course-selection.js"></script>
+    <script src="/static/js/homepage.js"></script>
 </body>
 </html>
 
