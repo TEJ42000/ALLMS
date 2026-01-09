@@ -31,7 +31,8 @@ class TestPagesEndpoint:
 
         assert response.status_code == 200
         assert "text/html" in response.headers["content-type"]
-        assert "LLS Study Portal" in response.text
+        # Updated to match new branding (homepage redesign)
+        assert "LLMRMS" in response.text or "LLS Study Portal" in response.text
 
     def test_index_page_contains_main_elements(self, client):
         """Test that index page contains expected elements."""
