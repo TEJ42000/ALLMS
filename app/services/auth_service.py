@@ -15,7 +15,7 @@ from typing import Optional
 
 from fastapi import Request
 
-from app.models.auth_models import AuthConfig, User, MockUser, AllowListEntry
+from app.models.auth_models import AuthConfig, User, MockUser
 
 logger = logging.getLogger(__name__)
 
@@ -156,59 +156,52 @@ async def check_allow_list(email: str) -> bool:
     """
     Check if an email is on the allow list in Firestore.
 
+    Uses the AllowListService for consistent allow list checking.
+
     Args:
         email: Email address to check
 
     Returns:
         True if email is on the active, non-expired allow list
     """
-    # Import here to avoid circular imports and allow lazy loading
+    # Import here to avoid circular imports
     try:
-        from app.services.gcp_service import get_firestore_client
+        from app.services.allow_list_service import get_allow_list_service
     except ImportError:
-        logger.warning("Firestore client not available, allow list check skipped")
+        logger.warning("Allow list service not available, check skipped")
         return False
 
     try:
-        db = get_firestore_client()
-        if db is None:
-            logger.warning("Firestore client is None, allow list check skipped")
+        service = get_allow_list_service()
+
+        if not service.is_available:
+            logger.warning("Allow list service is not available")
             return False
 
-        # Normalize email for lookup
-        normalized_email = email.lower().strip()
+        # Use the service's is_user_allowed method which checks:
+        # - User exists
+        # - active=True
+        # - Not expired
+        is_allowed = service.is_user_allowed(email)
 
-        # Use URL-safe encoding for document ID to avoid collisions
-        # This properly handles dots and all special characters
-        from urllib.parse import quote
-        doc_id = quote(normalized_email, safe='')
-        doc_ref = db.collection("allowed_users").document(doc_id)
-        doc = doc_ref.get()
+        if is_allowed:
+            logger.info("User found in allow list and has effective access: %s", email)
+        else:
+            # Get more details for logging
+            entry = service.get_user(email)
+            if entry is None:
+                logger.debug("Email not found in allow list: %s", email)
+            else:
+                logger.info(
+                    "Allow list entry exists but not effective (active=%s, expired=%s): %s",
+                    entry.active, entry.is_expired, email
+                )
 
-        if not doc.exists:
-            logger.debug("Email not found in allow list: %s", normalized_email)
-            return False
+        return is_allowed
 
-        # Parse the entry and check validity
-        entry = AllowListEntry.from_firestore_dict(doc.to_dict())
-
-        if not entry.is_valid:
-            logger.info(
-                "Allow list entry invalid (active=%s, expired=%s): %s",
-                entry.active, entry.is_expired, normalized_email
-            )
-            return False
-
-        logger.info("User found in allow list: %s", normalized_email)
-        return True
-
-    except (ValueError, KeyError, AttributeError) as e:
-        # Handle expected errors (validation, missing fields, etc.)
-        logger.error("Error checking allow list: %s", str(e))
-        return False
     except Exception as e:
         # Log unexpected errors with full traceback but don't crash
-        logger.exception("Unexpected error checking allow list: %s", str(e))
+        logger.exception("Unexpected error checking allow list for %s: %s", email, str(e))
         return False
 
 

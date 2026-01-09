@@ -143,15 +143,20 @@ class AllowListService:
     ) -> AllowListEntry:
         """Add a user to the allow list.
 
+        If the user already exists:
+        - If active and effective: raises ValueError
+        - If inactive (soft-deleted): reactivates the user with new details
+        - If expired: updates with new expiration and reactivates
+
         Args:
             request: Create request with email, reason, etc.
             added_by: Email of admin adding the user
 
         Returns:
-            Created AllowListEntry
+            Created or reactivated AllowListEntry
 
         Raises:
-            ValueError: If user already exists or service unavailable
+            ValueError: If user is already active or service unavailable
         """
         if not self.is_available:
             raise ValueError("Allow list service is not available")
@@ -162,8 +167,40 @@ class AllowListService:
         # Check if already exists
         existing = self.get_user(email)
         if existing is not None:
-            raise ValueError(f"User {email} is already on the allow list")
+            # If user is already active and effective, don't allow duplicate
+            if existing.is_effective:
+                raise ValueError(
+                    f"User {email} is already on the allow list and has active access. "
+                    f"Use the update endpoint to modify their entry."
+                )
 
+            # User exists but is inactive or expired - reactivate them
+            logger.info(
+                "Reactivating previously removed/expired user: %s (was active=%s, expired=%s)",
+                email, existing.active, existing.is_expired
+            )
+
+            # Update existing entry with new details
+            now = datetime.now(timezone.utc)
+            updates = {
+                "active": True,
+                "reason": request.reason,
+                "expires_at": request.expires_at,
+                "notes": request.notes,
+                "updated_at": now,
+                "added_by": added_by.lower().strip(),  # Update who reactivated
+                "added_at": now,  # Update when reactivated
+            }
+
+            try:
+                self._collection.document(doc_id).update(updates)
+                logger.info("Reactivated user on allow list: %s (by %s)", email, added_by)
+                return self.get_user(email)
+            except Exception as e:
+                logger.error("Error reactivating user %s: %s", email, e)
+                raise ValueError(f"Failed to reactivate user: {e}") from e
+
+        # User doesn't exist - create new entry
         now = datetime.now(timezone.utc)
         entry = AllowListEntry(
             email=email,
@@ -178,7 +215,7 @@ class AllowListService:
 
         try:
             self._collection.document(doc_id).set(entry.model_dump_for_firestore())
-            logger.info("Added user to allow list: %s (by %s)", email, added_by)
+            logger.info("Added new user to allow list: %s (by %s)", email, added_by)
             return entry
         except Exception as e:
             logger.error("Error adding user to allow list %s: %s", email, e)
