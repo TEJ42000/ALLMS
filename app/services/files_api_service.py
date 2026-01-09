@@ -143,6 +143,17 @@ class FilesAPIService:
             self._course_service = get_course_service()
         return self._course_service
 
+    def _get_anthropic_client(self):
+        """Get Anthropic client instance.
+
+        This method exists for test mocking purposes. Tests can patch this method
+        to inject mock clients without affecting the actual client initialization.
+
+        Returns:
+            AsyncAnthropic: The Anthropic client instance
+        """
+        return self.client
+
     @property
     def firestore(self):
         """Lazy-load Firestore client."""
@@ -426,7 +437,8 @@ Return ONLY valid JSON:
         })
 
         # Call API with Files API beta
-        response = await self.client.beta.messages.create(
+        client = self._get_anthropic_client()
+        response = await client.beta.messages.create(
             model="claude-sonnet-4-20250514",
             max_tokens=4000,
             betas=[self.beta_header],
@@ -541,7 +553,8 @@ Return ONLY valid JSON:
         )
 
         # Call API (no Files API beta header needed)
-        response = await self.client.messages.create(
+        client = self._get_anthropic_client()
+        response = await client.messages.create(
             model="claude-sonnet-4-20250514",
             max_tokens=4000,
             messages=[{
@@ -758,7 +771,8 @@ OUTPUT QUALITY:
 
         for attempt in range(max_retries):
             try:
-                response = await self.client.messages.create(
+                client = self._get_anthropic_client()
+                response = await client.messages.create(
                     model="claude-sonnet-4-20250514",
                     max_tokens=16000,  # Increased to accommodate thinking + output
                     thinking={
@@ -885,7 +899,8 @@ Cite page numbers if available.""" % (article, code)
             "text": prompt_text
         })
 
-        response = await self.client.beta.messages.create(
+        client = self._get_anthropic_client()
+        response = await client.beta.messages.create(
             model="claude-sonnet-4-20250514",
             max_tokens=2500,
             betas=[self.beta_header],
@@ -963,7 +978,8 @@ Use proper legal analysis method and cite articles.""" % (topic, case_facts)
             "text": prompt_text
         })
 
-        response = await self.client.beta.messages.create(
+        client = self._get_anthropic_client()
+        response = await client.beta.messages.create(
             model="claude-sonnet-4-20250514",
             max_tokens=2500,
             betas=[self.beta_header],
@@ -1116,7 +1132,8 @@ Include:
             "text": prompt_text
         })
 
-        response = await self.client.beta.messages.create(
+        client = self._get_anthropic_client()
+        response = await client.beta.messages.create(
             model="claude-sonnet-4-20250514",
             max_tokens=3000,
             betas=[self.beta_header],
@@ -1228,7 +1245,8 @@ Make flashcards clear, concise, and exam-focused.""" % (num_cards, topic)
         )
 
         # Call API (no Files API beta header needed)
-        response = await self.client.messages.create(
+        client = self._get_anthropic_client()
+        response = await client.messages.create(
             model="claude-sonnet-4-20250514",
             max_tokens=3000,
             messages=[{
@@ -1252,7 +1270,8 @@ Make flashcards clear, concise, and exam-focused.""" % (num_cards, topic)
     async def list_available_files(self) -> List[Dict]:
         """List all uploaded files from Anthropic API."""
         try:
-            response = await self.client.beta.files.list()
+            client = self._get_anthropic_client()
+            response = await client.beta.files.list()
 
             files = []
             for file_item in response.data:

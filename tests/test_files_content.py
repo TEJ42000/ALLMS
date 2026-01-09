@@ -467,11 +467,13 @@ class TestInputValidation:
         service = FilesAPIService()
 
         # Mock the Anthropic client
-        with patch.object(service, '_get_anthropic_client') as mock_client:
+        with patch.object(service, '_get_anthropic_client') as mock_get_client:
+            mock_client = MagicMock()
             mock_response = MagicMock()
-            mock_response.content = [MagicMock(text='[{"front": "Q", "back": "A"}]')]
+            mock_response.content = [MagicMock(text='{"flashcards": [{"front": "Q", "back": "A"}]}')]
             mock_response.usage = MagicMock(input_tokens=100, output_tokens=50)
-            mock_client.return_value.messages.create = AsyncMock(return_value=mock_response)
+            mock_client.beta.messages.create = AsyncMock(return_value=mock_response)
+            mock_get_client.return_value = mock_client
 
             # Should not raise - 5 is the minimum valid value
             result = await service.generate_flashcards(
