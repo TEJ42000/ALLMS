@@ -18,7 +18,7 @@ const FLASHCARD_CONSTANTS = {
 };
 
 class FlashcardViewer {
-    constructor(containerId, flashcards = []) {
+    constructor(containerId, flashcards = [], options = {}) {
         // HIGH: Validate containerId
         if (!containerId || typeof containerId !== 'string') {
             console.error('[FlashcardViewer] Invalid containerId:', containerId);
@@ -36,6 +36,11 @@ class FlashcardViewer {
             console.error('[FlashcardViewer] flashcards must be an array');
             throw new Error('flashcards parameter must be an array');
         }
+
+        // NEW: Study mode configuration
+        this.studyMode = options.studyMode || 'standard'; // 'standard', 'quiz', 'spaced'
+        this.showXP = options.showXP !== false; // Show XP by default
+        this.onComplete = options.onComplete || null; // Callback when set completed
 
         // HIGH FIX: Enhanced input validation with comprehensive checks
         this.flashcards = flashcards.filter((card, index) => {
@@ -85,6 +90,15 @@ class FlashcardViewer {
         this.reviewedCards = new Set();
         this.knownCards = new Set();
         this.starredCards = new Set();
+
+        // NEW: Quiz mode tracking
+        this.quizAnswers = new Map(); // Map<cardIndex, 'correct'|'incorrect'|'skip'>
+        this.quizScore = 0;
+        this.quizStartTime = null;
+
+        // NEW: XP tracking
+        this.xpEarned = 0;
+        this.xpPerCard = 1; // Base XP per card reviewed
 
         // Store original flashcards for restoration after filtering
         this.originalFlashcards = [...this.flashcards];
@@ -213,35 +227,7 @@ class FlashcardViewer {
 
                 <!-- Card Actions -->
                 <div class="flashcard-actions" role="toolbar" aria-label="Flashcard actions">
-                    <button class="btn-action ${this.starredCards.has(this.currentIndex) ? 'active' : ''}"
-                            id="btn-star"
-                            aria-label="${this.starredCards.has(this.currentIndex) ? 'Unstar' : 'Star'} this card for later review"
-                            aria-pressed="${this.starredCards.has(this.currentIndex)}">
-                        <span class="icon" aria-hidden="true">⭐</span>
-                        <span class="label">Star</span>
-                    </button>
-
-                    <button class="btn-action ${this.knownCards.has(this.currentIndex) ? 'active' : ''}"
-                            id="btn-know"
-                            aria-label="${this.knownCards.has(this.currentIndex) ? 'Unmark' : 'Mark'} as known"
-                            aria-pressed="${this.knownCards.has(this.currentIndex)}">
-                        <span class="icon" aria-hidden="true">✓</span>
-                        <span class="label">Know</span>
-                    </button>
-
-                    <button class="btn-action"
-                            id="btn-shuffle"
-                            aria-label="Shuffle all flashcards">
-                        <span class="icon" aria-hidden="true">🔀</span>
-                        <span class="label">Shuffle</span>
-                    </button>
-
-                    <button class="btn-action"
-                            id="btn-restart"
-                            aria-label="Restart from the beginning">
-                        <span class="icon" aria-hidden="true">↺</span>
-                        <span class="label">Restart</span>
-                    </button>
+                    ${this.studyMode === 'quiz' && this.isFlipped ? this.renderQuizActions() : this.renderStandardActions()}
                 </div>
 
                 <!-- Study Stats -->
@@ -271,6 +257,85 @@ class FlashcardViewer {
             console.error('[FlashcardViewer] Error rendering:', error);
             this.showError('An error occurred while displaying the flashcard');
         }
+    }
+
+    /**
+     * Render standard mode actions (star, know, shuffle, restart)
+     * NEW: Extracted for quiz mode support
+     */
+    renderStandardActions() {
+        return `
+            <button class="btn-action ${this.starredCards.has(this.currentIndex) ? 'active' : ''}"
+                    id="btn-star"
+                    aria-label="${this.starredCards.has(this.currentIndex) ? 'Unstar' : 'Star'} this card for later review"
+                    aria-pressed="${this.starredCards.has(this.currentIndex)}">
+                <span class="icon" aria-hidden="true">⭐</span>
+                <span class="label">Star</span>
+            </button>
+
+            <button class="btn-action ${this.knownCards.has(this.currentIndex) ? 'active' : ''}"
+                    id="btn-know"
+                    aria-label="${this.knownCards.has(this.currentIndex) ? 'Unmark' : 'Mark'} as known"
+                    aria-pressed="${this.knownCards.has(this.currentIndex)}">
+                <span class="icon" aria-hidden="true">✓</span>
+                <span class="label">Know</span>
+            </button>
+
+            <button class="btn-action"
+                    id="btn-shuffle"
+                    aria-label="Shuffle all flashcards">
+                <span class="icon" aria-hidden="true">🔀</span>
+                <span class="label">Shuffle</span>
+            </button>
+
+            <button class="btn-action"
+                    id="btn-restart"
+                    aria-label="Restart from the beginning">
+                <span class="icon" aria-hidden="true">↺</span>
+                <span class="label">Restart</span>
+            </button>
+        `;
+    }
+
+    /**
+     * Render quiz mode actions (correct, incorrect, skip)
+     * NEW: Self-assessment buttons for quiz mode
+     */
+    renderQuizActions() {
+        const currentAnswer = this.quizAnswers.get(this.currentIndex);
+        return `
+            <button class="btn-action btn-quiz-correct ${currentAnswer === 'correct' ? 'active' : ''}"
+                    id="btn-quiz-correct"
+                    aria-label="Mark as correct"
+                    aria-pressed="${currentAnswer === 'correct'}">
+                <span class="icon" aria-hidden="true">✓</span>
+                <span class="label">Correct</span>
+            </button>
+
+            <button class="btn-action btn-quiz-incorrect ${currentAnswer === 'incorrect' ? 'active' : ''}"
+                    id="btn-quiz-incorrect"
+                    aria-label="Mark as incorrect"
+                    aria-pressed="${currentAnswer === 'incorrect'}">
+                <span class="icon" aria-hidden="true">✗</span>
+                <span class="label">Incorrect</span>
+            </button>
+
+            <button class="btn-action btn-quiz-skip ${currentAnswer === 'skip' ? 'active' : ''}"
+                    id="btn-quiz-skip"
+                    aria-label="Skip this card"
+                    aria-pressed="${currentAnswer === 'skip'}">
+                <span class="icon" aria-hidden="true">→</span>
+                <span class="label">Skip</span>
+            </button>
+
+            <button class="btn-action"
+                    id="btn-star"
+                    aria-label="${this.starredCards.has(this.currentIndex) ? 'Unstar' : 'Star'} this card for later review"
+                    aria-pressed="${this.starredCards.has(this.currentIndex)}">
+                <span class="icon" aria-hidden="true">⭐</span>
+                <span class="label">Star</span>
+            </button>
+        `;
     }
 
     /**
@@ -347,6 +412,28 @@ class FlashcardViewer {
             const restartHandler = () => this.restart();
             btnRestart.addEventListener('click', restartHandler);
             this.eventListeners.push({ element: btnRestart, event: 'click', handler: restartHandler });
+        }
+
+        // NEW: Quiz mode buttons
+        const btnQuizCorrect = document.getElementById('btn-quiz-correct');
+        if (btnQuizCorrect) {
+            const correctHandler = () => this.markQuizAnswer('correct');
+            btnQuizCorrect.addEventListener('click', correctHandler);
+            this.eventListeners.push({ element: btnQuizCorrect, event: 'click', handler: correctHandler });
+        }
+
+        const btnQuizIncorrect = document.getElementById('btn-quiz-incorrect');
+        if (btnQuizIncorrect) {
+            const incorrectHandler = () => this.markQuizAnswer('incorrect');
+            btnQuizIncorrect.addEventListener('click', incorrectHandler);
+            this.eventListeners.push({ element: btnQuizIncorrect, event: 'click', handler: incorrectHandler });
+        }
+
+        const btnQuizSkip = document.getElementById('btn-quiz-skip');
+        if (btnQuizSkip) {
+            const skipHandler = () => this.markQuizAnswer('skip');
+            btnQuizSkip.addEventListener('click', skipHandler);
+            this.eventListeners.push({ element: btnQuizSkip, event: 'click', handler: skipHandler });
         }
         } catch (error) {
             // MEDIUM FIX: Catch and log setup errors
@@ -627,6 +714,203 @@ class FlashcardViewer {
         this.reviewedCards.clear();
         this.knownCards.clear();
         this.cleanupEventListeners();  // CRITICAL: Remove old listeners first
+        this.render();
+        this.setupEventListeners();
+    }
+
+    /**
+     * Mark quiz answer (correct, incorrect, skip)
+     * NEW: Self-assessment for quiz mode
+     */
+    markQuizAnswer(answer) {
+        if (this.studyMode !== 'quiz') {
+            console.warn('[FlashcardViewer] markQuizAnswer called in non-quiz mode');
+            return;
+        }
+
+        // Start quiz timer on first answer
+        if (!this.quizStartTime) {
+            this.quizStartTime = Date.now();
+        }
+
+        // Store answer
+        const previousAnswer = this.quizAnswers.get(this.currentIndex);
+        this.quizAnswers.set(this.currentIndex, answer);
+
+        // Update score
+        if (answer === 'correct' && previousAnswer !== 'correct') {
+            this.quizScore++;
+            this.xpEarned += this.xpPerCard;
+        } else if (previousAnswer === 'correct' && answer !== 'correct') {
+            this.quizScore--;
+            this.xpEarned = Math.max(0, this.xpEarned - this.xpPerCard);
+        }
+
+        // Mark as reviewed
+        this.reviewedCards.add(this.currentIndex);
+        this.setupBeforeUnloadHandler();
+
+        // Re-render to update button states
+        this.cleanupEventListeners();
+        this.render();
+        this.setupEventListeners();
+
+        // Auto-advance after marking (optional)
+        if (this.currentIndex < this.flashcards.length - 1) {
+            setTimeout(() => {
+                this.nextCard();
+            }, 300); // Small delay for visual feedback
+        } else {
+            // Quiz complete
+            this.showQuizResults();
+        }
+    }
+
+    /**
+     * Format time in seconds to MM:SS
+     * NEW: Helper for quiz results
+     */
+    formatTime(seconds) {
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+    }
+
+    /**
+     * Show quiz results
+     * NEW: Display quiz completion with score and XP
+     */
+    showQuizResults() {
+        const totalCards = this.flashcards.length;
+        const correctCount = this.quizScore;
+        const incorrectCount = Array.from(this.quizAnswers.values()).filter(a => a === 'incorrect').length;
+        const skippedCount = Array.from(this.quizAnswers.values()).filter(a => a === 'skip').length;
+        const percentage = Math.round((correctCount / totalCards) * 100);
+        const timeTaken = this.quizStartTime ? Math.round((Date.now() - this.quizStartTime) / 1000) : 0;
+
+        this.container.innerHTML = `
+            <div class="flashcard-completion quiz-results" role="status" aria-live="polite">
+                <div class="completion-icon" aria-hidden="true">🎯</div>
+                <h2>Quiz Complete!</h2>
+
+                <div class="quiz-score">
+                    <div class="score-circle">
+                        <div class="score-percentage">${percentage}%</div>
+                        <div class="score-fraction">${correctCount}/${totalCards}</div>
+                    </div>
+                </div>
+
+                <div class="quiz-stats">
+                    <div class="quiz-stat">
+                        <span class="stat-icon correct">✓</span>
+                        <span class="stat-label">Correct:</span>
+                        <span class="stat-value">${correctCount}</span>
+                    </div>
+                    <div class="quiz-stat">
+                        <span class="stat-icon incorrect">✗</span>
+                        <span class="stat-label">Incorrect:</span>
+                        <span class="stat-value">${incorrectCount}</span>
+                    </div>
+                    <div class="quiz-stat">
+                        <span class="stat-icon skip">→</span>
+                        <span class="stat-label">Skipped:</span>
+                        <span class="stat-value">${skippedCount}</span>
+                    </div>
+                    ${timeTaken > 0 ? `
+                    <div class="quiz-stat">
+                        <span class="stat-icon">⏱️</span>
+                        <span class="stat-label">Time:</span>
+                        <span class="stat-value">${this.formatTime(timeTaken)}</span>
+                    </div>
+                    ` : ''}
+                    ${this.showXP ? `
+                    <div class="quiz-stat xp-earned">
+                        <span class="stat-icon">⭐</span>
+                        <span class="stat-label">XP Earned:</span>
+                        <span class="stat-value">+${this.xpEarned}</span>
+                    </div>
+                    ` : ''}
+                </div>
+
+                <div class="completion-actions">
+                    <button class="btn-primary" id="btn-review-incorrect">
+                        Review Incorrect
+                    </button>
+                    <button class="btn-secondary" id="btn-restart-quiz">
+                        Restart Quiz
+                    </button>
+                    <button class="btn-secondary" id="btn-back-quiz">
+                        Back to Sets
+                    </button>
+                </div>
+            </div>
+        `;
+
+        // Set up button handlers
+        const btnReviewIncorrect = document.getElementById('btn-review-incorrect');
+        if (btnReviewIncorrect) {
+            btnReviewIncorrect.addEventListener('click', () => this.reviewIncorrectCards());
+        }
+
+        const btnRestartQuiz = document.getElementById('btn-restart-quiz');
+        if (btnRestartQuiz) {
+            btnRestartQuiz.addEventListener('click', () => this.restart());
+        }
+
+        const btnBackQuiz = document.getElementById('btn-back-quiz');
+        if (btnBackQuiz) {
+            btnBackQuiz.addEventListener('click', () => {
+                if (this.onComplete) {
+                    this.onComplete({ score: correctCount, total: totalCards, xp: this.xpEarned });
+                }
+            });
+        }
+
+        // Trigger XP gain event for gamification integration
+        if (this.showXP && this.xpEarned > 0) {
+            document.dispatchEvent(new CustomEvent('gamification:xpgain', {
+                detail: { xp: this.xpEarned, source: 'flashcard_quiz' }
+            }));
+        }
+    }
+
+    /**
+     * Review only incorrect cards from quiz
+     * NEW: Filter to incorrect answers
+     */
+    reviewIncorrectCards() {
+        const incorrectIndices = [];
+        this.quizAnswers.forEach((answer, index) => {
+            if (answer === 'incorrect') {
+                incorrectIndices.push(index);
+            }
+        });
+
+        if (incorrectIndices.length === 0) {
+            this.showError('No incorrect cards to review!');
+            return;
+        }
+
+        // Store original state
+        if (!this.isFilteredView) {
+            this.originalFlashcards = [...this.flashcards];
+            this.originalReviewedCards = new Set(this.reviewedCards);
+            this.originalKnownCards = new Set(this.knownCards);
+            this.originalStarredCards = new Set(this.starredCards);
+        }
+
+        // Filter to incorrect cards
+        this.flashcards = incorrectIndices.map(index => this.originalFlashcards[index]);
+        this.isFilteredView = true;
+        this.currentIndex = 0;
+        this.isFlipped = false;
+
+        // Reset quiz state for review
+        this.quizAnswers.clear();
+        this.quizScore = 0;
+        this.quizStartTime = null;
+
+        this.cleanupEventListeners();
         this.render();
         this.setupEventListeners();
     }
