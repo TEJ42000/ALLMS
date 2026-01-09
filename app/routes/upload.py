@@ -43,6 +43,7 @@ from app.services.retry_logic import retry_with_backoff, RetryConfig
 from app.models.course_models import CourseMaterial
 from app.models.auth_models import User
 from app.dependencies.auth import require_allowed_user
+from google.api_core import exceptions as google_exceptions
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -927,12 +928,20 @@ async def process_extraction_task(
             # Update Firestore with results (with retry for transient failures)
             if result.success:
                 # Retry Firestore update in case of transient failures
-                # Only retry network/connection errors, not validation errors
+                # Only retry network/connection errors and transient Firestore errors
                 retry_config = RetryConfig(
                     max_retries=3,
                     initial_delay=1.0,
                     max_delay=10.0,
-                    retryable_exceptions=(ConnectionError, TimeoutError, OSError)
+                    retryable_exceptions=(
+                        ConnectionError,
+                        TimeoutError,
+                        OSError,
+                        google_exceptions.ServiceUnavailable,
+                        google_exceptions.DeadlineExceeded,
+                        google_exceptions.ResourceExhausted,
+                        google_exceptions.Aborted,
+                    )
                 )
 
                 async def update_firestore():
@@ -954,11 +963,19 @@ async def process_extraction_task(
                 }
             else:
                 # Even for failed extraction, retry Firestore update
-                # Only retry network/connection errors, not validation errors
+                # Only retry network/connection errors and transient Firestore errors
                 retry_config = RetryConfig(
                     max_retries=3,
                     initial_delay=1.0,
-                    retryable_exceptions=(ConnectionError, TimeoutError, OSError)
+                    retryable_exceptions=(
+                        ConnectionError,
+                        TimeoutError,
+                        OSError,
+                        google_exceptions.ServiceUnavailable,
+                        google_exceptions.DeadlineExceeded,
+                        google_exceptions.ResourceExhausted,
+                        google_exceptions.Aborted,
+                    )
                 )
 
                 async def update_firestore_error():
