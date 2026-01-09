@@ -12,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 # Import routers
-from app.routes import ai_tutor, assessment, pages, files_content, admin_courses, admin_pages, admin_users, admin_usage, echr, text_cache, quiz_management, study_guide_routes, gamification, gdpr, upload
+from app.routes import ai_tutor, assessment, pages, files_content, admin_courses, admin_pages, admin_users, admin_usage, echr, text_cache, quiz_management, study_guide_routes, gamification, gdpr, upload, auth
 
 # Import authentication middleware
 from app.middleware import AuthMiddleware
@@ -98,6 +98,7 @@ app.mount("/static", StaticFiles(directory="app/static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
 # Include routers
+app.include_router(auth.router)  # Auth routes first
 app.include_router(pages.router)
 app.include_router(ai_tutor.router)
 app.include_router(assessment.router)
@@ -127,14 +128,25 @@ async def startup_event():
 
     if auth_config.auth_enabled:
         print(f"🔐 Authentication: ENABLED (domain: @{auth_config.auth_domain})")
-        if not auth_config.google_client_id:
-            if env == "production":
-                print("🚨 CRITICAL: GOOGLE_CLIENT_ID not set in production!")
-                print("🚨 Without JWT verification, IAP headers can be spoofed!")
-                print("🚨 Set GOOGLE_CLIENT_ID or set AUTH_ENABLED=false for testing only.")
-                # Don't fail startup, but log prominently
+        print(f"🔐 Auth mode: {auth_config.auth_mode.upper()}")
+
+        # Log mode-specific configuration status
+        if auth_config.auth_mode in ("oauth", "dual"):
+            if auth_config.is_oauth_configured:
+                print("✅ OAuth: Configured")
             else:
-                print("⚠️  WARNING: GOOGLE_CLIENT_ID not set - JWT verification unavailable")
+                if env == "production":
+                    print("🚨 CRITICAL: OAuth not configured but AUTH_MODE requires it!")
+                else:
+                    print("⚠️  WARNING: OAuth not fully configured")
+
+        if auth_config.auth_mode in ("iap", "dual"):
+            if not auth_config.google_client_id:
+                if env == "production":
+                    print("🚨 CRITICAL: GOOGLE_CLIENT_ID not set in production!")
+                    print("🚨 Without JWT verification, IAP headers can be spoofed!")
+                else:
+                    print("⚠️  WARNING: GOOGLE_CLIENT_ID not set - IAP JWT verification unavailable")
     else:
         print("⚠️  Authentication: DISABLED (development mode)")
         if env == "production":

@@ -1,12 +1,12 @@
-"""Authentication Models for Google IAP Integration.
+"""Authentication Models for Google IAP and OAuth Integration.
 
 Provides Pydantic models for user authentication, allow list management,
-and configuration settings for Google Identity-Aware Proxy (IAP).
+and configuration settings for Google Identity-Aware Proxy (IAP) and OAuth.
 """
 
 import os
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
 from pydantic_settings import BaseSettings
@@ -19,6 +19,7 @@ from pydantic_settings import BaseSettings
 class AuthConfig(BaseSettings):
     """Authentication configuration loaded from environment variables."""
 
+    # ---- General Auth Settings ----
     auth_enabled: bool = Field(
         default=True,
         description="Enable/disable authentication (set to false for local dev)"
@@ -27,13 +28,9 @@ class AuthConfig(BaseSettings):
         default="mgms.eu",
         description="Primary allowed domain for full access"
     )
-    google_client_id: Optional[str] = Field(
-        default=None,
-        description="Google OAuth Client ID for IAP JWT verification"
-    )
-    iap_audience: Optional[str] = Field(
-        default=None,
-        description="IAP audience for JWT validation"
+    auth_mode: Literal["oauth", "iap", "dual"] = Field(
+        default="iap",
+        description="Authentication mode: 'oauth' (application-level), 'iap' (Cloud IAP), or 'dual' (try oauth first, fallback to iap)"
     )
     auth_mock_user_email: str = Field(
         default="dev@mgms.eu",
@@ -44,11 +41,67 @@ class AuthConfig(BaseSettings):
         description="Mock user admin status when auth is disabled"
     )
 
+    # ---- IAP Settings (legacy) ----
+    google_client_id: Optional[str] = Field(
+        default=None,
+        description="Google OAuth Client ID for IAP JWT verification"
+    )
+    iap_audience: Optional[str] = Field(
+        default=None,
+        description="IAP audience for JWT validation"
+    )
+
+    # ---- OAuth 2.0 Settings ----
+    google_oauth_client_id: Optional[str] = Field(
+        default=None,
+        description="Google OAuth 2.0 Client ID for application-level auth"
+    )
+    google_oauth_client_secret: Optional[str] = Field(
+        default=None,
+        description="Google OAuth 2.0 Client Secret"
+    )
+    oauth_redirect_uri: Optional[str] = Field(
+        default=None,
+        description="OAuth callback URL (e.g., https://example.com/auth/callback)"
+    )
+
+    # ---- Session Settings ----
+    session_secret_key: Optional[str] = Field(
+        default=None,
+        description="Secret key for session cookie signing and token encryption (min 32 chars)"
+    )
+    session_cookie_name: str = Field(
+        default="lls_session",
+        description="Name of the session cookie"
+    )
+    session_expiry_days: int = Field(
+        default=7,
+        description="Session expiry in days"
+    )
+    session_cookie_secure: bool = Field(
+        default=True,
+        description="Set Secure flag on session cookie (requires HTTPS)"
+    )
+    session_cookie_samesite: Literal["lax", "strict", "none"] = Field(
+        default="lax",
+        description="SameSite cookie attribute"
+    )
+
     class Config:
         """Pydantic settings configuration."""
         env_file = ".env"
         env_file_encoding = "utf-8"
         extra = "ignore"
+
+    @property
+    def is_oauth_configured(self) -> bool:
+        """Check if OAuth is properly configured."""
+        return bool(
+            self.google_oauth_client_id
+            and self.google_oauth_client_secret
+            and self.oauth_redirect_uri
+            and self.session_secret_key
+        )
 
 
 # ============================================================================
