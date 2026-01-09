@@ -14,61 +14,12 @@ const FLASHCARD_CONSTANTS = {
     MAX_CARD_LENGTH: 5000,
     NAVIGATION_LOCK_MS: 50,
     SWIPE_THRESHOLD_PX: 50,
-    FLIP_ANIMATION_MS: 600
+    FLIP_ANIMATION_MS: 600,
+    AUTO_ADVANCE_DELAY_MS: 300  // NEW: Delay before auto-advancing to next card in quiz mode
 };
 
-/**
- * CRITICAL: Async Initialization Pattern Documentation
- * =====================================================
- *
- * This class uses async initialization to prevent race conditions with gamification.
- *
- * Usage Pattern:
- * ```javascript
- * // Create instance (constructor is synchronous)
- * const viewer = new FlashcardViewer('container-id', flashcards);
- *
- * // Wait for async initialization to complete (optional but recommended)
- * const ready = await viewer.waitForReady();
- * if (!ready) {
- *     console.error('Viewer failed to initialize');
- * }
- *
- * // Or check ready flag directly
- * if (viewer.ready) {
- *     // Viewer is ready to use
- * }
- * ```
- *
- * Initialization Flow:
- * 1. Constructor runs synchronously (sets up basic properties)
- * 2. initializeAsync() runs asynchronously:
- *    - Checks gamification status (API call)
- *    - Initializes viewer UI
- *    - Sets this.ready = true
- * 3. External code can wait using waitForReady() or check this.ready
- *
- * Why This Pattern?
- * - Prevents race conditions from async constructor
- * - Allows external code to wait for initialization
- * - Provides error handling for initialization failures
- * - Maintains backward compatibility (constructor still works)
- *
- * Alternative Factory Method Pattern:
- * ```javascript
- * // If you prefer factory method pattern, add this static method:
- * static async create(containerId, flashcards) {
- *     const viewer = new FlashcardViewer(containerId, flashcards);
- *     await viewer.waitForReady();
- *     return viewer;
- * }
- *
- * // Usage:
- * const viewer = await FlashcardViewer.create('container-id', flashcards);
- * ```
- */
 class FlashcardViewer {
-    constructor(containerId, flashcards = []) {
+    constructor(containerId, flashcards = [], options = {}) {
         // HIGH: Validate containerId
         if (!containerId || typeof containerId !== 'string') {
             console.error('[FlashcardViewer] Invalid containerId:', containerId);
@@ -86,6 +37,12 @@ class FlashcardViewer {
             console.error('[FlashcardViewer] flashcards must be an array');
             throw new Error('flashcards parameter must be an array');
         }
+
+        // NEW: Study mode configuration
+        this.studyMode = options.studyMode || 'standard'; // 'standard', 'quiz', 'spaced'
+        this.showXP = options.showXP !== false; // Show XP by default
+        this.onComplete = options.onComplete || null; // Callback when set completed
+        this.xpPerCard = options.xpPerCard || 1; // MEDIUM FIX: Configurable XP per card
 
         // HIGH FIX: Enhanced input validation with comprehensive checks
         this.flashcards = flashcards.filter((card, index) => {
@@ -146,6 +103,18 @@ class FlashcardViewer {
         this.srMode = false; // Spaced repetition mode
         this.srQuality = null; // Quality rating for current card
 
+        // NEW: Quiz mode tracking
+        this.quizAnswers = new Map(); // Map<cardIndex, 'correct'|'incorrect'|'skip'>
+        this.quizScore = 0;
+        this.quizStartTime = null;
+
+        // NEW: XP tracking
+        this.xpEarned = 0;
+        // xpPerCard is now configured in options (line 45)
+
+        // NEW: Auto-advance timeout tracking for cleanup
+        this.autoAdvanceTimeout = null;
+
         // Store original flashcards for restoration after filtering
         this.originalFlashcards = [...this.flashcards];
 
@@ -161,71 +130,11 @@ class FlashcardViewer {
         // HIGH FIX: beforeUnloadHandler is now set up only when needed (when user has progress)
         this.beforeUnloadHandler = null;
 
-        // PHASE 2A: Gamification integration
-        this.sessionStartTime = Date.now();
-        this.totalTimeSpent = 0;
-        this.xpEarned = 0;
-        this.sessionId = null;
-        this.gamificationEnabled = false;
-        this.userStats = null;
-        this.timeTrackerInterval = null;
-        this.gamificationInitialized = false;
-
-        // CRITICAL FIX: Ready flag for async initialization
-        this.ready = false;
-
-        // CRITICAL FIX: Initialize asynchronously to avoid race conditions
-        this.initializeAsync();
-    }
-
-    /**
-     * CRITICAL FIX: Async initialization to prevent race conditions
-     * Sets this.ready = true when complete
-     */
-    async initializeAsync() {
-        try {
-            // Check if user is authenticated for gamification
-            await this.checkGamificationStatus();
-            this.gamificationInitialized = true;
-
-            // Initialize the viewer
-            this.init();
-
-            // CRITICAL FIX: Mark as ready
-            this.ready = true;
-        } catch (error) {
-            console.error('[FlashcardViewer] Initialization failed:', error);
-            this.ready = false;
-            this.showError('Failed to initialize flashcard viewer');
-        }
-    }
-
-    /**
-     * CRITICAL FIX: Wait for viewer to be ready
-     * @returns {Promise<boolean>} True when ready
-     */
-    async waitForReady() {
-        if (this.ready) return true;
-
-        return new Promise((resolve) => {
-            const checkReady = setInterval(() => {
-                if (this.ready) {
-                    clearInterval(checkReady);
-                    resolve(true);
-                }
-            }, 100);
-
-            // Timeout after 10 seconds
-            setTimeout(() => {
-                clearInterval(checkReady);
-                resolve(false);
-            }, 10000);
-        });
+        this.init();
     }
 
     /**
      * Initialize the flashcard viewer
-     * PHASE 2A: Start time tracking timer
      */
     init() {
         console.log('[FlashcardViewer] Initializing with', this.flashcards.length, 'cards');
@@ -233,11 +142,6 @@ class FlashcardViewer {
         this.setupEventListeners();
         this.setupKeyboardShortcuts();
         this.setupTouchGestures();
-
-        // PHASE 2A: Start timer to update session time display
-        if (this.gamificationEnabled) {
-            this.startTimeTracker();
-        }
     }
 
     /**
@@ -267,26 +171,6 @@ class FlashcardViewer {
         
         this.container.innerHTML = `
             <div class="flashcard-viewer">
-                ${this.gamificationEnabled && this.userStats ? `
-                    <!-- PHASE 2A: Gamification Header -->
-                    <div class="gamification-header">
-                        <div class="streak-display">
-                            <span class="streak-icon">🔥</span>
-                            <span class="streak-count">${this.userStats.streak?.current_count || 0}</span>
-                            <span class="streak-label">day streak</span>
-                        </div>
-                        <div class="xp-display">
-                            <span class="xp-icon">⭐</span>
-                            <span class="xp-count">${this.userStats.total_xp || 0}</span>
-                            <span class="xp-label">XP</span>
-                        </div>
-                        <div class="time-display">
-                            <span class="time-icon">⏱️</span>
-                            <span class="time-count" id="session-time">0s</span>
-                        </div>
-                    </div>
-                ` : ''}
-
                 <!-- Progress Bar -->
                 <div class="flashcard-progress">
                     <div class="progress-bar" role="progressbar"
@@ -358,61 +242,7 @@ class FlashcardViewer {
 
                 <!-- Card Actions -->
                 <div class="flashcard-actions" role="toolbar" aria-label="Flashcard actions">
-                    <button class="btn-action ${this.starredCards.has(this.currentIndex) ? 'active' : ''}"
-                            id="btn-star"
-                            aria-label="${this.starredCards.has(this.currentIndex) ? 'Unstar' : 'Star'} this card for later review"
-                            aria-pressed="${this.starredCards.has(this.currentIndex)}">
-                        <span class="icon" aria-hidden="true">⭐</span>
-                        <span class="label">Star</span>
-                    </button>
-
-                    <button class="btn-action ${this.knownCards.has(this.currentIndex) ? 'active' : ''}"
-                            id="btn-know"
-                            aria-label="${this.knownCards.has(this.currentIndex) ? 'Unmark' : 'Mark'} as known"
-                            aria-pressed="${this.knownCards.has(this.currentIndex)}">
-                        <span class="icon" aria-hidden="true">✓</span>
-                        <span class="label">Know</span>
-                    </button>
-
-                    <!-- PHASE 2B: Notes button -->
-                    <button class="btn-action ${this.cardNotes.has(this.currentIndex) ? 'active' : ''}"
-                            id="btn-notes"
-                            aria-label="Add or view notes for this card"
-                            aria-pressed="${this.cardNotes.has(this.currentIndex)}">
-                        <span class="icon" aria-hidden="true">📝</span>
-                        <span class="label">Notes</span>
-                    </button>
-
-                    <!-- PHASE 2B: Report issue button -->
-                    <button class="btn-action"
-                            id="btn-report"
-                            aria-label="Report an issue with this card">
-                        <span class="icon" aria-hidden="true">⚠️</span>
-                        <span class="label">Report</span>
-                    </button>
-
-                    <button class="btn-action"
-                            id="btn-shuffle"
-                            aria-label="Shuffle all flashcards">
-                        <span class="icon" aria-hidden="true">🔀</span>
-                        <span class="label">Shuffle</span>
-                    </button>
-
-                    <button class="btn-action"
-                            id="btn-restart"
-                            aria-label="Restart from the beginning">
-                        <span class="icon" aria-hidden="true">↺</span>
-                        <span class="label">Restart</span>
-                    </button>
-
-                    <!-- PHASE 2C: Spaced Repetition toggle -->
-                    <button class="btn-action ${this.srMode ? 'active' : ''}"
-                            id="btn-sr-mode"
-                            aria-label="Toggle spaced repetition mode"
-                            aria-pressed="${this.srMode}">
-                        <span class="icon" aria-hidden="true">🧠</span>
-                        <span class="label">SR Mode</span>
-                    </button>
+                    ${this.studyMode === 'quiz' && this.isFlipped ? this.renderQuizActions() : this.renderStandardActions()}
                 </div>
 
                 <!-- PHASE 2C: Spaced Repetition Quality Rating -->
@@ -438,7 +268,7 @@ class FlashcardViewer {
                             </button>
                             <button class="btn-quality btn-quality-4" data-quality="4" aria-label="Correct after hesitation">
                                 <span class="quality-number">4</span>
-                                <span class="quality-label">Hesitation</span>
+                                <span class="quality-label">Hesitant</span>
                             </button>
                             <button class="btn-quality btn-quality-5" data-quality="5" aria-label="Perfect recall">
                                 <span class="quality-number">5</span>
@@ -475,6 +305,112 @@ class FlashcardViewer {
             console.error('[FlashcardViewer] Error rendering:', error);
             this.showError('An error occurred while displaying the flashcard');
         }
+    }
+
+    /**
+     * Render standard mode actions (star, know, shuffle, restart)
+     * NEW: Extracted for quiz mode support
+     * PHASE 2B/2C: Added Notes, Report, and SR Mode buttons
+     */
+    renderStandardActions() {
+        return `
+            <button class="btn-action ${this.starredCards.has(this.currentIndex) ? 'active' : ''}"
+                    id="btn-star"
+                    aria-label="${this.starredCards.has(this.currentIndex) ? 'Unstar' : 'Star'} this card for later review"
+                    aria-pressed="${this.starredCards.has(this.currentIndex)}">
+                <span class="icon" aria-hidden="true">⭐</span>
+                <span class="label">Star</span>
+            </button>
+
+            <button class="btn-action ${this.knownCards.has(this.currentIndex) ? 'active' : ''}"
+                    id="btn-know"
+                    aria-label="${this.knownCards.has(this.currentIndex) ? 'Unmark' : 'Mark'} as known"
+                    aria-pressed="${this.knownCards.has(this.currentIndex)}">
+                <span class="icon" aria-hidden="true">✓</span>
+                <span class="label">Know</span>
+            </button>
+
+            <!-- PHASE 2B: Notes button -->
+            <button class="btn-action ${this.cardNotes.has(this.currentIndex) ? 'active' : ''}"
+                    id="btn-notes"
+                    aria-label="Add or view notes for this card"
+                    aria-pressed="${this.cardNotes.has(this.currentIndex)}">
+                <span class="icon" aria-hidden="true">📝</span>
+                <span class="label">Notes</span>
+            </button>
+
+            <!-- PHASE 2B: Report issue button -->
+            <button class="btn-action"
+                    id="btn-report"
+                    aria-label="Report an issue with this card">
+                <span class="icon" aria-hidden="true">⚠️</span>
+                <span class="label">Report</span>
+            </button>
+
+            <button class="btn-action"
+                    id="btn-shuffle"
+                    aria-label="Shuffle all flashcards">
+                <span class="icon" aria-hidden="true">🔀</span>
+                <span class="label">Shuffle</span>
+            </button>
+
+            <button class="btn-action"
+                    id="btn-restart"
+                    aria-label="Restart from the beginning">
+                <span class="icon" aria-hidden="true">↺</span>
+                <span class="label">Restart</span>
+            </button>
+
+            <!-- PHASE 2C: Spaced Repetition toggle -->
+            <button class="btn-action ${this.srMode ? 'active' : ''}"
+                    id="btn-sr-mode"
+                    aria-label="Toggle spaced repetition mode"
+                    aria-pressed="${this.srMode}">
+                <span class="icon" aria-hidden="true">🧠</span>
+                <span class="label">SR Mode</span>
+            </button>
+        `;
+    }
+
+    /**
+     * Render quiz mode actions (correct, incorrect, skip)
+     * NEW: Self-assessment buttons for quiz mode
+     */
+    renderQuizActions() {
+        const currentAnswer = this.quizAnswers.get(this.currentIndex);
+        return `
+            <button class="btn-action btn-quiz-correct ${currentAnswer === 'correct' ? 'active' : ''}"
+                    id="btn-quiz-correct"
+                    aria-label="Mark as correct"
+                    aria-pressed="${currentAnswer === 'correct'}">
+                <span class="icon" aria-hidden="true">✓</span>
+                <span class="label">Correct</span>
+            </button>
+
+            <button class="btn-action btn-quiz-incorrect ${currentAnswer === 'incorrect' ? 'active' : ''}"
+                    id="btn-quiz-incorrect"
+                    aria-label="Mark as incorrect"
+                    aria-pressed="${currentAnswer === 'incorrect'}">
+                <span class="icon" aria-hidden="true">✗</span>
+                <span class="label">Incorrect</span>
+            </button>
+
+            <button class="btn-action btn-quiz-skip ${currentAnswer === 'skip' ? 'active' : ''}"
+                    id="btn-quiz-skip"
+                    aria-label="Skip this card"
+                    aria-pressed="${currentAnswer === 'skip'}">
+                <span class="icon" aria-hidden="true">→</span>
+                <span class="label">Skip</span>
+            </button>
+
+            <button class="btn-action"
+                    id="btn-star"
+                    aria-label="${this.starredCards.has(this.currentIndex) ? 'Unstar' : 'Star'} this card for later review"
+                    aria-pressed="${this.starredCards.has(this.currentIndex)}">
+                <span class="icon" aria-hidden="true">⭐</span>
+                <span class="label">Star</span>
+            </button>
+        `;
     }
 
     /**
@@ -539,22 +475,6 @@ class FlashcardViewer {
             this.eventListeners.push({ element: btnKnow, event: 'click', handler: knowHandler });
         }
 
-        // PHASE 2B: Notes button
-        const btnNotes = document.getElementById('btn-notes');
-        if (btnNotes) {
-            const notesHandler = () => this.showNotesModal();
-            btnNotes.addEventListener('click', notesHandler);
-            this.eventListeners.push({ element: btnNotes, event: 'click', handler: notesHandler });
-        }
-
-        // PHASE 2B: Report button
-        const btnReport = document.getElementById('btn-report');
-        if (btnReport) {
-            const reportHandler = () => this.showReportModal();
-            btnReport.addEventListener('click', reportHandler);
-            this.eventListeners.push({ element: btnReport, event: 'click', handler: reportHandler });
-        }
-
         const btnShuffle = document.getElementById('btn-shuffle');
         if (btnShuffle) {
             const shuffleHandler = () => this.shuffleCards();
@@ -567,6 +487,22 @@ class FlashcardViewer {
             const restartHandler = () => this.restart();
             btnRestart.addEventListener('click', restartHandler);
             this.eventListeners.push({ element: btnRestart, event: 'click', handler: restartHandler });
+        }
+
+        // PHASE 2B: Notes button
+        const btnNotes = document.getElementById('btn-notes');
+        if (btnNotes) {
+            const notesHandler = () => this.showNotesDialog();
+            btnNotes.addEventListener('click', notesHandler);
+            this.eventListeners.push({ element: btnNotes, event: 'click', handler: notesHandler });
+        }
+
+        // PHASE 2B: Report button
+        const btnReport = document.getElementById('btn-report');
+        if (btnReport) {
+            const reportHandler = () => this.showReportDialog();
+            btnReport.addEventListener('click', reportHandler);
+            this.eventListeners.push({ element: btnReport, event: 'click', handler: reportHandler });
         }
 
         // PHASE 2C: SR Mode toggle
@@ -586,6 +522,27 @@ class FlashcardViewer {
             this.eventListeners.push({ element: button, event: 'click', handler: qualityHandler });
         });
 
+        // NEW: Quiz mode buttons
+        const btnQuizCorrect = document.getElementById('btn-quiz-correct');
+        if (btnQuizCorrect) {
+            const correctHandler = () => this.markQuizAnswer('correct');
+            btnQuizCorrect.addEventListener('click', correctHandler);
+            this.eventListeners.push({ element: btnQuizCorrect, event: 'click', handler: correctHandler });
+        }
+
+        const btnQuizIncorrect = document.getElementById('btn-quiz-incorrect');
+        if (btnQuizIncorrect) {
+            const incorrectHandler = () => this.markQuizAnswer('incorrect');
+            btnQuizIncorrect.addEventListener('click', incorrectHandler);
+            this.eventListeners.push({ element: btnQuizIncorrect, event: 'click', handler: incorrectHandler });
+        }
+
+        const btnQuizSkip = document.getElementById('btn-quiz-skip');
+        if (btnQuizSkip) {
+            const skipHandler = () => this.markQuizAnswer('skip');
+            btnQuizSkip.addEventListener('click', skipHandler);
+            this.eventListeners.push({ element: btnQuizSkip, event: 'click', handler: skipHandler });
+        }
         } catch (error) {
             // MEDIUM FIX: Catch and log setup errors
             console.error('[FlashcardViewer] Error setting up event listeners:', error);
@@ -726,6 +683,12 @@ class FlashcardViewer {
             return;
         }
 
+        // HIGH FIX: Clear auto-advance timeout on manual navigation
+        if (this.autoAdvanceTimeout) {
+            clearTimeout(this.autoAdvanceTimeout);
+            this.autoAdvanceTimeout = null;
+        }
+
         if (this.currentIndex > 0) {
             this.isNavigating = true;
             this.currentIndex--;
@@ -751,6 +714,12 @@ class FlashcardViewer {
         // HIGH FIX: Prevent race condition from rapid key presses
         if (this.isNavigating) {
             return;
+        }
+
+        // HIGH FIX: Clear auto-advance timeout on manual navigation
+        if (this.autoAdvanceTimeout) {
+            clearTimeout(this.autoAdvanceTimeout);
+            this.autoAdvanceTimeout = null;
         }
 
         if (this.currentIndex < this.flashcards.length - 1) {
@@ -870,23 +839,271 @@ class FlashcardViewer {
     }
 
     /**
-     * Show completion message
-     * CRITICAL FIX: Add try-catch for error handling
-     * MEDIUM FIX: Validate numeric values
-     * PHASE 2A: Add XP and time tracking to completion
+     * Mark quiz answer (correct, incorrect, skip)
+     * NEW: Self-assessment for quiz mode
+     * HIGH FIX: Added input validation
      */
-    async showCompletionMessage() {
-        try {
-            // MEDIUM FIX: Validate and sanitize numeric values
-            const totalCards = Math.max(1, this.flashcards.length);
-            const reviewedCount = Math.max(0, this.reviewedCards.size);
-            const knownCount = Math.max(0, this.knownCards.size);
-            const starredCount = Math.max(0, this.starredCards.size);
-            const accuracy = Math.min(100, Math.max(0, (knownCount / totalCards) * 100));
+    markQuizAnswer(answer) {
+        // HIGH FIX: Validate study mode
+        if (this.studyMode !== 'quiz') {
+            console.warn('[FlashcardViewer] markQuizAnswer called in non-quiz mode');
+            return;
+        }
 
-            // PHASE 2A: Award XP for completion
-            const xpAwarded = await this.awardFlashcardXP();
-            const timeSpent = this.getFormattedTimeSpent();
+        // HIGH FIX: Validate answer parameter
+        const validAnswers = ['correct', 'incorrect', 'skip'];
+        if (!validAnswers.includes(answer)) {
+            console.warn(`[FlashcardViewer] Invalid answer: ${answer}. Must be one of: ${validAnswers.join(', ')}`);
+            return;
+        }
+
+        // HIGH FIX: Validate currentIndex is within bounds
+        if (this.currentIndex < 0 || this.currentIndex >= this.flashcards.length) {
+            console.error(`[FlashcardViewer] Invalid currentIndex: ${this.currentIndex}. Must be between 0 and ${this.flashcards.length - 1}`);
+            return;
+        }
+
+        // Start quiz timer on first answer
+        if (!this.quizStartTime) {
+            this.quizStartTime = Date.now();
+        }
+
+        // Store answer
+        const previousAnswer = this.quizAnswers.get(this.currentIndex);
+        this.quizAnswers.set(this.currentIndex, answer);
+
+        // Update score
+        if (answer === 'correct' && previousAnswer !== 'correct') {
+            this.quizScore++;
+            this.xpEarned += this.xpPerCard;
+        } else if (previousAnswer === 'correct' && answer !== 'correct') {
+            this.quizScore--;
+            this.xpEarned = Math.max(0, this.xpEarned - this.xpPerCard);
+        }
+
+        // Mark as reviewed
+        this.reviewedCards.add(this.currentIndex);
+        this.setupBeforeUnloadHandler();
+
+        // Re-render to update button states
+        this.cleanupEventListeners();
+        this.render();
+        this.setupEventListeners();
+
+        // HIGH FIX: Clear any pending auto-advance timeout to prevent race conditions
+        if (this.autoAdvanceTimeout) {
+            clearTimeout(this.autoAdvanceTimeout);
+            this.autoAdvanceTimeout = null;
+        }
+
+        // Auto-advance after marking (optional)
+        if (this.currentIndex < this.flashcards.length - 1) {
+            // HIGH FIX: Store timeout ID for cleanup
+            this.autoAdvanceTimeout = setTimeout(() => {
+                this.autoAdvanceTimeout = null;
+                this.nextCard();
+            }, FLASHCARD_CONSTANTS.AUTO_ADVANCE_DELAY_MS); // Small delay for visual feedback
+        } else {
+            // Quiz complete
+            this.showQuizResults();
+        }
+    }
+
+    /**
+     * Format time in seconds to MM:SS
+     * NEW: Helper for quiz results
+     * MEDIUM FIX: Added input validation and edge case handling
+     */
+    formatTime(seconds) {
+        // MEDIUM FIX: Validate input is a number
+        if (typeof seconds !== 'number' || isNaN(seconds)) {
+            console.warn(`[FlashcardViewer] Invalid time value: ${seconds}`);
+            return '0:00';
+        }
+
+        // MEDIUM FIX: Handle negative values
+        if (seconds < 0) {
+            console.warn(`[FlashcardViewer] Negative time value: ${seconds}`);
+            return '0:00';
+        }
+
+        // MEDIUM FIX: Handle null/undefined
+        if (seconds == null) {
+            return '0:00';
+        }
+
+        const mins = Math.floor(seconds / 60);
+        const secs = Math.floor(seconds % 60);
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+    }
+
+    /**
+     * Show quiz results
+     * NEW: Display quiz completion with score and XP
+     */
+    showQuizResults() {
+        const totalCards = this.flashcards.length;
+        const correctCount = this.quizScore;
+        const incorrectCount = Array.from(this.quizAnswers.values()).filter(a => a === 'incorrect').length;
+        const skippedCount = Array.from(this.quizAnswers.values()).filter(a => a === 'skip').length;
+        const percentage = Math.round((correctCount / totalCards) * 100);
+        const timeTaken = this.quizStartTime ? Math.round((Date.now() - this.quizStartTime) / 1000) : 0;
+
+        this.container.innerHTML = `
+            <div class="flashcard-completion quiz-results" role="status" aria-live="polite">
+                <div class="completion-icon" aria-hidden="true">🎯</div>
+                <h2>Quiz Complete!</h2>
+
+                <div class="quiz-score">
+                    <div class="score-circle">
+                        <div class="score-percentage">${percentage}%</div>
+                        <div class="score-fraction">${correctCount}/${totalCards}</div>
+                    </div>
+                </div>
+
+                <div class="quiz-stats">
+                    <div class="quiz-stat">
+                        <span class="stat-icon correct">✓</span>
+                        <span class="stat-label">Correct:</span>
+                        <span class="stat-value">${correctCount}</span>
+                    </div>
+                    <div class="quiz-stat">
+                        <span class="stat-icon incorrect">✗</span>
+                        <span class="stat-label">Incorrect:</span>
+                        <span class="stat-value">${incorrectCount}</span>
+                    </div>
+                    <div class="quiz-stat">
+                        <span class="stat-icon skip">→</span>
+                        <span class="stat-label">Skipped:</span>
+                        <span class="stat-value">${skippedCount}</span>
+                    </div>
+                    ${timeTaken > 0 ? `
+                    <div class="quiz-stat">
+                        <span class="stat-icon">⏱️</span>
+                        <span class="stat-label">Time:</span>
+                        <span class="stat-value">${this.formatTime(timeTaken)}</span>
+                    </div>
+                    ` : ''}
+                    ${this.showXP ? `
+                    <div class="quiz-stat xp-earned">
+                        <span class="stat-icon">⭐</span>
+                        <span class="stat-label">XP Earned:</span>
+                        <span class="stat-value">+${this.xpEarned}</span>
+                    </div>
+                    ` : ''}
+                </div>
+
+                <div class="completion-actions">
+                    <button class="btn-primary" id="btn-review-incorrect">
+                        Review Incorrect
+                    </button>
+                    <button class="btn-secondary" id="btn-restart-quiz">
+                        Restart Quiz
+                    </button>
+                    <button class="btn-secondary" id="btn-back-quiz">
+                        Back to Sets
+                    </button>
+                </div>
+            </div>
+        `;
+
+        // MEDIUM FIX: Track button handlers in eventListeners array for proper cleanup
+        const btnReviewIncorrect = document.getElementById('btn-review-incorrect');
+        if (btnReviewIncorrect) {
+            const reviewHandler = () => this.reviewIncorrectCards();
+            btnReviewIncorrect.addEventListener('click', reviewHandler);
+            this.eventListeners.push({ element: btnReviewIncorrect, event: 'click', handler: reviewHandler });
+        }
+
+        const btnRestartQuiz = document.getElementById('btn-restart-quiz');
+        if (btnRestartQuiz) {
+            const restartHandler = () => this.restart();
+            btnRestartQuiz.addEventListener('click', restartHandler);
+            this.eventListeners.push({ element: btnRestartQuiz, event: 'click', handler: restartHandler });
+        }
+
+        const btnBackQuiz = document.getElementById('btn-back-quiz');
+        if (btnBackQuiz) {
+            const backHandler = () => {
+                if (this.onComplete) {
+                    this.onComplete({ score: correctCount, total: totalCards, xp: this.xpEarned });
+                }
+            };
+            btnBackQuiz.addEventListener('click', backHandler);
+            this.eventListeners.push({ element: btnBackQuiz, event: 'click', handler: backHandler });
+        }
+
+        // Trigger XP gain event for gamification integration
+        // MEDIUM FIX: Add error handling to prevent blocking quiz completion
+        if (this.showXP && this.xpEarned > 0) {
+            try {
+                document.dispatchEvent(new CustomEvent('gamification:xpgain', {
+                    detail: { xp: this.xpEarned, source: 'flashcard_quiz' }
+                }));
+                console.log(`[FlashcardViewer] XP gain event dispatched: +${this.xpEarned} XP`);
+            } catch (error) {
+                console.error('[FlashcardViewer] Failed to dispatch XP gain event:', error);
+                // Don't block quiz completion if gamification fails
+            }
+        }
+    }
+
+    /**
+     * Review only incorrect cards from quiz
+     * NEW: Filter to incorrect answers
+     * MEDIUM FIX: Check originalFlashcards exists before filtering
+     */
+    reviewIncorrectCards() {
+        const incorrectIndices = [];
+        this.quizAnswers.forEach((answer, index) => {
+            if (answer === 'incorrect') {
+                incorrectIndices.push(index);
+            }
+        });
+
+        if (incorrectIndices.length === 0) {
+            this.showError('No incorrect cards to review!');
+            return;
+        }
+
+        // MEDIUM FIX: Use originalFlashcards if available, otherwise current flashcards
+        const sourceFlashcards = this.originalFlashcards || this.flashcards;
+
+        // Store original state
+        if (!this.isFilteredView) {
+            this.originalFlashcards = [...this.flashcards];
+            this.originalReviewedCards = new Set(this.reviewedCards);
+            this.originalKnownCards = new Set(this.knownCards);
+            this.originalStarredCards = new Set(this.starredCards);
+        }
+
+        // Filter to incorrect cards
+        this.flashcards = incorrectIndices.map(index => sourceFlashcards[index]);
+        this.isFilteredView = true;
+        this.currentIndex = 0;
+        this.isFlipped = false;
+
+        // Reset quiz state for review
+        this.quizAnswers.clear();
+        this.quizScore = 0;
+        this.quizStartTime = null;
+
+        this.cleanupEventListeners();
+        this.render();
+        this.setupEventListeners();
+    }
+
+    /**
+     * Show completion message
+     * MEDIUM FIX: Validate numeric values
+     */
+    showCompletionMessage() {
+        // MEDIUM FIX: Validate and sanitize numeric values
+        const totalCards = Math.max(1, this.flashcards.length);
+        const reviewedCount = Math.max(0, this.reviewedCards.size);
+        const knownCount = Math.max(0, this.knownCards.size);
+        const starredCount = Math.max(0, this.starredCards.size);
+        const accuracy = Math.min(100, Math.max(0, (knownCount / totalCards) * 100));
 
         this.container.innerHTML = `
             <div class="flashcard-completion">
@@ -908,19 +1125,6 @@ class FlashcardViewer {
                         <div class="stat-label">Accuracy</div>
                     </div>
                 </div>
-
-                ${this.gamificationEnabled && xpAwarded > 0 ? `
-                    <div class="gamification-rewards">
-                        <div class="xp-reward">
-                            <span class="xp-icon">⭐</span>
-                            <span class="xp-amount">+${xpAwarded} XP</span>
-                        </div>
-                        <div class="time-spent">
-                            <span class="time-icon">⏱️</span>
-                            <span class="time-amount">Time: ${timeSpent}</span>
-                        </div>
-                    </div>
-                ` : ''}
 
                 <div class="completion-actions">
                     <button class="btn-primary" id="btn-restart-completion">
@@ -953,164 +1157,41 @@ class FlashcardViewer {
         if (btnBackToFull) {
             btnBackToFull.addEventListener('click', () => this.restoreFullDeck());
         }
-        } catch (error) {
-            // CRITICAL FIX: Error handling for showCompletionMessage
-            console.error('[FlashcardViewer] Error showing completion message:', error);
-            this.showError('Failed to display completion message. Please try restarting.');
-        }
-    }
-
-    /**
-     * Safely show notification with fallback chain
-     *
-     * HIGH FIX: Simplified notification fallback logic
-     *
-     * Fallback chain:
-     * 1. Try showNotification() (styled toast)
-     * 2. If unavailable or fails, use console.warn()
-     *
-     * @param {string} message - Message to display
-     * @param {string} type - Notification type ('info', 'warning', 'error', 'success')
-     * @returns {void}
-     */
-    safeNotify(message, type = 'info') {
-        try {
-            if (typeof showNotification === 'function') {
-                showNotification(message, type, 5000);
-            } else {
-                // Fallback to console if showNotification not available
-                console.warn(`[FlashcardViewer] ${message}`);
-            }
-        } catch (error) {
-            // Final fallback to console if showNotification throws
-            console.warn(`[FlashcardViewer] ${message}`);
-            console.error('[FlashcardViewer] Notification error:', error);
-        }
     }
 
     /**
      * Review only starred cards
-     *
-     * Error Handling Strategy (CONSISTENT):
-     * - Fail fast for critical errors (null/empty data, no starred cards)
-     * - Recover gracefully for minor issues (invalid indices, null cards)
-     * - Always log errors for debugging
-     * - Always show user-friendly messages
-     *
      * HIGH FIX: Don't lose original flashcards - store them for restoration
      * HIGH FIX: Validate starred indices to prevent corruption
-     * ISSUE #168: Add defensive checks for originalFlashcards
-     *
-     * @returns {void}
-     * @throws {Error} Never throws - all errors are handled internally
      */
     reviewStarredCards() {
-        // CRITICAL ERROR: No starred cards (fail fast)
+        // CRITICAL FIX: Replace alert() with showError()
         if (this.starredCards.size === 0) {
-            console.warn('[FlashcardViewer] No starred cards to review');
-            // HIGH FIX: More specific error message
-            this.showError('No starred cards to review. Star some cards first by clicking the star icon.');
+            this.showError('No starred cards to review!');
             return;
         }
 
         // HIGH FIX: Store original flashcards if not already stored
         if (!this.isFilteredView) {
-            // CRITICAL FIX: Validate this.flashcards before storing
-            if (!this.flashcards || !Array.isArray(this.flashcards)) {
-                console.error('[FlashcardViewer] CRITICAL: this.flashcards is not valid:', this.flashcards);
-                this.showError('Unable to review starred cards. Please refresh the page.');
-                return;
-            }
-
-            if (this.flashcards.length === 0) {
-                console.error('[FlashcardViewer] CRITICAL: this.flashcards is empty');
-                this.showError('No flashcards available to review. Please refresh the page.');
-                return;
-            }
-
             this.originalFlashcards = [...this.flashcards];
             this.originalReviewedCards = new Set(this.reviewedCards);
             this.originalKnownCards = new Set(this.knownCards);
             this.originalStarredCards = new Set(this.starredCards);
         }
 
-        // CRITICAL ERROR: originalFlashcards is null/undefined (fail fast)
-        if (!this.originalFlashcards || !Array.isArray(this.originalFlashcards)) {
-            console.error('[FlashcardViewer] CRITICAL: originalFlashcards is not properly initialized:', this.originalFlashcards);
-            // HIGH FIX: More specific error message
-            this.showError('Data corruption detected. Please refresh the page to reload flashcards.');
-            return;
-        }
-
-        // CRITICAL ERROR: originalFlashcards is empty (fail fast)
-        if (this.originalFlashcards.length === 0) {
-            console.error('[FlashcardViewer] CRITICAL: originalFlashcards is empty');
-            // HIGH FIX: More specific error message
-            this.showError('No flashcards found. Please refresh the page or select a different deck.');
-            return;
-        }
-
-        // MINOR ISSUE: Filter to only starred cards with index validation (recover gracefully)
+        // HIGH FIX: Filter to only starred cards with index validation
         const starredIndices = Array.from(this.starredCards);
-
-        // ISSUE #168: Validate index types and bounds (filter out invalid, don't fail)
-        // HIGH FIX: Batch logging to avoid performance issues with large datasets
-        const invalidIndices = [];
-        const outOfBoundsIndices = [];
-
         const validIndices = starredIndices.filter(index => {
-            // CRITICAL FIX: Check if index is an integer (not just a number)
-            if (!Number.isInteger(index)) {
-                invalidIndices.push({ type: typeof index, value: index });
-                return false;
-            }
-
-            // Check if index is within bounds
-            if (index < 0 || index >= this.originalFlashcards.length) {
-                outOfBoundsIndices.push(index);
-                return false;
-            }
-
-            return true;
+            return index >= 0 && index < this.originalFlashcards.length;
         });
 
-        // HIGH FIX: Log once with summary instead of per-index
-        if (invalidIndices.length > 0) {
-            console.warn(`[FlashcardViewer] RECOVERY: ${invalidIndices.length} invalid index type(s) filtered out:`, invalidIndices.slice(0, 5));
-        }
-        if (outOfBoundsIndices.length > 0) {
-            console.warn(`[FlashcardViewer] RECOVERY: ${outOfBoundsIndices.length} out-of-bounds index/indices filtered out (length: ${this.originalFlashcards.length}):`, outOfBoundsIndices.slice(0, 5));
-        }
-
-        // CRITICAL ERROR: No valid indices after filtering (fail fast)
+        // CRITICAL FIX: Replace alert() with showError()
         if (validIndices.length === 0) {
-            console.error('[FlashcardViewer] CRITICAL: No valid starred card indices found');
-            this.showError('No valid starred cards found. Please refresh the page.');
+            this.showError('No valid starred cards found!');
             return;
         }
 
-        // MINOR ISSUE: Filter out null/undefined cards (recover gracefully)
-        const starredCards = validIndices.map(index => this.originalFlashcards[index]);
-        const validCards = starredCards.filter(card => card !== null && card !== undefined);
-
-        // CRITICAL ERROR: All cards are null/undefined (fail fast)
-        if (validCards.length === 0) {
-            console.error('[FlashcardViewer] CRITICAL: All starred cards are null or undefined');
-            this.showError('Starred cards are not available. Please refresh the page.');
-            return;
-        }
-
-        // HIGH FIX: Warn user if cards were filtered out (silent card loss)
-        const filteredCount = starredIndices.length - validCards.length;
-        if (filteredCount > 0) {
-            const message = `${filteredCount} starred card${filteredCount > 1 ? 's were' : ' was'} filtered out due to invalid data. Showing ${validCards.length} valid card${validCards.length > 1 ? 's' : ''}.`;
-            console.warn(`[FlashcardViewer] ${message}`);
-
-            // HIGH FIX: Simplified notification fallback logic
-            this.safeNotify(message, 'warning');
-        }
-
-        this.flashcards = validCards;
+        this.flashcards = validIndices.map(index => this.originalFlashcards[index]);
 
         this.isFilteredView = true;
         this.currentIndex = 0;
@@ -1122,64 +1203,16 @@ class FlashcardViewer {
         this.cleanupEventListeners();  // CRITICAL: Remove old listeners first
         this.render();
         this.setupEventListeners();
-
-        console.log(`[FlashcardViewer] Reviewing ${validCards.length} starred cards`);
     }
 
     /**
      * Restore full deck from filtered view
-     *
-     * Error Handling Strategy (CONSISTENT):
-     * - Fail fast for critical errors (null/empty originalFlashcards)
-     * - Recover gracefully for Set corruption (Sets are metadata, can be recreated)
-     * - Always log errors for debugging
-     * - Always show user-friendly messages
-     *
      * HIGH FIX: Allow users to return to full deck
      * CRITICAL FIX: Remove old listeners before re-rendering
-     * ISSUE #168: Add defensive checks for originalFlashcards
-     *
-     * @returns {void}
-     * @throws {Error} Never throws - all errors are handled internally
      */
     restoreFullDeck() {
-        // Early return if not in filtered view (not an error)
-        if (!this.isFilteredView) {
-            console.log('[FlashcardViewer] Not in filtered view, nothing to restore');
+        if (!this.isFilteredView || !this.originalFlashcards) {
             return;
-        }
-
-        // CRITICAL ERROR: originalFlashcards is null/undefined (fail fast)
-        if (!this.originalFlashcards || !Array.isArray(this.originalFlashcards)) {
-            console.error('[FlashcardViewer] CRITICAL: originalFlashcards is not properly initialized:', this.originalFlashcards);
-            this.showError('Unable to restore full deck. Please refresh the page.');
-            return;
-        }
-
-        // CRITICAL ERROR: originalFlashcards is empty (fail fast)
-        if (this.originalFlashcards.length === 0) {
-            console.error('[FlashcardViewer] CRITICAL: originalFlashcards is empty');
-            this.showError('No flashcards available to restore. Please refresh the page.');
-            return;
-        }
-
-        // CONSISTENT STRATEGY: Always recover gracefully from Set corruption
-        // Rationale: Sets are metadata, not core data. Losing them is acceptable.
-        // Core data (originalFlashcards) must be valid, but Sets can be recreated.
-
-        if (!this.originalReviewedCards || !(this.originalReviewedCards instanceof Set)) {
-            console.warn('[FlashcardViewer] RECOVERY: originalReviewedCards is not a Set, creating new Set');
-            this.originalReviewedCards = new Set();
-        }
-
-        if (!this.originalKnownCards || !(this.originalKnownCards instanceof Set)) {
-            console.warn('[FlashcardViewer] RECOVERY: originalKnownCards is not a Set, creating new Set');
-            this.originalKnownCards = new Set();
-        }
-
-        if (!this.originalStarredCards || !(this.originalStarredCards instanceof Set)) {
-            console.warn('[FlashcardViewer] RECOVERY: originalStarredCards is not a Set, creating new Set');
-            this.originalStarredCards = new Set();
         }
 
         this.flashcards = [...this.originalFlashcards];
@@ -1194,8 +1227,6 @@ class FlashcardViewer {
         this.cleanupEventListeners();  // CRITICAL: Remove old listeners first
         this.render();
         this.setupEventListeners();
-
-        console.log(`[FlashcardViewer] Restored full deck with ${this.flashcards.length} cards`);
     }
 
     /**
@@ -1348,55 +1379,6 @@ class FlashcardViewer {
         this.eventListeners = [];
     }
 
-    /**
-     * Cleanup all resources including beforeunload handler
-     * CRITICAL FIX: Full cleanup when destroying viewer
-     * CRITICAL FIX: Prevent memory leaks from timers and event listeners
-     * CRITICAL FIX: Make cleanup async to await session end
-     * PHASE 2A: End gamification session on cleanup
-     */
-    async cleanup() {
-        console.log('[FlashcardViewer] Cleaning up all resources...');
-
-        // CRITICAL FIX: Stop time tracker to prevent memory leak
-        if (this.timeTrackerInterval) {
-            clearInterval(this.timeTrackerInterval);
-            this.timeTrackerInterval = null;
-            console.log('[FlashcardViewer] Time tracker stopped');
-        }
-
-        // CRITICAL FIX: Await session end before nulling properties
-        if (this.gamificationEnabled && this.sessionId) {
-            try {
-                await this.endGamificationSession();
-                console.log('[FlashcardViewer] Gamification session ended');
-            } catch (error) {
-                console.error('[FlashcardViewer] Error ending gamification session:', error);
-            }
-        }
-
-        // Remove DOM event listeners
-        this.cleanupEventListeners();
-
-        // CRITICAL FIX: Remove beforeunload handler
-        if (this.beforeUnloadHandler) {
-            window.removeEventListener('beforeunload', this.beforeUnloadHandler);
-            this.beforeUnloadHandler = null;
-        }
-
-        // CRITICAL FIX: Clear all references to prevent memory leaks
-        this.flashcards = null;
-        this.originalFlashcards = null;
-        this.reviewedCards = null;
-        this.knownCards = null;
-        this.starredCards = null;
-        this.cardNotes = null;
-        this.spacedRepetition = null;
-        this.userStats = null;
-
-        console.log('[FlashcardViewer] Cleanup complete');
-    }
-
     // =========================================================================
     // PHASE 2C: Spaced Repetition Methods
     // =========================================================================
@@ -1413,17 +1395,26 @@ class FlashcardViewer {
             this.filterDueCards();
         } else {
             // Restore all cards
-            this.flashcards = [...this.originalFlashcards];
+            if (this.originalFlashcards) {
+                this.flashcards = [...this.originalFlashcards];
+            }
             this.currentIndex = 0;
         }
 
+        this.cleanupEventListeners();
         this.render();
+        this.setupEventListeners();
     }
 
     /**
      * Filter cards to show only those due for review
      */
     filterDueCards() {
+        // Store original if not already stored
+        if (!this.originalFlashcards) {
+            this.originalFlashcards = [...this.flashcards];
+        }
+
         const cardIds = this.flashcards.map((_, index) => `card_${index}`);
         const dueCardIds = this.spacedRepetition.getDueCards(cardIds);
 
@@ -1511,75 +1502,18 @@ class FlashcardViewer {
                 <h2>All Caught Up!</h2>
                 <p>No cards are due for review right now.</p>
 
-                <div class="sr-stats-summary">
-                    ${this.getSRStatsSummary()}
-                </div>
-
                 <div class="completion-actions">
-                    <button class="btn-primary" id="btn-review-all">
-                        Review All Cards
-                    </button>
-                    <button class="btn-secondary" id="btn-exit-sr">
+                    <button class="btn-primary" id="btn-exit-sr">
                         Exit SR Mode
                     </button>
                 </div>
             </div>
         `;
 
-        // Add event listeners
-        const btnReviewAll = document.getElementById('btn-review-all');
-        if (btnReviewAll) {
-            btnReviewAll.addEventListener('click', () => {
-                this.srMode = false;
-                this.flashcards = [...this.originalFlashcards];
-                this.currentIndex = 0;
-                this.render();
-            });
-        }
-
         const btnExitSR = document.getElementById('btn-exit-sr');
         if (btnExitSR) {
-            btnExitSR.addEventListener('click', () => {
-                this.srMode = false;
-                this.flashcards = [...this.originalFlashcards];
-                this.currentIndex = 0;
-                this.render();
-            });
+            btnExitSR.addEventListener('click', () => this.toggleSRMode());
         }
-    }
-
-    /**
-     * Get SR statistics summary HTML
-     *
-     * @returns {string} HTML for statistics summary
-     */
-    getSRStatsSummary() {
-        const cardIds = this.originalFlashcards.map((_, index) => `card_${index}`);
-        const stats = this.spacedRepetition.getStatistics(cardIds);
-
-        return `
-            <div class="sr-stats">
-                <div class="sr-stat">
-                    <div class="sr-stat-value">${stats.new}</div>
-                    <div class="sr-stat-label">New</div>
-                </div>
-                <div class="sr-stat">
-                    <div class="sr-stat-value">${stats.learning}</div>
-                    <div class="sr-stat-label">Learning</div>
-                </div>
-                <div class="sr-stat">
-                    <div class="sr-stat-value">${stats.review}</div>
-                    <div class="sr-stat-label">Review</div>
-                </div>
-                <div class="sr-stat">
-                    <div class="sr-stat-value">${stats.mastered}</div>
-                    <div class="sr-stat-label">Mastered</div>
-                </div>
-            </div>
-            <div class="sr-upcoming">
-                <p><strong>Due this week:</strong> ${stats.dueThisWeek} cards</p>
-            </div>
-        `;
     }
 
     // =========================================================================
@@ -1587,452 +1521,93 @@ class FlashcardViewer {
     // =========================================================================
 
     /**
-     * Show notes modal for current card
+     * Show notes dialog for current card
      */
-    showNotesModal() {
-        const currentCard = this.flashcards[this.currentIndex];
-        const existingNote = this.cardNotes.get(this.currentIndex) || '';
+    showNotesDialog() {
+        const currentNote = this.cardNotes.get(this.currentIndex) || '';
 
-        // Create modal HTML
-        const modalHTML = `
-            <div class="modal-overlay" id="notes-modal">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h3>📝 Card Notes</h3>
-                        <button class="modal-close" aria-label="Close modal">&times;</button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="card-preview">
-                            <strong>Front:</strong> ${this.escapeHtml(currentCard.question || currentCard.term || '')}
-                        </div>
-                        <textarea
-                            id="note-input"
-                            placeholder="Add your notes here..."
-                            rows="6"
-                            aria-label="Note text"
-                        >${this.escapeHtml(existingNote)}</textarea>
-                    </div>
-                    <div class="modal-footer">
-                        <button class="btn-secondary" id="btn-cancel-note">Cancel</button>
-                        <button class="btn-primary" id="btn-save-note">Save Note</button>
-                    </div>
-                </div>
-            </div>
-        `;
+        this.showConfirm(
+            'Card Notes',
+            `<textarea id="card-note-input" rows="5" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">${this.escapeHtml(currentNote)}</textarea>`,
+            (confirmed) => {
+                if (confirmed) {
+                    const noteInput = document.getElementById('card-note-input');
+                    const noteText = noteInput ? noteInput.value.trim() : '';
 
-        // Add modal to DOM
-        document.body.insertAdjacentHTML('beforeend', modalHTML);
-
-        // Setup modal event listeners
-        const modal = document.getElementById('notes-modal');
-        const closeBtn = modal.querySelector('.modal-close');
-        const cancelBtn = document.getElementById('btn-cancel-note');
-        const saveBtn = document.getElementById('btn-save-note');
-        const noteInput = document.getElementById('note-input');
-
-        // Focus on textarea
-        noteInput.focus();
-
-        // CRITICAL FIX: Escape handler defined first for cleanup
-        const escapeHandler = (e) => {
-            if (e.key === 'Escape') {
-                closeModal();
-            }
-        };
-
-        // Close modal function
-        const closeModal = () => {
-            // CRITICAL FIX: Always remove escape handler
-            document.removeEventListener('keydown', escapeHandler);
-            modal.remove();
-        };
-
-        // Save note function
-        const saveNote = () => {
-            const noteText = noteInput.value.trim();
-            if (noteText) {
-                this.cardNotes.set(this.currentIndex, noteText);
-                console.log('[FlashcardViewer] Note saved for card', this.currentIndex);
-            } else {
-                this.cardNotes.delete(this.currentIndex);
-            }
-            this.render(); // Re-render to update button state
-            closeModal();
-        };
-
-        // Event listeners
-        closeBtn.addEventListener('click', closeModal);
-        cancelBtn.addEventListener('click', closeModal);
-        saveBtn.addEventListener('click', saveNote);
-
-        // Close on overlay click
-        modal.addEventListener('click', (e) => {
-            if (e.target === modal) {
-                closeModal();
-            }
-        });
-
-        // Close on Escape key
-        document.addEventListener('keydown', escapeHandler);
-
-        // Save on Ctrl+Enter
-        noteInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-                e.preventDefault();
-                saveNote();
-            }
-        });
-    }
-
-    /**
-     * Show report issue modal for current card
-     */
-    showReportModal() {
-        const currentCard = this.flashcards[this.currentIndex];
-
-        // Create modal HTML
-        const modalHTML = `
-            <div class="modal-overlay" id="report-modal">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h3>⚠️ Report Issue</h3>
-                        <button class="modal-close" aria-label="Close modal">&times;</button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="card-preview">
-                            <div><strong>Front:</strong> ${this.escapeHtml(currentCard.question || currentCard.term || '')}</div>
-                            <div><strong>Back:</strong> ${this.escapeHtml(currentCard.answer || currentCard.definition || '')}</div>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="issue-type">Issue Type:</label>
-                            <select id="issue-type" aria-label="Issue type">
-                                <option value="typo">Typo or Spelling Error</option>
-                                <option value="incorrect">Incorrect Information</option>
-                                <option value="unclear">Unclear or Confusing</option>
-                                <option value="formatting">Formatting Issue</option>
-                                <option value="other">Other</option>
-                            </select>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="issue-description">Description:</label>
-                            <textarea
-                                id="issue-description"
-                                placeholder="Please describe the issue..."
-                                rows="4"
-                                aria-label="Issue description"
-                                required
-                            ></textarea>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button class="btn-secondary" id="btn-cancel-report">Cancel</button>
-                        <button class="btn-primary" id="btn-submit-report">Submit Report</button>
-                    </div>
-                </div>
-            </div>
-        `;
-
-        // Add modal to DOM
-        document.body.insertAdjacentHTML('beforeend', modalHTML);
-
-        // Setup modal event listeners
-        const modal = document.getElementById('report-modal');
-        const closeBtn = modal.querySelector('.modal-close');
-        const cancelBtn = document.getElementById('btn-cancel-report');
-        const submitBtn = document.getElementById('btn-submit-report');
-        const issueType = document.getElementById('issue-type');
-        const issueDescription = document.getElementById('issue-description');
-
-        // Focus on description
-        issueDescription.focus();
-
-        // CRITICAL FIX: Escape handler defined first for cleanup
-        const escapeHandler = (e) => {
-            if (e.key === 'Escape') {
-                closeModal();
-            }
-        };
-
-        // Close modal function
-        const closeModal = () => {
-            // CRITICAL FIX: Always remove escape handler
-            document.removeEventListener('keydown', escapeHandler);
-            modal.remove();
-        };
-
-        // Submit report function
-        const submitReport = async () => {
-            const description = issueDescription.value.trim();
-            if (!description) {
-                // CRITICAL FIX: Use styled notification instead of alert()
-                showNotification('Please provide a description of the issue.', 'warning', 3000);
-                return;
-            }
-
-            // Disable button during submission
-            submitBtn.disabled = true;
-            submitBtn.textContent = 'Submitting...';
-
-            try {
-                // CRITICAL FIX: Use correct card properties
-                const reportData = {
-                    card_index: this.currentIndex,
-                    card_front: currentCard.question || currentCard.term || '',
-                    card_back: currentCard.answer || currentCard.definition || '',
-                    issue_type: issueType.value,
-                    description: description,
-                    timestamp: new Date().toISOString()
-                };
-
-                // TODO: Send to backend API
-                console.log('[FlashcardViewer] Issue reported:', reportData);
-
-                // CRITICAL FIX: Use styled notification instead of alert()
-                showNotification('Thank you for reporting this issue! We will review it shortly.', 'success', 5000);
-                closeModal();
-            } catch (error) {
-                console.error('[FlashcardViewer] Failed to submit report:', error);
-                // CRITICAL FIX: Use styled notification instead of alert()
-                showNotification('Failed to submit report. Please try again.', 'error', 5000);
-                submitBtn.disabled = false;
-                submitBtn.textContent = 'Submit Report';
-            }
-        };
-
-        // Event listeners
-        closeBtn.addEventListener('click', closeModal);
-        cancelBtn.addEventListener('click', closeModal);
-        submitBtn.addEventListener('click', submitReport);
-
-        // Close on overlay click
-        modal.addEventListener('click', (e) => {
-            if (e.target === modal) {
-                closeModal();
-            }
-        });
-
-        // Close on Escape key
-        document.addEventListener('keydown', escapeHandler);
-    }
-
-    // =========================================================================
-    // PHASE 2A: Gamification Methods
-    // =========================================================================
-
-    /**
-     * Check if gamification is available (user is authenticated)
-     */
-    async checkGamificationStatus() {
-        try {
-            const response = await fetch('/api/gamification/stats', {
-                credentials: 'include'
-            });
-
-            if (response.ok) {
-                this.userStats = await response.json();
-                this.gamificationEnabled = true;
-                console.log('[FlashcardViewer] Gamification enabled for user');
-
-                // Start gamification session
-                await this.startGamificationSession();
-            } else {
-                console.log('[FlashcardViewer] Gamification not available (user not authenticated)');
-            }
-        } catch (error) {
-            console.log('[FlashcardViewer] Gamification check failed:', error);
-            this.gamificationEnabled = false;
-        }
-    }
-
-    /**
-     * Start a gamification session
-     */
-    async startGamificationSession() {
-        if (!this.gamificationEnabled) return;
-
-        try {
-            const response = await fetch('/api/gamification/session/start', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                credentials: 'include',
-                body: JSON.stringify({
-                    course_id: null // Flashcards can be cross-course
-                })
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                this.sessionId = data.session_id;
-                console.log('[FlashcardViewer] Gamification session started:', this.sessionId);
-            }
-        } catch (error) {
-            console.error('[FlashcardViewer] Failed to start gamification session:', error);
-        }
-    }
-
-    /**
-     * End gamification session and award XP
-     * MEDIUM FIX: Standardized async/await pattern with proper error handling
-     */
-    async endGamificationSession() {
-        if (!this.gamificationEnabled || !this.sessionId) {
-            console.log('[FlashcardViewer] No active session to end');
-            return;
-        }
-
-        try {
-            // Calculate session duration
-            const sessionDuration = Math.floor((Date.now() - this.sessionStartTime) / 1000);
-
-            console.log('[FlashcardViewer] Ending session:', this.sessionId, 'Duration:', sessionDuration);
-
-            // MEDIUM FIX: Standardized async/await with response validation
-            const response = await fetch('/api/gamification/session/end', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                credentials: 'include',
-                body: JSON.stringify({
-                    session_id: this.sessionId,
-                    duration_seconds: sessionDuration
-                })
-            });
-
-            if (!response.ok) {
-                const errorText = await response.text();
-                console.error('[FlashcardViewer] Failed to end session:', response.status, errorText);
-                return;
-            }
-
-            const data = await response.json();
-            console.log('[FlashcardViewer] Gamification session ended successfully:', data);
-
-        } catch (error) {
-            console.error('[FlashcardViewer] Failed to end gamification session:', error);
-            // Don't throw - this is cleanup, should not break the app
-        }
-    }
-
-    /**
-     * Award XP for completing flashcard set
-     * CRITICAL FIX: Enhanced error handling for XP award failures
-     */
-    async awardFlashcardXP() {
-        if (!this.gamificationEnabled) {
-            console.log('[FlashcardViewer] Gamification not enabled, skipping XP award');
-            return 0;
-        }
-
-        if (!this.gamificationInitialized) {
-            console.warn('[FlashcardViewer] Gamification not initialized, skipping XP award');
-            return 0;
-        }
-
-        try {
-            const cardsReviewed = this.reviewedCards.size;
-            const cardsKnown = this.knownCards.size;
-            const accuracy = cardsReviewed > 0 ? (cardsKnown / cardsReviewed) * 100 : 0;
-
-            // Award XP based on cards reviewed correctly
-            // XP is awarded per 10 cards reviewed correctly
-            const setsCompleted = Math.floor(cardsKnown / 10);
-
-            if (setsCompleted <= 0) {
-                console.log('[FlashcardViewer] No complete sets, no XP awarded');
-                return 0;
-            }
-
-            console.log('[FlashcardViewer] Attempting to award XP for', setsCompleted, 'sets');
-
-            const response = await fetch('/api/gamification/activity', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                credentials: 'include',
-                body: JSON.stringify({
-                    activity_type: 'flashcard_set_completed',
-                    activity_data: {
-                        cards_reviewed: cardsReviewed,
-                        cards_known: cardsKnown,
-                        accuracy: accuracy,
-                        sets_completed: setsCompleted,
-                        session_id: this.sessionId
+                    if (noteText) {
+                        this.cardNotes.set(this.currentIndex, noteText);
+                    } else {
+                        this.cardNotes.delete(this.currentIndex);
                     }
-                })
-            });
 
-            if (!response.ok) {
-                const errorText = await response.text();
-                console.error('[FlashcardViewer] XP award failed with status:', response.status, errorText);
-
-                // Show user-friendly error message
-                this.showError('Failed to award XP. Your progress is still saved locally.');
-                return 0;
-            }
-
-            const data = await response.json();
-            this.xpEarned = data.xp_awarded || 0;
-            console.log('[FlashcardViewer] XP awarded successfully:', this.xpEarned);
-            return this.xpEarned;
-
-        } catch (error) {
-            console.error('[FlashcardViewer] Failed to award XP:', error);
-
-            // Network error or other exception
-            if (error.name === 'TypeError' && error.message.includes('fetch')) {
-                this.showError('Network error: Unable to award XP. Please check your connection.');
-            } else {
-                this.showError('An error occurred while awarding XP. Your progress is still saved.');
-            }
-
-            return 0;
-        }
-    }
-
-    /**
-     * Get current time spent in session (formatted)
-     */
-    getFormattedTimeSpent() {
-        const seconds = Math.floor((Date.now() - this.sessionStartTime) / 1000);
-        const minutes = Math.floor(seconds / 60);
-        const remainingSeconds = seconds % 60;
-
-        if (minutes > 0) {
-            return `${minutes}m ${remainingSeconds}s`;
-        }
-        return `${seconds}s`;
-    }
-
-    /**
-     * Start time tracker to update session time display
-     * MEDIUM FIX: Prevent timer drift by using actual elapsed time
-     */
-    startTimeTracker() {
-        // MEDIUM FIX: Store start time for accurate calculation
-        const startTime = this.sessionStartTime;
-
-        // Update time display every second
-        this.timeTrackerInterval = setInterval(() => {
-            const timeElement = document.getElementById('session-time');
-            if (timeElement) {
-                // MEDIUM FIX: Calculate from actual elapsed time, not accumulated intervals
-                const elapsed = Math.floor((Date.now() - startTime) / 1000);
-                const minutes = Math.floor(elapsed / 60);
-                const seconds = elapsed % 60;
-
-                if (minutes > 0) {
-                    timeElement.textContent = `${minutes}m ${seconds}s`;
-                } else {
-                    timeElement.textContent = `${seconds}s`;
+                    // Re-render to update button state
+                    this.cleanupEventListeners();
+                    this.render();
+                    this.setupEventListeners();
                 }
             }
-        }, 1000);
+        );
+    }
+
+    /**
+     * Show report issue dialog
+     */
+    showReportDialog() {
+        this.showConfirm(
+            'Report Issue',
+            `<p>Report an issue with this flashcard:</p>
+             <textarea id="report-issue-input" rows="4" placeholder="Describe the issue..." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px;"></textarea>`,
+            (confirmed) => {
+                if (confirmed) {
+                    const issueInput = document.getElementById('report-issue-input');
+                    const issueText = issueInput ? issueInput.value.trim() : '';
+
+                    if (issueText) {
+                        console.log('[FlashcardViewer] Issue reported:', {
+                            cardIndex: this.currentIndex,
+                            issue: issueText
+                        });
+
+                        // TODO: Send to backend API
+                        this.showError('Thank you! Your report has been submitted.');
+                    }
+                }
+            }
+        );
+    }
+
+    /**
+     * Cleanup all resources including beforeunload handler
+     * CRITICAL FIX: Full cleanup when destroying viewer
+     */
+    cleanup() {
+        console.log('[FlashcardViewer] Cleaning up all resources...');
+
+        // Remove DOM event listeners
+        this.cleanupEventListeners();
+
+        // CRITICAL FIX: Remove beforeunload handler
+        if (this.beforeUnloadHandler) {
+            window.removeEventListener('beforeunload', this.beforeUnloadHandler);
+            this.beforeUnloadHandler = null;
+        }
+
+        // HIGH FIX: Clear auto-advance timeout
+        if (this.autoAdvanceTimeout) {
+            clearTimeout(this.autoAdvanceTimeout);
+            this.autoAdvanceTimeout = null;
+        }
+
+        // PHASE 2: Clear all references to prevent memory leaks
+        this.flashcards = null;
+        this.originalFlashcards = null;
+        this.reviewedCards = null;
+        this.knownCards = null;
+        this.starredCards = null;
+        this.cardNotes = null;
+        this.spacedRepetition = null;
+
+        console.log('[FlashcardViewer] Cleanup complete');
     }
 }
 
