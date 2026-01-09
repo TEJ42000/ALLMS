@@ -93,7 +93,7 @@ jobs:
           region: ${{ env.REGION }}
           image: ${{ env.ARTIFACT_REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.SERVICE_NAME }}/${{ env.SERVICE_NAME }}:${{ steps.version.outputs.version }}
           flags: |
-            --allow-unauthenticated
+            --no-allow-unauthenticated
             --memory=1Gi
             --cpu=1
             --min-instances=0
@@ -102,6 +102,15 @@ jobs:
             --port=8080
           secrets: |
             ANTHROPIC_API_KEY=anthropic-api-key:latest
+            GOOGLE_OAUTH_CLIENT_ID=oauth-client-id:latest
+            GOOGLE_OAUTH_CLIENT_SECRET=oauth-client-secret:latest
+            SESSION_SECRET_KEY=session-secret-key:latest
+          env_vars: |
+            AUTH_MODE=dual
+            OAUTH_REDIRECT_URI=https://lls-study-portal-sarfwmfd3q-ez.a.run.app/auth/callback
+            SESSION_COOKIE_SECURE=true
+            SESSION_COOKIE_NAME=lls_session
+            SESSION_EXPIRY_DAYS=7
 
       - name: Output deployment URL
         run: |
