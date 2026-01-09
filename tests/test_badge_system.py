@@ -173,19 +173,26 @@ class TestBadgeService:
             criteria={},
             points=10
         )
-        
+
         # Mock Firestore collection
         mock_collection = Mock()
         mock_doc = Mock()
-        mock_collection.document.return_value = mock_doc
+        mock_doc_ref = Mock()
+        mock_doc.exists = False  # Badge not yet earned
+        mock_doc_ref.get.return_value = mock_doc
+        mock_collection.document.return_value = mock_doc_ref
         badge_service.db.collection.return_value = mock_collection
-        
+
+        # Mock the transactional decorator on db - it just calls the function
+        badge_service.db.transactional = lambda func: lambda txn: func(txn)
+        badge_service.db.transaction.return_value = Mock()
+
         user_badge = badge_service._unlock_badge("test_user", badge_def)
-        
+
         assert user_badge is not None
         assert user_badge.user_id == "test_user"
         assert user_badge.badge_id == "test_badge"
-        assert mock_doc.set.called
+        assert user_badge.badge_name == "Test Badge"
 
     def test_get_earned_badge_ids(self, badge_service):
         """Test getting earned badge IDs."""

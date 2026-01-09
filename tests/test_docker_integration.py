@@ -50,7 +50,7 @@ TEST_SCRIPT = REPO_ROOT / "scripts" / "test-docker.sh"
 def test_docker_build_and_run():
     """
     Integration test for Docker build and container.
-    
+
     This test runs the automated Docker test script which:
     1. Builds the Docker image
     2. Starts a container
@@ -58,9 +58,14 @@ def test_docker_build_and_run():
     4. Verifies static files
     5. Checks logs for errors
     6. Tests clean shutdown
-    
+
     The test passes if all Docker tests pass (exit code 0).
     """
+    # Skip in CI environments - this test requires a running Docker daemon
+    # and proper networking which may not be available in all CI runners
+    if os.environ.get("CI") or os.environ.get("GITHUB_ACTIONS"):
+        pytest.skip("Skipping Docker integration test in CI environment")
+
     # Check if Docker is available
     try:
         subprocess.run(

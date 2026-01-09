@@ -405,6 +405,9 @@ class BadgeService:
                 user_badge = UserBadge(
                     user_id=user_id,
                     badge_id=badge_def.badge_id,
+                    badge_name=badge_def.name,
+                    badge_description=badge_def.description,
+                    badge_icon=badge_def.icon,
                     earned_at=datetime.now(timezone.utc)
                 )
 

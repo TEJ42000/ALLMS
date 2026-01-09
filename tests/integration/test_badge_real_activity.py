@@ -24,15 +24,32 @@ class TestBadgeUnlockingWithRealActivity:
     @pytest.fixture
     def badge_service_with_db(self):
         """Create badge service with mocked Firestore."""
+        from unittest.mock import patch
+        # Patch before creating the service, then set up the mock db
+        patcher = patch('app.services.badge_service.get_firestore_client')
+        mock_client = patcher.start()
+        mock_db = MagicMock()
+        mock_client.return_value = mock_db
         service = BadgeService()
-        service.db = MagicMock()
-        return service
+
+        # Mock transactional decorator for _unlock_badge - it just executes the function
+        service.db.transactional = lambda func: lambda txn: func(txn)
+        service.db.transaction.return_value = MagicMock()
+
+        # Mock the document get to return that badge doesn't exist yet
+        mock_snapshot = MagicMock()
+        mock_snapshot.exists = False  # Badge not yet earned
+        service.db.collection.return_value.document.return_value.get.return_value = mock_snapshot
+
+        yield service
+        patcher.stop()
 
     @pytest.fixture
     def user_stats_new_user(self):
         """Create stats for a brand new user."""
         return UserStats(
             user_id="test_user_new",
+            user_email="test_new@example.com",
             total_xp=0,
             level=1,
             level_title="Beginner",
@@ -44,8 +61,8 @@ class TestBadgeUnlockingWithRealActivity:
             ),
             streak=StreakInfo(
                 current_count=0,
-                longest_count=0,
-                last_activity_date=None
+                longest_streak=0
+                # last_activity_date has a default, don't set to None
             ),
             created_at=datetime.now(timezone.utc)
         )
@@ -55,6 +72,7 @@ class TestBadgeUnlockingWithRealActivity:
         """Create stats for an active user with some progress."""
         return UserStats(
             user_id="test_user_active",
+            user_email="test_active@example.com",
             total_xp=750,
             level=3,
             level_title="Learner",
@@ -66,8 +84,8 @@ class TestBadgeUnlockingWithRealActivity:
             ),
             streak=StreakInfo(
                 current_count=5,
-                longest_count=10,
-                last_activity_date=datetime.now(timezone.utc).date()
+                longest_streak=10,
+                last_activity_date=datetime.now(timezone.utc)
             ),
             created_at=datetime.now(timezone.utc) - timedelta(days=30)
         )
@@ -264,6 +282,9 @@ class TestBadgeUnlockingWithRealActivity:
         existing_badge = UserBadge(
             user_id=user_stats_active_user.user_id,
             badge_id="novice",
+            badge_name="Novice",
+            badge_description="Earn 500 XP",
+            badge_icon="🌟",
             earned_at=datetime.now(timezone.utc) - timedelta(days=10)
         )
         badge_service_with_db.db.collection.return_value.where.return_value.stream.return_value = [

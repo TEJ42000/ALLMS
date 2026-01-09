@@ -290,6 +290,12 @@ class TestIntegrationWithRealFiles:
 
     def test_extract_real_pdf_file(self, materials_path):
         """Test extraction from a real PDF file."""
+        # Check if PyMuPDF is installed
+        try:
+            import fitz
+        except ImportError:
+            pytest.skip("PyMuPDF (fitz) not installed - required for PDF extraction")
+
         pdf_file = materials_path / "Syllabus" / "LLS" / "LLS Sylabus.pdf"
         if not pdf_file.exists():
             pytest.skip("LLS Sylabus.pdf not found")

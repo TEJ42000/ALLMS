@@ -319,12 +319,15 @@ class TestBadgeAPIEndpoints:
 
     def test_user_badge_serialization(self):
         """Test that user badges serialize correctly.
-        
+
         Verifies API can return earned badges properly.
         """
         user_badge = UserBadge(
             user_id="test_user",
             badge_id="test_badge",
+            badge_name="Test Badge",
+            badge_description="A test badge",
+            badge_icon="🏆",
             earned_at=datetime.now(timezone.utc)
         )
         

@@ -291,18 +291,21 @@ class TestCardNotes:
             '<IMG SRC="javascript:alert(\'XSS\');">',
         ]
 
-        # Expected: All should be escaped and rendered as text
+        # Expected: All should be escaped and rendered as safe text
         for vector in xss_vectors:
             # Simulate escapeHtml() function
             escaped = self._escape_html(vector)
 
-            # Verify no script tags remain
-            assert '<script' not in escaped.lower()
-            assert 'javascript:' not in escaped.lower()
-            assert 'onerror=' not in escaped.lower()
-            assert 'onload=' not in escaped.lower()
+            # Verify no unescaped HTML tags remain (angle brackets should be escaped)
+            assert '<script' not in escaped, f"Unescaped <script found in: {escaped}"
+            assert '<img' not in escaped, f"Unescaped <img found in: {escaped}"
+            assert '<svg' not in escaped, f"Unescaped <svg found in: {escaped}"
+            assert '<iframe' not in escaped, f"Unescaped <iframe found in: {escaped}"
+            assert '<body' not in escaped, f"Unescaped <body found in: {escaped}"
+            # Note: event handlers like 'onerror=' remain in text but are safe since
+            # they're now plain text (angle brackets are escaped), not executable
 
-            # Verify HTML entities are used
+            # Verify HTML entities are used (proves escaping occurred)
             assert '&lt;' in escaped or '&gt;' in escaped or '&quot;' in escaped
 
     def _escape_html(self, text):

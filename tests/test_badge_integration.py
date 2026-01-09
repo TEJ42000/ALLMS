@@ -99,35 +99,44 @@ class TestBadgeIntegration:
             criteria={},
             points=10
         )
-        
+
         # Mock Firestore transaction
         mock_doc_ref = Mock()
         mock_snapshot = Mock()
         mock_snapshot.exists = False  # First call: badge doesn't exist
         mock_doc_ref.get.return_value = mock_snapshot
-        
+
         mock_collection = Mock()
         mock_collection.document.return_value = mock_doc_ref
         badge_service_with_db.db.collection.return_value = mock_collection
-        
+
+        # Mock the transactional decorator - it just calls the function with transaction
+        badge_service_with_db.db.transactional = lambda func: lambda txn: func(txn)
+
         # Mock transaction
         mock_transaction = Mock()
         badge_service_with_db.db.transaction.return_value = mock_transaction
-        
+
         # First unlock should succeed
         result = badge_service_with_db._unlock_badge("test_user", badge_def)
-        
+
         # Verify transaction was used
         assert badge_service_with_db.db.transaction.called
-        
+        assert result is not None
+        assert result.user_id == "test_user"
+        assert result.badge_id == "test_badge"
+
         # Now simulate badge already exists (second simultaneous call)
         mock_snapshot.exists = True
         mock_snapshot.to_dict.return_value = {
             "user_id": "test_user",
             "badge_id": "test_badge",
+            "badge_name": "Test Badge",
+            "badge_description": "Test",
+            "badge_icon": "🎯",
             "earned_at": datetime.now(timezone.utc).isoformat()
         }
-        
+
         # Second unlock should return existing badge, not create duplicate
         result2 = badge_service_with_db._unlock_badge("test_user", badge_def)
         assert result2 is not None
