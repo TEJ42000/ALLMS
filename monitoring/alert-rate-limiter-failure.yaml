@@ -1,0 +1,70 @@
+# Cloud Monitoring Alert Policy: Rate Limiter Failure
+#
+# Triggers when the rate limiter backend (Redis) fails, indicating
+# that rate limiting is degraded or not working.
+#
+# Severity: HIGH
+# Impact: Rate limiting not working, potential abuse
+# Action: Check Redis instance status, verify connectivity
+#
+# Deploy with:
+#   gcloud alpha monitoring policies create \
+#     --notification-channels=CHANNEL_ID \
+#     --policy-from-file=monitoring/alert-rate-limiter-failure.yaml
+
+displayName: "Rate Limiter Backend Failure"
+documentation:
+  content: |
+    ## Rate Limiter Backend Failure Alert
+    
+    **Severity:** HIGH
+    **Impact:** Rate limiting is degraded or not working
+    
+    ### Symptoms
+    - Rate limiter backend (Redis) is failing
+    - Logs show "Redis rate limit check failed" errors
+    - System falling back to in-memory rate limiter
+    
+    ### Impact
+    - Rate limiting not working across instances
+    - Potential for abuse (excessive uploads)
+    - Degraded service protection
+    
+    ### Immediate Actions
+    1. Check Redis instance status in Cloud Console
+    2. Review Redis connection logs
+    3. Verify network connectivity to Redis
+    4. Check Redis memory usage
+    5. If Redis is down, restart instance
+    6. If persistent, investigate root cause
+    
+    ### Runbook
+    See: docs/runbooks/rate-limiter-alerts.md
+  mimeType: text/markdown
+
+conditions:
+  - displayName: "Rate limiter backend errors"
+    conditionThreshold:
+      filter: |
+        resource.type="cloud_run_revision"
+        severity="ERROR"
+        jsonPayload.message=~"Redis rate limit check failed"
+      comparison: COMPARISON_GT
+      thresholdValue: 5
+      duration: 300s
+      aggregations:
+        - alignmentPeriod: 60s
+          perSeriesAligner: ALIGN_RATE
+          crossSeriesReducer: REDUCE_SUM
+
+alertStrategy:
+  autoClose: 3600s  # Auto-close after 1 hour if no new errors
+  notificationRateLimit:
+    period: 300s  # Don't send more than 1 notification per 5 minutes
+
+# Notification channels will be added during deployment
+# Example:
+# notificationChannels:
+#   - projects/vigilant-axis-483119-r8/notificationChannels/email-ops
+#   - projects/vigilant-axis-483119-r8/notificationChannels/slack-alerts
+
