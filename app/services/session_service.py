@@ -9,7 +9,6 @@ Provides session management functionality including:
 """
 
 import base64
-import hashlib
 import logging
 from datetime import datetime, timedelta, timezone
 from functools import lru_cache
@@ -27,17 +26,6 @@ logger = logging.getLogger(__name__)
 
 # Firestore collection name
 SESSIONS_COLLECTION = "sessions"
-
-
-def _hash_identifier_for_logging(value: str) -> str:
-    """Create a short hash of a value for safe logging (no PII).
-
-    Uses SHA256 to create a non-reversible identifier for log correlation.
-    Example: user@example.com -> "a1b2c3d4e5f6"
-    """
-    if not value:
-        return "unknown"
-    return hashlib.sha256(value.encode()).hexdigest()[:12]
 
 # Salt for key derivation (constant, but secret key provides security)
 _KEY_DERIVATION_SALT = b"lls_session_encryption_v1"
@@ -177,7 +165,7 @@ class SessionService:
             self._collection.document(session.session_id).set(
                 session.to_firestore_dict()
             )
-            logger.info("Created session for user: %s", _hash_identifier_for_logging(user.email))
+            logger.info("Created new session successfully")
             return session
         except Exception as e:
             logger.error("Failed to create session: %s", e)

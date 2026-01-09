@@ -7,7 +7,6 @@ Provides endpoints for Google OAuth authentication including:
 - Current user info endpoint
 """
 
-import hashlib
 import logging
 from typing import Optional
 
@@ -25,17 +24,6 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 templates = Jinja2Templates(directory="templates")
-
-
-def _hash_identifier_for_logging(value: str) -> str:
-    """Create a short hash of a value for safe logging (no PII).
-
-    Uses SHA256 to create a non-reversible identifier for log correlation.
-    Example: user@example.com -> "a1b2c3d4e5f6"
-    """
-    if not value:
-        return "unknown"
-    return hashlib.sha256(value.encode()).hexdigest()[:12]
 
 
 def _get_user_from_request(request: Request) -> Optional[User]:
@@ -154,8 +142,7 @@ async def oauth_callback(
         is_authorized, user, reason = await _authorize_oauth_user(user_info, config)
 
         if not is_authorized:
-            # Log with hashed identifier - no PII (CodeQL safe)
-            logger.warning("User not authorized: %s - %s", _hash_identifier_for_logging(user_info.email), reason)
+            logger.warning("User not authorized, reason: %s", reason)
             return templates.TemplateResponse(
                 "errors/403_access_denied.html",
                 {
@@ -181,8 +168,7 @@ async def oauth_callback(
         response = RedirectResponse(url=redirect_uri or "/", status_code=302)
         _set_session_cookie(response, session.session_id, config)
 
-        # Log with hashed identifier - no PII (CodeQL safe)
-        logger.info("User logged in: %s (admin=%s)", _hash_identifier_for_logging(user.email), user.is_admin)
+        logger.info("User logged in (admin=%s)", user.is_admin)
         return response
 
     except ValueError as e:
