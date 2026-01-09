@@ -7,7 +7,7 @@ Pydantic models for flashcard notes and issue reporting.
 import html
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 
 
 class FlashcardNoteCreate(BaseModel):
@@ -44,6 +44,12 @@ class FlashcardNoteUpdate(BaseModel):
 
 class FlashcardNote(BaseModel):
     """Response model for a flashcard note"""
+    model_config = ConfigDict(
+        json_encoders={
+            datetime: lambda v: v.isoformat()
+        }
+    )
+
     id: str = Field(..., description="Note ID")
     user_id: str = Field(..., description="User ID who created the note")
     card_id: str = Field(..., description="Flashcard ID")
@@ -51,11 +57,6 @@ class FlashcardNote(BaseModel):
     note_text: str = Field(..., description="Note content")
     created_at: datetime = Field(..., description="Creation timestamp")
     updated_at: datetime = Field(..., description="Last update timestamp")
-
-    class Config:
-        json_encoders = {
-            datetime: lambda v: v.isoformat()
-        }
 
 
 class FlashcardIssueCreate(BaseModel):
@@ -114,6 +115,12 @@ class FlashcardIssueUpdate(BaseModel):
 
 class FlashcardIssue(BaseModel):
     """Response model for a flashcard issue"""
+    model_config = ConfigDict(
+        json_encoders={
+            datetime: lambda v: v.isoformat()
+        }
+    )
+
     id: str = Field(..., description="Issue ID")
     user_id: str = Field(..., description="User ID who reported the issue")
     card_id: str = Field(..., description="Flashcard ID")
@@ -124,11 +131,6 @@ class FlashcardIssue(BaseModel):
     created_at: datetime = Field(..., description="Creation timestamp")
     resolved_at: Optional[datetime] = Field(None, description="Resolution timestamp")
     admin_notes: Optional[str] = Field(None, description="Admin notes")
-
-    class Config:
-        json_encoders = {
-            datetime: lambda v: v.isoformat()
-        }
 
 
 class FlashcardNotesList(BaseModel):

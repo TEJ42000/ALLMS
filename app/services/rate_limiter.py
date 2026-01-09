@@ -246,14 +246,14 @@ def get_rate_limiter() -> RateLimiter:
 def check_upload_rate_limit(user_id: str, client_ip: str) -> tuple[bool, Optional[str]]:
     """
     Check if upload request is within rate limit.
-    
+
     Args:
         user_id: User identifier
         client_ip: Client IP address
-        
+
     Returns:
         Tuple of (is_allowed, error_message)
-        
+
     Example:
         is_allowed, error = check_upload_rate_limit("user123", "192.168.1.1")
         if not is_allowed:
@@ -261,4 +261,115 @@ def check_upload_rate_limit(user_id: str, client_ip: str) -> tuple[bool, Optiona
     """
     limiter = get_rate_limiter()
     return limiter.check_rate_limit(user_id, client_ip)
+
+
+def check_flashcard_rate_limit(
+    user_id: str,
+    client_ip: str,
+    endpoint_type: str,
+    max_requests: int,
+    window_seconds: int
+) -> tuple[bool, Optional[str]]:
+    """
+    Check if flashcard endpoint request is within rate limit.
+
+    Args:
+        user_id: User identifier
+        client_ip: Client IP address
+        endpoint_type: Type of endpoint (e.g., 'note_create', 'issue_create', 'note_list')
+        max_requests: Maximum requests allowed in window
+        window_seconds: Time window in seconds
+
+    Returns:
+        Tuple of (is_allowed, error_message)
+
+    Example:
+        is_allowed, error = check_flashcard_rate_limit(
+            "user123", "192.168.1.1", "note_create", 10, 60
+        )
+        if not is_allowed:
+            raise HTTPException(429, error)
+    """
+    limiter = get_rate_limiter()
+    key = f"flashcard:{endpoint_type}:{user_id}:{client_ip}"
+    now = time.time()
+
+    # For in-memory limiter, we need to track separately
+    if isinstance(limiter, MemoryRateLimiter):
+        # Clean up old entries
+        limiter.store[key] = [
+            timestamp for timestamp in limiter.store[key]
+            if now - timestamp < window_seconds
+        ]
+
+        # Check if limit exceeded
+        if len(limiter.store[key]) >= max_requests:
+            logger.warning(
+                f"Flashcard rate limit exceeded for {key}",
+                extra={
+                    "event": "flashcard_rate_limit_exceeded",
+                    "user_id": user_id,
+                    "client_ip": client_ip,
+                    "endpoint_type": endpoint_type,
+                    "current_count": len(limiter.store[key]),
+                    "limit": max_requests,
+                    "window_seconds": window_seconds,
+                    "backend": "memory"
+                }
+            )
+            return False, f"Rate limit exceeded. Maximum {max_requests} requests per {window_seconds} seconds."
+
+        # Add current request
+        limiter.store[key].append(now)
+        return True, None
+
+    elif isinstance(limiter, RedisRateLimiter):
+        # Use Redis for distributed rate limiting
+        window_start = now - window_seconds
+
+        try:
+            pipe = limiter.client.pipeline()
+            pipe.zremrangebyscore(key, 0, window_start)
+            pipe.zcard(key)
+            results = pipe.execute()
+            current_count = results[1]
+
+            if current_count >= max_requests:
+                logger.warning(
+                    f"Flashcard rate limit exceeded for {key}",
+                    extra={
+                        "event": "flashcard_rate_limit_exceeded",
+                        "user_id": user_id,
+                        "client_ip": client_ip,
+                        "endpoint_type": endpoint_type,
+                        "current_count": current_count,
+                        "limit": max_requests,
+                        "window_seconds": window_seconds,
+                        "backend": "redis"
+                    }
+                )
+                return False, f"Rate limit exceeded. Maximum {max_requests} requests per {window_seconds} seconds."
+
+            limiter.client.zadd(key, {str(now): now})
+            limiter.client.expire(key, window_seconds * 2)
+            return True, None
+
+        except Exception as e:
+            logger.error(
+                f"Redis flashcard rate limit check failed: {e}",
+                exc_info=True,
+                extra={
+                    "alert": "flashcard_rate_limiter_failure",
+                    "severity": "HIGH",
+                    "user_id": user_id,
+                    "client_ip": client_ip,
+                    "endpoint_type": endpoint_type,
+                    "fail_open": True
+                }
+            )
+            # Fail open - allow request if Redis is down
+            return True, None
+
+    # Fallback
+    return True, None
 
