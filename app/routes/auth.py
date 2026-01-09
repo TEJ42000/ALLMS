@@ -179,15 +179,14 @@ async def oauth_callback(
         raise HTTPException(status_code=500, detail="Authentication failed")
 
 
-@router.post("/logout")
-async def logout(request: Request):
-    """Logout and invalidate session.
+async def _perform_logout(request: Request) -> RedirectResponse:
+    """Common logout logic for both GET and POST.
 
     Args:
         request: The incoming request
 
     Returns:
-        Redirect to home page
+        Redirect to home page with session cleared
     """
     config = get_auth_config()
     session_service = get_session_service()
@@ -204,6 +203,32 @@ async def logout(request: Request):
     _clear_session_cookie(response, config)
 
     return response
+
+
+@router.get("/logout")
+async def logout_get(request: Request):
+    """Logout via GET request (for direct links).
+
+    Args:
+        request: The incoming request
+
+    Returns:
+        Redirect to home page
+    """
+    return await _perform_logout(request)
+
+
+@router.post("/logout")
+async def logout_post(request: Request):
+    """Logout via POST request (for form submissions).
+
+    Args:
+        request: The incoming request
+
+    Returns:
+        Redirect to home page
+    """
+    return await _perform_logout(request)
 
 
 @router.get("/me")

@@ -38,6 +38,7 @@ PUBLIC_PATHS: Set[str] = {
     "/openapi.json",
     "/auth/login",
     "/auth/callback",
+    "/auth/logout",
     "/privacy-policy",
     "/terms-of-service",
     "/cookie-policy",
