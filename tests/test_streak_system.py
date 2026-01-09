@@ -30,10 +30,9 @@ class TestWeeklyConsistencyBonus:
     @pytest.fixture
     def gamification_service(self, mock_db):
         """Create gamification service with mocked DB."""
-        with patch('app.services.gamification_service.get_firestore_client', return_value=mock_db):
-            service = GamificationService()
-            service.db = mock_db
-            return service
+        service = GamificationService()
+        service._db = mock_db  # Use private attribute to bypass property
+        return service
 
     def test_weekly_consistency_tracking(self, gamification_service, mock_db):
         """Test that weekly consistency categories are tracked correctly."""
