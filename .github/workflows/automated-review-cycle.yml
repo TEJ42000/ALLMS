@@ -33,6 +33,7 @@ jobs:
           intervalSeconds: 10
       
       - name: Get Review Comments
+        id: get-review
         if: steps.wait-for-review.outputs.conclusion == 'success'
         uses: actions/github-script@v7
         with:

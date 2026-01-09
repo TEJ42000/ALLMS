@@ -4,6 +4,9 @@
 
 This document explains the automated code review workflow for streamlining the review-fix-iterate cycle.
 
+**Status:** ✅ **OPERATIONAL** (Fixed 2026-01-09)
+**See:** [Fix Report](AUTOMATED_REVIEW_FIX_REPORT.md) for details on recent fixes
+
 ---
 
 ## Current Limitations (GitHub API)
@@ -43,19 +46,31 @@ Instead of fully automated, we use a **semi-automated workflow** that's signific
 # Set GitHub token
 export GITHUB_TOKEN="your_github_token"
 
-# Run for PR #238
+# Run for PR #238 (waits for workflow to complete)
 python scripts/automated_review_cycle.py --pr 238
+
+# Skip waiting, just parse existing comments
+python scripts/automated_review_cycle.py --pr 238 --skip-wait
+
+# Enable debug mode for troubleshooting
+python scripts/automated_review_cycle.py --pr 238 --debug
 
 # Save results to file
 python scripts/automated_review_cycle.py --pr 238 --output review_results.json
+
+# Custom timeout (default: 600s)
+python scripts/automated_review_cycle.py --pr 238 --timeout 1200
 ```
 
 **Features:**
-- ✅ Waits for Claude Code Review workflow to complete (10min timeout)
-- ✅ Retrieves all PR comments
-- ✅ Parses review feedback by priority (CRITICAL/HIGH/MEDIUM/LOW)
+- ✅ Waits for Claude Code Review workflow to complete (configurable timeout)
+- ✅ Retrieves all PR comments from claude[bot] and github-actions[bot]
+- ✅ Parses review feedback by priority using regex (handles emoji markers 🔴⚠️ℹ️💡)
 - ✅ Returns structured JSON results
 - ✅ Exit code indicates if fixes are needed
+- ✅ Debug mode for troubleshooting
+- ✅ Skip-wait mode to parse existing comments without waiting
+- ✅ Progress indicators and detailed error messages
 
 **Output Example:**
 ```json
@@ -188,31 +203,64 @@ gh pr view 238 --comments | grep -A 100 "Claude Code Review"
 
 ### Script Times Out
 
-**Cause:** Review workflow taking longer than 10 minutes
+**Cause:** Review workflow taking longer than default timeout (600s)
 
 **Solution:**
-```python
-# Increase timeout
+```bash
+# Increase timeout to 20 minutes
 python scripts/automated_review_cycle.py --pr 238 --timeout 1200
 ```
 
 ### No Review Comments Found
 
-**Cause:** Workflow failed or hasn't posted comments yet
+**Cause:** Workflow failed, hasn't posted comments yet, or comments are from wrong user
 
 **Solution:**
+```bash
+# Use debug mode to see what's happening
+python scripts/automated_review_cycle.py --pr 238 --debug --skip-wait
+
+# Check output for:
+# - Total comments on PR
+# - Comment authors
+# - Whether claude[bot] or github-actions[bot] posted
+```
+
+**Manual checks:**
 1. Check GitHub Actions tab for workflow status
 2. Verify workflow has `pull-requests: write` permission
-3. Check if workflow is configured correctly
+3. Verify `id: get-review` exists in `.github/workflows/automated-review-cycle.yml:36`
+4. Check if claude[bot] actually posted a comment
 
-### Parse Errors
+### Parse Errors / No Issues Detected
 
-**Cause:** Review comment format changed
+**Cause:** Review comment format doesn't match regex patterns
 
 **Solution:**
-1. Update parsing logic in `parse_review_comments()`
-2. Add more robust regex patterns
-3. Handle edge cases
+```bash
+# Run with debug mode to see the raw comment
+python scripts/automated_review_cycle.py --pr 238 --debug --skip-wait
+
+# Check if the comment contains:
+# - Emoji markers (🔴, ⚠️, ℹ️, 💡)
+# - Section headers (## 🔴 CRITICAL Issues)
+# - Numbered items (### 1., ### 2.)
+```
+
+If format has changed, update regex patterns in `scripts/automated_review_cycle.py:127-172`
+
+### Authentication Errors
+
+**Cause:** Invalid or missing GitHub token
+
+**Solution:**
+```bash
+# Create a new token at https://github.com/settings/tokens
+# Required scopes: repo, read:org
+
+export GITHUB_TOKEN="ghp_your_new_token_here"
+python scripts/automated_review_cycle.py --pr 238
+```
 
 ---
 
@@ -261,17 +309,36 @@ notify_slack(f"Review complete for PR #{pr_number}: {summary}")
 
 ### Limitations
 
-❌ **Not Fully Automated:** Requires running Python script  
-❌ **Comment-Based:** Cannot trigger via `@claude review` comment  
-❌ **Parsing-Dependent:** Relies on comment format  
+❌ **Not Fully Automated:** Requires running Python script (or GitHub Actions workflow)
+❌ **Comment-Based:** Cannot trigger via `@claude review` comment
+❌ **Parsing-Dependent:** Relies on comment format (but now uses robust regex)
+⚠️ **Requires GitHub Token:** Must have valid token with repo access
 
 ### Recommendation
 
 **Use the semi-automated workflow** with the Python script. It's significantly better than manual copy-paste and provides structured, parseable feedback for the AI to implement fixes efficiently.
 
+**Quick Start:**
+```bash
+export GITHUB_TOKEN="your_token"
+python scripts/automated_review_cycle.py --pr <PR_NUMBER> --skip-wait
+```
+
 ---
 
-**Last Updated:** 2026-01-09  
-**Version:** 1.0  
+## Recent Changes
+
+### 2026-01-09: Major Fixes
+- ✅ Fixed GitHub workflow step ID bug (`.github/workflows/automated-review-cycle.yml:36`)
+- ✅ Rewrote parsing logic to handle emoji markers and section-based format
+- ✅ Added debug mode, skip-wait mode, and configurable timeout
+- ✅ Improved error handling with specific error messages
+- ✅ Added progress indicators and better user feedback
+- 📄 Created comprehensive fix report: [AUTOMATED_REVIEW_FIX_REPORT.md](AUTOMATED_REVIEW_FIX_REPORT.md)
+
+---
+
+**Last Updated:** 2026-01-09
+**Version:** 2.0 (Fixed)
 **Maintainer:** AI Assistant
 

@@ -4,9 +4,10 @@ Flashcard Models
 Pydantic models for flashcard notes and issue reporting.
 """
 
+import html
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 
 
 class FlashcardNoteCreate(BaseModel):
@@ -15,24 +16,30 @@ class FlashcardNoteCreate(BaseModel):
     set_id: str = Field(..., min_length=1, max_length=100, description="Flashcard set identifier")
     note_text: str = Field(..., min_length=1, max_length=5000, description="Note content")
 
-    @validator('note_text')
-    def validate_note_text(cls, v):
-        """Validate note text is not empty after stripping"""
-        if not v.strip():
+    @field_validator('note_text')
+    @classmethod
+    def validate_note_text(cls, v: str) -> str:
+        """Validate note text is not empty after stripping and sanitize HTML"""
+        v = v.strip()
+        if not v:
             raise ValueError('Note text cannot be empty')
-        return v.strip()
+        # Escape HTML to prevent XSS
+        return html.escape(v)
 
 
 class FlashcardNoteUpdate(BaseModel):
     """Request model for updating a flashcard note"""
     note_text: str = Field(..., min_length=1, max_length=5000, description="Updated note content")
 
-    @validator('note_text')
-    def validate_note_text(cls, v):
-        """Validate note text is not empty after stripping"""
-        if not v.strip():
+    @field_validator('note_text')
+    @classmethod
+    def validate_note_text(cls, v: str) -> str:
+        """Validate note text is not empty after stripping and sanitize HTML"""
+        v = v.strip()
+        if not v:
             raise ValueError('Note text cannot be empty')
-        return v.strip()
+        # Escape HTML to prevent XSS
+        return html.escape(v)
 
 
 class FlashcardNote(BaseModel):
@@ -58,20 +65,24 @@ class FlashcardIssueCreate(BaseModel):
     issue_type: str = Field(..., description="Type of issue")
     description: str = Field(..., min_length=1, max_length=2000, description="Issue description")
 
-    @validator('issue_type')
-    def validate_issue_type(cls, v):
+    @field_validator('issue_type')
+    @classmethod
+    def validate_issue_type(cls, v: str) -> str:
         """Validate issue type is one of the allowed values"""
         allowed_types = ['incorrect', 'typo', 'unclear', 'other']
         if v not in allowed_types:
             raise ValueError(f'Issue type must be one of: {", ".join(allowed_types)}')
         return v
 
-    @validator('description')
-    def validate_description(cls, v):
-        """Validate description is not empty after stripping"""
-        if not v.strip():
+    @field_validator('description')
+    @classmethod
+    def validate_description(cls, v: str) -> str:
+        """Validate description is not empty after stripping and sanitize HTML"""
+        v = v.strip()
+        if not v:
             raise ValueError('Description cannot be empty')
-        return v.strip()
+        # Escape HTML to prevent XSS
+        return html.escape(v)
 
 
 class FlashcardIssueUpdate(BaseModel):
@@ -79,12 +90,25 @@ class FlashcardIssueUpdate(BaseModel):
     status: str = Field(..., description="Issue status")
     admin_notes: Optional[str] = Field(None, max_length=2000, description="Admin notes")
 
-    @validator('status')
-    def validate_status(cls, v):
+    @field_validator('status')
+    @classmethod
+    def validate_status(cls, v: str) -> str:
         """Validate status is one of the allowed values"""
         allowed_statuses = ['open', 'in_review', 'resolved', 'closed']
         if v not in allowed_statuses:
             raise ValueError(f'Status must be one of: {", ".join(allowed_statuses)}')
+        return v
+
+    @field_validator('admin_notes')
+    @classmethod
+    def validate_admin_notes(cls, v: Optional[str]) -> Optional[str]:
+        """Strip whitespace and convert empty to None, sanitize HTML"""
+        if v is not None:
+            v = v.strip()
+            if not v:
+                return None
+            # Escape HTML to prevent XSS
+            return html.escape(v)
         return v
 
 

@@ -4,10 +4,13 @@ Flashcard Issues API Routes
 Endpoints for reporting and managing flashcard issues.
 """
 
+import logging
 from fastapi import APIRouter, HTTPException, Depends
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 import uuid
+
+logger = logging.getLogger(__name__)
 
 from app.models.flashcard_models import (
     FlashcardIssue,
@@ -44,7 +47,7 @@ async def create_issue(
         db = get_firestore_client()
         
         issue_id = str(uuid.uuid4())
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         
         issue_dict = {
             'user_id': user.email,
@@ -60,7 +63,8 @@ async def create_issue(
         
         db.collection('flashcard_issues').document(issue_id).set(issue_dict)
         issue_dict['id'] = issue_id
-        
+
+        logger.info(f"User {user.email} reported issue {issue_id} for card {issue_data.card_id} (type: {issue_data.issue_type})")
         return FlashcardIssue(**issue_dict)
         
     except Exception as e:
@@ -196,7 +200,7 @@ async def update_issue(
         
         # Set resolved_at if status is resolved or closed
         if issue_data.status in ['resolved', 'closed']:
-            update_data['resolved_at'] = datetime.utcnow()
+            update_data['resolved_at'] = datetime.now(timezone.utc)
         
         issue_ref.update(update_data)
         
@@ -204,7 +208,8 @@ async def update_issue(
         updated_doc = issue_ref.get()
         issue_dict = updated_doc.to_dict()
         issue_dict['id'] = issue_id
-        
+
+        logger.info(f"Admin {user.email} updated issue {issue_id} to status {issue_data.status}")
         return FlashcardIssue(**issue_dict)
         
     except HTTPException:
@@ -239,9 +244,10 @@ async def delete_issue(
         
         if not issue_doc.exists:
             raise HTTPException(status_code=404, detail="Issue not found")
-        
+
         issue_ref.delete()
-        
+        logger.info(f"Admin {user.email} deleted issue {issue_id}")
+
     except HTTPException:
         raise
     except Exception as e:

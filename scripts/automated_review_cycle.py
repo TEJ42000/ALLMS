@@ -23,10 +23,11 @@ import os
 
 
 class AutomatedReviewCycle:
-    def __init__(self, repo: str, pr_number: int, github_token: str):
+    def __init__(self, repo: str, pr_number: int, github_token: str, debug: bool = False):
         self.repo = repo
         self.pr_number = pr_number
         self.github_token = github_token
+        self.debug = debug
         self.base_url = f"https://api.github.com/repos/{repo}"
         self.headers = {
             "Authorization": f"token {github_token}",
@@ -36,9 +37,21 @@ class AutomatedReviewCycle:
     def get_pr_details(self) -> Dict:
         """Get PR details"""
         url = f"{self.base_url}/pulls/{self.pr_number}"
-        response = requests.get(url, headers=self.headers)
-        response.raise_for_status()
-        return response.json()
+        try:
+            response = requests.get(url, headers=self.headers)
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 404:
+                print(f"❌ PR #{self.pr_number} not found in {self.repo}")
+            elif e.response.status_code == 401:
+                print(f"❌ Authentication failed. Check your GITHUB_TOKEN")
+            else:
+                print(f"❌ HTTP error: {e}")
+            raise
+        except Exception as e:
+            print(f"❌ Error fetching PR details: {e}")
+            raise
     
     def get_workflow_runs(self, sha: str) -> List[Dict]:
         """Get workflow runs for a specific commit"""
@@ -48,60 +61,94 @@ class AutomatedReviewCycle:
             "head_sha": sha,
             "per_page": 10
         }
-        response = requests.get(url, headers=self.headers, params=params)
-        response.raise_for_status()
-        return response.json()["workflow_runs"]
-    
+        try:
+            response = requests.get(url, headers=self.headers, params=params)
+            response.raise_for_status()
+            return response.json()["workflow_runs"]
+        except Exception as e:
+            print(f"❌ Error fetching workflow runs: {e}")
+            raise
+
     def wait_for_review_completion(self, sha: str, timeout: int = 600) -> Optional[Dict]:
         """Wait for Claude Code Review workflow to complete"""
         print(f"⏳ Waiting for Claude Code Review to complete (timeout: {timeout}s)...")
-        
+        print(f"   Commit SHA: {sha}")
+
         start_time = time.time()
+        first_check = True
         while time.time() - start_time < timeout:
             runs = self.get_workflow_runs(sha)
-            
+
+            if first_check and runs:
+                print(f"   Found {len(runs)} workflow runs for this commit")
+                print(f"   Workflows: {[run['name'] for run in runs]}")
+                first_check = False
+
             # Find Claude Code Review workflow
             review_run = next(
                 (run for run in runs if "Claude Code Review" in run["name"]),
                 None
             )
-            
+
             if review_run:
                 status = review_run["status"]
                 conclusion = review_run.get("conclusion")
-                
-                print(f"  Status: {status}, Conclusion: {conclusion}")
-                
+                elapsed = int(time.time() - start_time)
+
+                print(f"  [{elapsed}s] Status: {status}, Conclusion: {conclusion}")
+
                 if status == "completed":
+                    print(f"✅ Review workflow completed with conclusion: {conclusion}")
                     return review_run
-            
+            elif not first_check:
+                elapsed = int(time.time() - start_time)
+                print(f"  [{elapsed}s] No Claude Code Review workflow found yet...")
+
             time.sleep(10)
-        
+
         print("❌ Timeout waiting for review to complete")
+        print(f"   Waited {timeout}s but workflow did not complete")
         return None
     
     def get_pr_comments(self) -> List[Dict]:
         """Get all comments on the PR"""
         url = f"{self.base_url}/issues/{self.pr_number}/comments"
         params = {"per_page": 100}
-        response = requests.get(url, headers=self.headers, params=params)
-        response.raise_for_status()
-        return response.json()
+        try:
+            response = requests.get(url, headers=self.headers, params=params)
+            response.raise_for_status()
+            comments = response.json()
+            print(f"📥 Retrieved {len(comments)} total comments from PR")
+            return comments
+        except Exception as e:
+            print(f"❌ Error fetching PR comments: {e}")
+            raise
     
     def parse_review_comments(self, comments: List[Dict]) -> Dict:
         """Parse Claude Code Review comments"""
+        # Look for comments from claude[bot] or github-actions[bot] containing review content
         review_comments = [
             c for c in comments
-            if "github-actions" in c["user"]["login"].lower() or
-               "claude" in c["body"].lower()
+            if (c["user"]["login"] in ["claude[bot]", "github-actions[bot]"] and
+                ("CRITICAL" in c["body"] or "HIGH" in c["body"] or
+                 "Code Review" in c["body"] or "Priority" in c["body"]))
         ]
-        
+
         if not review_comments:
+            print("⚠️  No review comments found from claude[bot] or github-actions[bot]")
+            print(f"   Total comments on PR: {len(comments)}")
+            if comments:
+                print(f"   Comment authors: {[c['user']['login'] for c in comments]}")
             return {"has_review": False}
-        
+
+        # Use the latest review comment
         latest_review = review_comments[-1]
         body = latest_review["body"]
-        
+
+        print(f"✅ Found review comment from {latest_review['user']['login']}")
+        print(f"   Comment ID: {latest_review['id']}")
+        print(f"   Created: {latest_review['created_at']}")
+
         # Parse priority levels
         result = {
             "has_review": True,
@@ -113,46 +160,47 @@ class AutomatedReviewCycle:
             "medium_issues": [],
             "low_issues": []
         }
-        
-        # Simple parsing - look for priority markers
-        lines = body.split("\n")
-        current_priority = None
-        current_issue = []
-        
-        for line in lines:
-            line_upper = line.upper()
-            
-            if "CRITICAL" in line_upper:
-                if current_issue:
-                    if current_priority:
-                        result[f"{current_priority}_issues"].append("\n".join(current_issue))
-                    current_issue = []
-                current_priority = "critical"
-            elif "HIGH" in line_upper and "PRIORITY" in line_upper:
-                if current_issue:
-                    if current_priority:
-                        result[f"{current_priority}_issues"].append("\n".join(current_issue))
-                    current_issue = []
-                current_priority = "high"
-            elif "MEDIUM" in line_upper and "PRIORITY" in line_upper:
-                if current_issue:
-                    if current_priority:
-                        result[f"{current_priority}_issues"].append("\n".join(current_issue))
-                    current_issue = []
-                current_priority = "medium"
-            elif "LOW" in line_upper and "PRIORITY" in line_upper:
-                if current_issue:
-                    if current_priority:
-                        result[f"{current_priority}_issues"].append("\n".join(current_issue))
-                    current_issue = []
-                current_priority = "low"
-            elif current_priority and line.strip():
-                current_issue.append(line)
-        
-        # Add last issue
-        if current_issue and current_priority:
-            result[f"{current_priority}_issues"].append("\n".join(current_issue))
-        
+
+        # Improved parsing - extract sections by priority markers
+        import re
+
+        # Look for sections marked with emoji and priority levels
+        # Patterns: 🔴 CRITICAL, ⚠️ HIGH, ℹ️ MEDIUM, 💡 LOW
+        # Also handle: ## 🔴 CRITICAL Issues, ## ⚠️ HIGH Priority Issues, etc.
+
+        # Extract CRITICAL section
+        critical_pattern = r'(?:🔴|##\s*🔴|CRITICAL\s+Issues?)(.*?)(?=(?:🟠|⚠️|##\s*⚠️|HIGH\s+Priority|🟡|ℹ️|##\s*ℹ️|MEDIUM\s+Priority|🟢|💡|##\s*💡|LOW\s+Priority|##\s+✅|##\s+Summary|$))'
+        critical_match = re.search(critical_pattern, body, re.DOTALL | re.IGNORECASE)
+        if critical_match:
+            critical_text = critical_match.group(1).strip()
+            # Split by numbered items (### 1., ### 2., etc.) or bullet points
+            issues = re.split(r'(?:^|\n)(?:###\s*\d+\.|\*\*\d+\.)', critical_text)
+            result["critical_issues"] = [issue.strip() for issue in issues if issue.strip() and len(issue.strip()) > 20]
+
+        # Extract HIGH section
+        high_pattern = r'(?:🟠|⚠️|##\s*⚠️|##\s*🟠|HIGH\s+Priority\s+Issues?)(.*?)(?=(?:🟡|ℹ️|##\s*ℹ️|MEDIUM\s+Priority|🟢|💡|##\s*💡|LOW\s+Priority|##\s+✅|##\s+Summary|$))'
+        high_match = re.search(high_pattern, body, re.DOTALL | re.IGNORECASE)
+        if high_match:
+            high_text = high_match.group(1).strip()
+            issues = re.split(r'(?:^|\n)(?:###\s*\d+\.|\*\*\d+\.)', high_text)
+            result["high_issues"] = [issue.strip() for issue in issues if issue.strip() and len(issue.strip()) > 20]
+
+        # Extract MEDIUM section
+        medium_pattern = r'(?:🟡|ℹ️|##\s*ℹ️|##\s*🟡|MEDIUM\s+Priority\s+Issues?)(.*?)(?=(?:🟢|💡|##\s*💡|LOW\s+Priority|##\s+✅|##\s+Summary|$))'
+        medium_match = re.search(medium_pattern, body, re.DOTALL | re.IGNORECASE)
+        if medium_match:
+            medium_text = medium_match.group(1).strip()
+            issues = re.split(r'(?:^|\n)(?:###\s*\d+\.|\*\*\d+\.)', medium_text)
+            result["medium_issues"] = [issue.strip() for issue in issues if issue.strip() and len(issue.strip()) > 20]
+
+        # Extract LOW section
+        low_pattern = r'(?:🟢|💡|##\s*💡|##\s*🟢|LOW\s+Priority)(.*?)(?=(?:##\s+✅|##\s+Summary|##\s+Conclusion|$))'
+        low_match = re.search(low_pattern, body, re.DOTALL | re.IGNORECASE)
+        if low_match:
+            low_text = low_match.group(1).strip()
+            issues = re.split(r'(?:^|\n)(?:###\s*\d+\.|\*\*\d+\.)', low_text)
+            result["low_issues"] = [issue.strip() for issue in issues if issue.strip() and len(issue.strip()) > 20]
+
         # Calculate summary
         result["has_critical"] = len(result["critical_issues"]) > 0
         result["has_high"] = len(result["high_issues"]) > 0
@@ -161,25 +209,29 @@ class AutomatedReviewCycle:
         
         return result
     
-    def run(self) -> Dict:
+    def run(self, skip_wait: bool = False, timeout: int = 600) -> Dict:
         """Run the automated review cycle"""
         print(f"🚀 Starting automated review cycle for PR #{self.pr_number}")
-        
+
         # Get PR details
         pr = self.get_pr_details()
         sha = pr["head"]["sha"]
         print(f"📝 PR: {pr['title']}")
         print(f"🔗 SHA: {sha}")
-        
-        # Wait for review to complete
-        review_run = self.wait_for_review_completion(sha)
-        
-        if not review_run:
-            return {"error": "Review workflow did not complete in time"}
-        
-        if review_run["conclusion"] != "success":
-            print(f"⚠️ Review workflow conclusion: {review_run['conclusion']}")
-        
+        print(f"👤 Author: {pr['user']['login']}")
+        print(f"🌿 Branch: {pr['head']['ref']}")
+
+        # Wait for review to complete (unless skipped)
+        if not skip_wait:
+            review_run = self.wait_for_review_completion(sha, timeout=timeout)
+
+            if not review_run:
+                print("⚠️  Continuing anyway to check for existing review comments...")
+            elif review_run["conclusion"] != "success":
+                print(f"⚠️  Review workflow conclusion: {review_run['conclusion']}")
+        else:
+            print("⏭️  Skipping workflow wait, checking for existing comments...")
+
         # Get and parse comments
         print("📥 Retrieving review comments...")
         comments = self.get_pr_comments()
@@ -216,18 +268,30 @@ def main():
     parser.add_argument("--pr", type=int, required=True, help="Pull request number")
     parser.add_argument("--repo", default="TEJ42000/ALLMS", help="Repository (owner/repo)")
     parser.add_argument("--output", help="Output file for JSON results")
-    
+    parser.add_argument("--skip-wait", action="store_true", help="Skip waiting for workflow, just parse existing comments")
+    parser.add_argument("--debug", action="store_true", help="Enable debug output")
+    parser.add_argument("--timeout", type=int, default=600, help="Timeout in seconds for workflow completion (default: 600)")
+
     args = parser.parse_args()
-    
+
     # Get GitHub token from environment
     github_token = os.getenv("GITHUB_TOKEN")
     if not github_token:
         print("❌ Error: GITHUB_TOKEN environment variable not set")
+        print("   Set it with: export GITHUB_TOKEN='your_token_here'")
+        print("   Or create a token at: https://github.com/settings/tokens")
         sys.exit(1)
-    
+
+    if args.debug:
+        print(f"🔍 Debug mode enabled")
+        print(f"   Repository: {args.repo}")
+        print(f"   PR Number: {args.pr}")
+        print(f"   Timeout: {args.timeout}s")
+        print(f"   Skip Wait: {args.skip_wait}")
+
     # Run review cycle
-    cycle = AutomatedReviewCycle(args.repo, args.pr, github_token)
-    result = cycle.run()
+    cycle = AutomatedReviewCycle(args.repo, args.pr, github_token, debug=args.debug)
+    result = cycle.run(skip_wait=args.skip_wait, timeout=args.timeout)
     
     # Output results
     if args.output:
