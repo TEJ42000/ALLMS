@@ -14,7 +14,8 @@ const FLASHCARD_CONSTANTS = {
     MAX_CARD_LENGTH: 5000,
     NAVIGATION_LOCK_MS: 50,
     SWIPE_THRESHOLD_PX: 50,
-    FLIP_ANIMATION_MS: 600
+    FLIP_ANIMATION_MS: 600,
+    AUTO_ADVANCE_DELAY_MS: 300  // NEW: Delay before auto-advancing to next card in quiz mode
 };
 
 class FlashcardViewer {
@@ -99,6 +100,9 @@ class FlashcardViewer {
         // NEW: XP tracking
         this.xpEarned = 0;
         this.xpPerCard = 1; // Base XP per card reviewed
+
+        // NEW: Auto-advance timeout tracking for cleanup
+        this.autoAdvanceTimeout = null;
 
         // Store original flashcards for restoration after filtering
         this.originalFlashcards = [...this.flashcards];
@@ -575,6 +579,12 @@ class FlashcardViewer {
             return;
         }
 
+        // HIGH FIX: Clear auto-advance timeout on manual navigation
+        if (this.autoAdvanceTimeout) {
+            clearTimeout(this.autoAdvanceTimeout);
+            this.autoAdvanceTimeout = null;
+        }
+
         if (this.currentIndex > 0) {
             this.isNavigating = true;
             this.currentIndex--;
@@ -600,6 +610,12 @@ class FlashcardViewer {
         // HIGH FIX: Prevent race condition from rapid key presses
         if (this.isNavigating) {
             return;
+        }
+
+        // HIGH FIX: Clear auto-advance timeout on manual navigation
+        if (this.autoAdvanceTimeout) {
+            clearTimeout(this.autoAdvanceTimeout);
+            this.autoAdvanceTimeout = null;
         }
 
         if (this.currentIndex < this.flashcards.length - 1) {
@@ -721,10 +737,25 @@ class FlashcardViewer {
     /**
      * Mark quiz answer (correct, incorrect, skip)
      * NEW: Self-assessment for quiz mode
+     * HIGH FIX: Added input validation
      */
     markQuizAnswer(answer) {
+        // HIGH FIX: Validate study mode
         if (this.studyMode !== 'quiz') {
             console.warn('[FlashcardViewer] markQuizAnswer called in non-quiz mode');
+            return;
+        }
+
+        // HIGH FIX: Validate answer parameter
+        const validAnswers = ['correct', 'incorrect', 'skip'];
+        if (!validAnswers.includes(answer)) {
+            console.warn(`[FlashcardViewer] Invalid answer: ${answer}. Must be one of: ${validAnswers.join(', ')}`);
+            return;
+        }
+
+        // HIGH FIX: Validate currentIndex is within bounds
+        if (this.currentIndex < 0 || this.currentIndex >= this.flashcards.length) {
+            console.error(`[FlashcardViewer] Invalid currentIndex: ${this.currentIndex}. Must be between 0 and ${this.flashcards.length - 1}`);
             return;
         }
 
@@ -755,11 +786,19 @@ class FlashcardViewer {
         this.render();
         this.setupEventListeners();
 
+        // HIGH FIX: Clear any pending auto-advance timeout to prevent race conditions
+        if (this.autoAdvanceTimeout) {
+            clearTimeout(this.autoAdvanceTimeout);
+            this.autoAdvanceTimeout = null;
+        }
+
         // Auto-advance after marking (optional)
         if (this.currentIndex < this.flashcards.length - 1) {
-            setTimeout(() => {
+            // HIGH FIX: Store timeout ID for cleanup
+            this.autoAdvanceTimeout = setTimeout(() => {
+                this.autoAdvanceTimeout = null;
                 this.nextCard();
-            }, 300); // Small delay for visual feedback
+            }, FLASHCARD_CONSTANTS.AUTO_ADVANCE_DELAY_MS); // Small delay for visual feedback
         } else {
             // Quiz complete
             this.showQuizResults();
@@ -769,10 +808,28 @@ class FlashcardViewer {
     /**
      * Format time in seconds to MM:SS
      * NEW: Helper for quiz results
+     * MEDIUM FIX: Added input validation and edge case handling
      */
     formatTime(seconds) {
+        // MEDIUM FIX: Validate input is a number
+        if (typeof seconds !== 'number' || isNaN(seconds)) {
+            console.warn(`[FlashcardViewer] Invalid time value: ${seconds}`);
+            return '0:00';
+        }
+
+        // MEDIUM FIX: Handle negative values
+        if (seconds < 0) {
+            console.warn(`[FlashcardViewer] Negative time value: ${seconds}`);
+            return '0:00';
+        }
+
+        // MEDIUM FIX: Handle null/undefined
+        if (seconds == null) {
+            return '0:00';
+        }
+
         const mins = Math.floor(seconds / 60);
-        const secs = seconds % 60;
+        const secs = Math.floor(seconds % 60);
         return `${mins}:${secs.toString().padStart(2, '0')}`;
     }
 
@@ -846,37 +903,51 @@ class FlashcardViewer {
             </div>
         `;
 
-        // Set up button handlers
+        // MEDIUM FIX: Track button handlers in eventListeners array for proper cleanup
         const btnReviewIncorrect = document.getElementById('btn-review-incorrect');
         if (btnReviewIncorrect) {
-            btnReviewIncorrect.addEventListener('click', () => this.reviewIncorrectCards());
+            const reviewHandler = () => this.reviewIncorrectCards();
+            btnReviewIncorrect.addEventListener('click', reviewHandler);
+            this.eventListeners.push({ element: btnReviewIncorrect, event: 'click', handler: reviewHandler });
         }
 
         const btnRestartQuiz = document.getElementById('btn-restart-quiz');
         if (btnRestartQuiz) {
-            btnRestartQuiz.addEventListener('click', () => this.restart());
+            const restartHandler = () => this.restart();
+            btnRestartQuiz.addEventListener('click', restartHandler);
+            this.eventListeners.push({ element: btnRestartQuiz, event: 'click', handler: restartHandler });
         }
 
         const btnBackQuiz = document.getElementById('btn-back-quiz');
         if (btnBackQuiz) {
-            btnBackQuiz.addEventListener('click', () => {
+            const backHandler = () => {
                 if (this.onComplete) {
                     this.onComplete({ score: correctCount, total: totalCards, xp: this.xpEarned });
                 }
-            });
+            };
+            btnBackQuiz.addEventListener('click', backHandler);
+            this.eventListeners.push({ element: btnBackQuiz, event: 'click', handler: backHandler });
         }
 
         // Trigger XP gain event for gamification integration
+        // MEDIUM FIX: Add error handling to prevent blocking quiz completion
         if (this.showXP && this.xpEarned > 0) {
-            document.dispatchEvent(new CustomEvent('gamification:xpgain', {
-                detail: { xp: this.xpEarned, source: 'flashcard_quiz' }
-            }));
+            try {
+                document.dispatchEvent(new CustomEvent('gamification:xpgain', {
+                    detail: { xp: this.xpEarned, source: 'flashcard_quiz' }
+                }));
+                console.log(`[FlashcardViewer] XP gain event dispatched: +${this.xpEarned} XP`);
+            } catch (error) {
+                console.error('[FlashcardViewer] Failed to dispatch XP gain event:', error);
+                // Don't block quiz completion if gamification fails
+            }
         }
     }
 
     /**
      * Review only incorrect cards from quiz
      * NEW: Filter to incorrect answers
+     * MEDIUM FIX: Check originalFlashcards exists before filtering
      */
     reviewIncorrectCards() {
         const incorrectIndices = [];
@@ -891,6 +962,9 @@ class FlashcardViewer {
             return;
         }
 
+        // MEDIUM FIX: Use originalFlashcards if available, otherwise current flashcards
+        const sourceFlashcards = this.originalFlashcards || this.flashcards;
+
         // Store original state
         if (!this.isFilteredView) {
             this.originalFlashcards = [...this.flashcards];
@@ -900,7 +974,7 @@ class FlashcardViewer {
         }
 
         // Filter to incorrect cards
-        this.flashcards = incorrectIndices.map(index => this.originalFlashcards[index]);
+        this.flashcards = incorrectIndices.map(index => sourceFlashcards[index]);
         this.isFilteredView = true;
         this.currentIndex = 0;
         this.isFlipped = false;
@@ -1215,6 +1289,12 @@ class FlashcardViewer {
         if (this.beforeUnloadHandler) {
             window.removeEventListener('beforeunload', this.beforeUnloadHandler);
             this.beforeUnloadHandler = null;
+        }
+
+        // HIGH FIX: Clear auto-advance timeout
+        if (this.autoAdvanceTimeout) {
+            clearTimeout(this.autoAdvanceTimeout);
+            this.autoAdvanceTimeout = null;
         }
     }
 }
