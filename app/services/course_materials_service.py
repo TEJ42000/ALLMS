@@ -229,7 +229,17 @@ class CourseMaterialsService:
             max_week: Maximum week number to include (default 12, must be >= 1)
 
         Returns:
-            Dict with week counts and total
+            Dict with:
+                - course_id: The course identifier
+                - weeks: List of {week: int, count: int} for weeks 1 to max_week
+                - no_week_count: Count of materials with no week assigned OR
+                  week number outside the 1-max_week range
+                - total: Total number of materials in the course
+
+        Note:
+            Materials with weekNumber > max_week are counted in no_week_count,
+            not in their respective week. This is intentional to keep the
+            response structure consistent regardless of max_week value.
 
         Raises:
             ValueError: If max_week is less than 1

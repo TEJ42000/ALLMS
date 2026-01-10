@@ -384,3 +384,137 @@ class TestMaterialCountsByWeek:
             data = response.json()
             assert "detail" in data
             assert "fail" in data["detail"].lower()
+
+
+class TestMaterialCountsServiceMethod:
+    """Unit tests for CourseMaterialsService.get_material_counts_by_week()."""
+
+    @pytest.fixture
+    def mock_materials_service(self):
+        """Create a mock materials service with list_materials mocked."""
+        with patch("app.services.course_materials_service.CourseMaterialsService") as MockClass:
+            mock_service = MagicMock()
+            MockClass.return_value = mock_service
+            yield mock_service
+
+    def test_groups_materials_by_week_correctly(self):
+        """Should group materials by week number correctly."""
+        from app.services.course_materials_service import CourseMaterialsService
+        from app.models.course_models import CourseMaterial
+
+        with patch.object(CourseMaterialsService, "__init__", lambda self: None):
+            service = CourseMaterialsService()
+
+            # Mock materials with various week numbers
+            mock_materials = [
+                MagicMock(weekNumber=1),
+                MagicMock(weekNumber=1),
+                MagicMock(weekNumber=2),
+                MagicMock(weekNumber=3),
+                MagicMock(weekNumber=3),
+                MagicMock(weekNumber=3),
+            ]
+            service.list_materials = MagicMock(return_value=mock_materials)
+
+            result = service.get_material_counts_by_week("test-course", max_week=5)
+
+            assert result["course_id"] == "test-course"
+            assert result["total"] == 6
+
+            # Check week counts
+            week_counts = {w["week"]: w["count"] for w in result["weeks"]}
+            assert week_counts[1] == 2
+            assert week_counts[2] == 1
+            assert week_counts[3] == 3
+            assert week_counts[4] == 0
+            assert week_counts[5] == 0
+
+    def test_includes_empty_weeks(self):
+        """Should return weeks with zero count."""
+        from app.services.course_materials_service import CourseMaterialsService
+
+        with patch.object(CourseMaterialsService, "__init__", lambda self: None):
+            service = CourseMaterialsService()
+
+            # Only materials in week 1
+            mock_materials = [MagicMock(weekNumber=1)]
+            service.list_materials = MagicMock(return_value=mock_materials)
+
+            result = service.get_material_counts_by_week("test-course", max_week=5)
+
+            # Should have 5 weeks in response
+            assert len(result["weeks"]) == 5
+            # Weeks 2-5 should have count 0
+            for week_data in result["weeks"]:
+                if week_data["week"] > 1:
+                    assert week_data["count"] == 0
+
+    def test_respects_max_week(self):
+        """Materials with weekNumber > max_week should go to no_week_count."""
+        from app.services.course_materials_service import CourseMaterialsService
+
+        with patch.object(CourseMaterialsService, "__init__", lambda self: None):
+            service = CourseMaterialsService()
+
+            # Materials in weeks 1, 5, and 10
+            mock_materials = [
+                MagicMock(weekNumber=1),
+                MagicMock(weekNumber=5),
+                MagicMock(weekNumber=10),  # Beyond max_week=7
+            ]
+            service.list_materials = MagicMock(return_value=mock_materials)
+
+            result = service.get_material_counts_by_week("test-course", max_week=7)
+
+            # Week 10 material should be in no_week_count
+            assert result["no_week_count"] == 1
+            assert len(result["weeks"]) == 7
+
+    def test_counts_materials_without_week(self):
+        """Materials with no weekNumber should be in no_week_count."""
+        from app.services.course_materials_service import CourseMaterialsService
+
+        with patch.object(CourseMaterialsService, "__init__", lambda self: None):
+            service = CourseMaterialsService()
+
+            mock_materials = [
+                MagicMock(weekNumber=1),
+                MagicMock(weekNumber=None),
+                MagicMock(weekNumber=None),
+            ]
+            service.list_materials = MagicMock(return_value=mock_materials)
+
+            result = service.get_material_counts_by_week("test-course", max_week=5)
+
+            assert result["no_week_count"] == 2
+            assert result["total"] == 3
+
+    def test_validates_max_week(self):
+        """Should raise ValueError if max_week < 1."""
+        from app.services.course_materials_service import CourseMaterialsService
+
+        with patch.object(CourseMaterialsService, "__init__", lambda self: None):
+            service = CourseMaterialsService()
+            service.list_materials = MagicMock(return_value=[])
+
+            with pytest.raises(ValueError, match="max_week must be >= 1"):
+                service.get_material_counts_by_week("test-course", max_week=0)
+
+            with pytest.raises(ValueError, match="max_week must be >= 1"):
+                service.get_material_counts_by_week("test-course", max_week=-5)
+
+    def test_empty_course(self):
+        """Should handle course with no materials."""
+        from app.services.course_materials_service import CourseMaterialsService
+
+        with patch.object(CourseMaterialsService, "__init__", lambda self: None):
+            service = CourseMaterialsService()
+            service.list_materials = MagicMock(return_value=[])
+
+            result = service.get_material_counts_by_week("test-course", max_week=5)
+
+            assert result["total"] == 0
+            assert result["no_week_count"] == 0
+            assert len(result["weeks"]) == 5
+            for week_data in result["weeks"]:
+                assert week_data["count"] == 0

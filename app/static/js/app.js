@@ -2156,6 +2156,10 @@ async function populateStudyWeekDropdown() {
         // Update each week option with material count
         weekSelect.querySelectorAll('option[data-week]').forEach(option => {
             const weekNum = parseInt(option.dataset.week);
+            if (isNaN(weekNum)) {
+                console.warn('Invalid week number in dropdown option:', option);
+                return;
+            }
             const count = weekCounts[weekNum] || 0;
             const countText = count === 0 ? 'no materials' : `${count} material${count !== 1 ? 's' : ''}`;
 
