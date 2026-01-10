@@ -22,6 +22,7 @@ from app.services.text_extractor import (
     extract_from_text,
     extract_from_html,
     extract_from_json,
+    extract_from_pdf,  # FIX #259: Import for direct PDF testing
     get_file_extension,
     ExtractionResult,
 )
@@ -290,25 +291,68 @@ class TestIntegrationWithRealFiles:
         assert result.success is True
         assert len(result.text) > 0
 
-    @pytest.mark.skip(reason="Flaky test - depends on local PDF file not available in CI. See GitHub issue for re-enabling.")
-    def test_extract_real_pdf_file(self, materials_path):
-        """Test extraction from a real PDF file."""
+    def test_extract_real_pdf_file(self, tmp_path):
+        """Test extraction from a real PDF file.
+
+        FIX #259: Generate PDF at test time from base64 to ensure cross-platform
+        compatibility and avoid git line-ending issues.
+        """
+        import base64
+        import sys
+
+        # FIX #259: Remove any mock of fitz from other tests (test_syllabus_parser)
+        # This ensures we use the real PyMuPDF library
+        if 'fitz' in sys.modules:
+            from unittest.mock import MagicMock
+            if isinstance(sys.modules['fitz'], MagicMock):
+                del sys.modules['fitz']
+
         # Check if PyMuPDF is installed
         try:
             import fitz
         except ImportError:
             pytest.skip("PyMuPDF (fitz) not installed - required for PDF extraction")
 
-        pdf_file = materials_path / "Syllabus" / "LLS" / "LLS Sylabus.pdf"
-        if not pdf_file.exists():
-            pytest.skip("LLS Sylabus.pdf not found")
+        # FIX #259: Base64-encoded minimal PDF with embedded text
+        # This PDF contains: "Test PDF Document", "unit testing", "Legal Studies"
+        pdf_base64 = (
+            "JVBERi0xLjQKMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4KZW5k"
+            "b2JqCjIgMCBvYmoKPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUl0gL0NvdW50IDEgPj4K"
+            "ZW5kb2JqCjMgMCBvYmoKPDwgL1R5cGUgL1BhZ2UgL1BhcmVudCAyIDAgUiAvTWVkaWFCb3gg"
+            "WzAgMCA2MTIgNzkyXQogICAvQ29udGVudHMgNCAwIFIgL1Jlc291cmNlcyA8PCAvRm9udCA8"
+            "PCAvRjEgNSAwIFIgPj4gPj4gPj4KZW5kb2JqCjQgMCBvYmoKPDwgL0xlbmd0aCAxNzggPj4K"
+            "c3RyZWFtCkJUCi9GMSAxNCBUZgoxMDAgNzAwIFRkCihUZXN0IFBERiBEb2N1bWVudCkgVGoK"
+            "MCAtMjAgVGQKKFRoaXMgaXMgYSBzYW1wbGUgUERGIGZpbGUgZm9yIHVuaXQgdGVzdGluZy4p"
+            "IFRqCjAgLTIwIFRkCihMZWdhbCBTdHVkaWVzIENvdXJzZSBNYXRlcmlhbCkgVGoKRVQKZW5k"
+            "c3RyZWFtCmVuZG9iago1IDAgb2JqCjw8IC9UeXBlIC9Gb250IC9TdWJ0eXBlIC9UeXBlMSAv"
+            "QmFzZUZvbnQgL0hlbHZldGljYSA+PgplbmRvYmoKeHJlZgowIDYKMDAwMDAwMDAwMCA2NTUz"
+            "NSBmIAowMDAwMDAwMDA5IDAwMDAwIG4gCjAwMDAwMDAwNTggMDAwMDAgbiAKMDAwMDAwMDEx"
+            "NSAwMDAwMCBuIAowMDAwMDAwMjY2IDAwMDAwIG4gCjAwMDAwMDA0OTQgMDAwMDAgbiAKdHJh"
+            "aWxlcgo8PCAvU2l6ZSA2IC9Sb290IDEgMCBSID4+CnN0YXJ0eHJlZgo1NzMKJSVFT0YK"
+        )
 
-        result = extract_text(pdf_file)
+        # Write PDF to temp file
+        pdf_bytes = base64.b64decode(pdf_base64)
+        pdf_file = tmp_path / "sample.pdf"
+        pdf_file.write_bytes(pdf_bytes)
+
+        # FIX #259: First verify fitz can read it directly from bytes
+        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+        assert len(doc) == 1, f"Expected 1 page from bytes, got {len(doc)}"
+        direct_text = doc[0].get_text()
+        doc.close()
+        assert "Test PDF Document" in direct_text, f"Direct extraction failed: {direct_text}"
+
+        # FIX #259: Use extract_from_pdf to test the service
+        result = extract_from_pdf(pdf_file)
 
         assert result.success is True
         assert result.file_type == "pdf"
-        assert len(result.text) > 0
+        assert len(result.text) > 0, f"Empty text. Result: {result}"
         assert result.pages is not None
+        # FIX #259: Verify expected content from fixture
+        assert "Test PDF Document" in result.text
+        assert "Legal Studies" in result.text
 
     @pytest.mark.skip(reason="Depends on local Materials files not available in CI.")
     def test_extract_slide_archive(self, materials_path):
