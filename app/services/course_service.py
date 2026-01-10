@@ -523,6 +523,109 @@ class CourseService:
             logger.error("Firestore error deactivating course %s: %s", course_id, str(e))
             raise FirestoreOperationError(f"Failed to deactivate course {course_id}: {str(e)}") from e
 
+    @with_retry()
+    def delete_course(self, course_id: str) -> bool:
+        """
+        Permanently delete a course and all its subcollections.
+
+        This is a DESTRUCTIVE operation that:
+        1. Deletes all weeks subcollection documents
+        2. Deletes all materials subcollection documents
+        3. Deletes all topics subcollection documents
+        4. Deletes all legalSkills subcollection documents
+        5. Deletes the course document itself
+
+        NOTE: This does NOT delete files from the Materials folder.
+        File deletion should be handled separately by the caller.
+
+        Args:
+            course_id: The course ID
+
+        Returns:
+            True if deleted, False if not found
+
+        Raises:
+            ServiceValidationError: If course_id is invalid
+            FirestoreOperationError: If Firestore operation fails
+        """
+        try:
+            course_id = validate_course_id(course_id)
+        except ValueError as e:
+            raise ServiceValidationError(str(e)) from e
+
+        try:
+            course_ref = self.db.collection(COURSES_COLLECTION).document(course_id)
+
+            # Check if course exists
+            if not course_ref.get().exists:
+                logger.warning("Course not found for deletion: %s", course_id)
+                return False
+
+            # Delete all subcollections
+            # Firestore requires deleting subcollection documents before parent
+            subcollections = [
+                WEEKS_SUBCOLLECTION,
+                MATERIALS_SUBCOLLECTION,
+                TOPICS_SUBCOLLECTION,
+                LEGAL_SKILLS_SUBCOLLECTION,
+                'uploadedMaterials',  # Also delete uploaded materials
+            ]
+
+            total_deleted = 0
+            for subcollection_name in subcollections:
+                deleted = self._delete_subcollection(course_ref, subcollection_name)
+                total_deleted += deleted
+                if deleted > 0:
+                    logger.info("Deleted %d documents from %s/%s", deleted, course_id, subcollection_name)
+
+            # Finally, delete the course document itself
+            course_ref.delete()
+            logger.info("Permanently deleted course %s (removed %d subcollection documents)",
+                       course_id, total_deleted)
+            return True
+
+        except google_exceptions.GoogleAPIError as e:
+            logger.error("Firestore error deleting course %s: %s", course_id, str(e))
+            raise FirestoreOperationError("Failed to delete course") from e
+
+    def _delete_subcollection(self, parent_ref, subcollection_name: str) -> int:
+        """
+        Delete all documents in a subcollection.
+
+        Args:
+            parent_ref: Parent document reference
+            subcollection_name: Name of the subcollection
+
+        Returns:
+            Number of documents deleted
+        """
+        subcollection_ref = parent_ref.collection(subcollection_name)
+        docs = list(subcollection_ref.stream())
+
+        if not docs:
+            return 0
+
+        # Delete in batches of 500 (Firestore limit)
+        deleted_count = 0
+        batch = self.db.batch()
+        batch_count = 0
+
+        for doc in docs:
+            batch.delete(doc.reference)
+            batch_count += 1
+            deleted_count += 1
+
+            if batch_count >= 500:
+                batch.commit()
+                batch = self.db.batch()
+                batch_count = 0
+
+        # Commit remaining deletes
+        if batch_count > 0:
+            batch.commit()
+
+        return deleted_count
+
     # ========================================================================
     # Week Operations
     # ========================================================================

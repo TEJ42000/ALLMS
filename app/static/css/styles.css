@@ -809,6 +809,8 @@ textarea { resize: vertical; font-family: inherit; }
 .btn-secondary:hover { background: rgba(255, 255, 255, 0.1); border-color: var(--gold); }
 .btn-success { background: var(--success); color: white; }
 .btn-warning { background: var(--warning); color: var(--navy-dark); }
+.btn-danger { background: linear-gradient(135deg, #ff4444 0%, #cc0000 100%); color: white; }
+.btn-danger:hover { transform: translateY(-2px); box-shadow: 0 5px 20px rgba(255, 68, 68, 0.4); }
 .result-box { margin-top: 20px; padding: 20px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 10px; display: none; }
 .result-box.show { display: block; animation: fadeIn 0.3s; }
 .quiz-controls, .quiz-content { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 15px; padding: 25px; margin-bottom: 20px; }

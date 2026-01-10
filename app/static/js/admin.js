@@ -684,7 +684,12 @@ function renderCoursesList() {
     }
     elements.coursesList.innerHTML = courses.map(course => `
         <div class="course-card" data-course-id="${course.id}">
-            <h3>${course.name || 'Untitled Course'}</h3>
+            <div class="course-card-header">
+                <h3>${course.name || 'Untitled Course'}</h3>
+                <button class="btn-icon btn-delete" data-course-id="${course.id}" data-course-name="${course.name || 'Untitled Course'}" title="Delete course permanently">
+                    🗑️
+                </button>
+            </div>
             <div class="course-id">${course.id}</div>
             <div class="course-meta">
                 ${course.institution || ''} ${course.academicYear ? '• ' + course.academicYear : ''}
@@ -695,8 +700,24 @@ function renderCoursesList() {
             </span>
         </div>
     `).join('');
+
+    // Add click handlers for course cards (excluding delete button)
     document.querySelectorAll('.course-card').forEach(card => {
-        card.addEventListener('click', () => fetchCourse(card.dataset.courseId));
+        card.addEventListener('click', (e) => {
+            // Don't open course if clicking delete button
+            if (e.target.closest('.btn-delete')) return;
+            fetchCourse(card.dataset.courseId);
+        });
+    });
+
+    // Add click handlers for delete buttons
+    document.querySelectorAll('.btn-delete').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent card click
+            const courseId = btn.dataset.courseId;
+            const courseName = btn.dataset.courseName;
+            confirmDeleteCourse(courseId, courseName);
+        });
     });
 }
 
@@ -1996,6 +2017,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // Course actions
     document.getElementById('create-course-btn').addEventListener('click', createNewCourse);
     document.getElementById('save-course-btn').addEventListener('click', saveCourse);
+    document.getElementById('delete-course-detail-btn').addEventListener('click', () => {
+        if (currentCourse) {
+            confirmDeleteCourse(currentCourse.id, currentCourse.name);
+        }
+    });
     document.getElementById('back-to-list-btn').addEventListener('click', () => { showView('courses'); fetchCourses(); });
     document.getElementById('add-week-btn').addEventListener('click', addNewWeek);
     document.getElementById('add-component-btn').addEventListener('click', addComponent);
@@ -2027,4 +2053,74 @@ document.addEventListener('DOMContentLoaded', () => {
         fetchCourse(window.initialCourseId);
     }
 });
+
+// ========== Course Deletion ==========
+
+/**
+ * Show confirmation dialog before deleting a course.
+ *
+ * @param {string} courseId - Course ID to delete
+ * @param {string} courseName - Course name for display
+ */
+function confirmDeleteCourse(courseId, courseName) {
+    const message = `Are you sure you want to delete "${courseName}"?\n\n` +
+                   `This will permanently delete:\n` +
+                   `• All course weeks and materials\n` +
+                   `• All student data and progress\n` +
+                   `• All associated files\n\n` +
+                   `⚠️ THIS ACTION CANNOT BE UNDONE!\n\n` +
+                   `Type the course ID "${courseId}" to confirm:`;
+
+    const confirmation = prompt(message);
+
+    if (confirmation === courseId) {
+        deleteCourse(courseId, courseName);
+    } else if (confirmation !== null) {
+        // User entered something but it didn't match
+        alert('Course ID did not match. Deletion cancelled.');
+    }
+    // If confirmation is null, user clicked Cancel - do nothing
+}
+
+/**
+ * Delete a course permanently.
+ *
+ * @param {string} courseId - Course ID to delete
+ * @param {string} courseName - Course name for display
+ */
+async function deleteCourse(courseId, courseName) {
+    try {
+        showLoading();
+
+        // Ask if they want to delete files too
+        const deleteFiles = confirm(
+            `Do you also want to delete the files from the Materials/${courseId}/ folder?\n\n` +
+            `Click OK to delete files, or Cancel to keep them.`
+        );
+
+        const response = await fetch(`/admin/api/courses/${courseId}/permanent?delete_files=${deleteFiles}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.detail || `Failed to delete course: ${response.status}`);
+        }
+
+        hideLoading();
+        alert(`✅ Course "${courseName}" has been permanently deleted.`);
+
+        // Navigate back to course list and refresh
+        showView('courses');
+        fetchCourses();
+
+    } catch (error) {
+        hideLoading();
+        console.error('Error deleting course:', error);
+        alert(`❌ Failed to delete course: ${error.message}`);
+    }
+}
 
