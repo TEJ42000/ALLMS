@@ -106,7 +106,22 @@ def extract_text(file_path: Path | str, *, _skip_path_validation: bool = False) 
     # Path validation can be skipped for testing only (underscore prefix indicates internal use)
     if not _skip_path_validation:
         try:
-            validated_path = validate_path_within_base(str(file_path), MATERIALS_BASE)
+            # Convert to Path object
+            path_obj = Path(file_path)
+
+            # If path is already absolute and within MATERIALS_BASE, use it directly
+            if path_obj.is_absolute():
+                resolved_path = path_obj.resolve()
+                try:
+                    resolved_path.relative_to(MATERIALS_BASE.resolve())
+                    # Path is already within MATERIALS_BASE
+                    validated_path = resolved_path
+                except ValueError:
+                    # Path is absolute but not within MATERIALS_BASE - reject it
+                    raise ValueError(f"Absolute path outside Materials directory: {file_path}")
+            else:
+                # Path is relative - validate it's within MATERIALS_BASE
+                validated_path = validate_path_within_base(str(file_path), MATERIALS_BASE)
         except ValueError as e:
             logger.error(
                 "Path validation failed - file_path=%s, MATERIALS_BASE=%s, error=%s",
