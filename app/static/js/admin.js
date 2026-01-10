@@ -76,7 +76,7 @@ async function batchProcessMaterials() {
         showLoading();
         showToast('Processing materials... This may take a while.', 'info');
 
-        const response = await fetch(`${API_BASE}/${currentCourse.id}/unified-materials/batch-process`, {
+        const response = await secureFetch(`${API_BASE}/${currentCourse.id}/unified-materials/batch-process`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -172,7 +172,7 @@ async function saveCourse() {
         const isNew = !currentCourse || currentCourse.id !== courseData.id;
         const method = isNew ? 'POST' : 'PATCH';
         const url = isNew ? API_BASE : `${API_BASE}/${courseData.id}`;
-        const response = await fetch(url, {
+        const response = await secureFetch(url, {
             method,
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(courseData)
@@ -199,7 +199,7 @@ async function scanMaterials() {
     showLoading();
 
     try {
-        const response = await fetch(`${API_BASE}/${currentCourse.id}/scan-materials`, {
+        const response = await secureFetch(`${API_BASE}/${currentCourse.id}/scan-materials`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ use_ai_titles: useAI })
@@ -565,7 +565,7 @@ async function syncWeekMaterials() {
 
     showLoading();
     try {
-        const response = await fetch(`${API_BASE}/${currentCourse.id}/sync-week-materials`, {
+        const response = await secureFetch(`${API_BASE}/${currentCourse.id}/sync-week-materials`, {
             method: 'POST'
         });
 
@@ -592,7 +592,7 @@ async function saveWeek() {
     if (!weekData.weekNumber) { showToast('Week number is required', 'error'); return; }
     showLoading();
     try {
-        const response = await fetch(`${API_BASE}/${currentCourse.id}/weeks/${weekData.weekNumber}`, {
+        const response = await secureFetch(`${API_BASE}/${currentCourse.id}/weeks/${weekData.weekNumber}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(weekData)
@@ -1124,7 +1124,7 @@ async function extractSyllabusData() {
 
     showLoading();
     try {
-        const response = await fetch(`${API_BASE}/syllabi/extract`, {
+        const response = await secureFetch(`${API_BASE}/syllabi/extract`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ syllabus_path: selectedSyllabus.path })
@@ -1240,7 +1240,7 @@ async function importSyllabusData() {
             syllabus: syllabusData
         };
 
-        const response = await fetch(API_BASE, {
+        const response = await secureFetch(API_BASE, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(courseData)
@@ -1265,7 +1265,7 @@ async function importSyllabusData() {
                 keyConcepts: []
             };
 
-            await fetch(`${API_BASE}/${courseId}/weeks/${weekNumber}`, {
+            await secureFetch(`${API_BASE}/${courseId}/weeks/${weekNumber}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(weekData)
@@ -1475,13 +1475,13 @@ async function deleteMaterial(materialId) {
         showLoading();
 
         // Try unified endpoint first, fall back to legacy
-        let response = await fetch(`${API_BASE}/${currentCourse.id}/unified-materials/${materialId}?delete_file=true`, {
+        let response = await secureFetch(`${API_BASE}/${currentCourse.id}/unified-materials/${materialId}?delete_file=true`, {
             method: 'DELETE'
         });
 
         // If unified endpoint fails with 404, try legacy endpoint
         if (response.status === 404) {
-            response = await fetch(`${API_BASE}/${currentCourse.id}/materials/uploads/${materialId}`, {
+            response = await secureFetch(`${API_BASE}/${currentCourse.id}/materials/uploads/${materialId}`, {
                 method: 'DELETE'
             });
         }
@@ -1881,7 +1881,7 @@ async function processConcurrentExtractions(items, processor, maxConcurrent, sig
 
 async function extractSingleFile(filePath) {
     // Use the correct endpoint for individual file extraction
-    const response = await fetch(`/api/admin/cache/file/${encodeURIComponent(filePath)}/refresh`, {
+    const response = await secureFetch(`/api/admin/cache/file/${encodeURIComponent(filePath)}/refresh`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
     });
@@ -2098,7 +2098,7 @@ async function deleteCourse(courseId, courseName) {
             `Click OK to delete files, or Cancel to keep them.`
         );
 
-        const response = await fetch(`/admin/api/courses/${courseId}/permanent?delete_files=${deleteFiles}`, {
+        const response = await secureFetch(`/admin/api/courses/${courseId}/permanent?delete_files=${deleteFiles}`, {
             method: 'DELETE',
             headers: {
                 'Content-Type': 'application/json'

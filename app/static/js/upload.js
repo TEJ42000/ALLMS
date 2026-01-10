@@ -249,8 +249,16 @@ async function uploadSingleFile(file, tier, category, weekNumber, description, e
     formData.append('extract_text', extractText);
     formData.append('generate_summary', generateSummary);
     
+    // Add CSRF token to headers for multipart/form-data
+    const csrfToken = getCSRFToken();
+    const headers = {};
+    if (csrfToken) {
+        headers['X-CSRF-Token'] = csrfToken;
+    }
+
     const response = await fetch(`/api/admin/courses/${currentCourseId}/materials/upload`, {
         method: 'POST',
+        headers: headers,
         body: formData
     });
     
@@ -282,7 +290,7 @@ async function deleteMaterial(materialId) {
     }
 
     try {
-        const response = await fetch(`/api/admin/courses/${currentCourseId}/materials/uploads/${materialId}`, {
+        const response = await secureFetch(`/api/admin/courses/${currentCourseId}/materials/uploads/${materialId}`, {
             method: 'DELETE'
         });
 
