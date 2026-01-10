@@ -148,3 +148,93 @@ class TestListCoursesPublic:
         assert data["items"] == []
         assert data["has_more"] is False
 
+
+class TestGetCoursePublic:
+    """Tests for GET /api/courses/{course_id}."""
+
+    def test_get_course_authenticated_user(self, client, mock_course_service, override_auth_dependency):
+        """Should return course details for authenticated user."""
+        from app.models.course_models import Course
+
+        mock_course_service.get_course.return_value = Course(
+            id="LLS-2025-2026",
+            name="Law and Legal Skills",
+            academicYear="2025-2026",
+            active=True,
+            weeks=[]
+        )
+
+        response = client.get("/api/courses/LLS-2025-2026")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["id"] == "LLS-2025-2026"
+        assert data["name"] == "Law and Legal Skills"
+
+    def test_get_course_unauthenticated(self, client):
+        """Should return 401 for unauthenticated requests."""
+        from fastapi import HTTPException
+        from app.dependencies.auth import require_authenticated
+
+        def raise_unauthorized():
+            raise HTTPException(status_code=401, detail="Not authenticated")
+
+        app.dependency_overrides[require_authenticated] = raise_unauthorized
+
+        response = client.get("/api/courses/LLS-2025-2026")
+
+        assert response.status_code == 401
+        app.dependency_overrides.clear()
+
+    def test_get_course_not_found(self, client, mock_course_service, override_auth_dependency):
+        """Should return 404 when course not found."""
+        mock_course_service.get_course.return_value = None
+
+        response = client.get("/api/courses/NONEXISTENT")
+
+        assert response.status_code == 404
+
+    def test_get_course_inactive_hidden(self, client, mock_course_service, override_auth_dependency):
+        """Should return 404 for inactive courses (hidden from non-admin users)."""
+        from app.models.course_models import Course
+
+        mock_course_service.get_course.return_value = Course(
+            id="OLD-COURSE",
+            name="Old Course",
+            academicYear="2020-2021",
+            active=False,
+            weeks=[]
+        )
+
+        response = client.get("/api/courses/OLD-COURSE")
+
+        assert response.status_code == 404
+
+    def test_get_course_with_weeks(self, client, mock_course_service, override_auth_dependency):
+        """Should include weeks when requested."""
+        from app.models.course_models import Course, Week
+
+        mock_course_service.get_course.return_value = Course(
+            id="LLS-2025-2026",
+            name="Law and Legal Skills",
+            academicYear="2025-2026",
+            active=True,
+            weeks=[
+                Week(weekNumber=1, title="Introduction", topics=[])
+            ]
+        )
+
+        response = client.get("/api/courses/LLS-2025-2026?include_weeks=true")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["weeks"]) == 1
+        assert data["weeks"][0]["weekNumber"] == 1
+
+    def test_get_course_firestore_error(self, client, mock_course_service, override_auth_dependency):
+        """Should return 503 when Firestore is unavailable."""
+        mock_course_service.get_course.side_effect = FirestoreOperationError("Connection failed")
+
+        response = client.get("/api/courses/LLS-2025-2026")
+
+        assert response.status_code == 503

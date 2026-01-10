@@ -35,10 +35,10 @@ class WeekContentManager {
     async loadWeeks() {
         try {
             console.log('[WeekContentManager] Fetching weeks from API...');
-            console.log('[WeekContentManager] URL:', `/api/admin/courses/${this.courseId}?include_weeks=true`);
+            console.log('[WeekContentManager] URL:', `/api/courses/${this.courseId}?include_weeks=true`);
 
-            // Fetch weeks from existing admin API
-            const response = await fetch(`/api/admin/courses/${this.courseId}?include_weeks=true`);
+            // Fetch weeks from public courses API (accessible to all authenticated users)
+            const response = await fetch(`/api/courses/${this.courseId}?include_weeks=true`);
             console.log('[WeekContentManager] Response status:', response.status);
 
             if (!response.ok) {
