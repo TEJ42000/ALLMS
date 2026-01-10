@@ -90,9 +90,11 @@ class AuthMiddleware(BaseHTTPMiddleware):
             request.state.user = MockUser()
             return await call_next(request)
 
-        # Skip auth for public paths
+        # For public paths, still try to get user but don't require auth
         if self._is_public_path(request.url.path):
-            request.state.user = None  # No user for public paths
+            # Try to get user from session (if logged in) but don't block
+            user = await self._get_optional_user(request, config)
+            request.state.user = user  # May be None or a valid User
             return await call_next(request)
 
         # Authenticate based on configured mode
@@ -149,6 +151,33 @@ class AuthMiddleware(BaseHTTPMiddleware):
             return None, "Invalid or expired session"
 
         return user, "OAuth session valid"
+
+    async def _get_optional_user(
+        self, request: Request, config
+    ) -> Optional[User]:
+        """Get user from session if available, without requiring authentication.
+
+        Used for public paths where authentication is optional but we still
+        want to show user info if they're logged in.
+
+        Args:
+            request: The incoming request
+            config: Auth configuration
+
+        Returns:
+            User if authenticated, None otherwise
+        """
+        if config.auth_mode in ("oauth", "dual"):
+            user, _ = await self._authenticate_oauth(request, config)
+            if user:
+                return user
+
+        if config.auth_mode in ("iap", "dual"):
+            is_authorized, user, _ = await is_user_authorized(request)
+            if is_authorized and user:
+                return user
+
+        return None
 
     def _handle_unauthenticated(self, request: Request, reason: str):
         """Handle unauthenticated request based on request type.
