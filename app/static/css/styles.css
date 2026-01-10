@@ -4117,12 +4117,62 @@ textarea { resize: vertical; font-family: inherit; }
     .recent-uploads {
         margin-top: 20px;
     }
-    
+
     .upload-item-info {
         gap: 10px;
     }
-    
+
     .upload-item-icon {
         font-size: 1.3em;
     }
+}
+
+/* Part Selector (for courses with parts like Criminal Law) */
+.part-selector {
+    margin-bottom: 30px;
+}
+
+.part-tabs {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.part-tab {
+    padding: 12px 30px;
+    background: var(--bg-card);
+    border: 2px solid var(--border-color);
+    border-radius: 10px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.3s;
+    font-weight: 600;
+    font-size: 1em;
+    min-width: 120px;
+}
+
+.part-tab:hover {
+    background: rgba(255, 255, 255, 0.1);
+    transform: translateY(-2px);
+    border-color: var(--gold);
+}
+
+.part-tab.active {
+    background: linear-gradient(135deg, var(--gold) 0%, #b8941f 100%);
+    color: var(--navy-dark);
+    border-color: var(--gold);
+    box-shadow: 0 4px 15px rgba(212, 175, 55, 0.3);
+}
+
+.part-tab[data-part="A"]::before {
+    content: "📖 ";
+}
+
+.part-tab[data-part="B"]::before {
+    content: "⚖️ ";
+}
+
+.part-tab[data-part="mixed"]::before {
+    content: "🔀 ";
 }
