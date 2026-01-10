@@ -2944,14 +2944,54 @@ function hideFlashcardLoading() {
 }
 
 /**
- * Show error message for flashcards
+ * Show error message for flashcards with user-friendly display
  */
 function showFlashcardError(message) {
     const questionEl = document.getElementById('flashcard-question');
     const answerEl = document.getElementById('flashcard-answer');
 
-    if (questionEl) questionEl.textContent = 'Error';
-    if (answerEl) answerEl.innerHTML = `<span class="error">${escapeHtml(message)}</span>`;
+    // Check if this is a "no flashcards" scenario vs actual error
+    const isEmptyState = message.includes('No flashcards') ||
+                         message.includes('No course materials') ||
+                         message.includes('not found');
+
+    if (isEmptyState) {
+        // Show friendly empty state
+        if (questionEl) {
+            questionEl.innerHTML = `
+                <div style="text-align: center; padding: 20px;">
+                    <div style="font-size: 48px; margin-bottom: 10px;">📚</div>
+                    <div style="font-size: 18px; font-weight: 500; margin-bottom: 10px;">No Flashcards Yet</div>
+                </div>
+            `;
+        }
+        if (answerEl) {
+            answerEl.innerHTML = `
+                <div style="text-align: center; padding: 20px; color: #666;">
+                    <p>Click "Generate New Flashcards" below to create flashcards from your course materials.</p>
+                    <p style="margin-top: 10px; font-size: 14px;">Flashcards help you memorize key concepts and terms.</p>
+                </div>
+            `;
+        }
+    } else {
+        // Show actual error with helpful message
+        if (questionEl) {
+            questionEl.innerHTML = `
+                <div style="text-align: center; padding: 20px;">
+                    <div style="font-size: 48px; margin-bottom: 10px;">⚠️</div>
+                    <div style="font-size: 18px; font-weight: 500; color: #e74c3c;">Failed to Load Flashcards</div>
+                </div>
+            `;
+        }
+        if (answerEl) {
+            answerEl.innerHTML = `
+                <div style="text-align: center; padding: 20px;">
+                    <p style="color: #e74c3c; margin-bottom: 10px;">${escapeHtml(message)}</p>
+                    <p style="color: #666; font-size: 14px;">Try clicking "Generate New Flashcards" or refresh the page.</p>
+                </div>
+            `;
+        }
+    }
 
     flashcards = [];
     updateFlashcardStats();
@@ -2994,8 +3034,22 @@ function updateFlashcardDisplay() {
     const answerEl = document.getElementById('flashcard-answer');
 
     if (flashcards.length === 0) {
-        if (questionEl) questionEl.textContent = 'No flashcards available';
-        if (answerEl) answerEl.textContent = '';
+        // Show friendly empty state instead of just "No flashcards available"
+        if (questionEl) {
+            questionEl.innerHTML = `
+                <div style="text-align: center; padding: 20px;">
+                    <div style="font-size: 48px; margin-bottom: 10px;">📚</div>
+                    <div style="font-size: 18px; font-weight: 500; margin-bottom: 10px;">No Flashcards Yet</div>
+                </div>
+            `;
+        }
+        if (answerEl) {
+            answerEl.innerHTML = `
+                <div style="text-align: center; padding: 20px; color: #666;">
+                    <p>Click "Generate New Flashcards" to create flashcards from your course materials.</p>
+                </div>
+            `;
+        }
         return;
     }
 
