@@ -12,6 +12,12 @@ const COURSE = window.COURSE_CONTEXT?.course || null;
 // Counter for active tutor requests to prevent race conditions with typing indicator
 let activeTutorRequests = 0;
 
+// ========== Tutor Request Debouncing ==========
+// Prevents rapid-fire submissions that waste API credits and cause duplicate responses
+// Uses same debouncing pattern as flashcard error handling
+let lastTutorRequestTime = 0;
+const TUTOR_REQUEST_DEBOUNCE_MS = 2000; // 2 second cooldown between requests
+
 /**
  * Add course_id parameter to API requests if in course context
  */
@@ -424,34 +430,43 @@ function escapeHtml(text) {
 // These patterns are defined at module level to avoid recompilation on every validation call
 // Patterns avoid false positives for legal education (e.g., "act as a judge" is valid)
 // Tightened to require AI-specific context words to avoid blocking legal topics
+// Word boundaries (\b) prevent false positives on partial word matches (e.g., "signore" != "ignore")
 const PROMPT_INJECTION_PATTERNS = [
     // Instruction override attempts - target AI/system instructions specifically
     // Requires context words like "instructions", "prompts", "rules", "commands"
-    /ignore\s+(previous|all|above|prior|earlier)\s+(instructions?|prompts?|rules?|commands?)/i,
-    /disregard\s+(previous|all|above|prior|earlier)\s+(instructions?|prompts?|rules?|commands?)/i,
-    /forget\s+(previous|all|above|prior|earlier)\s+(instructions?|prompts?|rules?|commands?)/i,
-    /override\s+(previous|all|above|prior)\s+(instructions?|prompts?|rules?|commands?)/i,
+    // Word boundaries prevent matching partial words (e.g., "signore" won't match "ignore")
+    /\bignore\s+(previous|all|above|prior|earlier)\s+(instructions?|prompts?|rules?|commands?)\b/i,
+    /\bdisregard\s+(previous|all|above|prior|earlier)\s+(instructions?|prompts?|rules?|commands?)\b/i,
+    /\bforget\s+(previous|all|above|prior|earlier)\s+(instructions?|prompts?|rules?|commands?)\b/i,
+    /\boverride\s+(previous|all|above|prior)\s+(instructions?|prompts?|rules?|commands?)\b/i,
 
     // System manipulation attempts - specific to AI system
     // Tightened: requires "AI", "assistant", or "model" before "system" to avoid legal topics
     // Allows: "legal system instruction", "justice system message"
     // Blocks: "AI system prompt", "ignore system instruction"
-    /(ai|assistant|model|chatbot)\s+system\s+(prompt|message|instruction)/i,
-    /(ignore|bypass|override)\s+(the\s+)?system\s+(prompt|instruction|rules?)/i,
-    /new\s+(instructions?|prompt)\s+(for\s+)?(you|the\s+system|the\s+ai)/i,
+    /\b(ai|assistant|model|chatbot)\s+system\s+(prompt|message|instruction)\b/i,
+    /\b(ignore|bypass|override)\s+(the\s+)?system\s+(prompt|instruction|rules?)\b/i,
+    /\bnew\s+(instructions?|prompt)\s+(for\s+)?(you|the\s+system|the\s+ai)\b/i,
 
     // Role manipulation attempts - target AI role changes, not legal roles
-    // Requires AI-specific roles: unrestricted, jailbroken, developer, admin, root, DAN
-    /you\s+are\s+now\s+(an?\s+)?(unrestricted|jailbroken|developer|admin|root)/i,
-    /act\s+as\s+(an?\s+)?(unrestricted|jailbroken|developer|admin|root|dan)/i,
-    /pretend\s+(to\s+be|you\s+are)\s+(an?\s+)?(unrestricted|jailbroken|developer|admin)/i,
+    // Requires AI-specific roles: unrestricted, jailbroken, developer, admin, DAN
+    // Note: 'root' only blocks when followed by technical terms (user/access/privileges/admin)
+    // to allow legal terms like "root cause analysis" and "root of title"
+    // Trade-off: Standalone "you are now root" is NOT blocked to allow legal phrases like
+    // "root cause". This is acceptable given Claude's system-level role protections and
+    // the high value of allowing legal education content.
+    /\byou\s+are\s+now\s+(an?\s+)?(unrestricted|jailbroken|developer|admin)\b/i,
+    /\byou\s+are\s+now\s+(an?\s+)?root\s+(user|access|privileges?|admin)\b/i,
+    /\bact\s+as\s+(an?\s+)?(unrestricted|jailbroken|developer|admin|dan)\b/i,
+    /\bact\s+as\s+(an?\s+)?root\s+(user|access|privileges?|admin)\b/i,
+    /\bpretend\s+(to\s+be|you\s+are)\s+(an?\s+)?(unrestricted|jailbroken|developer|admin)\b/i,
 
     // Direct command attempts targeting AI behavior
     // Requires "code", "command", or "script" to avoid blocking legal topics
-    /(^|\s)(execute|run|perform)\s+(this|the|following)\s+(code|command|script)/i,
+    /\b(execute|run|perform)\s+(this|the|following)\s+(code|command|script)\b/i,
 
     // Explicit jailbreak attempts
-    /(jailbreak|dan\s+mode|developer\s+mode|god\s+mode)/i,
+    /\b(jailbreak|dan\s+mode|developer\s+mode|god\s+mode)\b/i,
 ];
 
 /**
@@ -507,6 +522,21 @@ async function askTutor() {
 
     if (!message) return;
 
+    // Debounce check to prevent rapid-fire submissions
+    // Uses same pattern as flashcard loading debouncing
+    const now = Date.now();
+    const timeSinceLastRequest = now - lastTutorRequestTime;
+
+    if (timeSinceLastRequest < TUTOR_REQUEST_DEBOUNCE_MS) {
+        const remainingMs = TUTOR_REQUEST_DEBOUNCE_MS - timeSinceLastRequest;
+        const remainingSec = Math.ceil(remainingMs / 1000);
+        const debounceMsg = remainingSec === 1
+            ? '⏳ Please wait 1 second before sending another message.'
+            : `⏳ Please wait ${remainingSec} seconds before sending another message.`;
+        addMessage('system', debounceMsg);
+        return;
+    }
+
     // Parse context value to extract week number if present
     // Format from template: "Week X: Topic Name" stored as topic name,
     // but option value could be topic name directly
@@ -539,6 +569,11 @@ async function askTutor() {
         if (week_number !== null) {
             requestBody.week_number = week_number;
         }
+
+        // Update debounce timestamp after request is built but before network call
+        // This allows immediate retry if request building fails, but prevents
+        // rapid-fire submissions once we're about to make the network request
+        lastTutorRequestTime = now;
 
         const response = await fetch(`${API_BASE}/api/tutor/chat`, {
             method: 'POST',
