@@ -324,15 +324,23 @@ class TestIntegrationWithRealFiles:
         )
 
         # Write PDF to temp file
+        pdf_bytes = base64.b64decode(pdf_base64)
         pdf_file = tmp_path / "sample.pdf"
-        pdf_file.write_bytes(base64.b64decode(pdf_base64))
+        pdf_file.write_bytes(pdf_bytes)
 
-        # FIX #259: Use extract_from_pdf directly to bypass file type detection
+        # FIX #259: First verify fitz can read it directly from bytes
+        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+        assert len(doc) == 1, f"Expected 1 page from bytes, got {len(doc)}"
+        direct_text = doc[0].get_text()
+        doc.close()
+        assert "Test PDF Document" in direct_text, f"Direct extraction failed: {direct_text}"
+
+        # FIX #259: Use extract_from_pdf to test the service
         result = extract_from_pdf(pdf_file)
 
         assert result.success is True
         assert result.file_type == "pdf"
-        assert len(result.text) > 0
+        assert len(result.text) > 0, f"Empty text. Result: {result}"
         assert result.pages is not None
         # FIX #259: Verify expected content from fixture
         assert "Test PDF Document" in result.text
