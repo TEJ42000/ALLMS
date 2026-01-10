@@ -211,7 +211,7 @@ class TestGetCoursePublic:
         assert response.status_code == 404
 
     def test_get_course_with_weeks(self, client, mock_course_service, override_auth_dependency):
-        """Should include weeks when requested."""
+        """Should include weeks when requested and verify service call parameters."""
         from app.models.course_models import Course, Week
 
         mock_course_service.get_course.return_value = Course(
@@ -230,6 +230,32 @@ class TestGetCoursePublic:
         data = response.json()
         assert len(data["weeks"]) == 1
         assert data["weeks"][0]["weekNumber"] == 1
+        # Verify service was called with correct parameters
+        mock_course_service.get_course.assert_called_once_with(
+            "LLS-2025-2026",
+            include_weeks=True
+        )
+
+    def test_get_course_without_weeks(self, client, mock_course_service, override_auth_dependency):
+        """Should pass include_weeks=False to service when requested."""
+        from app.models.course_models import Course
+
+        mock_course_service.get_course.return_value = Course(
+            id="LLS-2025-2026",
+            name="Law and Legal Skills",
+            academicYear="2025-2026",
+            active=True,
+            weeks=[]
+        )
+
+        response = client.get("/api/courses/LLS-2025-2026?include_weeks=false")
+
+        assert response.status_code == 200
+        # Verify service was called with include_weeks=False
+        mock_course_service.get_course.assert_called_once_with(
+            "LLS-2025-2026",
+            include_weeks=False
+        )
 
     def test_get_course_firestore_error(self, client, mock_course_service, override_auth_dependency):
         """Should return 503 when Firestore is unavailable."""

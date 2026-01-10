@@ -34,12 +34,8 @@ class WeekContentManager {
     
     async loadWeeks() {
         try {
-            console.log('[WeekContentManager] Fetching weeks from API...');
-            console.log('[WeekContentManager] URL:', `/api/courses/${this.courseId}?include_weeks=true`);
-
             // Fetch weeks from public courses API (accessible to all authenticated users)
             const response = await fetch(`/api/courses/${this.courseId}?include_weeks=true`);
-            console.log('[WeekContentManager] Response status:', response.status);
 
             if (!response.ok) {
                 const errorText = await response.text();
@@ -48,19 +44,11 @@ class WeekContentManager {
             }
 
             const course = await response.json();
-            console.log('[WeekContentManager] Course data:', course);
-
             const weeks = course.weeks || [];
-            console.log('[WeekContentManager] Weeks found:', weeks.length);
-
-            if (weeks.length > 0) {
-                console.log('[WeekContentManager] First week:', weeks[0]);
-            }
 
             this.renderWeeks(weeks);
         } catch (error) {
             console.error('[WeekContentManager] Error loading weeks:', error);
-            console.error('[WeekContentManager] Error stack:', error.stack);
             // Fallback: render placeholder weeks
             this.renderFallbackWeeks();
         }

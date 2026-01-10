@@ -10,7 +10,7 @@ and course details after OAuth login.
 import logging
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 from pydantic import BaseModel
 
 from app.dependencies.auth import require_authenticated
@@ -94,7 +94,13 @@ async def list_courses(
 
 @router.get("/{course_id}", response_model=Course)
 async def get_course(
-    course_id: str,
+    course_id: str = Path(
+        ...,
+        min_length=1,
+        max_length=100,
+        pattern=r"^[A-Za-z0-9_-]+$",
+        description="Course identifier (alphanumeric with hyphens/underscores)"
+    ),
     user: User = Depends(require_authenticated),
     include_weeks: bool = Query(True, description="Include weeks and legal skills")
 ):
@@ -102,7 +108,9 @@ async def get_course(
     Get a course by ID for authenticated users.
 
     Returns course details including weeks and legal skills.
-    Only active courses are accessible to non-admin users.
+
+    **Security**: Only active courses are accessible to non-admin users.
+    Inactive courses return 404 (not 403) to avoid leaking course existence.
 
     **Parameters:**
     - `course_id`: The unique course identifier (e.g., "LLS-2025-2026")
@@ -116,7 +124,7 @@ async def get_course(
             logger.warning("Course not found: %s (user: %s)", course_id, user.email)
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Course not found: {course_id}"
+                detail="Course not found"
             )
 
         # Non-admin users can only access active courses
@@ -124,7 +132,7 @@ async def get_course(
             logger.warning("User %s attempted to access inactive course: %s", user.email, course_id)
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Course not found: {course_id}"
+                detail="Course not found"
             )
 
         logger.info("User %s retrieved course: %s", user.email, course_id)
