@@ -285,10 +285,24 @@
     .quiz-progress-bar {
         display: none;
     }
-    
+
     .question-header-enhanced {
         box-shadow: none;
         border: 1px solid #000;
     }
+}
+
+/* ========== CSP-Safe Animations (Issue #179) ========== */
+/* Fade-in animation using CSS classes instead of inline styles */
+
+.quiz-fade-in-hidden {
+    opacity: 0;
+    transform: translateY(20px);
+}
+
+.quiz-fade-in-visible {
+    opacity: 1;
+    transform: translateY(0);
+    transition: opacity 0.3s ease, transform 0.3s ease;
 }
 

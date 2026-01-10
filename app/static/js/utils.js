@@ -1,8 +1,12 @@
 /**
  * Shared Utility Functions
- * 
+ *
  * Common utilities used across multiple JavaScript files.
- * MEDIUM FIX: Consolidate duplicate functions to avoid code duplication.
+ *
+ * Security utilities:
+ * - escapeHtml: XSS prevention
+ * - getCSRFToken: CSRF token retrieval
+ * - secureFetch: Fetch wrapper with CSRF protection
  */
 
 /**
@@ -90,7 +94,103 @@ function showNotification(message, type = 'info', duration = 5000) {
     }
 }
 
+/**
+ * CSRF Protection Utilities
+ *
+ * Implements client-side support for double-submit cookie CSRF pattern.
+ * Issue: #204
+ */
+
+const CSRF_COOKIE_NAME = 'csrf_token';
+const CSRF_HEADER_NAME = 'X-CSRF-Token';
+
+/**
+ * Get CSRF token from cookie
+ *
+ * @returns {string|null} - The CSRF token or null if not found
+ *
+ * @example
+ * const token = getCSRFToken();
+ * if (token) {
+ *     headers['X-CSRF-Token'] = token;
+ * }
+ */
+function getCSRFToken() {
+    const cookies = document.cookie.split(';');
+    for (const cookie of cookies) {
+        const [name, value] = cookie.trim().split('=');
+        if (name === CSRF_COOKIE_NAME) {
+            return decodeURIComponent(value);
+        }
+    }
+    return null;
+}
+
+/**
+ * Secure fetch wrapper that automatically includes CSRF token
+ *
+ * Use this for all mutating requests (POST, PUT, PATCH, DELETE).
+ * GET/HEAD/OPTIONS requests don't need CSRF but can use this safely.
+ *
+ * @param {string} url - The URL to fetch
+ * @param {Object} options - Fetch options (same as standard fetch)
+ * @returns {Promise<Response>} - The fetch response
+ *
+ * @example
+ * // POST request with automatic CSRF
+ * const response = await secureFetch('/api/data', {
+ *     method: 'POST',
+ *     headers: {'Content-Type': 'application/json'},
+ *     body: JSON.stringify(data)
+ * });
+ */
+async function secureFetch(url, options = {}) {
+    const method = (options.method || 'GET').toUpperCase();
+
+    // Only add CSRF token for mutating methods
+    if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+        const csrfToken = getCSRFToken();
+
+        if (csrfToken) {
+            // Merge CSRF header with existing headers
+            options.headers = {
+                ...options.headers,
+                [CSRF_HEADER_NAME]: csrfToken
+            };
+        } else {
+            console.warn('[secureFetch] CSRF token not found. Request may fail.');
+        }
+    }
+
+    return fetch(url, options);
+}
+
+/**
+ * Add CSRF token to existing headers object
+ *
+ * Use this when you need to manually construct headers but still want CSRF.
+ *
+ * @param {Object} headers - Existing headers object
+ * @returns {Object} - Headers with CSRF token added
+ *
+ * @example
+ * const headers = addCSRFHeader({
+ *     'Content-Type': 'application/json',
+ *     'X-User-ID': userId
+ * });
+ */
+function addCSRFHeader(headers = {}) {
+    const csrfToken = getCSRFToken();
+    if (csrfToken) {
+        return {
+            ...headers,
+            [CSRF_HEADER_NAME]: csrfToken
+        };
+    }
+    return headers;
+}
+
 // Export for use in other scripts
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { escapeHtml, showNotification };
+    module.exports = { escapeHtml, showNotification, getCSRFToken, secureFetch, addCSRFHeader };
 }
