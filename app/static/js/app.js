@@ -528,8 +528,8 @@ async function askTutor() {
         const remainingMs = TUTOR_REQUEST_DEBOUNCE_MS - timeSinceLastRequest;
         const remainingSec = Math.ceil(remainingMs / 1000);
         const debounceMsg = remainingSec === 1
-            ? 'Please wait 1 second before sending another message.'
-            : `Please wait ${remainingSec} seconds before sending another message.`;
+            ? '⏳ Please wait 1 second before sending another message.'
+            : `⏳ Please wait ${remainingSec} seconds before sending another message.`;
         addMessage('system', debounceMsg);
         return;
     }
