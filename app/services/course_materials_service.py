@@ -221,6 +221,43 @@ class CourseMaterialsService:
 
         return stats
 
+    def get_material_counts_by_week(self, course_id: str, max_week: int = 12) -> Dict[str, Any]:
+        """Get material counts grouped by week number.
+
+        Args:
+            course_id: Course ID
+            max_week: Maximum week number to include (default 12)
+
+        Returns:
+            Dict with week counts and total
+        """
+        materials = self.list_materials(course_id)
+
+        # Count materials by week
+        by_week: Dict[int, int] = {}
+        no_week_count = 0
+
+        for m in materials:
+            if m.weekNumber is not None and 1 <= m.weekNumber <= max_week:
+                by_week[m.weekNumber] = by_week.get(m.weekNumber, 0) + 1
+            else:
+                no_week_count += 1
+
+        # Build response with all weeks (including zeros)
+        week_counts = []
+        for week_num in range(1, max_week + 1):
+            week_counts.append({
+                "week": week_num,
+                "count": by_week.get(week_num, 0)
+            })
+
+        return {
+            "course_id": course_id,
+            "weeks": week_counts,
+            "no_week_count": no_week_count,
+            "total": len(materials)
+        }
+
     def bulk_upsert_materials(
         self,
         course_id: str,

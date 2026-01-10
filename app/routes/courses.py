@@ -8,7 +8,7 @@ and course details after OAuth login.
 """
 
 import logging
-from typing import List
+from typing import Any, Dict, List
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 from pydantic import BaseModel
@@ -21,6 +21,7 @@ from app.services.course_service import (
     ServiceValidationError,
     FirestoreOperationError,
 )
+from app.services.course_materials_service import get_course_materials_service
 
 logger = logging.getLogger(__name__)
 
@@ -157,4 +158,79 @@ async def get_course(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to get course details."
+        )
+
+
+class WeekMaterialCount(BaseModel):
+    """Material count for a single week."""
+    week: int
+    count: int
+
+
+class MaterialCountsByWeekResponse(BaseModel):
+    """Response for material counts by week."""
+    course_id: str
+    weeks: List[WeekMaterialCount]
+    no_week_count: int
+    total: int
+
+
+@router.get(
+    "/{course_id}/materials/week-counts",
+    response_model=MaterialCountsByWeekResponse,
+    summary="Get material counts by week",
+    description="Returns the number of materials available for each week. "
+                "Useful for showing users which weeks have content available."
+)
+async def get_material_counts_by_week(
+    course_id: str = Path(
+        ...,
+        min_length=1,
+        max_length=100,
+        pattern=r"^[A-Za-z0-9_-]+$",
+        description="Course identifier"
+    ),
+    user: User = Depends(require_authenticated),
+    max_week: int = Query(12, ge=1, le=52, description="Maximum week number to include")
+) -> MaterialCountsByWeekResponse:
+    """
+    Get material counts grouped by week number.
+
+    Returns the count of materials for each week (1 to max_week),
+    including weeks with zero materials. This helps users understand
+    which weeks have content available for study guide generation.
+
+    **Parameters:**
+    - `course_id`: The course identifier
+    - `max_week`: Maximum week number to include (default: 12)
+    """
+    try:
+        # Verify course exists and is active
+        course_service = get_course_service()
+        course = course_service.get_course(course_id, include_weeks=False)
+
+        if course is None or not course.active:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Course not found"
+            )
+
+        # Get material counts
+        materials_service = get_course_materials_service()
+        counts = materials_service.get_material_counts_by_week(course_id, max_week)
+
+        logger.info(
+            "User %s retrieved material counts for course %s: %d total materials",
+            user.email, course_id, counts["total"]
+        )
+
+        return MaterialCountsByWeekResponse(**counts)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Error getting material counts for %s: %s", course_id, e)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to get material counts."
         )

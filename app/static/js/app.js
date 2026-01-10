@@ -2111,6 +2111,69 @@ function initStudyListeners() {
 
     // Load saved guides on init
     loadSavedStudyGuides();
+
+    // Populate week dropdown with material counts
+    populateStudyWeekDropdown();
+}
+
+/**
+ * Enhance the study guide week dropdown with material counts.
+ * The dropdown is server-rendered with course topics; this adds material counts
+ * and disables weeks with no materials.
+ */
+async function populateStudyWeekDropdown() {
+    const weekSelect = document.getElementById('study-week-select');
+    if (!weekSelect || !COURSE_ID) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/courses/${COURSE_ID}/materials/week-counts`);
+
+        if (!response.ok) {
+            console.error('Failed to fetch material counts:', response.status);
+            // Keep existing options as-is (server-rendered)
+            return;
+        }
+
+        const data = await response.json();
+        const weeks = data.weeks || [];
+        const totalMaterials = data.total || 0;
+
+        // Create a map of week number to count
+        const weekCounts = {};
+        weeks.forEach(w => {
+            weekCounts[w.week] = w.count;
+        });
+
+        // Update the "All Weeks" option with total count
+        const allWeeksOption = weekSelect.querySelector('option[value=""]');
+        if (allWeeksOption) {
+            allWeeksOption.textContent = `All Weeks (${totalMaterials} materials)`;
+        }
+
+        // Update each week option with material count
+        weekSelect.querySelectorAll('option[data-week]').forEach(option => {
+            const weekNum = parseInt(option.dataset.week);
+            const count = weekCounts[weekNum] || 0;
+            const countText = count === 0 ? 'no materials' : `${count} material${count !== 1 ? 's' : ''}`;
+
+            // Append count to existing text (which includes topic name)
+            const currentText = option.textContent;
+            option.textContent = `${currentText} (${countText})`;
+
+            // Disable if no materials
+            if (count === 0) {
+                option.disabled = true;
+            }
+        });
+
+        console.log(`Enhanced study week dropdown with material counts: ${totalMaterials} total materials`);
+
+    } catch (error) {
+        console.error('Error fetching material counts:', error);
+        // Keep existing options as-is (server-rendered)
+    }
 }
 
 /**
