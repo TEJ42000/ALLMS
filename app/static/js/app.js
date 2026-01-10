@@ -2110,13 +2110,11 @@ function initStudyListeners() {
     });
 
     // Load saved guides and populate week dropdown concurrently
-    // Both operations are independent and handle their own errors
+    // Both operations are independent and handle their own errors individually
     Promise.all([
-        loadSavedStudyGuides(),
-        populateStudyWeekDropdown()
-    ]).catch(error => {
-        console.error('Error initializing study guide tab:', error);
-    });
+        loadSavedStudyGuides().catch(e => console.error('Failed to load saved guides:', e)),
+        populateStudyWeekDropdown().catch(e => console.error('Failed to populate week dropdown:', e))
+    ]);
 }
 
 /**

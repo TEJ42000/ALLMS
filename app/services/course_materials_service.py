@@ -226,11 +226,17 @@ class CourseMaterialsService:
 
         Args:
             course_id: Course ID
-            max_week: Maximum week number to include (default 12)
+            max_week: Maximum week number to include (default 12, must be >= 1)
 
         Returns:
             Dict with week counts and total
+
+        Raises:
+            ValueError: If max_week is less than 1
         """
+        if max_week < 1:
+            raise ValueError("max_week must be >= 1")
+
         materials = self.list_materials(course_id)
 
         # Count materials by week

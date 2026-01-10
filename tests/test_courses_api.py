@@ -381,4 +381,6 @@ class TestMaterialCountsByWeek:
             response = client.get("/api/courses/LLS-2025-2026/materials/week-counts")
 
             assert response.status_code == 500
-            assert "error" in response.json()["detail"].lower() or "fail" in response.json()["detail"].lower()
+            data = response.json()
+            assert "detail" in data
+            assert "fail" in data["detail"].lower()
