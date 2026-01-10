@@ -623,6 +623,7 @@ def run_streak_maintenance(
         # SECURITY: Return only safe fields from successful result (CWE-209)
         # Explicitly construct response to avoid exposing any internal error data
         return {
+            "success": result.get("success", True),
             "status": result.get("status", "success"),
             "users_processed": result.get("users_processed", 0),
             "users_updated": result.get("users_updated", 0),
