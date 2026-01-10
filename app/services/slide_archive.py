@@ -57,12 +57,13 @@ def is_slide_archive(file_path: Path) -> bool:
     except ValueError as e:
         logger.warning("Path validation failed for path=%s: %s", file_path, e)
         return False
-    
+
     if not validated_path.exists():
         return False
-    
+
     try:
-        with zipfile.ZipFile(file_path, 'r') as zf:
+        # SECURITY: Use validated_path, not original file_path
+        with zipfile.ZipFile(validated_path, 'r') as zf:
             return 'manifest.json' in zf.namelist()
     except (zipfile.BadZipFile, Exception):
         return False
@@ -70,48 +71,64 @@ def is_slide_archive(file_path: Path) -> bool:
 
 def get_file_type(file_path: Path) -> str:
     """Determine the actual file type of a .pdf file.
-    
+
     Returns: 'pdf', 'slide_archive', or 'unknown'
     """
-    if not file_path.exists():
+    # Security: Validate path to prevent path traversal attacks (CWE-22/23/36)
+    try:
+        validated_path = validate_path_within_base(str(file_path), MATERIALS_BASE)
+    except ValueError as e:
+        logger.warning("Path validation failed for path=%s: %s", file_path, e)
         return 'unknown'
-    
+
+    if not validated_path.exists():
+        return 'unknown'
+
     # Check if it's a real PDF by reading magic bytes
     try:
-        with open(file_path, 'rb') as f:
+        # SECURITY: Use validated_path, not original file_path
+        with open(validated_path, 'rb') as f:
             header = f.read(8)
             if header.startswith(b'%PDF'):
                 return 'pdf'
     except Exception:
         pass
-    
-    # Check if it's a slide archive
+
+    # Check if it's a slide archive (is_slide_archive already validates)
     if is_slide_archive(file_path):
         return 'slide_archive'
-    
+
     return 'unknown'
 
 
 def extract_slide_archive(file_path: Path, use_cache: bool = True) -> Optional[SlideArchiveData]:
     """Extract content from a slide archive.
-    
+
     Args:
         file_path: Path to the slide archive file
         use_cache: Whether to use cached data if available
-        
+
     Returns:
         SlideArchiveData with all slide information, or None if invalid
     """
-    cache_key = str(file_path)
-    
+    # Security: Validate path to prevent path traversal attacks (CWE-22/23/36)
+    try:
+        validated_path = validate_path_within_base(str(file_path), MATERIALS_BASE)
+    except ValueError as e:
+        logger.warning("Path validation failed for path=%s: %s", file_path, e)
+        return None
+
+    cache_key = str(validated_path)
+
     if use_cache and cache_key in _archive_cache:
         return _archive_cache[cache_key]
-    
+
     if not is_slide_archive(file_path):
         return None
-    
+
     try:
-        with zipfile.ZipFile(file_path, 'r') as zf:
+        # SECURITY: Use validated_path, not original file_path
+        with zipfile.ZipFile(validated_path, 'r') as zf:
             # Read manifest
             manifest_data = json.loads(zf.read('manifest.json'))
             
@@ -138,17 +155,17 @@ def extract_slide_archive(file_path: Path, use_cache: bool = True) -> Optional[S
                 slides.append(slide)
             
             archive_data = SlideArchiveData(
-                file_path=str(file_path),
+                file_path=str(validated_path),
                 num_pages=manifest_data.get('num_pages', len(slides)),
                 slides=slides
             )
-            
+
             # Cache the result
             _archive_cache[cache_key] = archive_data
             return archive_data
-            
+
     except Exception as e:
-        logger.error("Failed to extract slide archive %s: %s", file_path, e)
+        logger.error("Failed to extract slide archive %s: %s", validated_path, e)
         return None
 
 
