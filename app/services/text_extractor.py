@@ -88,29 +88,36 @@ def detect_file_type(file_path: Path) -> str:
     return 'unknown'
 
 
-def extract_text(file_path: Path) -> ExtractionResult:
+def extract_text(file_path: Path | str, *, _skip_path_validation: bool = False) -> ExtractionResult:
     """Extract text from any supported file type.
 
     This is the main entry point for text extraction.
 
     Args:
         file_path: Path to the file (absolute or relative to project root)
+        _skip_path_validation: Internal flag for testing only. DO NOT use in production code.
+            When True, skips the path validation check. This is only for unit tests
+            that need to test extraction from temporary directories.
 
     Returns:
         ExtractionResult with extracted text and metadata
     """
     # Security: Validate path to prevent path traversal attacks (CWE-22/23/36)
-    try:
-        validated_path = validate_path_within_base(str(file_path), MATERIALS_BASE)
-    except ValueError as e:
-        logger.warning("Path validation failed for path=%s: %s", file_path, e)
-        return ExtractionResult(
-            file_path=str(file_path),
-            file_type='unknown',
-            text='',
-            success=False,
-            error=f'Invalid path: {file_path}'
-        )
+    # Path validation can be skipped for testing only (underscore prefix indicates internal use)
+    if not _skip_path_validation:
+        try:
+            validated_path = validate_path_within_base(str(file_path), MATERIALS_BASE)
+        except ValueError as e:
+            logger.warning("Path validation failed for path=%s: %s", file_path, e)
+            return ExtractionResult(
+                file_path=str(file_path),
+                file_type='unknown',
+                text='',
+                success=False,
+                error=f'Invalid path: {file_path}'
+            )
+    else:
+        validated_path = Path(file_path).resolve()
 
     if not validated_path.exists():
         return ExtractionResult(
@@ -507,12 +514,18 @@ def extract_from_json(file_path: Path) -> ExtractionResult:
 # Batch Operations
 # ============================================================================
 
-def extract_all_from_folder(folder_path: Path, recursive: bool = True) -> List[ExtractionResult]:
+def extract_all_from_folder(
+    folder_path: Path,
+    recursive: bool = True,
+    *,
+    _skip_path_validation: bool = False
+) -> List[ExtractionResult]:
     """Extract text from all supported files in a folder.
 
     Args:
         folder_path: Path to the folder
         recursive: Whether to search subdirectories
+        _skip_path_validation: Internal flag for testing only. DO NOT use in production code.
 
     Returns:
         List of ExtractionResult for each file
@@ -528,8 +541,8 @@ def extract_all_from_folder(folder_path: Path, recursive: bool = True) -> List[E
         if file_path.is_file():
             # Check if it's a supported type
             file_type = detect_file_type(file_path)
-            if file_type != 'unknown':
-                result = extract_text(file_path)
+            if file_type \!= 'unknown':
+                result = extract_text(file_path, _skip_path_validation=_skip_path_validation)
                 results.append(result)
 
     return results
