@@ -11,6 +11,7 @@ import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import Mock, patch
 
+from app import __version__
 from app.main import app
 from app.models.auth_models import User
 
@@ -169,7 +170,7 @@ class TestHealthCheck:
         assert "service" in data
         assert data["service"] == "lls-study-portal"
         assert "version" in data
-        assert data["version"] == "2.0.0"
+        assert data["version"] == __version__
 
     def test_health_check_return_type(self):
         """Test that health_check has correct return type annotation."""

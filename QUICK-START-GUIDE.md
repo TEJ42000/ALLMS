@@ -195,10 +195,11 @@ echo -n "your-api-key" | \
   gcloud secrets create anthropic-api-key --data-file=-
 
 # 4. Deploy
+# NOTE: This deploy is private by default. Add --allow-unauthenticated only if you intentionally want public access.
 gcloud run deploy lls-study-portal \
   --source . \
   --region us-central1 \
-  --allow-unauthenticated \
+  --no-allow-unauthenticated \
   --set-secrets=ANTHROPIC_API_KEY=anthropic-api-key:latest
 ```
 

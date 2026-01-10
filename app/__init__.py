@@ -1,3 +1,3 @@
-"""LLS Study Portal Application."""
+"""Cognitio Flow - AI-Powered Legal Education Platform."""
 
-__version__ = "2.0.0"
+__version__ = "3.0.5"

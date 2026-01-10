@@ -228,12 +228,13 @@ docker build -t gcr.io/YOUR_PROJECT/allms:gdpr-v1 .
 # Push to Container Registry
 docker push gcr.io/YOUR_PROJECT/allms:gdpr-v1
 
+# NOTE: This deploy is private by default. Add --allow-unauthenticated only if you intentionally want public access.
 # Deploy to Cloud Run with Redis rate limiting
 gcloud run deploy allms \
     --image gcr.io/YOUR_PROJECT/allms:gdpr-v1 \
     --platform managed \
     --region us-central1 \
-    --allow-unauthenticated \
+    --no-allow-unauthenticated \
     --min-instances=1 \
     --max-instances=10 \
     --set-env-vars ENVIRONMENT=production \
@@ -257,12 +258,13 @@ docker build -t gcr.io/YOUR_PROJECT/allms:gdpr-v1 .
 # Push to Container Registry
 docker push gcr.io/YOUR_PROJECT/allms:gdpr-v1
 
+# NOTE: This deploy is private by default. Add --allow-unauthenticated only if you intentionally want public access.
 # Deploy to Cloud Run with SINGLE INSTANCE ONLY
 gcloud run deploy allms \
     --image gcr.io/YOUR_PROJECT/allms:gdpr-v1 \
     --platform managed \
     --region us-central1 \
-    --allow-unauthenticated \
+    --no-allow-unauthenticated \
     --min-instances=1 \
     --max-instances=1 \
     --set-env-vars ENVIRONMENT=production \

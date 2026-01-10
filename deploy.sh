@@ -11,23 +11,31 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Parse command line arguments
-ENABLE_IAP=false
+# Default is **secure-by-default** (NOT publicly invokable).
+# If you intentionally want a public demo/service, you must opt-in via --public.
+AUTH_MODE="protected"  # protected|public
 while [[ $# -gt 0 ]]; do
     case $1 in
         --with-iap)
-            ENABLE_IAP=true
+            # Backwards compatible alias for protected mode.
+            AUTH_MODE="protected"
+            shift
+            ;;
+        --public)
+            AUTH_MODE="public"
             shift
             ;;
         --help|-h)
             echo "Usage: ./deploy.sh [OPTIONS]"
             echo ""
             echo "Options:"
-            echo "  --with-iap    Enable IAP authentication (blocks public access)"
+            echo "  --public      Make the Cloud Run service publicly invokable (NOT recommended)"
+            echo "  --with-iap    (alias) Deploy in protected mode (no public access)"
             echo "  --help, -h    Show this help message"
             echo ""
             echo "Examples:"
-            echo "  ./deploy.sh              # Deploy with public access"
-            echo "  ./deploy.sh --with-iap   # Deploy with IAP authentication"
+            echo "  ./deploy.sh              # Deploy in protected mode (recommended)"
+            echo "  ./deploy.sh --public     # Deploy with public access (explicit opt-in)"
             exit 0
             ;;
         *)
@@ -62,21 +70,26 @@ fi
 PROJECT_ID=${GCP_PROJECT_ID:-"your-project-id"}
 REGION=${GCP_REGION:-"us-central1"}
 SERVICE_NAME=${APP_NAME:-"lls-study-portal"}
+AUTH_DOMAIN_VALUE=${AUTH_DOMAIN:-"mgms.eu"}
 
 echo -e "${YELLOW}Configuration:${NC}"
 echo "  Project ID: $PROJECT_ID"
 echo "  Region: $REGION"
 echo "  Service Name: $SERVICE_NAME"
-if [ "$ENABLE_IAP" = true ]; then
-    echo -e "  Authentication: ${BLUE}IAP Enabled${NC}"
+if [ "$AUTH_MODE" = "public" ]; then
+    echo -e "  Access: ${YELLOW}Public (unauthenticated)${NC}"
+    echo -e "  App Auth: ${YELLOW}Disabled${NC}"
 else
-    echo -e "  Authentication: ${YELLOW}Public Access${NC}"
+    echo -e "  Access: ${BLUE}Protected (not publicly invokable)${NC}"
+    echo -e "  App Auth: ${BLUE}Enabled${NC} (AUTH_DOMAIN=$AUTH_DOMAIN_VALUE)"
 fi
 echo ""
 
 # Confirm deployment
-if [ "$ENABLE_IAP" = true ]; then
-    echo -e "${YELLOW}⚠️  IAP mode: Service will require Google login${NC}"
+if [ "$AUTH_MODE" = "public" ]; then
+    echo -e "${YELLOW}⚠️  Public mode: Service will be invokable by allUsers (internet-accessible)${NC}"
+else
+    echo -e "${GREEN}Protected mode:${NC} Service will NOT be publicly invokable"
 fi
 read -p "Deploy to Google Cloud Run? (y/n) " -n 1 -r
 echo ""
@@ -120,16 +133,16 @@ DEPLOY_CMD="gcloud run deploy $SERVICE_NAME \
     --timeout 300 \
     --port 8080"
 
-if [ "$ENABLE_IAP" = true ]; then
-    # IAP mode: require authentication, enable auth in app
-    DEPLOY_CMD="$DEPLOY_CMD \
-        --no-allow-unauthenticated \
-        --set-env-vars=AUTH_ENABLED=true,AUTH_DOMAIN=mgms.eu"
-else
-    # Public mode: allow unauthenticated, disable auth in app
+if [ "$AUTH_MODE" = "public" ]; then
+    # Public mode: explicit opt-in
     DEPLOY_CMD="$DEPLOY_CMD \
         --allow-unauthenticated \
         --set-env-vars=AUTH_ENABLED=false"
+else
+    # Protected (default): do NOT make the service public
+    DEPLOY_CMD="$DEPLOY_CMD \
+        --no-allow-unauthenticated \
+        --set-env-vars=AUTH_ENABLED=true,AUTH_DOMAIN=$AUTH_DOMAIN_VALUE"
 fi
 
 eval $DEPLOY_CMD
@@ -145,17 +158,14 @@ echo ""
 echo -e "${GREEN}Service URL:${NC} $SERVICE_URL"
 echo ""
 echo -e "${YELLOW}Next steps:${NC}"
-if [ "$ENABLE_IAP" = true ]; then
-    echo "  1. Run: ./scripts/setup-iap.sh"
-    echo "  2. Configure OAuth consent screen (see docs/IAP-SETUP.md)"
-    echo "  3. Access via Load Balancer URL (not Cloud Run URL directly)"
-else
+if [ "$AUTH_MODE" = "public" ]; then
     echo "  1. Visit your app at: $SERVICE_URL"
     echo "  2. Test the API docs: $SERVICE_URL/api/docs"
+else
+    echo "  1. Ensure access control is configured (IAP preview or Cloud Run IAM invoker bindings)"
+    echo "  2. Visit your app at: $SERVICE_URL (may redirect to sign-in if IAP is enabled)"
 fi
 echo "  📊 Monitor logs: gcloud run services logs read $SERVICE_NAME --region $REGION"
 echo ""
-if [ "$ENABLE_IAP" = true ]; then
-    echo -e "${BLUE}📖 For IAP setup, see: docs/IAP-SETUP.md${NC}"
-    echo ""
-fi
+echo -e "${BLUE}📖 Auth setup docs: docs/IAP-SETUP.md${NC}"
+echo ""

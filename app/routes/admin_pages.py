@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
+from app import __version__
 from app.dependencies.auth import require_mgms_domain
 from app.models.auth_models import User
 from app.services.auth_service import get_auth_config
@@ -38,7 +39,7 @@ async def admin_dashboard(
         {
             "request": request,
             "title": "Course Management",
-            "version": "2.0.0",
+            "version": __version__,
             "user": user,
             "auth_enabled": auth_config.auth_enabled
         }
@@ -66,7 +67,7 @@ async def admin_courses(
         {
             "request": request,
             "title": "Course Management",
-            "version": "2.0.0",
+            "version": __version__,
             "user": user,
             "auth_enabled": auth_config.auth_enabled
         }
@@ -96,7 +97,7 @@ async def admin_course_detail(
             "request": request,
             "title": f"Edit Course: {course_id}",
             "course_id": course_id,
-            "version": "2.0.0",
+            "version": __version__,
             "user": user,
             "auth_enabled": auth_config.auth_enabled
         }
@@ -124,7 +125,7 @@ async def admin_users(
         {
             "request": request,
             "title": "User Management",
-            "version": "2.0.0",
+            "version": __version__,
             "user": user,
             "auth_enabled": auth_config.auth_enabled
         }
@@ -154,7 +155,7 @@ async def admin_usage_dashboard(
         {
             "request": request,
             "title": "Usage Analytics",
-            "version": "2.0.0",
+            "version": __version__,
             "user": user,
             "auth_enabled": auth_config.auth_enabled
         }

@@ -208,11 +208,12 @@ chmod +x deploy.sh
 
 4. **Deploy to Cloud Run**
    ```bash
+   # NOTE: This deploy is private by default. Add --allow-unauthenticated only if you intentionally want public access.
    gcloud run deploy lls-study-portal \
      --source . \
      --region europe-west4 \
      --platform managed \
-     --allow-unauthenticated \
+     --no-allow-unauthenticated \
      --set-secrets=ANTHROPIC_API_KEY=anthropic-api-key:latest \
      --memory 1Gi \
      --cpu 1 \

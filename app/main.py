@@ -1,4 +1,4 @@
-"""FastAPI Application Entry Point for LLS Study Portal."""
+"""FastAPI Application Entry Point for Cognitio Flow."""
 
 import logging
 import os
@@ -10,6 +10,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+
+from app import __version__
 
 # Import routers
 from app.routes import ai_tutor, assessment, pages, files_content, admin_courses, admin_pages, admin_users, admin_usage, echr, text_cache, quiz_management, study_guide_routes, gamification, gdpr, upload, auth, flashcard_notes, flashcard_issues
@@ -26,9 +28,9 @@ logger = logging.getLogger(__name__)
 
 # Initialize FastAPI app
 app = FastAPI(
-    title="LLS Study Portal",
-    description="AI-powered Law & Legal Skills study platform",
-    version="2.0.0",
+    title="Cognitio Flow",
+    description="AI-Powered Legal Education Platform",
+    version=__version__,
     docs_url="/api/docs",
     redoc_url="/api/redoc"
 )

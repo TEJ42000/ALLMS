@@ -301,11 +301,12 @@ gcloud secrets versions access latest --secret=anthropic-api-key
 #### Step 5.1: Build and Deploy
 ```bash
 # Option A: Using Cloud Build (recommended)
+# NOTE: This deploy is private by default. Add --allow-unauthenticated only if you intentionally want public access.
 gcloud run deploy lls-study-portal \
   --source . \
   --region us-central1 \
   --platform managed \
-  --allow-unauthenticated \
+  --no-allow-unauthenticated \
   --set-secrets=ANTHROPIC_API_KEY=anthropic-api-key:latest \
   --memory 1Gi \
   --cpu 1 \

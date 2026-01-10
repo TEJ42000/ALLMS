@@ -1,4 +1,4 @@
-"""Page Rendering Routes for the LLS Study Portal."""
+"""Page Rendering Routes for Cognitio Flow."""
 
 import logging
 from typing import Optional
@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
+from app import __version__
 from app.models.auth_models import User
 from app.models.schemas import HealthCheckResponse
 from app.services.course_service import get_course_service
@@ -47,7 +48,7 @@ async def landing_page(request: Request) -> HTMLResponse:
         {
             "request": request,
             "title": "Select Your Course - LLS Study Portal",
-            "version": "2.0.0",
+            "version": __version__,
             "user": user
         }
     )
@@ -96,7 +97,7 @@ async def course_study_portal(request: Request, course_id: str) -> HTMLResponse:
             {
                 "request": request,
                 "title": f"{course.name} - Study Portal",
-                "version": "2.0.0",
+                "version": __version__,
                 "course_id": course_id,
                 "course_name": course.name,
                 "course": course,
@@ -122,7 +123,7 @@ async def health_check() -> HealthCheckResponse:
     return HealthCheckResponse(
         status="healthy",
         service="lls-study-portal",
-        version="2.0.0"
+        version=__version__
     )
 
 

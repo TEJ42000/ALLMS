@@ -276,12 +276,14 @@ while True:
 ### Task 2.4: Deploy Demo Instance (1 hour)
 
 ```bash
+# NOTE: Deploys are private by default. For an intentionally PUBLIC demo, replace
+# --no-allow-unauthenticated with --allow-unauthenticated.
 # Deploy to Cloud Run
 gcloud run deploy allms-demo \
   --image gcr.io/vigilant-axis-483119-r8/allms:latest \
   --region europe-west4 \
   --platform managed \
-  --allow-unauthenticated \
+  --no-allow-unauthenticated \
   --set-env-vars DEMO_MODE=true,AUTH_ENABLED=false,READ_ONLY_MODE=true
 
 # Map custom domain

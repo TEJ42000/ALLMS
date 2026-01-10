@@ -1,5 +1,7 @@
 """Tests for health and pages endpoints."""
 
+from app import __version__
+
 
 class TestHealthEndpoint:
     """Tests for the health check endpoint."""
@@ -19,7 +21,7 @@ class TestHealthEndpoint:
         response = client.get("/health")
 
         data = response.json()
-        assert data["version"] == "2.0.0"
+        assert data["version"] == __version__
 
 
 class TestPagesEndpoint:
