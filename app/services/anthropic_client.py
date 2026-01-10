@@ -132,15 +132,16 @@ GRADING RUBRIC:
 Be constructive, specific, visual, and educational!"""
 
 
-ESSAY_QUESTION_SYSTEM_PROMPT = """You are an expert Law & Legal Skills professor \
-creating essay exam questions for the University of Groningen LLS course.
+ESSAY_QUESTION_SYSTEM_PROMPT = """You are an expert Criminal Law professor \
+creating essay exam questions for the Criminal Law course (CRIM-2025-2026).
 
 YOUR TASK: Generate a thoughtful essay question that:
-1. Tests deep understanding of the topic
+1. Tests deep understanding of the topic(s)
 2. Requires a response of 3-7 paragraphs
 3. Is similar to questions seen on actual law exams
 4. Requires analysis, not just memorization
 5. May ask students to compare, analyze, apply, or evaluate legal concepts
+6. For comprehensive questions (all-weeks, part-a, part-b), integrates multiple topics
 
 QUESTION TYPES to consider:
 - Case analysis: "Analyze the following scenario..."
@@ -148,11 +149,18 @@ QUESTION TYPES to consider:
 - Application: "Apply the principles of X to the following situation..."
 - Critical analysis: "Critically evaluate the argument that..."
 - Problem questions: Present a legal scenario and ask for resolution
+- Comprehensive: Integrate multiple topics (for all-weeks, part-a, part-b questions)
+
+FOR COMPREHENSIVE QUESTIONS:
+- Draw from multiple weeks/topics
+- Test connections between different concepts
+- Create realistic scenarios that require synthesizing knowledge
+- Challenge students to apply multiple frameworks/tests
 
 FORMAT YOUR RESPONSE AS JSON:
 {
     "question": "The full essay question text",
-    "topic": "The specific topic being tested",
+    "topic": "The specific topic(s) being tested",
     "key_concepts": ["concept1", "concept2", "concept3"],
     "guidance": "Optional hints about what a good answer should address"
 }
@@ -407,7 +415,11 @@ async def generate_essay_question(
     Generate an essay question for a given topic.
 
     Args:
-        topic: The topic to generate a question about
+        topic: The topic to generate a question about. Can be:
+            - A specific week topic (e.g., "Consensus and Offer")
+            - "all-weeks" for comprehensive practice across entire course
+            - "part-a" for Part A (Substantive Criminal Law, Weeks 1-6)
+            - "part-b" for Part B (Criminal Procedure, Weeks 7-12)
         course_context: Optional course material context
         user_context: User context for usage tracking
 
@@ -417,7 +429,39 @@ async def generate_essay_question(
     import json
 
     try:
-        user_message = f"Generate an essay question for the topic: {topic}"
+        # Handle special topic values for comprehensive practice
+        if topic == "all-weeks":
+            user_message = """Generate a comprehensive essay question that draws from ANY content across the entire Criminal Law course (both Part A: Substantive Criminal Law and Part B: Criminal Procedure).
+
+The question should:
+- Integrate concepts from multiple weeks
+- Test understanding of connections between different topics
+- Be suitable for comprehensive exam practice
+- Challenge students to synthesize knowledge from the full course"""
+        elif topic == "part-a":
+            user_message = """Generate an essay question focused on Part A: Substantive Criminal Law (Weeks 1-6).
+
+The question should cover topics from:
+- Week 1: Foundations (legality principle, theories of punishment)
+- Week 2: Offense Structure (tripartite framework, actus reus, causation)
+- Week 3: Mens Rea (dolus directus/indirectus/eventualis, negligence)
+- Week 4: Defenses (justifications vs excuses, self-defense, necessity)
+- Week 5: Inchoate Offenses (attempt, impossibility, withdrawal)
+- Week 6: Participation (derivative liability, co-perpetration, aiding)
+
+The question may integrate multiple topics from Part A."""
+        elif topic == "part-b":
+            user_message = """Generate an essay question focused on Part B: Criminal Procedure & Human Rights (Weeks 7-12).
+
+The question should cover topics from:
+- Week 7: ECHR & Fair Trial Rights (Engel criteria, autonomous interpretation)
+- Weeks 8-12: Criminal procedure topics (Salduz, evidence, impartiality, etc.)
+
+The question may integrate multiple topics from Part B."""
+        else:
+            # Standard single-topic question
+            user_message = f"Generate an essay question for the topic: {topic}"
+
         if course_context:
             user_message += f"\n\nRelevant course material:\n{course_context[:5000]}"
 
