@@ -541,7 +541,7 @@ def extract_all_from_folder(
         if file_path.is_file():
             # Check if it's a supported type
             file_type = detect_file_type(file_path)
-            if file_type \!= 'unknown':
+            if file_type != 'unknown':
                 result = extract_text(file_path, _skip_path_validation=_skip_path_validation)
                 results.append(result)
 
