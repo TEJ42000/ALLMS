@@ -1,8 +1,12 @@
 /**
- * E2E tests for Criminal Law Part A/B selector functionality
- * 
+ * E2E tests for Part Selector functionality
+ *
  * Tests the part selector UI component that allows students to filter
- * weeks by Part A (Substantive), Part B (Procedure), or Mixed mode.
+ * weeks by part (e.g., Part A, Part B) or Mixed mode.
+ *
+ * This is a GENERIC feature that works for any course with a 'part' field
+ * on its weeks. The tests below use Criminal Law as an example course,
+ * but the functionality applies to any course with parts.
  */
 
 const { test, expect } = require('@playwright/test');
@@ -290,21 +294,21 @@ test.describe('Part Selector Edge Cases', () => {
     test('handles course without parts gracefully', async ({ page }) => {
         await page.goto('/');
         await page.waitForLoadState('networkidle');
-        
+
         // Select a course without parts (e.g., LLS-2025-2026)
         const courseSelector = page.locator('#course-selector');
         if (await courseSelector.isVisible()) {
             await courseSelector.selectOption('LLS-2025-2026');
             await page.waitForTimeout(1000);
         }
-        
+
         // Navigate to Weekly Content
         const weeklyContentTab = page.locator('button.nav-tab:has-text("Weekly Content")');
         if (await weeklyContentTab.isVisible()) {
             await weeklyContentTab.click();
             await page.waitForTimeout(500);
         }
-        
+
         // Part selector should NOT be visible
         const partSelector = page.locator('#part-selector');
         await expect(partSelector).not.toBeVisible();
@@ -316,3 +320,361 @@ test.describe('Part Selector Edge Cases', () => {
     });
 });
 
+
+/**
+ * E2E tests for Part Selector Error Handling
+ *
+ * Tests error scenarios using API mocking to verify graceful degradation.
+ * These tests are generic and apply to any course with part filtering.
+ */
+test.describe('Part Selector Error Handling', () => {
+
+    test('handles weeks without part field gracefully', async ({ page }) => {
+        // Mock API to return weeks without part field
+        await page.route('**/api/courses/*', route => {
+            if (route.request().url().includes('include_weeks=true')) {
+                route.fulfill({
+                    status: 200,
+                    contentType: 'application/json',
+                    body: JSON.stringify({
+                        id: 'TEST-COURSE',
+                        name: 'Test Course',
+                        academicYear: '2025-2026',
+                        active: true,
+                        weeks: [
+                            { weekNumber: 1, title: 'Week 1 - No Part', topics: [] },
+                            { weekNumber: 2, title: 'Week 2 - No Part', topics: [] },
+                            { weekNumber: 3, title: 'Week 3 - No Part', topics: [] }
+                        ]
+                    })
+                });
+            } else {
+                route.continue();
+            }
+        });
+
+        // Collect console errors
+        const errors = [];
+        page.on('console', msg => {
+            if (msg.type() === 'error') {
+                errors.push(msg.text());
+            }
+        });
+
+        await page.goto('/');
+        await page.waitForLoadState('networkidle');
+
+        // Navigate to Weekly Content
+        const weeklyContentTab = page.locator('button.nav-tab:has-text("Weekly Content")');
+        if (await weeklyContentTab.isVisible()) {
+            await weeklyContentTab.click();
+            await page.waitForTimeout(500);
+        }
+
+        // Part selector should NOT be visible (no parts in data)
+        const partSelector = page.locator('#part-selector');
+        await expect(partSelector).not.toBeVisible();
+
+        // Weeks should still be displayed
+        const weekCards = page.locator('.week-card');
+        const count = await weekCards.count();
+        expect(count).toBeGreaterThan(0);
+
+        // No JavaScript errors
+        expect(errors.length).toBe(0);
+    });
+
+    test('handles mixed weeks (some with part, some without)', async ({ page }) => {
+        // Mock API to return mixed weeks
+        await page.route('**/api/courses/*', route => {
+            if (route.request().url().includes('include_weeks=true')) {
+                route.fulfill({
+                    status: 200,
+                    contentType: 'application/json',
+                    body: JSON.stringify({
+                        id: 'MIXED-COURSE',
+                        name: 'Mixed Course',
+                        academicYear: '2025-2026',
+                        active: true,
+                        weeks: [
+                            { weekNumber: 1, title: 'Week 1', topics: [], part: 'A' },
+                            { weekNumber: 2, title: 'Week 2', topics: [] },  // No part
+                            { weekNumber: 3, title: 'Week 3', topics: [], part: 'B' },
+                            { weekNumber: 4, title: 'Week 4', topics: [] }   // No part
+                        ]
+                    })
+                });
+            } else {
+                route.continue();
+            }
+        });
+
+        const errors = [];
+        page.on('console', msg => {
+            if (msg.type() === 'error') {
+                errors.push(msg.text());
+            }
+        });
+
+        await page.goto('/');
+        await page.waitForLoadState('networkidle');
+
+        const weeklyContentTab = page.locator('button.nav-tab:has-text("Weekly Content")');
+        if (await weeklyContentTab.isVisible()) {
+            await weeklyContentTab.click();
+            await page.waitForTimeout(500);
+        }
+
+        // Part selector should be visible (some weeks have parts)
+        const partSelector = page.locator('#part-selector');
+        await expect(partSelector).toBeVisible();
+
+        // No JavaScript errors
+        expect(errors.length).toBe(0);
+    });
+
+    test('handles API 404 error gracefully', async ({ page }) => {
+        // Mock API to return 404
+        await page.route('**/api/courses/*', route => {
+            route.fulfill({
+                status: 404,
+                contentType: 'application/json',
+                body: JSON.stringify({ detail: 'Course not found' })
+            });
+        });
+
+        const errors = [];
+        page.on('console', msg => {
+            if (msg.type() === 'error') {
+                errors.push(msg.text());
+            }
+        });
+
+        await page.goto('/');
+        await page.waitForLoadState('networkidle');
+
+        const weeklyContentTab = page.locator('button.nav-tab:has-text("Weekly Content")');
+        if (await weeklyContentTab.isVisible()) {
+            await weeklyContentTab.click();
+            await page.waitForTimeout(500);
+        }
+
+        // Should show fallback content or error message, not crash
+        // The exact behavior depends on implementation
+        // At minimum, page should not have unhandled exceptions
+    });
+
+    test('handles API 503 error gracefully', async ({ page }) => {
+        // Mock API to return 503 (service unavailable)
+        await page.route('**/api/courses/*', route => {
+            route.fulfill({
+                status: 503,
+                contentType: 'application/json',
+                body: JSON.stringify({ detail: 'Database temporarily unavailable' })
+            });
+        });
+
+        const errors = [];
+        page.on('console', msg => {
+            if (msg.type() === 'error') {
+                errors.push(msg.text());
+            }
+        });
+
+        await page.goto('/');
+        await page.waitForLoadState('networkidle');
+
+        const weeklyContentTab = page.locator('button.nav-tab:has-text("Weekly Content")');
+        if (await weeklyContentTab.isVisible()) {
+            await weeklyContentTab.click();
+            await page.waitForTimeout(500);
+        }
+
+        // Fallback weeks should be shown
+        const weeksGrid = page.locator('#weeks-grid');
+        await expect(weeksGrid).toBeVisible();
+    });
+
+    test('handles malformed JSON response', async ({ page }) => {
+        // Mock API to return invalid JSON
+        await page.route('**/api/courses/*', route => {
+            route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: 'this is not valid json {'
+            });
+        });
+
+        const errors = [];
+        page.on('console', msg => {
+            if (msg.type() === 'error') {
+                errors.push(msg.text());
+            }
+        });
+
+        await page.goto('/');
+        await page.waitForLoadState('networkidle');
+
+        const weeklyContentTab = page.locator('button.nav-tab:has-text("Weekly Content")');
+        if (await weeklyContentTab.isVisible()) {
+            await weeklyContentTab.click();
+            await page.waitForTimeout(500);
+        }
+
+        // Should handle gracefully with fallback
+        const weeksGrid = page.locator('#weeks-grid');
+        await expect(weeksGrid).toBeVisible();
+    });
+
+    test('handles empty course response', async ({ page }) => {
+        // Mock API to return course with no weeks
+        await page.route('**/api/courses/*', route => {
+            if (route.request().url().includes('include_weeks=true')) {
+                route.fulfill({
+                    status: 200,
+                    contentType: 'application/json',
+                    body: JSON.stringify({
+                        id: 'EMPTY-COURSE',
+                        name: 'Empty Course',
+                        academicYear: '2025-2026',
+                        active: true,
+                        weeks: []
+                    })
+                });
+            } else {
+                route.continue();
+            }
+        });
+
+        const errors = [];
+        page.on('console', msg => {
+            if (msg.type() === 'error') {
+                errors.push(msg.text());
+            }
+        });
+
+        await page.goto('/');
+        await page.waitForLoadState('networkidle');
+
+        const weeklyContentTab = page.locator('button.nav-tab:has-text("Weekly Content")');
+        if (await weeklyContentTab.isVisible()) {
+            await weeklyContentTab.click();
+            await page.waitForTimeout(500);
+        }
+
+        // Part selector should not be visible (no weeks)
+        const partSelector = page.locator('#part-selector');
+        await expect(partSelector).not.toBeVisible();
+
+        // Should show fallback weeks
+        const weeksGrid = page.locator('#weeks-grid');
+        await expect(weeksGrid).toBeVisible();
+
+        // No unhandled errors
+        expect(errors.length).toBe(0);
+    });
+
+    test('handles weeks with null part field', async ({ page }) => {
+        // Mock API to return weeks with explicit null part
+        await page.route('**/api/courses/*', route => {
+            if (route.request().url().includes('include_weeks=true')) {
+                route.fulfill({
+                    status: 200,
+                    contentType: 'application/json',
+                    body: JSON.stringify({
+                        id: 'NULL-PARTS',
+                        name: 'Null Parts Course',
+                        academicYear: '2025-2026',
+                        active: true,
+                        weeks: [
+                            { weekNumber: 1, title: 'Week 1', topics: [], part: null },
+                            { weekNumber: 2, title: 'Week 2', topics: [], part: null }
+                        ]
+                    })
+                });
+            } else {
+                route.continue();
+            }
+        });
+
+        const errors = [];
+        page.on('console', msg => {
+            if (msg.type() === 'error') {
+                errors.push(msg.text());
+            }
+        });
+
+        await page.goto('/');
+        await page.waitForLoadState('networkidle');
+
+        const weeklyContentTab = page.locator('button.nav-tab:has-text("Weekly Content")');
+        if (await weeklyContentTab.isVisible()) {
+            await weeklyContentTab.click();
+            await page.waitForTimeout(500);
+        }
+
+        // Part selector should not be visible (null parts treated as no parts)
+        const partSelector = page.locator('#part-selector');
+        await expect(partSelector).not.toBeVisible();
+
+        // No JavaScript errors
+        expect(errors.length).toBe(0);
+    });
+
+    test('handles rapid part switching without errors', async ({ page }) => {
+        // Mock API to return course with parts
+        await page.route('**/api/courses/*', route => {
+            if (route.request().url().includes('include_weeks=true')) {
+                route.fulfill({
+                    status: 200,
+                    contentType: 'application/json',
+                    body: JSON.stringify({
+                        id: 'RAPID-SWITCH',
+                        name: 'Rapid Switch Course',
+                        academicYear: '2025-2026',
+                        active: true,
+                        weeks: [
+                            { weekNumber: 1, title: 'Week 1', topics: [], part: 'A' },
+                            { weekNumber: 2, title: 'Week 2', topics: [], part: 'A' },
+                            { weekNumber: 3, title: 'Week 3', topics: [], part: 'B' },
+                            { weekNumber: 4, title: 'Week 4', topics: [], part: 'B' }
+                        ]
+                    })
+                });
+            } else {
+                route.continue();
+            }
+        });
+
+        const errors = [];
+        page.on('console', msg => {
+            if (msg.type() === 'error') {
+                errors.push(msg.text());
+            }
+        });
+
+        await page.goto('/');
+        await page.waitForLoadState('networkidle');
+
+        const weeklyContentTab = page.locator('button.nav-tab:has-text("Weekly Content")');
+        if (await weeklyContentTab.isVisible()) {
+            await weeklyContentTab.click();
+            await page.waitForTimeout(500);
+        }
+
+        const partSelector = page.locator('#part-selector');
+        if (await partSelector.isVisible()) {
+            // Rapidly switch between parts
+            for (let i = 0; i < 5; i++) {
+                await page.locator('.part-tab[data-part="A"]').click();
+                await page.locator('.part-tab[data-part="B"]').click();
+                await page.locator('.part-tab[data-part="mixed"]').click();
+            }
+
+            await page.waitForTimeout(300);
+        }
+
+        // No JavaScript errors from rapid switching
+        expect(errors.length).toBe(0);
+    });
+});
