@@ -2528,8 +2528,8 @@ async function loadCourseWeeks() {
     }
 
     try {
-        // Fetch course with weeks from admin API
-        const response = await fetch(`/api/admin/courses/${COURSE_ID}?include_weeks=true`);
+        // Fetch course with weeks from public courses API (accessible to all authenticated users)
+        const response = await fetch(`/api/courses/${COURSE_ID}?include_weeks=true`);
 
         if (!response.ok) {
             throw new Error(`Failed to fetch course: ${response.status} ${response.statusText}`);
