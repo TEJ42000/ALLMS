@@ -909,6 +909,28 @@ This phase should be broken into sub-phases:
 }
 ```
 
+### Material Counts by Week Response
+```json
+{
+    "course_id": "LLS-2025-2026",
+    "weeks": [
+        {"week": 1, "count": 5},
+        {"week": 2, "count": 3},
+        {"week": 3, "count": 0},
+        {"week": 4, "count": 2}
+    ],
+    "no_week_count": 1,
+    "total": 11
+}
+```
+
+**Endpoint**: `GET /api/courses/{course_id}/materials/week-counts?max_week=12`
+
+**Notes**:
+- `weeks` contains counts for weeks 1 through `max_week` (default 12)
+- `no_week_count` includes materials with no week assigned OR week > max_week
+- Used by study guide dropdown to show material counts and disable empty weeks
+
 ---
 
 ## Common Validation Patterns

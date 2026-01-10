@@ -10,10 +10,26 @@ import hashlib
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, TypedDict
 
 from app.models.course_models import CourseMaterial
 from app.services.gcp_service import get_firestore_client
+
+
+class WeekCount(TypedDict):
+    """Type for individual week count entry."""
+
+    week: int
+    count: int
+
+
+class MaterialCountsByWeek(TypedDict):
+    """Type for material counts by week response."""
+
+    course_id: str
+    weeks: List[WeekCount]
+    no_week_count: int
+    total: int
 
 logger = logging.getLogger(__name__)
 
@@ -221,7 +237,7 @@ class CourseMaterialsService:
 
         return stats
 
-    def get_material_counts_by_week(self, course_id: str, max_week: int = 12) -> Dict[str, Any]:
+    def get_material_counts_by_week(self, course_id: str, max_week: int = 12) -> MaterialCountsByWeek:
         """Get material counts grouped by week number.
 
         Args:
@@ -229,9 +245,9 @@ class CourseMaterialsService:
             max_week: Maximum week number to include (default 12, must be >= 1)
 
         Returns:
-            Dict with:
+            MaterialCountsByWeek with:
                 - course_id: The course identifier
-                - weeks: List of {week: int, count: int} for weeks 1 to max_week
+                - weeks: List of WeekCount {week: int, count: int} for weeks 1 to max_week
                 - no_week_count: Count of materials with no week assigned OR
                   week number outside the 1-max_week range
                 - total: Total number of materials in the course

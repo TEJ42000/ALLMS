@@ -2173,7 +2173,10 @@ async function populateStudyWeekDropdown() {
             }
         });
 
-        console.log(`Enhanced study week dropdown with material counts: ${totalMaterials} total materials`);
+        // Debug logging - only in development
+        if (window.DEBUG_MODE) {
+            console.log(`Enhanced study week dropdown with material counts: ${totalMaterials} total materials`);
+        }
 
     } catch (error) {
         console.error('Error fetching material counts:', error);
