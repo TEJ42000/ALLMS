@@ -58,14 +58,14 @@ def is_slide_archive(file_path: Path) -> bool:
         logger.warning("Path validation failed for path=%s: %s", file_path, e)
         return False
 
-    # lgtm[py/path-injection] - validated_path is sanitized by validate_path_within_base()
-    if not validated_path.exists():  # CodeQL: path validated above
+    # codeql[py/path-injection] - validated_path is sanitized by validate_path_within_base()
+    if not validated_path.exists():
         return False
 
     try:
         # SECURITY: Use validated_path, not original file_path
-        # lgtm[py/path-injection] - validated_path is sanitized by validate_path_within_base()
-        with zipfile.ZipFile(validated_path, 'r') as zf:  # CodeQL: path validated above
+        # codeql[py/path-injection] - validated_path is sanitized by validate_path_within_base()
+        with zipfile.ZipFile(validated_path, 'r') as zf:
             return 'manifest.json' in zf.namelist()
     except (zipfile.BadZipFile, Exception):
         return False
@@ -83,15 +83,15 @@ def get_file_type(file_path: Path) -> str:
         logger.warning("Path validation failed for path=%s: %s", file_path, e)
         return 'unknown'
 
-    # lgtm[py/path-injection] - validated_path is sanitized by validate_path_within_base()
-    if not validated_path.exists():  # CodeQL: path validated above
+    # codeql[py/path-injection] - validated_path is sanitized by validate_path_within_base()
+    if not validated_path.exists():
         return 'unknown'
 
     # Check if it's a real PDF by reading magic bytes
     try:
         # SECURITY: Use validated_path, not original file_path
-        # lgtm[py/path-injection] - validated_path is sanitized by validate_path_within_base()
-        with open(validated_path, 'rb') as f:  # CodeQL: path validated above
+        # codeql[py/path-injection] - validated_path is sanitized by validate_path_within_base()
+        with open(validated_path, 'rb') as f:
             header = f.read(8)
             if header.startswith(b'%PDF'):
                 return 'pdf'

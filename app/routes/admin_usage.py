@@ -438,7 +438,14 @@ async def delete_user_records(
             result.get("total_cost_deleted", 0),
         )
 
-        return result
+        # SECURITY: Return only safe fields from successful result (CWE-209)
+        # Explicitly construct response to avoid exposing any internal error data
+        return {
+            "success": True,
+            "deleted_count": result.get("deleted_count", 0),
+            "total_cost_deleted": result.get("total_cost_deleted", 0),
+            "message": f"Successfully deleted {result.get('deleted_count', 0)} records"
+        }
 
     except HTTPException:
         raise

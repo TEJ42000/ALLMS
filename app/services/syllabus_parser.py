@@ -163,13 +163,13 @@ def extract_text_from_folder(
         logger.warning("Path validation failed for folder_path=%s: %s", folder_path, e)
         raise FileNotFoundError(f"Invalid folder path: {folder_path}") from e
 
-    # lgtm[py/path-injection] - full_path is sanitized by validate_path_within_base()
-    if not full_path.exists() or not full_path.is_dir():  # CodeQL: path validated above
+    # codeql[py/path-injection] - full_path is sanitized by validate_path_within_base()
+    if not full_path.exists() or not full_path.is_dir():
         raise FileNotFoundError(f"Folder not found: {full_path}")
 
     # Find all PDFs and sort by name for consistent ordering
-    # lgtm[py/path-injection] - full_path is sanitized by validate_path_within_base()
-    pdf_files = sorted(full_path.glob("*.pdf"))  # CodeQL: path validated above
+    # codeql[py/path-injection] - full_path is sanitized by validate_path_within_base()
+    pdf_files = sorted(full_path.glob("*.pdf"))
 
     if not pdf_files:
         raise FileNotFoundError(f"No PDF files found in: {full_path}")
