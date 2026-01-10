@@ -288,6 +288,7 @@ class TestIntegrationWithRealFiles:
         assert result.success is True
         assert len(result.text) > 0
 
+    @pytest.mark.skip(reason="Flaky test - depends on local PDF file not available in CI. See GitHub issue for re-enabling.")
     def test_extract_real_pdf_file(self, materials_path):
         """Test extraction from a real PDF file."""
         # Check if PyMuPDF is installed

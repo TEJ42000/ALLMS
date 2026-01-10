@@ -777,7 +777,7 @@ Return JSON with this exact structure:
             analysis = {
                 "raw_response": text,
                 "parse_error": True,
-                "error_message": str(e)
+                "error_message": "Failed to parse AI response as JSON"
             }
         
     except HTTPException:

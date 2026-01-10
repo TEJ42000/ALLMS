@@ -112,7 +112,7 @@ if (typeof mermaid !== 'undefined') {
     mermaid.initialize({
         startOnLoad: false,
         theme: 'default',
-        securityLevel: 'loose'
+        securityLevel: 'strict'
     });
 }
 
@@ -215,7 +215,7 @@ async function renderMermaidDiagrams(container) {
         if (isMermaid) {
             try {
                 const pre = block.parentElement;
-                const id = 'mermaid-' + Math.random().toString(36).substr(2, 9);
+                const id = 'mermaid-' + Array.from(window.crypto.getRandomValues(new Uint8Array(6)), b => b.toString(16).padStart(2, '0')).join('');
 
                 // Extract just the mermaid code (skip title lines before graph/flowchart)
                 let mermaidCode = text;
@@ -973,7 +973,7 @@ function getUserId() {
     // Get or create a persistent user ID
     let userId = localStorage.getItem('lls_user_id');
     if (!userId) {
-        userId = 'user-' + Math.random().toString(36).substring(2, 15);
+        userId = 'user-' + Array.from(window.crypto.getRandomValues(new Uint8Array(12)), b => b.toString(16).padStart(2, '0')).join('');
         localStorage.setItem('lls_user_id', userId);
     }
     return userId;
@@ -2236,7 +2236,7 @@ async function loadSavedStudyGuides() {
                         </div>
                     </div>
                     <div class="guide-actions">
-                        <button class="btn btn-small btn-danger" onclick="event.stopPropagation(); deleteStudyGuide('${guide.id}', '${escapeHtml(guide.title).replace(/'/g, "\\'")}')">
+                        <button class="btn btn-small btn-danger" onclick="event.stopPropagation(); deleteStudyGuide('${guide.id}', '${escapeHtml(guide.title).replace(/\\/g, '\\\\').replace(/'/g, "\\'")}')">
                             🗑️ Delete
                         </button>
                     </div>
