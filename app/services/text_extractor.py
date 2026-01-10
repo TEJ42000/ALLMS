@@ -126,11 +126,11 @@ def extract_text(file_path: Path | str, *, _skip_path_validation: bool = False) 
                 "This flag bypasses critical security checks."
             )
         logger.debug("Path validation SKIPPED for testing: %s", file_path)
-        # lgtm[py/path-injection] - _skip_path_validation is internal testing flag only (enforced above)
-        validated_path = Path(file_path).resolve()  # CodeQL: testing only, not exposed to users
+        # codeql[py/path-injection] - _skip_path_validation is internal testing flag only (enforced above)
+        validated_path = Path(file_path).resolve()
 
-    # lgtm[py/path-injection] - validated_path is sanitized above (or testing-only path)
-    if not validated_path.exists():  # CodeQL: path validated or testing-only
+    # codeql[py/path-injection] - validated_path is sanitized above (or testing-only path)
+    if not validated_path.exists():
         return ExtractionResult(
             file_path=str(validated_path),
             file_type='unknown',

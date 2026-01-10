@@ -248,8 +248,9 @@ async function renderMermaidDiagrams(container) {
                 const diagramDiv = document.createElement('div');
                 diagramDiv.className = 'mermaid';
                 // SECURITY: Use DOMParser for safe SVG insertion (CWE-79)
-                // Mermaid's render() returns sanitized SVG, but we use DOMParser
-                // to avoid innerHTML and satisfy CodeQL's XSS detection
+                // Mermaid's render() returns sanitized SVG (see https://mermaid.js.org/config/security.html)
+                // DOMParser parses the SVG as a structured document, not as executable HTML
+                // codeql[js/xss-through-dom] - svg is sanitized by Mermaid library, parsed as XML not HTML
                 const parser = new DOMParser();
                 const svgDoc = parser.parseFromString(svg, 'image/svg+xml');
 

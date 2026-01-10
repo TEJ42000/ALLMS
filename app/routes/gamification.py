@@ -620,7 +620,16 @@ def run_streak_maintenance(
 
         # Log success only after confirming no error
         logger.info(f"Streak maintenance succeeded for {user.email}: {result}")
-        return result
+        # SECURITY: Return only safe fields from successful result (CWE-209)
+        # Explicitly construct response to avoid exposing any internal error data
+        return {
+            "success": result.get("success", True),
+            "status": result.get("status", "success"),
+            "users_processed": result.get("users_processed", 0),
+            "users_updated": result.get("users_updated", 0),
+            "timestamp": result.get("timestamp"),
+            "message": result.get("message", "Maintenance completed successfully")
+        }
 
     except Exception as e:
         # CRITICAL SECURITY: Don't expose internal error details to client
