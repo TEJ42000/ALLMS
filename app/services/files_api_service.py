@@ -234,14 +234,15 @@ class FilesAPIService:
             material: The course material
 
         Returns:
-            Path to the local file
+            Absolute path to the local file
         """
         # Remove "Materials/" prefix if it exists (defensive coding)
         storage_path = material.storagePath
         if storage_path.startswith("Materials/"):
             storage_path = storage_path[len("Materials/"):]
 
-        return MATERIALS_ROOT / storage_path
+        # Return ABSOLUTE path so text_extractor doesn't add MATERIALS_BASE again
+        return (MATERIALS_ROOT / storage_path).resolve()
 
     def _extract_text_from_material(self, material: CourseMaterial) -> Optional[str]:
         """Extract text content from a material file.
