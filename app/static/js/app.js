@@ -281,7 +281,16 @@ async function renderMermaidDiagrams(container) {
                 pre.replaceWith(div);
             } catch (e) {
                 console.warn('Mermaid rendering failed:', e);
-                // Leave the code block as-is for debugging
+                // Hide the code block instead of showing broken diagram
+                const pre = block.parentElement;
+                if (pre) {
+                    pre.style.display = 'none';
+                }
+                // Also hide any error containers that Mermaid might create
+                setTimeout(() => {
+                    const errorContainers = document.querySelectorAll('#d3-mermaid-error, .mermaid-error, [id*="mermaid-error"]');
+                    errorContainers.forEach(el => el.style.display = 'none');
+                }, 100);
             }
         }
     }

@@ -1455,6 +1455,15 @@ textarea { resize: vertical; font-family: inherit; }
     overflow-x: auto;
 }
 
+/* Hide Mermaid error messages - they're distracting and we handle errors gracefully */
+#d3-mermaid-error,
+.mermaid-error,
+[id*="mermaid-error"],
+[class*="mermaid"] .error,
+.mermaid + .error {
+    display: none !important;
+}
+
 /* Callout Boxes for Study Guide */
 .study-guide-content .callout {
     padding: 1em 1.5em;
