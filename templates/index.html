@@ -285,6 +285,12 @@
                             <label for="essay-topic-select">Select Topic</label>
                             <select id="essay-topic-select" class="form-select">
                                 {% if topics %}
+                                <!-- Comprehensive Practice Options -->
+                                <option value="📚 All Weeks - Comprehensive Practice">📚 All Weeks - Comprehensive Practice</option>
+                                <option value="⚖️ Part A (Weeks 1-6) - Substantive Criminal Law">⚖️ Part A (Weeks 1-6) - Substantive Criminal Law</option>
+                                <option value="🏛️ Part B (Weeks 7-12) - Criminal Procedure">🏛️ Part B (Weeks 7-12) - Criminal Procedure</option>
+                                <option disabled>──────────</option>
+                                <!-- Individual Week Topics -->
                                 {% for topic in topics %}
                                 <option value="{{ topic.name }}">Week {{ topic.weekNumber }}: {{ topic.name }}</option>
                                 {% endfor %}
