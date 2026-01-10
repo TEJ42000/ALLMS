@@ -291,26 +291,43 @@ class TestIntegrationWithRealFiles:
         assert result.success is True
         assert len(result.text) > 0
 
-    def test_extract_real_pdf_file(self):
+    def test_extract_real_pdf_file(self, tmp_path):
         """Test extraction from a real PDF file.
 
-        FIX #259: Uses a committed test fixture instead of local Materials files.
-        This test uses extract_from_pdf directly to avoid path validation issues
-        when testing fixtures outside the Materials folder.
+        FIX #259: Generate PDF at test time from base64 to ensure cross-platform
+        compatibility and avoid git line-ending issues.
         """
+        import base64
+
         # Check if PyMuPDF is installed
         try:
             import fitz
         except ImportError:
             pytest.skip("PyMuPDF (fitz) not installed - required for PDF extraction")
 
-        # FIX #259: Use committed test fixture
-        pdf_file = Path(__file__).parent / "fixtures" / "sample.pdf"
-        if not pdf_file.exists():
-            pytest.fail(f"Test fixture not found: {pdf_file}")
+        # FIX #259: Base64-encoded minimal PDF with embedded text
+        # This PDF contains: "Test PDF Document", "unit testing", "Legal Studies"
+        pdf_base64 = (
+            "JVBERi0xLjQKMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4KZW5k"
+            "b2JqCjIgMCBvYmoKPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUl0gL0NvdW50IDEgPj4K"
+            "ZW5kb2JqCjMgMCBvYmoKPDwgL1R5cGUgL1BhZ2UgL1BhcmVudCAyIDAgUiAvTWVkaWFCb3gg"
+            "WzAgMCA2MTIgNzkyXQogICAvQ29udGVudHMgNCAwIFIgL1Jlc291cmNlcyA8PCAvRm9udCA8"
+            "PCAvRjEgNSAwIFIgPj4gPj4gPj4KZW5kb2JqCjQgMCBvYmoKPDwgL0xlbmd0aCAxNzggPj4K"
+            "c3RyZWFtCkJUCi9GMSAxNCBUZgoxMDAgNzAwIFRkCihUZXN0IFBERiBEb2N1bWVudCkgVGoK"
+            "MCAtMjAgVGQKKFRoaXMgaXMgYSBzYW1wbGUgUERGIGZpbGUgZm9yIHVuaXQgdGVzdGluZy4p"
+            "IFRqCjAgLTIwIFRkCihMZWdhbCBTdHVkaWVzIENvdXJzZSBNYXRlcmlhbCkgVGoKRVQKZW5k"
+            "c3RyZWFtCmVuZG9iago1IDAgb2JqCjw8IC9UeXBlIC9Gb250IC9TdWJ0eXBlIC9UeXBlMSAv"
+            "QmFzZUZvbnQgL0hlbHZldGljYSA+PgplbmRvYmoKeHJlZgowIDYKMDAwMDAwMDAwMCA2NTUz"
+            "NSBmIAowMDAwMDAwMDA5IDAwMDAwIG4gCjAwMDAwMDAwNTggMDAwMDAgbiAKMDAwMDAwMDEx"
+            "NSAwMDAwMCBuIAowMDAwMDAwMjY2IDAwMDAwIG4gCjAwMDAwMDA0OTQgMDAwMDAgbiAKdHJh"
+            "aWxlcgo8PCAvU2l6ZSA2IC9Sb290IDEgMCBSID4+CnN0YXJ0eHJlZgo1NzMKJSVFT0YK"
+        )
+
+        # Write PDF to temp file
+        pdf_file = tmp_path / "sample.pdf"
+        pdf_file.write_bytes(base64.b64decode(pdf_base64))
 
         # FIX #259: Use extract_from_pdf directly to bypass file type detection
-        # which involves path validation for slide_archive detection
         result = extract_from_pdf(pdf_file)
 
         assert result.success is True
