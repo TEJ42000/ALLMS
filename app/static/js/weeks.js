@@ -10,7 +10,10 @@ class WeekContentManager {
         this.currentWeek = null;
         this.currentWeekTitle = '';
         this.courseId = window.COURSE_CONTEXT?.courseId || window.COURSE_ID || 'LLS-2025-2026';
-        
+        // Cache weeks data to avoid additional API calls when viewing week details
+        // Note: Cache persists for page session. Refresh page to reload updated course data.
+        this.weeksData = {};
+
         this.init();
     }
     
@@ -46,6 +49,9 @@ class WeekContentManager {
             const course = await response.json();
             const weeks = course.weeks || [];
 
+            // Cache weeks data for later use (avoids additional API calls)
+            this.cacheWeeksData(weeks);
+
             this.renderWeeks(weeks);
         } catch (error) {
             console.error('[WeekContentManager] Error loading weeks:', error);
@@ -53,7 +59,30 @@ class WeekContentManager {
             this.renderFallbackWeeks();
         }
     }
-    
+
+    /**
+     * Cache weeks data by week number for quick lookup
+     * This allows showing week details without additional API calls
+     */
+    cacheWeeksData(weeks) {
+        this.weeksData = {};
+        weeks.forEach(week => {
+            // Validate weekNumber is a positive integer before caching
+            if (week.weekNumber && Number.isInteger(week.weekNumber) && week.weekNumber > 0) {
+                this.weeksData[week.weekNumber] = week;
+            }
+        });
+    }
+
+    /**
+     * Get cached week data by week number
+     * @param {number} weekNumber - The week number to look up
+     * @returns {Object|null} The cached week data or null if not found
+     */
+    getCachedWeekData(weekNumber) {
+        return this.weeksData[weekNumber] || null;
+    }
+
     renderWeeks(weeks) {
         console.log('[WeekContentManager] renderWeeks called with:', weeks);
 
@@ -159,11 +188,7 @@ class WeekContentManager {
             `;
         }
 
-        // Show loading state
         const modalBody = document.getElementById('week-modal-body');
-        if (modalBody) {
-            modalBody.innerHTML = '<div class="loading-placeholder">📚 Loading study notes...</div>';
-        }
 
         // Show modal
         this.modal.classList.add('show');
@@ -171,19 +196,15 @@ class WeekContentManager {
         // Show floating AI tutor button
         this.showFloatingAIButton();
 
-        try {
-            // Fetch week details from admin API
-            const response = await fetch(`/api/admin/courses/${this.courseId}/weeks/${weekNumber}`);
+        // Use cached week data (already fetched during loadWeeks) instead of making another API call
+        // This is more efficient and works for non-admin users
+        const weekData = this.getCachedWeekData(weekNumber);
 
-            if (response.ok) {
-                const weekData = await response.json();
-                modalBody.innerHTML = this.formatStudyNotes(weekData);
-            } else {
-                // Fallback: show basic info
-                modalBody.innerHTML = this.getPlaceholderStudyNotes(weekNumber, weekTitle);
-            }
-        } catch (error) {
-            console.error('[WeekContentManager] Error loading week content:', error);
+        if (weekData) {
+            modalBody.innerHTML = this.formatStudyNotes(weekData);
+        } else {
+            // Fallback: show placeholder if week data not in cache
+            console.warn('[WeekContentManager] Week data not found in cache for week:', weekNumber);
             modalBody.innerHTML = this.getPlaceholderStudyNotes(weekNumber, weekTitle);
         }
     }
