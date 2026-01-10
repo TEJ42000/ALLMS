@@ -236,7 +236,12 @@ class FilesAPIService:
         Returns:
             Path to the local file
         """
-        return MATERIALS_ROOT / material.storagePath
+        # Remove "Materials/" prefix if it exists (defensive coding)
+        storage_path = material.storagePath
+        if storage_path.startswith("Materials/"):
+            storage_path = storage_path[len("Materials/"):]
+
+        return MATERIALS_ROOT / storage_path
 
     def _extract_text_from_material(self, material: CourseMaterial) -> Optional[str]:
         """Extract text content from a material file.
