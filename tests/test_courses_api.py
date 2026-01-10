@@ -364,3 +364,21 @@ class TestMaterialCountsByWeek:
             mock_materials_service.get_material_counts_by_week.assert_called_once_with(
                 "LLS-2025-2026", 7
             )
+
+    def test_get_material_counts_service_error(self, client, mock_course_service, override_auth_dependency):
+        """Should return 500 when materials service fails."""
+        from app.models.course_models import Course
+
+        mock_course = MagicMock(spec=Course)
+        mock_course.active = True
+        mock_course_service.get_course.return_value = mock_course
+
+        with patch("app.routes.courses.get_course_materials_service") as mock_get_materials:
+            mock_materials_service = MagicMock()
+            mock_materials_service.get_material_counts_by_week.side_effect = Exception("Database error")
+            mock_get_materials.return_value = mock_materials_service
+
+            response = client.get("/api/courses/LLS-2025-2026/materials/week-counts")
+
+            assert response.status_code == 500
+            assert "error" in response.json()["detail"].lower() or "fail" in response.json()["detail"].lower()

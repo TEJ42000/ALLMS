@@ -2109,11 +2109,14 @@ function initStudyListeners() {
         });
     });
 
-    // Load saved guides on init
-    loadSavedStudyGuides();
-
-    // Populate week dropdown with material counts
-    populateStudyWeekDropdown();
+    // Load saved guides and populate week dropdown concurrently
+    // Both operations are independent and handle their own errors
+    Promise.all([
+        loadSavedStudyGuides(),
+        populateStudyWeekDropdown()
+    ]).catch(error => {
+        console.error('Error initializing study guide tab:', error);
+    });
 }
 
 /**
