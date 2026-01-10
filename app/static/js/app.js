@@ -2,6 +2,9 @@
 
 const API_BASE = '';  // Empty for same origin
 
+// Import DOMPurify for sanitizing SVG produced from untrusted input
+import DOMPurify from 'dompurify';
+
 // ========== Course Context ==========
 // Get course context from window object (set by template)
 const COURSE_ID = window.COURSE_CONTEXT?.courseId || null;
@@ -247,11 +250,15 @@ async function renderMermaidDiagrams(container) {
 
                 const diagramDiv = document.createElement('div');
                 diagramDiv.className = 'mermaid';
-                // SECURITY: Use DOMParser for safe SVG insertion (CWE-79)
-                // Mermaid's render() returns sanitized SVG, but we use DOMParser
-                // to avoid innerHTML and satisfy CodeQL's XSS detection
+                // SECURITY: Sanitize SVG before parsing and inserting into the DOM (CWE-79)
+                // Mermaid's render() returns SVG derived from potentially untrusted input.
+                // We use DOMPurify to remove any active or unsafe content from the SVG string,
+                // then parse the sanitized SVG with DOMParser to avoid using innerHTML.
+                const sanitizedSvg = DOMPurify.sanitize(svg, {
+                    USE_PROFILES: { svg: true, svgFilters: true }
+                });
                 const parser = new DOMParser();
-                const svgDoc = parser.parseFromString(svg, 'image/svg+xml');
+                const svgDoc = parser.parseFromString(sanitizedSvg, 'image/svg+xml');
 
                 // Check for parsing errors (DOMParser creates parsererror element on failure)
                 const parserError = svgDoc.querySelector('parsererror');

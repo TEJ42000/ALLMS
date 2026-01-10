@@ -58,5 +58,8 @@
     "testMatch": [
       "**/tests/**/*.test.js"
     ]
-  }
+  },
+  "dependencies": {
+    "dompurify": "^3.3.1"
+}
 }
