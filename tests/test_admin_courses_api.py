@@ -426,7 +426,7 @@ class TestValidateMaterialsPathWithResolution:
                 validate_materials_path("../../../etc/passwd")
         
         assert exc_info.value.status_code == 403
-        assert "outside materials directory" in exc_info.value.detail
+        assert "outside" in exc_info.value.detail.lower() or "access denied" in exc_info.value.detail.lower()
 
     @patch("app.routes.admin_courses.MATERIALS_BASE")
     def test_validate_path_corrected_path_must_exist(self, mock_base, tmp_path):

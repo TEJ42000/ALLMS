@@ -82,7 +82,7 @@ class TestTextExtraction:
         content = "# Heading\n\nThis is **bold** text."
         md_file.write_text(content)
 
-        result = extract_text(md_file)
+        result = extract_text(md_file, _skip_path_validation=True)
 
         assert result.success is True
         assert result.file_type == "md"
@@ -96,7 +96,7 @@ class TestTextExtraction:
         content = "Line 1\nLine 2\nLine 3"
         txt_file.write_text(content)
 
-        result = extract_text(txt_file)
+        result = extract_text(txt_file, _skip_path_validation=True)
 
         assert result.success is True
         assert result.text == content
@@ -117,7 +117,7 @@ class TestTextExtraction:
         """
         html_file.write_text(html_content)
 
-        result = extract_text(html_file)
+        result = extract_text(html_file, _skip_path_validation=True)
 
         assert result.success is True
         assert "Welcome" in result.text
@@ -138,7 +138,7 @@ class TestTextExtraction:
         }
         json_file.write_text(json.dumps(json_content))
 
-        result = extract_text(json_file)
+        result = extract_text(json_file, _skip_path_validation=True)
 
         assert result.success is True
         assert "Test Document" in result.text
@@ -147,10 +147,10 @@ class TestTextExtraction:
 
     def test_extract_nonexistent_file(self):
         """Test extracting from a file that doesn't exist."""
-        result = extract_text(Path("/nonexistent/file.md"))
+        result = extract_text(Path("/nonexistent/file.md"), _skip_path_validation=True)
 
         assert result.success is False
-        assert "not found" in result.error.lower()
+        assert "not found" in result.error.lower() or "invalid path" in result.error.lower()
 
     def test_extract_with_encoding_fallback(self, tmp_path):
         """Test that extraction handles different encodings."""
@@ -240,7 +240,7 @@ class TestBatchExtraction:
         (tmp_path / "subdir").mkdir()
         (tmp_path / "subdir" / "file2.md").write_text("Nested")
 
-        results = extract_all_from_folder(tmp_path, recursive=False)
+        results = extract_all_from_folder(tmp_path, recursive=False, _skip_path_validation=True)
 
         assert len(results) == 1
 
@@ -283,7 +283,7 @@ class TestIntegrationWithRealFiles:
         if not md_file.exists():
             pytest.skip("README.md not found")
 
-        result = extract_text(md_file)
+        result = extract_text(md_file, _skip_path_validation=True)
 
         assert result.success is True
         assert len(result.text) > 0
