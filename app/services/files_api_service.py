@@ -332,6 +332,14 @@ class FilesAPIService:
             limit=limit
         )
 
+        logger.info(
+            "DEBUG get_course_materials_with_text: Found %d materials for course %s (week=%s, tier=%s)",
+            len(materials),
+            course_id,
+            week_number,
+            tier
+        )
+
         if not materials:
             logger.warning("No materials found for course %s", course_id)
             return []
@@ -1238,6 +1246,22 @@ Include:
             "Generating flashcards from course %s: %d cards, week=%s, topic=%s",
             course_id, num_cards, week_number, topic
         )
+
+        # DEBUG: Check what materials exist in Firestore
+        debug_materials = self.get_course_materials(
+            course_id=course_id,
+            week_number=week_number,
+            limit=5
+        )
+        logger.info(
+            "DEBUG: Found %d materials in Firestore for course %s (week=%s)",
+            len(debug_materials),
+            course_id,
+            week_number
+        )
+        if debug_materials:
+            logger.info("DEBUG: First material: filename=%s, storagePath=%s",
+                       debug_materials[0].filename, debug_materials[0].storagePath)
 
         # Get materials with their extracted text content
         materials_with_text = await self.get_course_materials_with_text(
