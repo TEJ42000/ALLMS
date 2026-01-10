@@ -252,10 +252,11 @@ class FilesAPIService:
         file_path = self._get_local_file_path(material)
 
         logger.info(
-            "Extracting text from material: filename=%s, storagePath=%s, file_path=%s, exists=%s",
+            "Extracting text from material: filename=%s, storagePath=%s, file_path=%s, absolute_path=%s, exists=%s",
             material.filename,
             material.storagePath,
             file_path,
+            file_path.resolve(),
             file_path.exists()
         )
 
