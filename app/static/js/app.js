@@ -2795,10 +2795,10 @@ function initFlashcardListeners() {
     if (categorySelect) categorySelect.addEventListener('change', filterFlashcards);
     if (loadBtn) loadBtn.addEventListener('click', loadFlashcards);
 
-    // Load flashcards on init if course is selected
-    if (COURSE_ID) {
-        loadFlashcards();
-    }
+    // DON'T auto-generate flashcards on page load - it's expensive and slow
+    // Show empty state instead and let user click "Load Flashcards" button
+    // This prevents unnecessary API calls and gives users control
+    updateFlashcardDisplay(); // Shows empty state with instructions
 }
 
 /**
@@ -2852,7 +2852,13 @@ async function loadFlashcards() {
 
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
-            const errorMessage = errorData.detail || `API error: ${response.status}`;
+            let errorMessage = errorData.detail || `API error: ${response.status}`;
+
+            // Check if it's a "no materials" error - show friendly message
+            if (errorMessage.includes('No course materials available')) {
+                errorMessage = 'No course materials available yet. Please contact your instructor to add materials, or try selecting a different week.';
+            }
+
             throw new Error(errorMessage);
         }
 
@@ -2864,7 +2870,9 @@ async function loadFlashcards() {
         }
 
         if (data.flashcards.length === 0) {
-            throw new Error('No flashcards generated. Please try again.');
+            // This is not really an error - just no flashcards generated
+            showFlashcardError('No flashcards could be generated from the available materials. Try selecting a different week or topic.');
+            return;
         }
 
         // Transform backend format (front/back) to frontend format (question/answer)
