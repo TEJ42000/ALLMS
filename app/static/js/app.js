@@ -2795,15 +2795,17 @@ function initFlashcardListeners() {
     if (categorySelect) categorySelect.addEventListener('change', filterFlashcards);
     if (loadBtn) loadBtn.addEventListener('click', loadFlashcards);
 
-    // DON'T auto-generate flashcards on page load - it's expensive and slow
-    // Show empty state instead and let user click "Load Flashcards" button
-    // This prevents unnecessary API calls and gives users control
+    // Auto-generate flashcards on page load if course is selected
+    // We have materials for all courses, so this should work
+    console.log('[Flashcards] Initializing, COURSE_ID:', COURSE_ID);
 
-    // Debug: Log to console to verify this code is running
-    console.log('[Flashcards] Initializing with empty state, flashcards.length:', flashcards.length);
-
-    updateFlashcardDisplay(); // Shows empty state with instructions
-    updateFlashcardStats(); // Update stats to show 0/0
+    if (COURSE_ID) {
+        console.log('[Flashcards] Auto-loading flashcards for course:', COURSE_ID);
+        loadFlashcards();
+    } else {
+        console.log('[Flashcards] No course selected, showing empty state');
+        updateFlashcardDisplay(); // Shows empty state
+    }
 }
 
 /**
@@ -2899,7 +2901,14 @@ async function loadFlashcards() {
         console.log(`Loaded ${flashcards.length} flashcards for course ${COURSE_ID}`);
 
     } catch (error) {
-        console.error('Error loading flashcards:', error);
+        console.error('[Flashcards] Error loading flashcards:', error);
+        console.error('[Flashcards] Error details:', {
+            message: error.message,
+            stack: error.stack,
+            courseId: COURSE_ID
+        });
+
+        // Show user-friendly error message
         showFlashcardError(error.message || 'Error loading flashcards. Please try again.');
 
         // Record error timestamp for debouncing future retry attempts
