@@ -39,21 +39,35 @@ class TestCriminalLawSetup:
     def test_create_course_duplicate_without_force(self, mock_firestore):
         """Test that duplicate course creation fails without --force."""
         from scripts.setup_criminal_law_course import create_criminal_law_course
-        
+
         # Mock Firestore client
         mock_db = MagicMock()
         mock_firestore.return_value = mock_db
-        
+
         # Mock course already exists
         mock_course_ref = MagicMock()
         mock_course_doc = MagicMock()
         mock_course_doc.exists = True
         mock_course_ref.get.return_value = mock_course_doc
         mock_db.collection.return_value.document.return_value = mock_course_ref
-        
+
         # Should raise ValueError
         with pytest.raises(ValueError, match="already exists"):
             create_criminal_law_course(force=False)
+
+    def test_create_course_invalid_force_type(self):
+        """Test that invalid force parameter type raises TypeError."""
+        from scripts.setup_criminal_law_course import create_criminal_law_course
+
+        # Should raise TypeError for non-boolean values
+        with pytest.raises(TypeError, match="force parameter must be a boolean"):
+            create_criminal_law_course(force="true")
+
+        with pytest.raises(TypeError, match="force parameter must be a boolean"):
+            create_criminal_law_course(force=1)
+
+        with pytest.raises(TypeError, match="force parameter must be a boolean"):
+            create_criminal_law_course(force=None)
 
     @patch('scripts.setup_criminal_law_course.firestore.Client')
     def test_create_course_duplicate_with_force(self, mock_firestore):

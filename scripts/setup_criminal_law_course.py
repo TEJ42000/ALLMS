@@ -27,8 +27,13 @@ def create_criminal_law_course(force: bool = False):
         force: If True, overwrite existing course. If False, fail if course exists.
 
     Raises:
+        TypeError: If force is not a boolean
         ValueError: If course already exists and force=False
     """
+
+    # Type check for force parameter
+    if not isinstance(force, bool):
+        raise TypeError(f"force parameter must be a boolean, got {type(force).__name__}")
 
     db = firestore.Client()
     course_id = "CRIM-2025-2026"

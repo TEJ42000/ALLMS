@@ -140,27 +140,47 @@ class WeekContentManager {
         if (!Array.isArray(this.allWeeks)) {
             console.error('[WeekContentManager] allWeeks is not an array:', this.allWeeks);
             this.renderFallbackWeeks();
+            this.announceFilterChange('Error loading weeks');
             return;
         }
 
         let filteredWeeks;
+        let partName;
 
         if (this.currentPart === 'mixed') {
             // Show all weeks
             filteredWeeks = this.allWeeks;
+            partName = 'all parts';
             console.log('[WeekContentManager] Showing all weeks (mixed mode):', filteredWeeks.length);
         } else {
             // Filter by part
             filteredWeeks = this.allWeeks.filter(w => w.part === this.currentPart);
+            partName = `Part ${this.currentPart}`;
             console.log(`[WeekContentManager] Filtered to Part ${this.currentPart}:`, filteredWeeks.length, 'weeks');
         }
 
         // Validate we have weeks to show
         if (filteredWeeks.length === 0) {
             console.warn(`[WeekContentManager] No weeks found for part ${this.currentPart}`);
+            this.announceFilterChange(`No weeks found for ${partName}`);
+        } else {
+            // Announce filter change to screen readers
+            this.announceFilterChange(`Showing ${filteredWeeks.length} weeks from ${partName}`);
         }
 
         this.renderWeeks(filteredWeeks);
+    }
+
+    /**
+     * Announce filter changes to screen readers via ARIA live region
+     * @param {string} message - Message to announce
+     */
+    announceFilterChange(message) {
+        const statusElement = document.getElementById('part-filter-status');
+        if (statusElement) {
+            statusElement.textContent = message;
+            console.log('[WeekContentManager] ARIA announcement:', message);
+        }
     }
 
     /**
@@ -200,7 +220,11 @@ class WeekContentManager {
 
         // Sort by week number
         weeks.sort((a, b) => (a.weekNumber || 0) - (b.weekNumber || 0));
-        console.log('[WeekContentManager] Sorted weeks:', weeks.map(w => `Week ${w.weekNumber}`));
+
+        // Safe logging with Array.isArray check
+        if (Array.isArray(weeks)) {
+            console.log('[WeekContentManager] Sorted weeks:', weeks.map(w => `Week ${w.weekNumber}`));
+        }
 
         weeks.forEach((week, index) => {
             console.log(`[WeekContentManager] Creating card ${index + 1}/${weeks.length}:`, week);
@@ -244,7 +268,7 @@ class WeekContentManager {
             <h3>${this.escapeHtml(week.title || `Week ${week.weekNumber}`)}</h3>
             <p class="week-description">${this.escapeHtml(description)}</p>
 
-            ${topics.length > 0 ? `
+            ${topics.length > 0 && Array.isArray(topics) ? `
                 <div class="week-topics">
                     ${topics.slice(0, 4).map(t => `<span class="topic-tag">${this.escapeHtml(typeof t === 'string' ? t : t.name || t)}</span>`).join('')}
                     ${topics.length > 4 ? `<span class="topic-tag">+${topics.length - 4} more</span>` : ''}

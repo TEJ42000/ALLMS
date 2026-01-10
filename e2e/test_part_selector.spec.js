@@ -8,27 +8,45 @@
 const { test, expect } = require('@playwright/test');
 
 test.describe('Criminal Law Part Selector', () => {
+    /**
+     * Test Preconditions:
+     * 1. Criminal Law course (CRIM-2025-2026) must exist in Firestore
+     * 2. Course must have 12 weeks (6 Part A + 6 Part B)
+     * 3. Weeks 1-6 must have part="A"
+     * 4. Weeks 7-12 must have part="B"
+     * 5. User must be authenticated
+     * 6. Course must be accessible to the test user
+     *
+     * Setup:
+     * Run `python scripts/setup_criminal_law_course.py` before running these tests
+     */
+
     test.beforeEach(async ({ page }) => {
         // Navigate to the study portal
         await page.goto('/');
-        
+
         // Wait for page to load
         await page.waitForLoadState('networkidle');
-        
-        // Select Criminal Law course (CRIM-2025-2026)
-        // This assumes the course selector is available
+
+        // PRECONDITION: Course selector must be available
         const courseSelector = page.locator('#course-selector');
-        if (await courseSelector.isVisible()) {
-            await courseSelector.selectOption('CRIM-2025-2026');
-            await page.waitForTimeout(1000); // Wait for course to load
-        }
-        
+        await expect(courseSelector).toBeVisible({ timeout: 5000 });
+
+        // Select Criminal Law course (CRIM-2025-2026)
+        // PRECONDITION: CRIM-2025-2026 must exist in the course list
+        await courseSelector.selectOption('CRIM-2025-2026');
+        await page.waitForTimeout(1000); // Wait for course to load
+
         // Navigate to Weekly Content section
+        // PRECONDITION: Weekly Content tab must be available
         const weeklyContentTab = page.locator('button.nav-tab:has-text("Weekly Content")');
-        if (await weeklyContentTab.isVisible()) {
-            await weeklyContentTab.click();
-            await page.waitForTimeout(500);
-        }
+        await expect(weeklyContentTab).toBeVisible({ timeout: 5000 });
+        await weeklyContentTab.click();
+        await page.waitForTimeout(500);
+
+        // PRECONDITION: Weeks grid must be rendered
+        const weeksGrid = page.locator('#weeks-grid');
+        await expect(weeksGrid).toBeVisible({ timeout: 5000 });
     });
 
     test('part selector is visible for Criminal Law course', async ({ page }) => {
