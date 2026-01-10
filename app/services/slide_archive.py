@@ -179,8 +179,16 @@ def get_slide_image(file_path: Path, page_number: int) -> Optional[Tuple[bytes, 
     Returns:
         Tuple of (image_bytes, media_type) or None if not found
     """
+    # Security: Validate path to prevent path traversal attacks (CWE-22/23/36)
     try:
-        with zipfile.ZipFile(file_path, 'r') as zf:
+        validated_path = validate_path_within_base(str(file_path), MATERIALS_BASE)
+    except ValueError as e:
+        logger.warning("Path validation failed for path=%s: %s", file_path, e)
+        return None
+
+    try:
+        # SECURITY: Use validated_path, not original file_path
+        with zipfile.ZipFile(validated_path, 'r') as zf:
             # Read manifest to find the image path
             manifest_data = json.loads(zf.read('manifest.json'))
 
@@ -194,7 +202,7 @@ def get_slide_image(file_path: Path, page_number: int) -> Optional[Tuple[bytes, 
 
             return None
     except Exception as e:
-        logger.error("Failed to get slide image from %s page %d: %s", file_path, page_number, e)
+        logger.error("Failed to get slide image from %s page %d: %s", validated_path, page_number, e)
         return None
 
 
