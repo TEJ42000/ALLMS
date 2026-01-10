@@ -251,8 +251,16 @@ class FilesAPIService:
         """
         file_path = self._get_local_file_path(material)
 
+        logger.info(
+            "Extracting text from material: filename=%s, storagePath=%s, file_path=%s, exists=%s",
+            material.filename,
+            material.storagePath,
+            file_path,
+            file_path.exists()
+        )
+
         if not file_path.exists():
-            logger.warning("File not found: %s", file_path)
+            logger.error("File not found: %s (storagePath: %s)", file_path, material.storagePath)
             return None
 
         # Detect file type and extract text

@@ -108,13 +108,18 @@ def extract_text(file_path: Path | str, *, _skip_path_validation: bool = False) 
         try:
             validated_path = validate_path_within_base(str(file_path), MATERIALS_BASE)
         except ValueError as e:
-            logger.warning("Path validation failed for path=%s: %s", file_path, e)
+            logger.error(
+                "Path validation failed - file_path=%s, MATERIALS_BASE=%s, error=%s",
+                file_path,
+                MATERIALS_BASE,
+                e
+            )
             return ExtractionResult(
                 file_path=str(file_path),
                 file_type='unknown',
                 text='',
                 success=False,
-                error=f'Invalid path: {file_path}'
+                error=f'Path validation failed: {e}'
             )
     else:
         # SECURITY: Enforce that _skip_path_validation is only used in test environment
