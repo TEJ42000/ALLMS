@@ -184,11 +184,11 @@
                 <p class="section-description">Explore weekly topics, study materials, and get AI-powered help</p>
 
                 <!-- Part Selector (for courses with parts like Criminal Law) -->
-                <div id="part-selector" class="part-selector" style="display: none;">
+                <div id="part-selector" class="part-selector" style="display: none;" role="tablist" aria-label="Course part selector">
                     <div class="part-tabs">
-                        <button class="part-tab active" data-part="A">Part A</button>
-                        <button class="part-tab" data-part="B">Part B</button>
-                        <button class="part-tab" data-part="mixed">Mixed</button>
+                        <button class="part-tab active" data-part="A" role="tab" aria-selected="true" aria-controls="weeks-grid" id="part-a-tab">Part A</button>
+                        <button class="part-tab" data-part="B" role="tab" aria-selected="false" aria-controls="weeks-grid" id="part-b-tab">Part B</button>
+                        <button class="part-tab" data-part="mixed" role="tab" aria-selected="false" aria-controls="weeks-grid" id="part-mixed-tab">Mixed</button>
                     </div>
                 </div>
 

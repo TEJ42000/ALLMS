@@ -76,40 +76,88 @@ class WeekContentManager {
      * Initialize part selector for courses with parts (e.g., Criminal Law)
      */
     initPartSelector() {
-        if (!this.partSelector) return;
+        if (!this.partSelector) {
+            console.warn('[WeekContentManager] Part selector element not found');
+            return;
+        }
 
         // Show the part selector
         this.partSelector.style.display = 'block';
 
         // Add click handlers to part tabs
         const partTabs = this.partSelector.querySelectorAll('.part-tab');
+
+        if (partTabs.length === 0) {
+            console.error('[WeekContentManager] No part tabs found in part selector');
+            return;
+        }
+
         partTabs.forEach(tab => {
-            tab.addEventListener('click', () => {
-                // Update active state
-                partTabs.forEach(t => t.classList.remove('active'));
+            // Validate tab has data-part attribute
+            if (!tab.dataset.part) {
+                console.error('[WeekContentManager] Part tab missing data-part attribute:', tab);
+                return;
+            }
+
+            tab.addEventListener('click', (e) => {
+                e.preventDefault();
+
+                const selectedPart = tab.dataset.part;
+
+                // Validate part value
+                const validParts = ['A', 'B', 'mixed'];
+                if (!validParts.includes(selectedPart)) {
+                    console.error('[WeekContentManager] Invalid part selected:', selectedPart);
+                    return;
+                }
+
+                console.log('[WeekContentManager] Part selected:', selectedPart);
+
+                // Update active state and ARIA attributes
+                partTabs.forEach(t => {
+                    t.classList.remove('active');
+                    t.setAttribute('aria-selected', 'false');
+                });
                 tab.classList.add('active');
+                tab.setAttribute('aria-selected', 'true');
 
                 // Update current part
-                this.currentPart = tab.dataset.part;
+                this.currentPart = selectedPart;
 
                 // Filter and render weeks
                 this.filterWeeksByPart();
             });
         });
+
+        console.log('[WeekContentManager] Part selector initialized with', partTabs.length, 'tabs');
     }
 
     /**
      * Filter weeks by selected part
      */
     filterWeeksByPart() {
+        // Validate allWeeks is an array
+        if (!Array.isArray(this.allWeeks)) {
+            console.error('[WeekContentManager] allWeeks is not an array:', this.allWeeks);
+            this.renderFallbackWeeks();
+            return;
+        }
+
         let filteredWeeks;
 
         if (this.currentPart === 'mixed') {
             // Show all weeks
             filteredWeeks = this.allWeeks;
+            console.log('[WeekContentManager] Showing all weeks (mixed mode):', filteredWeeks.length);
         } else {
             // Filter by part
             filteredWeeks = this.allWeeks.filter(w => w.part === this.currentPart);
+            console.log(`[WeekContentManager] Filtered to Part ${this.currentPart}:`, filteredWeeks.length, 'weeks');
+        }
+
+        // Validate we have weeks to show
+        if (filteredWeeks.length === 0) {
+            console.warn(`[WeekContentManager] No weeks found for part ${this.currentPart}`);
         }
 
         this.renderWeeks(filteredWeeks);

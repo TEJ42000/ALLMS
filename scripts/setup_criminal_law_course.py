@@ -20,16 +20,47 @@ sys.path.insert(0, str(project_root))
 from google.cloud import firestore
 
 
-def create_criminal_law_course():
-    """Create the Criminal Law course with Part A and Part B."""
-    
+def create_criminal_law_course(force: bool = False):
+    """Create the Criminal Law course with Part A and Part B.
+
+    Args:
+        force: If True, overwrite existing course. If False, fail if course exists.
+
+    Raises:
+        ValueError: If course already exists and force=False
+    """
+
     db = firestore.Client()
     course_id = "CRIM-2025-2026"
-    
+
     print("=" * 70)
     print("🎓 Setting up Criminal Law Course (CRIM-2025-2026)")
     print("=" * 70)
-    
+
+    # Check if course already exists
+    course_ref = db.collection("courses").document(course_id)
+    existing_course = course_ref.get()
+
+    if existing_course.exists:
+        if not force:
+            raise ValueError(
+                f"Course {course_id} already exists in Firestore. "
+                f"Use --force flag to overwrite, or delete the course first."
+            )
+        else:
+            print(f"\n⚠️  Course {course_id} already exists - will overwrite (--force flag used)")
+            # Delete existing weeks
+            weeks_ref = course_ref.collection("weeks")
+            existing_weeks = weeks_ref.stream()
+            batch = db.batch()
+            count = 0
+            for week in existing_weeks:
+                batch.delete(week.reference)
+                count += 1
+            if count > 0:
+                batch.commit()
+                print(f"   Deleted {count} existing weeks")
+
     # Course metadata
     course_data = {
         "id": course_id,
@@ -454,11 +485,28 @@ def create_part_b_weeks():
 
 
 if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description="Setup Criminal Law course (CRIM-2025-2026) in Firestore"
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Overwrite existing course if it already exists"
+    )
+    args = parser.parse_args()
+
     try:
-        create_criminal_law_course()
+        create_criminal_law_course(force=args.force)
         sys.exit(0)
-    except Exception as e:
+    except ValueError as e:
         print(f"\n❌ Error: {e}")
+        print("\nTo overwrite the existing course, run:")
+        print(f"  python {sys.argv[0]} --force")
+        sys.exit(1)
+    except Exception as e:
+        print(f"\n❌ Unexpected error: {e}")
         import traceback
         traceback.print_exc()
         sys.exit(1)
