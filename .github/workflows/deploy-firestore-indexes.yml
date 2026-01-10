@@ -93,10 +93,11 @@ jobs:
           echo "⏳ Indexes take 5-15 minutes to build."
 
       - name: List Indexes
+        continue-on-error: true
         run: |
           echo "📋 Current Firestore Indexes:"
           gcloud firestore indexes composite list \
             --project="${{ env.PROJECT_ID }}" \
             --database="${{ env.DATABASE }}" \
-            --format="table(name,state,queryScope)"
+            --format="table(name,state,queryScope)" || echo "⚠️ Could not list indexes (may need datastore.indexAdmin role)"
 
