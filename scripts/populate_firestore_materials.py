@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 # Course ID mapping (directory name -> Firestore course ID)
 COURSE_MAPPING = {
-    "Criminal_Law": "Criminal-Law---Part--2025-2026",
+    "Criminal_Law": "CRIM-2025-2026",  # Fixed: was "Criminal-Law---Part--2025-2026"
     "LLS": "LLS-2025-2026",
     "LH": "Legal-History-2025-2026",
 }
