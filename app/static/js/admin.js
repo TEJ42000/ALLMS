@@ -171,7 +171,12 @@ async function saveCourse() {
     try {
         const isNew = !currentCourse || currentCourse.id !== courseData.id;
         const method = isNew ? 'POST' : 'PATCH';
-        const url = isNew ? API_BASE : `${API_BASE}/${courseData.id}`;
+
+        // IMPORTANT: For updates, use the original course ID from currentCourse, not the form field
+        // The form field might be corrupted or modified, but the URL must use the original ID
+        const courseIdForUrl = isNew ? courseData.id : currentCourse.id;
+        const url = isNew ? API_BASE : `${API_BASE}/${courseIdForUrl}`;
+
         const response = await secureFetch(url, {
             method,
             headers: { 'Content-Type': 'application/json' },
