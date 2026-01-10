@@ -26,7 +26,7 @@ class TestHomepageLogo:
         
         # Verify logo attributes
         assert nav_logo.get('src') == '/static/images/favicon.svg'
-        assert nav_logo.get('alt') == 'LLMRMS Logo'
+        assert nav_logo.get('alt') == 'Cognitio Flow Logo'
         assert 'brand-logo' in nav_logo.get('class', [])
 
     def test_logo_exists_in_footer(self, client: TestClient):
@@ -42,7 +42,7 @@ class TestHomepageLogo:
         
         # Verify logo attributes
         assert footer_logo.get('src') == '/static/images/favicon.svg'
-        assert footer_logo.get('alt') == 'LLMRMS Logo'
+        assert footer_logo.get('alt') == 'Cognitio Flow Logo'
         assert 'footer-logo' in footer_logo.get('class', [])
 
     def test_no_emoji_in_navigation(self, client: TestClient):
@@ -71,21 +71,21 @@ class TestHomepageLogo:
             assert '⚖️' not in footer_brand_header.get_text(), "Emoji should be replaced with SVG logo"
 
     def test_brand_name_present(self, client: TestClient):
-        """Test that brand name 'LLMRMS' is still present."""
+        """Test that brand name 'Cognitio Flow' is present."""
         response = client.get("/")
         assert response.status_code == 200
-        
+
         soup = BeautifulSoup(response.text, 'html.parser')
-        
+
         # Check navigation
         nav_brand_name = soup.select_one('.nav-brand .brand-name')
         assert nav_brand_name is not None
-        assert 'LLMRMS' in nav_brand_name.get_text()
-        
+        assert 'Cognitio Flow' in nav_brand_name.get_text()
+
         # Check footer
         footer_brand_name = soup.select_one('.footer-brand .brand-name')
         assert footer_brand_name is not None
-        assert 'LLMRMS' in footer_brand_name.get_text()
+        assert 'Cognitio Flow' in footer_brand_name.get_text()
 
     def test_logo_accessibility(self, client: TestClient):
         """Test that logo has proper accessibility attributes."""
