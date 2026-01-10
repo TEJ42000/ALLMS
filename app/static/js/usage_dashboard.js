@@ -178,11 +178,11 @@ function sanitizeSearchInput(input) {
     // Remove control characters and zero-width characters
     sanitized = sanitized.replace(/[\x00-\x1F\x7F\u200B-\u200D\uFEFF]/g, '');
 
-    // Remove HTML tags
-    sanitized = sanitized.replace(/<[^>]*>/g, '');
-
+    // Security: Apply strict ASCII whitelist FIRST before HTML tag removal.
+    // This removes < and > characters entirely, preventing any HTML injection.
+    // This also prevents incomplete multi-character sanitization attacks
+    // where crafted input like <scr<script>ipt> could reform after one pass.
     // Allow only ASCII alphanumeric, spaces, @, ., -, _ (for email search)
-    // Using explicit ASCII ranges instead of \w to avoid Unicode word characters
     sanitized = sanitized.replace(/[^a-zA-Z0-9\s@._-]/g, '');
 
     return sanitized.trim();

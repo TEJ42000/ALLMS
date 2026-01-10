@@ -153,11 +153,15 @@ def extract_text_from_folder(
         If return_details=False: Combined extracted text from all PDFs
         If return_details=True: Dict with {text, files, folder_path}
     """
-    # Handle both relative and absolute paths
-    if os.path.isabs(folder_path):
-        full_path = Path(folder_path)
-    else:
-        full_path = MATERIALS_BASE / folder_path
+    # Security: Validate path to prevent path traversal attacks (CWE-22/23/36)
+    # Use validate_path_within_base() to ensure all paths are within MATERIALS_BASE
+    try:
+        full_path = validate_path_within_base(folder_path, MATERIALS_BASE)
+    except ValueError as e:
+        # Re-raise as FileNotFoundError to maintain API compatibility
+        # but log the security event
+        logger.warning("Path validation failed for folder_path=%s: %s", folder_path, e)
+        raise FileNotFoundError(f"Invalid folder path: {folder_path}") from e
 
     if not full_path.exists() or not full_path.is_dir():
         raise FileNotFoundError(f"Folder not found: {full_path}")
@@ -202,20 +206,23 @@ def extract_text_from_folder(
 def extract_text_from_pdf(pdf_path: str, max_pages: Optional[int] = None) -> str:
     """
     Extract text content from a PDF file.
-    
+
     Args:
         pdf_path: Path to the PDF file (relative to materials base or absolute)
         max_pages: Maximum number of pages to extract (None = all pages)
-        
+
     Returns:
         Extracted text content
     """
-    # Handle both relative and absolute paths
-    if os.path.isabs(pdf_path):
-        full_path = Path(pdf_path)
-    else:
-        full_path = MATERIALS_BASE / pdf_path
-    
+    # Security: Validate path to prevent path traversal attacks (CWE-22/23/36)
+    # Use validate_path_within_base() to ensure all paths are within MATERIALS_BASE
+    try:
+        full_path = validate_path_within_base(pdf_path, MATERIALS_BASE)
+    except ValueError as e:
+        # Re-raise as FileNotFoundError to maintain API compatibility
+        logger.warning("Path validation failed for pdf_path=%s: %s", pdf_path, e)
+        raise FileNotFoundError(f"Invalid PDF path: {pdf_path}") from e
+
     if not full_path.exists():
         raise FileNotFoundError(f"PDF not found: {full_path}")
     
