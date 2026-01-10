@@ -13,6 +13,9 @@ class WeekContentManager {
         // Cache weeks data to avoid additional API calls when viewing week details
         // Note: Cache persists for page session. Refresh page to reload updated course data.
         this.weeksData = {};
+        this.allWeeks = [];
+        this.currentPart = 'A'; // Default to Part A
+        this.partSelector = document.getElementById('part-selector');
 
         this.init();
     }
@@ -49,8 +52,17 @@ class WeekContentManager {
             const course = await response.json();
             const weeks = course.weeks || [];
 
+            // Store all weeks
+            this.allWeeks = weeks;
+
             // Cache weeks data for later use (avoids additional API calls)
             this.cacheWeeksData(weeks);
+
+            // Check if course has parts (e.g., Criminal Law with Part A and Part B)
+            const hasParts = weeks.some(w => w.part);
+            if (hasParts) {
+                this.initPartSelector();
+            }
 
             this.renderWeeks(weeks);
         } catch (error) {
@@ -58,6 +70,49 @@ class WeekContentManager {
             // Fallback: render placeholder weeks
             this.renderFallbackWeeks();
         }
+    }
+
+    /**
+     * Initialize part selector for courses with parts (e.g., Criminal Law)
+     */
+    initPartSelector() {
+        if (!this.partSelector) return;
+
+        // Show the part selector
+        this.partSelector.style.display = 'block';
+
+        // Add click handlers to part tabs
+        const partTabs = this.partSelector.querySelectorAll('.part-tab');
+        partTabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                // Update active state
+                partTabs.forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+
+                // Update current part
+                this.currentPart = tab.dataset.part;
+
+                // Filter and render weeks
+                this.filterWeeksByPart();
+            });
+        });
+    }
+
+    /**
+     * Filter weeks by selected part
+     */
+    filterWeeksByPart() {
+        let filteredWeeks;
+
+        if (this.currentPart === 'mixed') {
+            // Show all weeks
+            filteredWeeks = this.allWeeks;
+        } else {
+            // Filter by part
+            filteredWeeks = this.allWeeks.filter(w => w.part === this.currentPart);
+        }
+
+        this.renderWeeks(filteredWeeks);
     }
 
     /**
@@ -137,7 +192,7 @@ class WeekContentManager {
         card.onclick = () => this.openWeekStudyNotes(week.weekNumber, week.title || `Week ${week.weekNumber}`);
 
         card.innerHTML = `
-            <span class="week-label">Week ${week.weekNumber}</span>
+            <span class="week-label">Week ${week.weekNumber}${week.part ? ` - Part ${week.part}` : ''}</span>
             <h3>${this.escapeHtml(week.title || `Week ${week.weekNumber}`)}</h3>
             <p class="week-description">${this.escapeHtml(description)}</p>
 
