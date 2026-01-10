@@ -84,7 +84,7 @@ PROMPT_INJECTION_PATTERNS = [
 
     # Direct command attempts targeting AI behavior
     # Requires "code", "command", or "script" to avoid blocking legal topics
-    re.compile(r'(^|\s)(execute|run|perform)\s+(this|the|following)\s+(code|command|script)\b', re.IGNORECASE),
+    re.compile(r'\b(execute|run|perform)\s+(this|the|following)\s+(code|command|script)\b', re.IGNORECASE),
 
     # Explicit jailbreak attempts
     re.compile(r'\b(jailbreak|dan\s+mode|developer\s+mode|god\s+mode)\b', re.IGNORECASE),

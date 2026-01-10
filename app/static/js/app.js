@@ -14,7 +14,7 @@ let activeTutorRequests = 0;
 
 // ========== Tutor Request Debouncing ==========
 // Prevents rapid-fire submissions that waste API credits and cause duplicate responses
-// Uses same debouncing pattern as flashcard loading (see line ~2450)
+// Uses same debouncing pattern as flashcard error handling
 let lastTutorRequestTime = 0;
 const TUTOR_REQUEST_DEBOUNCE_MS = 2000; // 2 second cooldown between requests
 
@@ -460,7 +460,7 @@ const PROMPT_INJECTION_PATTERNS = [
 
     // Direct command attempts targeting AI behavior
     // Requires "code", "command", or "script" to avoid blocking legal topics
-    /(^|\s)(execute|run|perform)\s+(this|the|following)\s+(code|command|script)\b/i,
+    /\b(execute|run|perform)\s+(this|the|following)\s+(code|command|script)\b/i,
 
     // Explicit jailbreak attempts
     /\b(jailbreak|dan\s+mode|developer\s+mode|god\s+mode)\b/i,
@@ -534,9 +534,6 @@ async function askTutor() {
         return;
     }
 
-    // Update last request time before sending
-    lastTutorRequestTime = now;
-
     // Parse context value to extract week number if present
     // Format from template: "Week X: Topic Name" stored as topic name,
     // but option value could be topic name directly
@@ -569,6 +566,11 @@ async function askTutor() {
         if (week_number !== null) {
             requestBody.week_number = week_number;
         }
+
+        // Update debounce timestamp after request is built but before network call
+        // This allows immediate retry if request building fails, but prevents
+        // rapid-fire submissions once we're about to make the network request
+        lastTutorRequestTime = now;
 
         const response = await fetch(`${API_BASE}/api/tutor/chat`, {
             method: 'POST',
