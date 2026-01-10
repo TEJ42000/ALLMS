@@ -148,8 +148,17 @@ async function fetchCourse(courseId) {
     showLoading();
     try {
         const response = await fetch(`${API_BASE}/${courseId}?include_weeks=true`);
-        if (!response.ok) throw new Error('Course not found');
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.detail || 'Course not found');
+        }
         currentCourse = await response.json();
+
+        // Ensure weeks is an array (handle null/undefined)
+        if (!currentCourse.weeks) {
+            currentCourse.weeks = [];
+        }
+
         renderCourseForm();
         renderWeeksList();
         renderCourseMaterialsList(currentCourse.materials);
@@ -161,6 +170,11 @@ async function fetchCourse(courseId) {
         }
     } catch (error) {
         showToast('Error loading course: ' + error.message, 'error');
+
+        // Clear the weeks list to show error state instead of leaving it on "Loading..."
+        if (elements.weeksList) {
+            elements.weeksList.innerHTML = '<p class="empty-state error">Failed to load weeks. Please try again.</p>';
+        }
     } finally { hideLoading(); }
 }
 

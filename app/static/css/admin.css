@@ -208,6 +208,11 @@
     font-style: italic;
 }
 
+.empty-state.error {
+    color: #e74c3c;
+    font-weight: 500;
+}
+
 .loading-placeholder {
     color: var(--text-secondary);
     text-align: center;
