@@ -227,7 +227,7 @@ class TestBatchExtraction:
         (tmp_path / "subdir").mkdir()
         (tmp_path / "subdir" / "file3.md").write_text("Nested content")
 
-        results = extract_all_from_folder(tmp_path, recursive=True)
+        results = extract_all_from_folder(tmp_path, recursive=True, _skip_path_validation=True)
 
         assert len(results) == 3
         assert all(r.success for r in results)
