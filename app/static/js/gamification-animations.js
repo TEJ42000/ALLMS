@@ -670,7 +670,7 @@ class GamificationAnimations {
             // Footer
             ctx.fillStyle = '#d4af37';
             ctx.font = 'bold 28px Arial, sans-serif';
-            ctx.fillText('⚖️ LLS Study Portal', 600, 570);
+            ctx.fillText('⚖️ Cognitio Flow', 600, 570);
 
             return canvas;
         } catch (error) {

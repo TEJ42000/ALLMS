@@ -1,5 +1,5 @@
 /**
- * LLMRMS Homepage JavaScript
+ * Cognitio Flow Homepage JavaScript
  * Handles course loading and interactions for the premium homepage
  */
 

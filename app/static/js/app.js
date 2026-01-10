@@ -1,4 +1,4 @@
-// app.js - Frontend JavaScript for LLS Study Portal
+// app.js - Frontend JavaScript for Cognitio Flow
 
 const API_BASE = '';  // Empty for same origin
 

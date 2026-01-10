@@ -410,7 +410,7 @@ class OnboardingTour {
         message.className = 'download-notification';
         message.innerHTML = `
             <div class="download-notification-content">
-                🎉 Welcome to LLS Study Portal! Start earning XP now!
+                🎉 Welcome to Cognitio Flow! Start earning XP now!
             </div>
         `;
 

@@ -47,7 +47,7 @@ async def landing_page(request: Request) -> HTMLResponse:
         "course_selection.html",
         {
             "request": request,
-            "title": "Select Your Course - LLS Study Portal",
+            "title": "Select Your Course - Cognitio Flow",
             "version": __version__,
             "user": user
         }
@@ -122,7 +122,7 @@ async def health_check() -> HealthCheckResponse:
     """
     return HealthCheckResponse(
         status="healthy",
-        service="lls-study-portal",
+        service="cognitio-flow",
         version=__version__
     )
 

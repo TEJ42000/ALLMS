@@ -359,7 +359,7 @@ class ShareableGraphics {
         // Footer
         ctx.fillStyle = '#d4af37';
         ctx.font = 'bold 28px Inter, sans-serif';
-        ctx.fillText('⚖️ LLS Study Portal', 600, 570);
+        ctx.fillText('⚖️ Cognitio Flow', 600, 570);
 
         return canvas;
     }
@@ -435,7 +435,7 @@ class ShareableGraphics {
         // Footer
         ctx.fillStyle = '#d4af37';
         ctx.font = 'bold 28px Inter, sans-serif';
-        ctx.fillText('⚖️ LLS Study Portal', 600, 570);
+        ctx.fillText('⚖️ Cognitio Flow', 600, 570);
 
         return canvas;
     }
@@ -487,7 +487,7 @@ class ShareableGraphics {
         // Footer
         ctx.fillStyle = '#d4af37';
         ctx.font = 'bold 28px Inter, sans-serif';
-        ctx.fillText('⚖️ LLS Study Portal', 600, 570);
+        ctx.fillText('⚖️ Cognitio Flow', 600, 570);
 
         return canvas;
     }
@@ -530,7 +530,7 @@ class ShareableGraphics {
                         await navigator.share({
                             files: [file],
                             title: 'My Study Progress',
-                            text: 'Check out my progress on LLS Study Portal!'
+                            text: 'Check out my progress on Cognitio Flow!'
                         });
                         console.log('[ShareableGraphics] Shared successfully');
                     } catch (error) {

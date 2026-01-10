@@ -168,7 +168,7 @@ class TestHealthCheck:
         assert "status" in data
         assert data["status"] == "healthy"
         assert "service" in data
-        assert data["service"] == "lls-study-portal"
+        assert data["service"] == "cognitio-flow"
         assert "version" in data
         assert data["version"] == __version__
 

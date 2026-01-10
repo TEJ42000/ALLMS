@@ -124,7 +124,7 @@ app.include_router(flashcard_issues.router)  # Phase 2: Flashcard issues
 @app.on_event("startup")
 async def startup_event():
     """Run on application startup."""
-    print("🚀 LLS Study Portal starting up...")
+    print("🚀 Cognitio Flow starting up...")
 
     # Log authentication status
     auth_config = get_auth_config()
@@ -173,7 +173,7 @@ async def startup_event():
 @app.on_event("shutdown")
 async def shutdown_event():
     """Run on application shutdown."""
-    print("👋 LLS Study Portal shutting down...")
+    print("👋 Cognitio Flow shutting down...")
 
 
 if __name__ == "__main__":
