@@ -2601,10 +2601,10 @@ function initDashboard() {
 }
 
 /**
- * Fetch course weeks from API and render them in the dashboard
+ * Fetch course weeks from API and render them in the dashboard overview section
  */
 async function loadCourseWeeks() {
-    const weeksGrid = document.getElementById('weeks-grid');
+    const weeksGrid = document.getElementById('overview-weeks-grid');
     if (!weeksGrid) return;
 
     // Need course context to fetch weeks
