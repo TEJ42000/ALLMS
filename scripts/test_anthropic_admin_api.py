@@ -44,7 +44,7 @@ async def test_admin_api():
             print("   (then paste the key and press Ctrl+D)")
             return False
         
-        print(f"✅ Admin API key found: {api_key[:20]}...")
+        print(f"✅ Admin API key found: {api_key[:8]}...{api_key[-4:] if len(api_key) > 12 else '****'}")
         print()
     except Exception as e:
         print(f"❌ FAILED: Error retrieving API key: {e}")
@@ -54,7 +54,7 @@ async def test_admin_api():
     print("Step 2: Checking API key format...")
     if not api_key.startswith("sk-ant-admin"):
         print(f"⚠️  WARNING: API key does not start with 'sk-ant-admin'")
-        print(f"   Current prefix: {api_key[:15]}...")
+        print(f"   Current prefix: {api_key[:8]}...")
         print("   Make sure you're using an Admin API key, not a regular API key.")
         print()
     else:
