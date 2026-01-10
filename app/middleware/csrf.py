@@ -3,11 +3,21 @@ CSRF Protection Middleware
 
 Implements the Double-Submit Cookie pattern for CSRF protection:
 1. Generate a random CSRF token
-2. Store token in an HttpOnly cookie
+2. Store token in a cookie (readable by JavaScript)
 3. Require token in request header for mutating requests
 4. Validate token matches cookie value
 
-This is more robust than Origin/Referer header validation alone.
+SECURITY TRADE-OFF (httponly=False):
+The CSRF cookie has httponly=False so that JavaScript can read the token
+and include it in the X-CSRF-Token header. This means:
+- If an XSS vulnerability exists, attackers could steal the CSRF token
+- STRICT XSS PREVENTION IS CRITICAL (escapeHtml, CSP, input sanitization)
+- Consider synchronized token pattern (server-side storage) for higher security
+
+Defense in depth:
+- CSRF token validation (primary defense)
+- Origin/Referer header validation (secondary defense, enforced when header present)
+- SameSite=Lax cookie attribute (browser-level protection)
 
 Issue: #204
 """
@@ -32,7 +42,7 @@ CSRF_TOKEN_LENGTH = 32  # 256 bits
 # Routes that don't require CSRF protection (GET, HEAD, OPTIONS are safe)
 SAFE_METHODS = {"GET", "HEAD", "OPTIONS", "TRACE"}
 
-# Paths that are exempt from CSRF (e.g., OAuth callbacks, webhooks)
+# Paths that are exempt from CSRF (e.g., OAuth callbacks, webhooks, static files)
 CSRF_EXEMPT_PATHS = {
     "/api/auth/callback",
     "/api/auth/google/callback",
@@ -41,6 +51,8 @@ CSRF_EXEMPT_PATHS = {
     "/api/docs",
     "/api/redoc",
     "/api/openapi.json",
+    "/static/",  # Static files don't need CSRF protection
+    "/favicon.ico",
 }
 
 # Load allowed origins from environment for CSRF validation
@@ -68,23 +80,32 @@ def is_path_exempt(path: str) -> bool:
     return False
 
 
-def validate_origin(request: Request) -> bool:
-    """Validate Origin/Referer header as additional security layer."""
+def validate_origin(request: Request) -> tuple[bool, bool]:
+    """
+    Validate Origin/Referer header as additional security layer.
+
+    Returns:
+        tuple[bool, bool]: (header_present, is_valid)
+        - header_present: True if Origin or Referer header was found
+        - is_valid: True if the header value is in ALLOWED_ORIGINS
+    """
     origin = request.headers.get("origin")
     referer = request.headers.get("referer")
-    
+
     # Check Origin header
     if origin:
-        return any(origin.startswith(allowed) for allowed in ALLOWED_ORIGINS)
-    
+        is_valid = any(origin.startswith(allowed) for allowed in ALLOWED_ORIGINS)
+        return (True, is_valid)
+
     # Fall back to Referer
     if referer:
         parsed = urlparse(referer)
         referer_origin = f"{parsed.scheme}://{parsed.netloc}"
-        return any(referer_origin.startswith(allowed) for allowed in ALLOWED_ORIGINS)
-    
-    # For same-origin requests without headers (some browsers)
-    return False
+        is_valid = any(referer_origin.startswith(allowed) for allowed in ALLOWED_ORIGINS)
+        return (True, is_valid)
+
+    # No Origin or Referer header present
+    return (False, False)
 
 
 class CSRFMiddleware(BaseHTTPMiddleware):
@@ -155,11 +176,19 @@ class CSRFMiddleware(BaseHTTPMiddleware):
                 content={"detail": "CSRF token validation failed."}
             )
         
-        # Additional Origin/Referer validation
-        if not validate_origin(request):
-            # Log but don't block - Origin header may not always be present
-            logger.debug(f"CSRF: Origin validation skipped for {request.method} {path}")
-        
+        # Additional Origin/Referer validation (enforce when header is present)
+        header_present, origin_valid = validate_origin(request)
+        if header_present and not origin_valid:
+            # Origin/Referer header present but invalid - BLOCK request
+            logger.warning(f"CSRF: Origin validation failed for {request.method} {path}")
+            return JSONResponse(
+                status_code=403,
+                content={"detail": "Origin validation failed."}
+            )
+        elif not header_present:
+            # No Origin/Referer header - allow but log (some browsers/proxies strip these)
+            logger.debug(f"CSRF: No Origin/Referer header for {request.method} {path}")
+
         # Token is valid, proceed
         return await call_next(request)
 

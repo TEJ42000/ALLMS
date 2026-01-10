@@ -250,6 +250,12 @@ class GamificationUI {
      * Show XP notification (CSP-safe, Issue #179)
      */
     showXPNotification(xpAwarded, newTotal) {
+        // Remove existing XP notification if any (prevent race condition/overlap)
+        const existing = document.querySelector('.xp-notification');
+        if (existing) {
+            existing.remove();
+        }
+
         // Create notification element using CSS classes
         const notification = document.createElement('div');
         notification.className = 'xp-notification';
@@ -322,6 +328,12 @@ class GamificationUI {
      * Show streak milestone notification (CSP-safe, Issue #179)
      */
     showStreakMilestoneNotification(streakCount) {
+        // Remove existing notification if any (prevent race condition/overlap)
+        const existing = document.querySelector('.streak-milestone-notification');
+        if (existing) {
+            existing.remove();
+        }
+
         const notification = document.createElement('div');
         notification.className = 'streak-milestone-notification';
 
@@ -341,6 +353,12 @@ class GamificationUI {
      * Show freeze used notification (CSP-safe, Issue #179)
      */
     showFreezeUsedNotification(streakCount) {
+        // Remove existing notification if any (prevent race condition/overlap)
+        const existing = document.querySelector('.freeze-used-notification');
+        if (existing) {
+            existing.remove();
+        }
+
         const notification = document.createElement('div');
         notification.className = 'freeze-used-notification';
 
