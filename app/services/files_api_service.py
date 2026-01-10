@@ -54,34 +54,40 @@ SENTENCE_BOUNDARY_THRESHOLD = 0.9  # Prefer sentence boundaries in last 10% of t
 # These patterns detect common prompt injection attempts while avoiding false positives
 # for legitimate legal education content (e.g., "act as a judge" is valid legal topic)
 # Patterns are tightened to require AI-specific context words to avoid blocking legal topics
+# Word boundaries (\b) prevent false positives on partial word matches (e.g., "signore" != "ignore")
 PROMPT_INJECTION_PATTERNS = [
     # Instruction override attempts - target AI/system instructions specifically
     # Requires context words like "instructions", "prompts", "rules", "commands"
-    re.compile(r'ignore\s+(previous|all|above|prior|earlier)\s+(instructions?|prompts?|rules?|commands?)', re.IGNORECASE),
-    re.compile(r'disregard\s+(previous|all|above|prior|earlier)\s+(instructions?|prompts?|rules?|commands?)', re.IGNORECASE),
-    re.compile(r'forget\s+(previous|all|above|prior|earlier)\s+(instructions?|prompts?|rules?|commands?)', re.IGNORECASE),
-    re.compile(r'override\s+(previous|all|above|prior)\s+(instructions?|prompts?|rules?|commands?)', re.IGNORECASE),
+    # Word boundaries prevent matching partial words (e.g., "signore" won't match "ignore")
+    re.compile(r'\bignore\s+(previous|all|above|prior|earlier)\s+(instructions?|prompts?|rules?|commands?)\b', re.IGNORECASE),
+    re.compile(r'\bdisregard\s+(previous|all|above|prior|earlier)\s+(instructions?|prompts?|rules?|commands?)\b', re.IGNORECASE),
+    re.compile(r'\bforget\s+(previous|all|above|prior|earlier)\s+(instructions?|prompts?|rules?|commands?)\b', re.IGNORECASE),
+    re.compile(r'\boverride\s+(previous|all|above|prior)\s+(instructions?|prompts?|rules?|commands?)\b', re.IGNORECASE),
 
     # System manipulation attempts - specific to AI system
     # Tightened: requires "AI", "assistant", or "model" before "system" to avoid legal topics
     # Allows: "legal system instruction", "justice system message"
     # Blocks: "AI system prompt", "ignore system instruction"
-    re.compile(r'(ai|assistant|model|chatbot)\s+system\s+(prompt|message|instruction)', re.IGNORECASE),
-    re.compile(r'(ignore|bypass|override)\s+(the\s+)?system\s+(prompt|instruction|rules?)', re.IGNORECASE),
-    re.compile(r'new\s+(instructions?|prompt)\s+(for\s+)?(you|the\s+system|the\s+ai)', re.IGNORECASE),
+    re.compile(r'\b(ai|assistant|model|chatbot)\s+system\s+(prompt|message|instruction)\b', re.IGNORECASE),
+    re.compile(r'\b(ignore|bypass|override)\s+(the\s+)?system\s+(prompt|instruction|rules?)\b', re.IGNORECASE),
+    re.compile(r'\bnew\s+(instructions?|prompt)\s+(for\s+)?(you|the\s+system|the\s+ai)\b', re.IGNORECASE),
 
     # Role manipulation attempts - target AI role changes, not legal roles
-    # Requires AI-specific roles: unrestricted, jailbroken, developer, admin, root, DAN
-    re.compile(r'you\s+are\s+now\s+(an?\s+)?(unrestricted|jailbroken|developer|admin|root)', re.IGNORECASE),
-    re.compile(r'act\s+as\s+(an?\s+)?(unrestricted|jailbroken|developer|admin|root|dan)', re.IGNORECASE),
-    re.compile(r'pretend\s+(to\s+be|you\s+are)\s+(an?\s+)?(unrestricted|jailbroken|developer|admin)', re.IGNORECASE),
+    # Requires AI-specific roles: unrestricted, jailbroken, developer, admin, DAN
+    # Note: 'root' only blocks when followed by technical terms (user/access/privileges/admin)
+    # to allow legal terms like "root cause analysis" and "root of title"
+    re.compile(r'\byou\s+are\s+now\s+(an?\s+)?(unrestricted|jailbroken|developer|admin)\b', re.IGNORECASE),
+    re.compile(r'\byou\s+are\s+now\s+(an?\s+)?root\s+(user|access|privileges?|admin)\b', re.IGNORECASE),
+    re.compile(r'\bact\s+as\s+(an?\s+)?(unrestricted|jailbroken|developer|admin|dan)\b', re.IGNORECASE),
+    re.compile(r'\bact\s+as\s+(an?\s+)?root\s+(user|access|privileges?|admin)\b', re.IGNORECASE),
+    re.compile(r'\bpretend\s+(to\s+be|you\s+are)\s+(an?\s+)?(unrestricted|jailbroken|developer|admin)\b', re.IGNORECASE),
 
     # Direct command attempts targeting AI behavior
     # Requires "code", "command", or "script" to avoid blocking legal topics
-    re.compile(r'(^|\s)(execute|run|perform)\s+(this|the|following)\s+(code|command|script)', re.IGNORECASE),
+    re.compile(r'(^|\s)(execute|run|perform)\s+(this|the|following)\s+(code|command|script)\b', re.IGNORECASE),
 
     # Explicit jailbreak attempts
-    re.compile(r'(jailbreak|dan\s+mode|developer\s+mode|god\s+mode)', re.IGNORECASE),
+    re.compile(r'\b(jailbreak|dan\s+mode|developer\s+mode|god\s+mode)\b', re.IGNORECASE),
 ]
 
 
