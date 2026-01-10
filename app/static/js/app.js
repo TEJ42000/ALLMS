@@ -2254,7 +2254,7 @@ async function estimateStudyGuideTokens() {
             url += `?weeks=${weekSelect.value}`;
         }
 
-        const response = await fetch(url, { method: 'POST' });
+        const response = await secureFetch(url, { method: 'POST' });
 
         if (!response.ok) {
             throw new Error(`API error: ${response.status}`);
@@ -2340,7 +2340,7 @@ async function loadSavedStudyGuides() {
     }
 
     try {
-        const response = await fetch(`${API_BASE}/api/study-guides/courses/${COURSE_ID}`);
+        const response = await secureFetch(`${API_BASE}/api/study-guides/courses/${COURSE_ID}`);
         if (!response.ok) throw new Error('Failed to load study guides');
 
         const data = await response.json();
@@ -2385,7 +2385,7 @@ async function loadStudyGuide(guideId) {
     showLoading();
 
     try {
-        const response = await fetch(`${API_BASE}/api/study-guides/courses/${COURSE_ID}/${guideId}`);
+        const response = await secureFetch(`${API_BASE}/api/study-guides/courses/${COURSE_ID}/${guideId}`);
         if (!response.ok) throw new Error('Failed to load study guide');
 
         const guide = await response.json();
@@ -2428,8 +2428,8 @@ async function generateStudyGuide() {
             requestBody.weeks = [parseInt(weekSelect.value, 10)];
         }
 
-        // Use new persistence API
-        const response = await fetch(`${API_BASE}/api/study-guides/courses/${COURSE_ID}`, {
+        // Use new persistence API with CSRF token
+        const response = await secureFetch(`${API_BASE}/api/study-guides/courses/${COURSE_ID}`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(requestBody)
@@ -2495,7 +2495,7 @@ async function deleteStudyGuide(guideId, guideTitle) {
     showLoading();
 
     try {
-        const response = await fetch(`${API_BASE}/api/study-guides/courses/${COURSE_ID}/${guideId}`, {
+        const response = await secureFetch(`${API_BASE}/api/study-guides/courses/${COURSE_ID}/${guideId}`, {
             method: 'DELETE'
         });
 
