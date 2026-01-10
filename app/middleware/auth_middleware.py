@@ -32,6 +32,7 @@ logger = logging.getLogger(__name__)
 # Public paths that don't require authentication
 # Uses exact match or prefix match for paths ending with *
 PUBLIC_PATHS: Set[str] = {
+    "/",  # Homepage - publicly accessible to meet Google OAuth verification requirements
     "/health",
     "/api/docs",
     "/api/redoc",

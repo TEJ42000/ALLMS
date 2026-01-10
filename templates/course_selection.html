@@ -27,8 +27,8 @@
                 {% if user %}
                     {% include "partials/user_header.html" %}
                 {% else %}
-                    <a href="/admin/courses" class="nav-link">Admin</a>
                     <a href="/api/docs" class="nav-link">API Docs</a>
+                    <a href="/auth/login" class="nav-link nav-link-primary">Sign In</a>
                 {% endif %}
             </div>
         </div>

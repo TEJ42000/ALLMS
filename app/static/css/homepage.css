@@ -130,6 +130,25 @@
     width: 100%;
 }
 
+.nav-link-primary {
+    background: var(--gold-primary);
+    color: var(--rich-black) !important;
+    padding: 0.5rem 1.25rem;
+    border-radius: 0.5rem;
+    font-weight: 600;
+}
+
+.nav-link-primary::after {
+    display: none;
+}
+
+.nav-link-primary:hover {
+    background: var(--gold-secondary);
+    color: var(--rich-black) !important;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(212, 175, 55, 0.3);
+}
+
 /* ========== Hero Section ========== */
 .hero-section {
     padding: var(--spacing-xl) var(--spacing-md);
