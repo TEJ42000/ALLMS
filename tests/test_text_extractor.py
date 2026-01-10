@@ -22,6 +22,7 @@ from app.services.text_extractor import (
     extract_from_text,
     extract_from_html,
     extract_from_json,
+    extract_from_pdf,  # FIX #259: Import for direct PDF testing
     get_file_extension,
     ExtractionResult,
 )
@@ -290,25 +291,35 @@ class TestIntegrationWithRealFiles:
         assert result.success is True
         assert len(result.text) > 0
 
-    @pytest.mark.skip(reason="Flaky test - depends on local PDF file not available in CI. See GitHub issue for re-enabling.")
-    def test_extract_real_pdf_file(self, materials_path):
-        """Test extraction from a real PDF file."""
+    def test_extract_real_pdf_file(self):
+        """Test extraction from a real PDF file.
+
+        FIX #259: Uses a committed test fixture instead of local Materials files.
+        This test uses extract_from_pdf directly to avoid path validation issues
+        when testing fixtures outside the Materials folder.
+        """
         # Check if PyMuPDF is installed
         try:
             import fitz
         except ImportError:
             pytest.skip("PyMuPDF (fitz) not installed - required for PDF extraction")
 
-        pdf_file = materials_path / "Syllabus" / "LLS" / "LLS Sylabus.pdf"
+        # FIX #259: Use committed test fixture
+        pdf_file = Path(__file__).parent / "fixtures" / "sample.pdf"
         if not pdf_file.exists():
-            pytest.skip("LLS Sylabus.pdf not found")
+            pytest.fail(f"Test fixture not found: {pdf_file}")
 
-        result = extract_text(pdf_file)
+        # FIX #259: Use extract_from_pdf directly to bypass file type detection
+        # which involves path validation for slide_archive detection
+        result = extract_from_pdf(pdf_file)
 
         assert result.success is True
         assert result.file_type == "pdf"
         assert len(result.text) > 0
         assert result.pages is not None
+        # FIX #259: Verify expected content from fixture
+        assert "Test PDF Document" in result.text
+        assert "Legal Studies" in result.text
 
     @pytest.mark.skip(reason="Depends on local Materials files not available in CI.")
     def test_extract_slide_archive(self, materials_path):

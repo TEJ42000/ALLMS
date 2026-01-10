@@ -127,6 +127,10 @@ class FlashcardViewer {
         // CRITICAL FIX: Prevent touch gesture race conditions
         this.isSwiping = false;
 
+        // MEDIUM FIX (#170): Store timeout IDs for proper cleanup
+        this.swipeLockTimeout = null;
+        this.navigationLockTimeout = null;
+
         // HIGH FIX: beforeUnloadHandler is now set up only when needed (when user has progress)
         this.beforeUnloadHandler = null;
 
@@ -624,7 +628,7 @@ class FlashcardViewer {
     /**
      * Handle swipe gesture
      * CRITICAL FIX: Prevent race conditions with swipe lock
-     * MEDIUM FIX: Use constant instead of magic number
+     * MEDIUM FIX (#170): Store timeout ID for proper cleanup
      */
     handleSwipe() {
         // CRITICAL FIX: Prevent overlapping swipes
@@ -646,9 +650,16 @@ class FlashcardViewer {
                 this.previousCard();
             }
 
+            // MEDIUM FIX (#170): Clear existing timeout before setting new one
+            if (this.swipeLockTimeout) {
+                clearTimeout(this.swipeLockTimeout);
+            }
+
             // Release lock after navigation completes
-            setTimeout(() => {
+            // MEDIUM FIX (#170): Store timeout ID for cleanup
+            this.swipeLockTimeout = setTimeout(() => {
                 this.isSwiping = false;
+                this.swipeLockTimeout = null;
             }, FLASHCARD_CONSTANTS.NAVIGATION_LOCK_MS);
         }
     }
@@ -676,6 +687,7 @@ class FlashcardViewer {
      * Navigate to previous card
      * CRITICAL FIX: Remove old listeners before adding new ones
      * HIGH FIX: Prevent race conditions with navigation lock
+     * MEDIUM FIX (#170): Store timeout ID for proper cleanup
      */
     previousCard() {
         // HIGH FIX: Prevent race condition from rapid key presses
@@ -697,10 +709,16 @@ class FlashcardViewer {
             this.render();
             this.setupEventListeners();
 
+            // MEDIUM FIX (#170): Clear existing timeout before setting new one
+            if (this.navigationLockTimeout) {
+                clearTimeout(this.navigationLockTimeout);
+            }
+
             // Release lock after render completes
-            // MEDIUM FIX: Use constant instead of magic number
-            setTimeout(() => {
+            // MEDIUM FIX (#170): Store timeout ID for cleanup
+            this.navigationLockTimeout = setTimeout(() => {
                 this.isNavigating = false;
+                this.navigationLockTimeout = null;
             }, FLASHCARD_CONSTANTS.NAVIGATION_LOCK_MS);
         }
     }
@@ -709,6 +727,7 @@ class FlashcardViewer {
      * Navigate to next card
      * CRITICAL FIX: Remove old listeners before adding new ones
      * HIGH FIX: Prevent race conditions with navigation lock
+     * MEDIUM FIX (#170): Store timeout ID for proper cleanup
      */
     nextCard() {
         // HIGH FIX: Prevent race condition from rapid key presses
@@ -730,10 +749,16 @@ class FlashcardViewer {
             this.render();
             this.setupEventListeners();
 
+            // MEDIUM FIX (#170): Clear existing timeout before setting new one
+            if (this.navigationLockTimeout) {
+                clearTimeout(this.navigationLockTimeout);
+            }
+
             // Release lock after render completes
-            // MEDIUM FIX: Use constant instead of magic number
-            setTimeout(() => {
+            // MEDIUM FIX (#170): Store timeout ID for cleanup
+            this.navigationLockTimeout = setTimeout(() => {
                 this.isNavigating = false;
+                this.navigationLockTimeout = null;
             }, FLASHCARD_CONSTANTS.NAVIGATION_LOCK_MS);
         } else {
             // Completed all cards
@@ -1161,8 +1186,9 @@ class FlashcardViewer {
 
     /**
      * Review only starred cards
-     * HIGH FIX: Don't lose original flashcards - store them for restoration
-     * HIGH FIX: Validate starred indices to prevent corruption
+     * HIGH FIX (#168): Don't lose original flashcards - store them for restoration
+     * HIGH FIX (#168): Validate starred indices to prevent corruption
+     * HIGH FIX (#168): Add defensive check for originalFlashcards
      */
     reviewStarredCards() {
         // CRITICAL FIX: Replace alert() with showError()
@@ -1171,7 +1197,7 @@ class FlashcardViewer {
             return;
         }
 
-        // HIGH FIX: Store original flashcards if not already stored
+        // HIGH FIX (#168): Store original flashcards if not already stored
         if (!this.isFilteredView) {
             this.originalFlashcards = [...this.flashcards];
             this.originalReviewedCards = new Set(this.reviewedCards);
@@ -1179,10 +1205,20 @@ class FlashcardViewer {
             this.originalStarredCards = new Set(this.starredCards);
         }
 
-        // HIGH FIX: Filter to only starred cards with index validation
+        // HIGH FIX (#168): Defensive check for originalFlashcards
+        if (!this.originalFlashcards || !Array.isArray(this.originalFlashcards)) {
+            console.error('[FlashcardViewer] originalFlashcards is not properly initialized');
+            this.showError('Unable to review starred cards. Please try again.');
+            return;
+        }
+
+        // HIGH FIX (#168): Filter to only starred cards with index validation
         const starredIndices = Array.from(this.starredCards);
         const validIndices = starredIndices.filter(index => {
-            return index >= 0 && index < this.originalFlashcards.length;
+            // HIGH FIX (#168): Validate index type and bounds
+            return typeof index === 'number' &&
+                   index >= 0 &&
+                   index < this.originalFlashcards.length;
         });
 
         // CRITICAL FIX: Replace alert() with showError()
@@ -1209,9 +1245,13 @@ class FlashcardViewer {
      * Restore full deck from filtered view
      * HIGH FIX: Allow users to return to full deck
      * CRITICAL FIX: Remove old listeners before re-rendering
+     * HIGH FIX (#168): Add defensive check for originalFlashcards
      */
     restoreFullDeck() {
-        if (!this.isFilteredView || !this.originalFlashcards) {
+        // HIGH FIX (#168): Enhanced defensive check for originalFlashcards
+        if (!this.isFilteredView ||
+            !this.originalFlashcards ||
+            !Array.isArray(this.originalFlashcards)) {
             return;
         }
 
@@ -1579,6 +1619,7 @@ class FlashcardViewer {
     /**
      * Cleanup all resources including beforeunload handler
      * CRITICAL FIX: Full cleanup when destroying viewer
+     * MEDIUM FIX (#170): Clear all timeouts properly
      */
     cleanup() {
         console.log('[FlashcardViewer] Cleaning up all resources...');
@@ -1596,6 +1637,18 @@ class FlashcardViewer {
         if (this.autoAdvanceTimeout) {
             clearTimeout(this.autoAdvanceTimeout);
             this.autoAdvanceTimeout = null;
+        }
+
+        // MEDIUM FIX (#170): Clear swipe lock timeout
+        if (this.swipeLockTimeout) {
+            clearTimeout(this.swipeLockTimeout);
+            this.swipeLockTimeout = null;
+        }
+
+        // MEDIUM FIX (#170): Clear navigation lock timeout
+        if (this.navigationLockTimeout) {
+            clearTimeout(this.navigationLockTimeout);
+            this.navigationLockTimeout = null;
         }
 
         // PHASE 2: Clear all references to prevent memory leaks
