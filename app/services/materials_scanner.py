@@ -10,12 +10,37 @@ import re
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from anthropic import Anthropic
+from anthropic import AsyncAnthropic
 from pydantic import BaseModel
 
 from app.services.gcp_service import get_anthropic_api_key
+from app.services.usage_tracking_service import get_usage_tracking_service
 
 logger = logging.getLogger(__name__)
+
+
+async def _track_system_usage(
+    response,
+    model: str,
+    operation_type: str,
+) -> None:
+    """Track usage for system operations (no user context)."""
+    try:
+        usage = response.usage
+        await get_usage_tracking_service().record_usage(
+            user_email="system@internal",
+            user_id="system",
+            model=model,
+            operation_type=operation_type,
+            input_tokens=getattr(usage, 'input_tokens', 0) or 0,
+            output_tokens=getattr(usage, 'output_tokens', 0) or 0,
+            cache_creation_tokens=getattr(usage, 'cache_creation_input_tokens', 0) or 0,
+            cache_read_tokens=getattr(usage, 'cache_read_input_tokens', 0) or 0,
+            course_id=None,
+            request_metadata={"source": "materials_scanner"},
+        )
+    except Exception as e:
+        logger.warning("Failed to track system usage: %s", e)
 
 # Base path for materials
 MATERIALS_BASE = Path("Materials/Course_Materials")
@@ -180,7 +205,7 @@ async def enhance_titles_with_ai(materials: List[ScannedMaterial]) -> List[Scann
         return materials
 
     try:
-        client = Anthropic(api_key=get_anthropic_api_key())
+        client = AsyncAnthropic(api_key=get_anthropic_api_key())
 
         # Build prompt with all filenames
         filenames = [m.filename for m in materials]
@@ -201,10 +226,17 @@ Respond with ONLY numbered titles, one per line:
 2. [title for second file]
 ..."""
 
-        response = client.messages.create(
+        response = await client.messages.create(
             model="claude-sonnet-4-20250514",
             max_tokens=1000,
             messages=[{"role": "user", "content": prompt}]
+        )
+
+        # Track system usage
+        await _track_system_usage(
+            response=response,
+            model="claude-sonnet-4-20250514",
+            operation_type="title_enhancement",
         )
 
         # Parse response
