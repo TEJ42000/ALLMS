@@ -294,8 +294,9 @@ async def get_usage_summary(
         return summary
 
     except Exception as e:
-        logger.error("Error getting usage summary: %s", e)
-        raise HTTPException(500, detail=str(e)) from e
+        # SECURITY: Don't expose internal error details to client
+        logger.error("Error getting usage summary: %s", e, exc_info=True)
+        raise HTTPException(500, detail="Failed to retrieve usage summary. Please try again later.") from e
 
 
 @router.get("/users/{email}", response_model=UserUsageSummary)
@@ -331,8 +332,9 @@ async def get_user_usage(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("Error getting user usage: %s", e)
-        raise HTTPException(500, detail=str(e)) from e
+        # SECURITY: Don't expose internal error details to client
+        logger.error("Error getting user usage: %s", e, exc_info=True)
+        raise HTTPException(500, detail="Failed to retrieve user usage. Please try again later.") from e
 
 
 @router.get("/records")
@@ -363,8 +365,9 @@ async def list_usage_records(
         }
 
     except Exception as e:
-        logger.error("Error listing usage records: %s", e)
-        raise HTTPException(500, detail=str(e)) from e
+        # SECURITY: Don't expose internal error details to client
+        logger.error("Error listing usage records: %s", e, exc_info=True)
+        raise HTTPException(500, detail="Failed to list usage records. Please try again later.") from e
 
 
 @router.delete("/users/{email}")
@@ -498,8 +501,9 @@ async def export_usage_csv(
         )
 
     except Exception as e:
-        logger.error("Error exporting usage: %s", e)
-        raise HTTPException(500, detail=str(e)) from e
+        # SECURITY: Don't expose internal error details to client
+        logger.error("Error exporting usage: %s", e, exc_info=True)
+        raise HTTPException(500, detail="Failed to export usage data. Please try again later.") from e
 
 
 # ============================================================================
@@ -559,8 +563,9 @@ async def get_dashboard_kpis(
         )
 
     except Exception as e:
-        logger.error("Error getting dashboard KPIs: %s", e)
-        raise HTTPException(500, detail=str(e)) from e
+        # SECURITY: Don't expose internal error details to client
+        logger.error("Error getting dashboard KPIs: %s", e, exc_info=True)
+        raise HTTPException(500, detail="Failed to retrieve dashboard KPIs. Please try again later.") from e
 
 
 @router.get("/timeseries", response_model=TimeSeriesResponse)
@@ -634,8 +639,9 @@ async def get_usage_timeseries(
     except ValueError as e:
         raise HTTPException(400, detail=f"Invalid date format: {e}") from e
     except Exception as e:
-        logger.error("Error getting time series: %s", e)
-        raise HTTPException(500, detail=str(e)) from e
+        # SECURITY: Don't expose internal error details to client
+        logger.error("Error getting time series: %s", e, exc_info=True)
+        raise HTTPException(500, detail="Failed to retrieve time series data. Please try again later.") from e
 
 
 @router.get("/token-breakdown", response_model=TokenBreakdownResponse)
@@ -720,8 +726,9 @@ async def get_token_breakdown_timeseries(
     except ValueError as e:
         raise HTTPException(400, detail=f"Invalid date format: {e}") from e
     except Exception as e:
-        logger.error("Error getting token breakdown: %s", e)
-        raise HTTPException(500, detail=str(e)) from e
+        # SECURITY: Don't expose internal error details to client
+        logger.error("Error getting token breakdown: %s", e, exc_info=True)
+        raise HTTPException(500, detail="Failed to retrieve token breakdown. Please try again later.") from e
 
 
 def _get_bucket_key(timestamp: datetime, granularity: GranularityEnum) -> str:
@@ -806,8 +813,9 @@ async def get_top_users(
         )
 
     except Exception as e:
-        logger.error("Error getting top users: %s", e)
-        raise HTTPException(500, detail=str(e)) from e
+        # SECURITY: Don't expose internal error details to client
+        logger.error("Error getting top users: %s", e, exc_info=True)
+        raise HTTPException(500, detail="Failed to retrieve top users. Please try again later.") from e
 
 
 @router.get("/breakdown", response_model=BreakdownResponse)
@@ -878,8 +886,9 @@ async def get_usage_breakdown(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("Error getting breakdown: %s", e)
-        raise HTTPException(500, detail=str(e)) from e
+        # SECURITY: Don't expose internal error details to client
+        logger.error("Error getting breakdown: %s", e, exc_info=True)
+        raise HTTPException(500, detail="Failed to retrieve usage breakdown. Please try again later.") from e
 
 
 @router.get("/cache-analytics", response_model=CacheAnalytics)
@@ -934,8 +943,9 @@ async def get_cache_analytics(
         )
 
     except Exception as e:
-        logger.error("Error getting cache analytics: %s", e)
-        raise HTTPException(500, detail=str(e)) from e
+        # SECURITY: Don't expose internal error details to client
+        logger.error("Error getting cache analytics: %s", e, exc_info=True)
+        raise HTTPException(500, detail="Failed to retrieve cache analytics. Please try again later.") from e
 
 
 # =============================================================================
@@ -1022,8 +1032,9 @@ async def get_anthropic_usage(
             detail="Anthropic Admin API not configured. Please add 'anthropic-admin-api-key' to Secret Manager."
         ) from e
     except Exception as e:
+        # SECURITY: Don't expose internal error details to client
         logger.error("Error fetching Anthropic usage: %s", e, exc_info=True)
-        raise HTTPException(500, detail=f"Error fetching Anthropic usage: {str(e)}") from e
+        raise HTTPException(500, detail="Failed to fetch Anthropic usage data. Please try again later.") from e
 
 
 @router.get(
@@ -1071,8 +1082,9 @@ async def get_anthropic_cost(
             detail="Anthropic Admin API not configured. Please add 'anthropic-admin-api-key' to Secret Manager."
         ) from e
     except Exception as e:
+        # SECURITY: Don't expose internal error details to client
         logger.error("Error fetching Anthropic cost: %s", e, exc_info=True)
-        raise HTTPException(500, detail=f"Error fetching Anthropic cost: {str(e)}") from e
+        raise HTTPException(500, detail="Failed to fetch Anthropic cost data. Please try again later.") from e
 
 
 @router.get(
@@ -1195,5 +1207,6 @@ async def get_reconciliation_report(
     except HTTPException:
         raise
     except Exception as e:
+        # SECURITY: Don't expose internal error details to client
         logger.error("Error generating reconciliation report: %s", e, exc_info=True)
-        raise HTTPException(500, detail=f"Error generating reconciliation report: {str(e)}") from e
+        raise HTTPException(500, detail="Failed to generate reconciliation report. Please try again later.") from e

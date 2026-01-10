@@ -592,8 +592,9 @@ async def health_check():
         }
 
     except Exception as e:
-        logger.error("Health check failed: %s", e)
+        # SECURITY: Don't expose internal error details to client
+        logger.error("Health check failed: %s", e, exc_info=True)
         return {
             "status": "unhealthy",
-            "error": str(e),
+            "error": "Service unavailable",
         }

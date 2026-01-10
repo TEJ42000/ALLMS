@@ -90,8 +90,9 @@ def get_user_stats(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error getting user stats: {e}")
-        raise HTTPException(500, detail=str(e)) from e
+        # SECURITY: Don't expose internal error details to client
+        logger.error(f"Error getting user stats: {e}", exc_info=True)
+        raise HTTPException(500, detail="Failed to retrieve user statistics. Please try again later.") from e
 
 
 # =============================================================================
@@ -129,8 +130,9 @@ def log_activity(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error logging activity: {e}")
-        raise HTTPException(500, detail=str(e)) from e
+        # SECURITY: Don't expose internal error details to client
+        logger.error(f"Error logging activity: {e}", exc_info=True)
+        raise HTTPException(500, detail="Failed to log activity. Please try again later.") from e
 
 
 @router.get("/activities")
@@ -197,8 +199,9 @@ def get_activities(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error getting activities: {e}")
-        raise HTTPException(500, detail=str(e)) from e
+        # SECURITY: Don't expose internal error details to client
+        logger.error(f"Error getting activities: {e}", exc_info=True)
+        raise HTTPException(500, detail="Failed to retrieve activities. Please try again later.") from e
 
 
 # =============================================================================
@@ -233,8 +236,9 @@ def start_session(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error starting session: {e}")
-        raise HTTPException(500, detail=str(e)) from e
+        # SECURITY: Don't expose internal error details to client
+        logger.error(f"Error starting session: {e}", exc_info=True)
+        raise HTTPException(500, detail="Failed to start session. Please try again later.") from e
 
 
 @router.post("/session/heartbeat")
@@ -266,8 +270,9 @@ def session_heartbeat(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error updating session: {e}")
-        raise HTTPException(500, detail=str(e)) from e
+        # SECURITY: Don't expose internal error details to client
+        logger.error(f"Error updating session: {e}", exc_info=True)
+        raise HTTPException(500, detail="Failed to update session. Please try again later.") from e
 
 
 @router.post("/session/end")
@@ -295,8 +300,9 @@ def end_session(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error ending session: {e}")
-        raise HTTPException(500, detail=str(e)) from e
+        # SECURITY: Don't expose internal error details to client
+        logger.error(f"Error ending session: {e}", exc_info=True)
+        raise HTTPException(500, detail="Failed to end session. Please try again later.") from e
 
 
 # =============================================================================
@@ -336,8 +342,9 @@ def get_xp_config(
         )
 
     except Exception as e:
-        logger.error(f"Error getting XP config: {e}")
-        raise HTTPException(500, detail=str(e)) from e
+        # SECURITY: Don't expose internal error details to client
+        logger.error(f"Error getting XP config: {e}", exc_info=True)
+        raise HTTPException(500, detail="Failed to retrieve XP configuration. Please try again later.") from e
 
 
 @router.patch("/config/xp")
@@ -427,8 +434,9 @@ def update_xp_config(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error updating XP config: {e}")
-        raise HTTPException(500, detail=str(e)) from e
+        # SECURITY: Don't expose internal error details to client
+        logger.error(f"Error updating XP config: {e}", exc_info=True)
+        raise HTTPException(500, detail="Failed to update XP configuration. Please try again later.") from e
 
 # =============================================================================
 # Badge Endpoints - REMOVED (Duplicate)
@@ -521,8 +529,9 @@ def get_streak_calendar(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error getting streak calendar: {e}")
-        raise HTTPException(500, detail=str(e)) from e
+        # SECURITY: Don't expose internal error details to client
+        logger.error(f"Error getting streak calendar: {e}", exc_info=True)
+        raise HTTPException(500, detail="Failed to retrieve streak calendar. Please try again later.") from e
 
 
 @router.get("/streak/consistency")
@@ -565,8 +574,9 @@ def get_weekly_consistency(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error getting weekly consistency: {e}")
-        raise HTTPException(500, detail=str(e)) from e
+        # SECURITY: Don't expose internal error details to client
+        logger.error(f"Error getting weekly consistency: {e}", exc_info=True)
+        raise HTTPException(500, detail="Failed to retrieve weekly consistency. Please try again later.") from e
 
 
 @router.post("/streak/maintenance")
@@ -675,8 +685,9 @@ def get_all_badges(
         }
 
     except Exception as e:
-        logger.error(f"Error getting badges: {e}")
-        raise HTTPException(500, detail=str(e)) from e
+        # SECURITY: Don't expose internal error details to client
+        logger.error(f"Error getting badges: {e}", exc_info=True)
+        raise HTTPException(500, detail="Failed to retrieve badges. Please try again later.") from e
 
 
 @router.get("/badges/earned")
@@ -700,8 +711,9 @@ def get_earned_badges(
         }
 
     except Exception as e:
-        logger.error(f"Error getting earned badges: {e}")
-        raise HTTPException(500, detail=str(e)) from e
+        # SECURITY: Don't expose internal error details to client
+        logger.error(f"Error getting earned badges: {e}", exc_info=True)
+        raise HTTPException(500, detail="Failed to retrieve earned badges. Please try again later.") from e
 
 
 @router.get("/badges/{badge_id}")
@@ -795,8 +807,9 @@ def get_badge_details(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error getting badge details: {e}")
-        raise HTTPException(500, detail=str(e)) from e
+        # SECURITY: Don't expose internal error details to client
+        logger.error(f"Error getting badge details: {e}", exc_info=True)
+        raise HTTPException(500, detail="Failed to retrieve badge details. Please try again later.") from e
 
 
 @router.get("/badges/progress")
@@ -832,8 +845,9 @@ def get_badge_progress(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error getting badge progress: {e}")
-        raise HTTPException(500, detail=str(e)) from e
+        # SECURITY: Don't expose internal error details to client
+        logger.error(f"Error getting badge progress: {e}", exc_info=True)
+        raise HTTPException(500, detail="Failed to retrieve badge progress. Please try again later.") from e
 
 
 @router.post("/badges/seed")
@@ -874,8 +888,9 @@ def seed_all_badges(
         }
 
     except Exception as e:
-        logger.error(f"Error seeding badges: {e}")
-        raise HTTPException(500, detail=str(e)) from e
+        # SECURITY: Don't expose internal error details to client
+        logger.error(f"Error seeding badges: {e}", exc_info=True)
+        raise HTTPException(500, detail="Failed to seed badges. Please try again later.") from e
 
 
 # =============================================================================

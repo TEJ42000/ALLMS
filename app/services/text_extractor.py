@@ -117,6 +117,8 @@ def extract_text(file_path: Path | str, *, _skip_path_validation: bool = False) 
                 error=f'Invalid path: {file_path}'
             )
     else:
+        # lgtm[py/path-injection] - This branch is only for testing (_skip_path_validation=True)
+        # Production code always validates paths through the if branch above
         validated_path = Path(file_path).resolve()
 
     if not validated_path.exists():
