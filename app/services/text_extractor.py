@@ -21,9 +21,10 @@ from dataclasses import dataclass, field
 
 from app.services.syllabus_parser import validate_path_within_base, MATERIALS_BASE
 
-logger = logging.getLogger(__name__)
+# Alias for backward compatibility - MATERIALS_ROOT is used by text_cache_service
+MATERIALS_ROOT = MATERIALS_BASE
 
-# Base path for materials (using validated MATERIALS_BASE from syllabus_parser)
+logger = logging.getLogger(__name__)
 
 
 @dataclass
