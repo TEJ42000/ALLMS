@@ -452,6 +452,9 @@ const PROMPT_INJECTION_PATTERNS = [
     // Requires AI-specific roles: unrestricted, jailbroken, developer, admin, DAN
     // Note: 'root' only blocks when followed by technical terms (user/access/privileges/admin)
     // to allow legal terms like "root cause analysis" and "root of title"
+    // Trade-off: Standalone "you are now root" is NOT blocked to allow legal phrases like
+    // "root cause". This is acceptable given Claude's system-level role protections and
+    // the high value of allowing legal education content.
     /\byou\s+are\s+now\s+(an?\s+)?(unrestricted|jailbroken|developer|admin)\b/i,
     /\byou\s+are\s+now\s+(an?\s+)?root\s+(user|access|privileges?|admin)\b/i,
     /\bact\s+as\s+(an?\s+)?(unrestricted|jailbroken|developer|admin|dan)\b/i,
