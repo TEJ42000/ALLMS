@@ -20,10 +20,11 @@ from typing import Dict, List, Optional, Tuple
 
 from pydantic import BaseModel
 
+from app.services.syllabus_parser import validate_path_within_base, MATERIALS_BASE
+
 logger = logging.getLogger(__name__)
 
-# Base path for materials
-MATERIALS_ROOT = Path("Materials")
+# Base path for materials (using validated MATERIALS_BASE from syllabus_parser)
 
 # Cache for extracted archives (in-memory for now)
 _archive_cache: Dict[str, "SlideArchiveData"] = {}
@@ -50,7 +51,14 @@ class SlideArchiveData(BaseModel):
 
 def is_slide_archive(file_path: Path) -> bool:
     """Check if a file is a slide archive (ZIP with manifest.json)."""
-    if not file_path.exists():
+    # Security: Validate path to prevent path traversal attacks (CWE-22/23/36)
+    try:
+        validated_path = validate_path_within_base(str(file_path), MATERIALS_BASE)
+    except ValueError as e:
+        logger.warning("Path validation failed for path=%s: %s", file_path, e)
+        return False
+    
+    if not validated_path.exists():
         return False
     
     try:

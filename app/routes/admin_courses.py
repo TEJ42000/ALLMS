@@ -48,6 +48,7 @@ from app.services.materials_scanner import (
     convert_to_materials_registry,
     ScanResult,
 )
+from app.services.syllabus_parser import validate_path_within_base
 from app.services.slide_archive import (
     get_file_type,
     extract_slide_archive,
@@ -137,26 +138,15 @@ def validate_materials_path(file_path: str, try_resolve: bool = True) -> pathlib
             detail="Invalid path: null bytes not allowed"
         )
 
-    # Build the path and resolve it
+    # Security: Validate path to prevent path traversal attacks (CWE-22/23/36)
+    # Use centralized validation function from syllabus_parser
     try:
-        # Use the already-resolved MATERIALS_BASE
-        full_path = (MATERIALS_BASE / file_path).resolve()
-    except (ValueError, OSError) as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid file path: {e}"
-        )
-
-    # Security: Ensure the resolved path is under MATERIALS_BASE
-    # Using is_relative_to() is the secure way to check this
-    try:
-        full_path.relative_to(MATERIALS_BASE)
-    except ValueError:
-        # Path is not under MATERIALS_BASE - potential path traversal
-        logger.warning("Path traversal attempt blocked: %s -> %s", file_path, full_path)
+        full_path = validate_path_within_base(file_path, MATERIALS_BASE)
+    except ValueError as e:
+        logger.warning("Path validation failed for path=%s: %s", file_path, e)
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied: path outside materials directory"
+            detail=f"Access denied: {e}"
         )
 
     # If file doesn't exist and try_resolve is True, attempt to resolve incomplete path

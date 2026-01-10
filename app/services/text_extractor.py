@@ -19,10 +19,11 @@ from pathlib import Path
 from typing import Optional, Dict, Any, List
 from dataclasses import dataclass, field
 
+from app.services.syllabus_parser import validate_path_within_base, MATERIALS_BASE
+
 logger = logging.getLogger(__name__)
 
-# Base path for materials
-MATERIALS_ROOT = Path("Materials")
+# Base path for materials (using validated MATERIALS_BASE from syllabus_parser)
 
 
 @dataclass
@@ -97,16 +98,29 @@ def extract_text(file_path: Path) -> ExtractionResult:
     Returns:
         ExtractionResult with extracted text and metadata
     """
-    if not file_path.exists():
+    # Security: Validate path to prevent path traversal attacks (CWE-22/23/36)
+    try:
+        validated_path = validate_path_within_base(str(file_path), MATERIALS_BASE)
+    except ValueError as e:
+        logger.warning("Path validation failed for path=%s: %s", file_path, e)
         return ExtractionResult(
             file_path=str(file_path),
             file_type='unknown',
             text='',
             success=False,
-            error=f'File not found: {file_path}'
+            error=f'Invalid path: {file_path}'
         )
 
-    file_type = detect_file_type(file_path)
+    if not validated_path.exists():
+        return ExtractionResult(
+            file_path=str(validated_path),
+            file_type='unknown',
+            text='',
+            success=False,
+            error=f'File not found: {validated_path}'
+        )
+
+    file_type = detect_file_type(validated_path)
 
     extractors = {
         'pdf': extract_from_pdf,
@@ -122,7 +136,7 @@ def extract_text(file_path: Path) -> ExtractionResult:
     extractor = extractors.get(file_type)
     if not extractor:
         return ExtractionResult(
-            file_path=str(file_path),
+            file_path=str(validated_path),
             file_type=file_type,
             text='',
             success=False,
@@ -130,11 +144,11 @@ def extract_text(file_path: Path) -> ExtractionResult:
         )
 
     try:
-        return extractor(file_path)
+        return extractor(validated_path)
     except Exception as e:
-        logger.error("Text extraction failed for %s: %s", file_path, e)
+        logger.error("Text extraction failed for %s: %s", validated_path, e)
         return ExtractionResult(
-            file_path=str(file_path),
+            file_path=str(validated_path),
             file_type=file_type,
             text='',
             success=False,
