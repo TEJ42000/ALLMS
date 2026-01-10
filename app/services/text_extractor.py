@@ -117,7 +117,16 @@ def extract_text(file_path: Path | str, *, _skip_path_validation: bool = False) 
                 error=f'Invalid path: {file_path}'
             )
     else:
-        # lgtm[py/path-injection] - _skip_path_validation is internal testing flag only
+        # SECURITY: Enforce that _skip_path_validation is only used in test environment
+        import os
+        if os.getenv('PYTEST_CURRENT_TEST') is None and os.getenv('TESTING') != 'true':
+            logger.error("SECURITY: _skip_path_validation used outside of test environment!")
+            raise RuntimeError(
+                "_skip_path_validation can only be used in pytest tests. "
+                "This flag bypasses critical security checks."
+            )
+        logger.debug("Path validation SKIPPED for testing: %s", file_path)
+        # lgtm[py/path-injection] - _skip_path_validation is internal testing flag only (enforced above)
         validated_path = Path(file_path).resolve()  # CodeQL: testing only, not exposed to users
 
     # lgtm[py/path-injection] - validated_path is sanitized above (or testing-only path)

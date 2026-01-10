@@ -607,12 +607,10 @@ def run_streak_maintenance(
         maintenance_service = get_streak_maintenance_service()
         result = maintenance_service.run_daily_maintenance()
 
-        logger.info(f"Streak maintenance run by {user.email}: {result}")
-
         # SECURITY: Don't expose internal error messages from maintenance service (CWE-209)
         if result.get("status") == "error":
             # Log detailed error server-side
-            logger.error(f"Maintenance service returned error: {result.get('message', 'Unknown')}")
+            logger.error(f"Maintenance service error for {user.email}: {result.get('message', 'Unknown')}")
             # Return sanitized result without internal error message
             return {
                 "status": "error",
@@ -620,6 +618,8 @@ def run_streak_maintenance(
                 "timestamp": result.get("timestamp")
             }
 
+        # Log success only after confirming no error
+        logger.info(f"Streak maintenance succeeded for {user.email}: {result}")
         return result
 
     except Exception as e:
