@@ -2726,31 +2726,38 @@ function setupWeekCardEventDelegation(weeksGrid) {
         const card = e.target.closest('.week-card');
         if (!card) return;
 
-        const weekNumber = card.dataset.week;
+        const weekNumber = parseInt(card.dataset.week, 10);
         const title = card.dataset.title;
 
-        // Navigate to AI Tutor with week context
-        const tutorTab = document.querySelector('.nav-tab[data-tab="tutor"]');
-        if (tutorTab) tutorTab.click();
+        // Open week study notes modal instead of auto-opening AI tutor
+        // User can click "Ask AI Tutor" button in the modal if they want AI assistance
+        if (window.weekContentManager) {
+            window.weekContentManager.openWeekStudyNotes(weekNumber, title);
+        } else {
+            console.warn('[WeekCards] WeekContentManager not available, falling back to AI tutor');
+            // Fallback: Navigate to AI Tutor with week context (old behavior)
+            const tutorTab = document.querySelector('.nav-tab[data-tab="tutor"]');
+            if (tutorTab) tutorTab.click();
 
-        // Set context to the week topic
-        const contextSelect = document.getElementById('context-select');
-        if (contextSelect && title) {
-            // Try to find matching option or use the title
-            const options = Array.from(contextSelect.options);
-            const match = options.find(opt =>
-                opt.value.toLowerCase().includes(title.toLowerCase()) ||
-                title.toLowerCase().includes(opt.value.toLowerCase())
-            );
-            if (match) {
-                contextSelect.value = match.value;
+            // Set context to the week topic
+            const contextSelect = document.getElementById('context-select');
+            if (contextSelect && title) {
+                // Try to find matching option or use the title
+                const options = Array.from(contextSelect.options);
+                const match = options.find(opt =>
+                    opt.value.toLowerCase().includes(title.toLowerCase()) ||
+                    title.toLowerCase().includes(opt.value.toLowerCase())
+                );
+                if (match) {
+                    contextSelect.value = match.value;
+                }
             }
-        }
 
-        // Pre-fill chat with week context
-        const chatInput = document.getElementById('chat-input');
-        if (chatInput) {
-            chatInput.placeholder = `Ask about Week ${weekNumber}: ${title}...`;
+            // Pre-fill chat with week context
+            const chatInput = document.getElementById('chat-input');
+            if (chatInput) {
+                chatInput.placeholder = `Ask about Week ${weekNumber}: ${title}...`;
+            }
         }
     });
 }
