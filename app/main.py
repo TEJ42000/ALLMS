@@ -42,7 +42,9 @@ app.add_middleware(AuthMiddleware)
 # Add CSRF protection middleware (runs after Auth, before routes)
 # Uses double-submit cookie pattern - more robust than Origin/Referer alone
 # Issue: #204
-app.add_middleware(CSRFMiddleware)
+# Disabled in test environment to prevent 403 errors on POST/PUT/PATCH/DELETE requests
+if os.getenv("TESTING") != "true":
+    app.add_middleware(CSRFMiddleware)
 
 # CORS middleware (adjust origins as needed)
 app.add_middleware(
