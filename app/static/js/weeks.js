@@ -11,6 +11,7 @@ class WeekContentManager {
         this.currentWeekTitle = '';
         this.courseId = window.COURSE_CONTEXT?.courseId || window.COURSE_ID || 'LLS-2025-2026';
         // Cache weeks data to avoid additional API calls when viewing week details
+        // Note: Cache persists for page session. Refresh page to reload updated course data.
         this.weeksData = {};
 
         this.init();
@@ -66,7 +67,8 @@ class WeekContentManager {
     cacheWeeksData(weeks) {
         this.weeksData = {};
         weeks.forEach(week => {
-            if (week.weekNumber) {
+            // Validate weekNumber is a positive integer before caching
+            if (week.weekNumber && Number.isInteger(week.weekNumber) && week.weekNumber > 0) {
                 this.weeksData[week.weekNumber] = week;
             }
         });
