@@ -2830,13 +2830,13 @@ function initFlashcardListeners() {
     if (categorySelect) categorySelect.addEventListener('change', filterFlashcards);
     if (loadBtn) loadBtn.addEventListener('click', loadFlashcards);
 
-    // Auto-generate flashcards on page load if course is selected
-    // We have materials for all courses, so this should work
+    // Show empty state on page load - don't auto-load flashcards
+    // User must click "Generate New Flashcards" button to create them
     console.log('[Flashcards] Initializing, COURSE_ID:', COURSE_ID);
 
     if (COURSE_ID) {
-        console.log('[Flashcards] Auto-loading flashcards for course:', COURSE_ID);
-        loadFlashcards();
+        console.log('[Flashcards] Course selected, showing empty state. User can click Generate button.');
+        showFlashcardEmptyState();
     } else {
         console.log('[Flashcards] No course selected, showing empty state');
         updateFlashcardDisplay(); // Shows empty state
@@ -2972,14 +2972,56 @@ function filterFlashcards() {
 }
 
 /**
+ * Show empty state for flashcards (no flashcards generated yet)
+ */
+function showFlashcardEmptyState() {
+    const questionEl = document.getElementById('flashcard-question');
+    const answerEl = document.getElementById('flashcard-answer');
+
+    if (questionEl) {
+        questionEl.innerHTML = `
+            <div style="text-align: center; padding: 20px;">
+                <div style="font-size: 48px; margin-bottom: 10px;">📚</div>
+                <div style="font-size: 18px; font-weight: 500; margin-bottom: 10px;">Ready to Create Flashcards</div>
+            </div>
+        `;
+    }
+    if (answerEl) {
+        answerEl.innerHTML = `
+            <div style="text-align: center; padding: 20px; color: #666;">
+                <p>Click "🔄 Generate New Flashcards" button below to create flashcards from your course materials.</p>
+                <p style="margin-top: 10px; font-size: 14px;">Flashcards help you memorize key concepts and terms.</p>
+            </div>
+        `;
+    }
+
+    flashcards = [];
+    updateFlashcardStats();
+}
+
+/**
  * Show loading state for flashcards
  */
 function showFlashcardLoading() {
     const questionEl = document.getElementById('flashcard-question');
     const answerEl = document.getElementById('flashcard-answer');
 
-    if (questionEl) questionEl.textContent = 'Loading flashcards from course materials...';
-    if (answerEl) answerEl.textContent = 'Please wait...';
+    if (questionEl) {
+        questionEl.innerHTML = `
+            <div style="text-align: center; padding: 20px;">
+                <div style="font-size: 48px; margin-bottom: 10px;">⏳</div>
+                <div style="font-size: 18px; font-weight: 500; margin-bottom: 10px;">Generating Flashcards...</div>
+            </div>
+        `;
+    }
+    if (answerEl) {
+        answerEl.innerHTML = `
+            <div style="text-align: center; padding: 20px; color: #666;">
+                <p>Please wait while we analyze your course materials and create flashcards.</p>
+                <p style="margin-top: 10px; font-size: 14px;">This may take a few moments...</p>
+            </div>
+        `;
+    }
 
     // Disable navigation buttons
     const buttons = ['flip-card-btn', 'prev-card-btn', 'next-card-btn', 'know-btn', 'study-btn'];

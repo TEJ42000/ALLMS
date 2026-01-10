@@ -451,7 +451,6 @@ class ActivityTracker {
         });
         document.dispatchEvent(event);
     }
-    }
 }
 
 // Initialize tracker when DOM is ready
