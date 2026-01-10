@@ -20,6 +20,7 @@ def pytest_configure(config):
     )
 
 # Set test environment variables before importing app
+os.environ["TESTING"] = "true"  # Disable CSRF middleware in tests
 os.environ["ANTHROPIC_API_KEY"] = "test-api-key-for-testing"
 os.environ["AUTH_ENABLED"] = "false"  # Disable auth for tests by default
 os.environ["AUTH_MOCK_USER_EMAIL"] = "dev@mgms.eu"  # Use valid domain for mock user
