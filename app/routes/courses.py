@@ -18,7 +18,6 @@ from app.models.auth_models import User
 from app.models.course_models import Course, CourseSummary
 from app.services.course_service import (
     get_course_service,
-    CourseNotFoundError,
     ServiceValidationError,
     FirestoreOperationError,
 )
@@ -130,11 +129,6 @@ async def get_course(
 
         logger.info("User %s retrieved course: %s", user.email, course_id)
         return course
-    except CourseNotFoundError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e)
-        )
     except (ServiceValidationError, ValueError) as e:
         logger.warning("Invalid course ID: %s - %s", course_id, e)
         raise HTTPException(
@@ -148,6 +142,7 @@ async def get_course(
             detail="Database temporarily unavailable. Please try again."
         )
     except HTTPException:
+        # Re-raise HTTPExceptions (raised above for 404 cases) without catching them
         raise
     except Exception as e:
         logger.error("Error getting course %s: %s", course_id, e)
