@@ -113,7 +113,8 @@ class TestCriminalLawSetup:
         assert week1['weekNumber'] == 1
         assert week1['part'] == 'A'
         assert week1['title'] == 'Foundations of Criminal Law'
-        assert 'Legality principle' in week1['topics']
+        # Use substring matching since topics have detailed names (e.g., 'Legality principle (nullum crimen...)')
+        assert any('Legality principle' in t for t in week1['topics'])
         assert len(week1['keyConcepts']) > 0
         assert len(week1['keyFrameworks']) > 0
         assert len(week1['examTips']) > 0
@@ -146,7 +147,8 @@ class TestCriminalLawSetup:
         assert week7['weekNumber'] == 7
         assert week7['part'] == 'B'
         assert week7['title'] == 'ECHR & Fair Trial Rights'
-        assert 'Engel criteria' in week7['topics']
+        # Use substring matching since topics have detailed names (e.g., 'Engel criteria (3-part test)')
+        assert any('Engel criteria' in t for t in week7['topics'])
         
         # Check all weeks have part B
         for week in weeks:

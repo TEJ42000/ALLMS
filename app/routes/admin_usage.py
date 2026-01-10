@@ -425,7 +425,10 @@ async def delete_user_records(
         )
 
         if not result["success"]:
-            raise HTTPException(500, detail=result.get("error", "Unknown error"))
+            # SECURITY: Log detailed error server-side, return generic message (CWE-209)
+            error_detail = result.get("error", "Unknown error")
+            logger.error("Delete user records failed: %s", error_detail)
+            raise HTTPException(500, detail="Failed to delete user records. Check server logs for details.")
 
         logger.warning(
             "User %s deleted %d records for %s (cost: $%.2f)",

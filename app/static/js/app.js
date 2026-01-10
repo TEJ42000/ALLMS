@@ -247,7 +247,28 @@ async function renderMermaidDiagrams(container) {
 
                 const diagramDiv = document.createElement('div');
                 diagramDiv.className = 'mermaid';
-                diagramDiv.innerHTML = svg;
+                // SECURITY: Use DOMParser for safe SVG insertion (CWE-79)
+                // Mermaid's render() returns sanitized SVG, but we use DOMParser
+                // to avoid innerHTML and satisfy CodeQL's XSS detection
+                const parser = new DOMParser();
+                const svgDoc = parser.parseFromString(svg, 'image/svg+xml');
+
+                // Check for parsing errors (DOMParser creates parsererror element on failure)
+                const parserError = svgDoc.querySelector('parsererror');
+                if (parserError) {
+                    console.warn('SVG parsing failed:', parserError.textContent);
+                    // Keep the original code block as fallback
+                    continue;
+                }
+
+                const svgElement = svgDoc.documentElement;
+                if (svgElement && svgElement.nodeName === 'svg') {
+                    diagramDiv.appendChild(document.importNode(svgElement, true));
+                } else {
+                    console.warn('Invalid SVG structure received from Mermaid');
+                    // Keep the original code block as fallback
+                    continue;
+                }
                 div.appendChild(diagramDiv);
 
                 pre.replaceWith(div);

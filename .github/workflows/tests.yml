@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main]
 
+# Security: Explicitly declare minimum required permissions (CWE-250)
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
