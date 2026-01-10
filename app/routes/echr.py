@@ -592,8 +592,9 @@ async def health_check():
         }
 
     except Exception as e:
-        logger.error("Health check failed: %s", e)
+        # SECURITY: Log full error server-side, return generic message to client (CWE-209)
+        logger.error("Health check failed: %s", e, exc_info=True)
         return {
             "status": "unhealthy",
-            "error": str(e),
+            "error": "Health check failed. Check server logs for details.",
         }
