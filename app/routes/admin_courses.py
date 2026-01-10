@@ -470,6 +470,103 @@ async def deactivate_course(course_id: str):
         )
 
 
+@router.delete("/{course_id}/permanent", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_course_permanently(
+    course_id: str,
+    delete_files: bool = Query(False, description="Also delete files from Materials folder")
+):
+    """
+    Permanently delete a course and all associated data.
+
+    ⚠️ **DESTRUCTIVE OPERATION** - This action cannot be undone!
+
+    This endpoint will:
+    1. Delete all weeks subcollection documents
+    2. Delete all materials subcollection documents
+    3. Delete all topics subcollection documents
+    4. Delete all legal skills subcollection documents
+    5. Delete the course document itself
+    6. Optionally delete files from Materials/{course_id}/ folder
+
+    **Parameters:**
+    - `course_id`: The unique course identifier
+    - `delete_files`: If true, also delete files from Materials folder (default: false)
+
+    **Returns:**
+    - 204 No Content on success
+    - 404 Not Found if course doesn't exist
+    - 500 Internal Server Error if deletion fails
+
+    **Security:**
+    - Admin only (enforced by middleware)
+    - Requires explicit confirmation in UI
+    """
+    import shutil
+    from pathlib import Path
+
+    try:
+        service = get_course_service()
+
+        # Get course info before deletion for logging
+        course = service.get_course(course_id, include_weeks=False)
+        if not course:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Course not found: {course_id}"
+            )
+
+        course_name = course.name
+
+        # Delete from Firestore
+        success = service.delete_course(course_id)
+
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Course not found: {course_id}"
+            )
+
+        # Optionally delete files from Materials folder
+        if delete_files:
+            materials_path = Path("Materials") / course_id
+            if materials_path.exists() and materials_path.is_dir():
+                try:
+                    shutil.rmtree(materials_path)
+                    logger.info("Deleted materials folder for course %s: %s", course_id, materials_path)
+                except Exception as e:
+                    logger.error("Failed to delete materials folder for %s: %s", course_id, e)
+                    # Don't fail the entire operation if file deletion fails
+                    # The Firestore data is already deleted
+
+        logger.info("Permanently deleted course %s (%s) by admin", course_id, course_name)
+        return None
+
+    except CourseNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Course not found: {course_id}"
+        )
+    except ServiceValidationError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except FirestoreOperationError as e:
+        logger.error("Firestore error deleting course %s: %s", course_id, e)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database temporarily unavailable. Please try again later."
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Error deleting course %s: %s", course_id, e)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete course: {str(e)}"
+        )
+
+
 # ============================================================================
 # Week Endpoints
 # ============================================================================

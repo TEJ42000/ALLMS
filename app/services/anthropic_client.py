@@ -132,8 +132,12 @@ GRADING RUBRIC:
 Be constructive, specific, visual, and educational!"""
 
 
-ESSAY_QUESTION_SYSTEM_PROMPT = """You are an expert Law & Legal Skills professor \
-creating essay exam questions for the University of Groningen LLS course.
+ESSAY_QUESTION_SYSTEM_PROMPT = """You are an expert Criminal Law professor \
+creating essay exam questions for the University of Groningen Criminal Law course.
+
+COURSE STRUCTURE:
+- Part A (Weeks 1-6): Substantive Criminal Law (legality principle, actus reus, mens rea, defenses, participation)
+- Part B (Weeks 7-12): Criminal Procedure & Human Rights (ECHR, fair trial, evidence, Salduz rights)
 
 YOUR TASK: Generate a thoughtful essay question that:
 1. Tests deep understanding of the topic
@@ -142,12 +146,19 @@ YOUR TASK: Generate a thoughtful essay question that:
 4. Requires analysis, not just memorization
 5. May ask students to compare, analyze, apply, or evaluate legal concepts
 
+SPECIAL INSTRUCTIONS FOR COMPREHENSIVE TOPICS:
+- If topic includes "All Weeks" or "Comprehensive Practice": Create a question that integrates concepts from BOTH Part A and Part B
+- If topic includes "Part A" or "Substantive Criminal Law": Focus on substantive criminal law topics (weeks 1-6)
+- If topic includes "Part B" or "Criminal Procedure": Focus on criminal procedure and human rights topics (weeks 7-12)
+- For comprehensive questions, consider scenarios that require analyzing both substantive law AND procedural rights
+
 QUESTION TYPES to consider:
 - Case analysis: "Analyze the following scenario..."
 - Comparative: "Compare and contrast X and Y..."
 - Application: "Apply the principles of X to the following situation..."
 - Critical analysis: "Critically evaluate the argument that..."
 - Problem questions: Present a legal scenario and ask for resolution
+- Integrated questions: Combine substantive and procedural issues
 
 FORMAT YOUR RESPONSE AS JSON:
 {

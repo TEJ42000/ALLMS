@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ title }} - LLS Admin</title>
     <link rel="icon" type="image/svg+xml" href="/static/images/favicon.svg">
-    <link rel="stylesheet" href="/static/css/styles.css">
-    <link rel="stylesheet" href="/static/css/admin.css">
+    <link rel="stylesheet" href="/static/css/styles.css?v=8">
+    <link rel="stylesheet" href="/static/css/admin.css?v=8">
 </head>
 <body>
     {% include "admin/partials/dev_mode_banner.html" %}
@@ -50,6 +50,7 @@
                 <div class="section-header">
                     <h2 class="section-title">📝 Course Details</h2>
                     <div class="header-actions">
+                        <button id="delete-course-detail-btn" class="btn btn-danger" style="margin-right: auto;">🗑️ Delete Course</button>
                         <button id="back-to-list-btn" class="btn btn-secondary">← Back to List</button>
                         <button id="save-course-btn" class="btn btn-primary">💾 Save Changes</button>
                     </div>
@@ -503,8 +504,8 @@
         // Pass course_id from server if editing specific course
         window.initialCourseId = "{{ course_id | default('') }}";
     </script>
-    <script src="/static/js/upload.js?v=7"></script>
-    <script src="/static/js/admin.js?v=7"></script>
+    <script src="/static/js/upload.js?v=8"></script>
+    <script src="/static/js/admin.js?v=8"></script>
 </body>
 </html>
 
