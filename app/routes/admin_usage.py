@@ -440,8 +440,8 @@ async def delete_user_records(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("Error deleting user records: %s", e)
-        raise HTTPException(500, detail=str(e)) from e
+        logger.error("Error deleting user records: %s", e, exc_info=True)
+        raise HTTPException(500, detail="An internal error occurred while deleting user records") from e
 
 
 @router.get("/export")
