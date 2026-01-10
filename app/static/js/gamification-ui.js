@@ -125,42 +125,28 @@ class GamificationUI {
      */
     addLevelProgressBar() {
         if (!this.stats) return;
-        
+
         const header = document.querySelector('.header-top');
         if (!header) return;
-        
-        // Create progress bar container
+
+        // Create progress bar container using CSS classes (Issue #179 - CSP compliance)
         const progressContainer = document.createElement('div');
         progressContainer.className = 'level-progress-container';
-        progressContainer.style.cssText = `
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            height: 4px;
-            background: rgba(255, 255, 255, 0.1);
-            overflow: hidden;
-        `;
-        
+
         // Calculate progress percentage
         const totalXPForLevel = this.stats.xp_to_next_level + (this.stats.total_xp % 100);
         const currentXPInLevel = this.stats.total_xp % 100;
         const progressPercent = (currentXPInLevel / totalXPForLevel) * 100;
-        
-        // Create progress bar
+
+        // Create progress bar - use CSS custom property for dynamic width
         const progressBar = document.createElement('div');
         progressBar.className = 'level-progress-bar';
-        progressBar.style.cssText = `
-            height: 100%;
-            width: ${progressPercent}%;
-            background: linear-gradient(90deg, #4CAF50, #8BC34A);
-            transition: width 0.5s ease;
-        `;
-        
+        progressBar.style.width = `${progressPercent}%`;  // width is CSP-safe
+
         progressContainer.appendChild(progressBar);
-        header.style.position = 'relative';
+        header.classList.add('header-with-progress');  // CSS handles position: relative
         header.appendChild(progressContainer);
-        
+
         this.levelProgressBar = progressBar;
     }
     
@@ -261,29 +247,16 @@ class GamificationUI {
     }
 
     /**
-     * Show XP notification
+     * Show XP notification (CSP-safe, Issue #179)
      */
     showXPNotification(xpAwarded, newTotal) {
-        // Create notification element
+        // Create notification element using CSS classes
         const notification = document.createElement('div');
         notification.className = 'xp-notification';
-        notification.style.cssText = `
-            position: fixed;
-            top: 80px;
-            right: 20px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 1rem 1.5rem;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-            z-index: 10000;
-            animation: slideInRight 0.3s ease, fadeOut 0.3s ease 2.7s;
-            font-weight: 600;
-        `;
 
         notification.innerHTML = `
-            <div style="font-size: 1.2em;">+${xpAwarded} XP</div>
-            <div style="font-size: 0.9em; opacity: 0.9;">Total: ${newTotal.toLocaleString()} XP</div>
+            <div class="xp-notification-amount">+${this.escapeHtml(xpAwarded)} XP</div>
+            <div class="xp-notification-total">Total: ${this.escapeHtml(newTotal.toLocaleString())} XP</div>
         `;
 
         document.body.appendChild(notification);
@@ -295,51 +268,38 @@ class GamificationUI {
     }
 
     /**
-     * Show level up animation
+     * Escape HTML to prevent XSS
+     */
+    escapeHtml(text) {
+        if (text === null || text === undefined) return '';
+        const div = document.createElement('div');
+        div.textContent = String(text);
+        return div.innerHTML;
+    }
+
+    /**
+     * Show level up animation (CSP-safe, Issue #179)
      */
     showLevelUpAnimation(newLevel, newLevelTitle) {
-        // Create overlay
+        // Create overlay using CSS classes
         const overlay = document.createElement('div');
         overlay.className = 'level-up-overlay';
-        overlay.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.8);
-            z-index: 10001;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            animation: fadeIn 0.3s ease;
-        `;
 
-        // Create level up card
+        // Create level up card using CSS classes
         const card = document.createElement('div');
         card.className = 'level-up-card';
-        card.style.cssText = `
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 3rem;
-            border-radius: 16px;
-            text-align: center;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-            animation: scaleIn 0.5s ease;
-            max-width: 400px;
-        `;
 
         card.innerHTML = `
-            <div style="font-size: 4em; margin-bottom: 1rem;">🎉</div>
-            <div style="font-size: 2em; font-weight: 700; margin-bottom: 0.5rem;">Level Up!</div>
-            <div style="font-size: 1.5em; margin-bottom: 0.5rem;">Level ${newLevel}</div>
-            <div style="font-size: 1.2em; opacity: 0.9;">${newLevelTitle}</div>
+            <div class="level-up-emoji">🎉</div>
+            <div class="level-up-title">Level Up!</div>
+            <div class="level-up-level">Level ${this.escapeHtml(newLevel)}</div>
+            <div class="level-up-level-title">${this.escapeHtml(newLevelTitle)}</div>
         `;
 
-        // Create continue button with event listener (CSP compliant)
+        // Create continue button with CSS class
         const continueBtn = document.createElement('button');
+        continueBtn.className = 'level-up-continue-btn';
         continueBtn.textContent = 'Continue';
-        continueBtn.style.cssText = 'margin-top: 2rem; padding: 0.75rem 2rem; background: white; color: #667eea; border: none; border-radius: 8px; font-size: 1em; font-weight: 600; cursor: pointer;';
         continueBtn.addEventListener('click', () => {
             if (overlay.parentNode) {
                 overlay.remove();
@@ -359,28 +319,15 @@ class GamificationUI {
     }
 
     /**
-     * Show streak milestone notification
+     * Show streak milestone notification (CSP-safe, Issue #179)
      */
     showStreakMilestoneNotification(streakCount) {
         const notification = document.createElement('div');
         notification.className = 'streak-milestone-notification';
-        notification.style.cssText = `
-            position: fixed;
-            top: 80px;
-            right: 20px;
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-            color: white;
-            padding: 1rem 1.5rem;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-            z-index: 10000;
-            animation: slideInRight 0.3s ease, fadeOut 0.3s ease 3.7s;
-            font-weight: 600;
-        `;
 
         notification.innerHTML = `
-            <div style="font-size: 1.5em; margin-bottom: 0.25rem;">🔥 ${streakCount} Day Streak!</div>
-            <div style="font-size: 0.9em; opacity: 0.9;">Keep it going!</div>
+            <div class="streak-milestone-title">🔥 ${this.escapeHtml(streakCount)} Day Streak!</div>
+            <div class="streak-milestone-subtitle">Keep it going!</div>
         `;
 
         document.body.appendChild(notification);
@@ -391,28 +338,15 @@ class GamificationUI {
     }
 
     /**
-     * Show freeze used notification
+     * Show freeze used notification (CSP-safe, Issue #179)
      */
     showFreezeUsedNotification(streakCount) {
         const notification = document.createElement('div');
         notification.className = 'freeze-used-notification';
-        notification.style.cssText = `
-            position: fixed;
-            top: 80px;
-            right: 20px;
-            background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
-            color: #333;
-            padding: 1rem 1.5rem;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-            z-index: 10000;
-            animation: slideInRight 0.3s ease, fadeOut 0.3s ease 3.7s;
-            font-weight: 600;
-        `;
 
         notification.innerHTML = `
-            <div style="font-size: 1.3em; margin-bottom: 0.25rem;">❄️ Streak Freeze Used!</div>
-            <div style="font-size: 0.9em; opacity: 0.8;">Your ${streakCount}-day streak is safe!</div>
+            <div class="freeze-used-title">❄️ Streak Freeze Used!</div>
+            <div class="freeze-used-subtitle">Your ${this.escapeHtml(streakCount)}-day streak is safe!</div>
         `;
 
         document.body.appendChild(notification);
@@ -599,50 +533,8 @@ class GamificationUI {
     }
 }
 
-// Add CSS animations
-const style = document.createElement('style');
-style.textContent = `
-    @keyframes slideInRight {
-        from {
-            transform: translateX(100%);
-            opacity: 0;
-        }
-        to {
-            transform: translateX(0);
-            opacity: 1;
-        }
-    }
-
-    @keyframes fadeOut {
-        from {
-            opacity: 1;
-        }
-        to {
-            opacity: 0;
-        }
-    }
-
-    @keyframes fadeIn {
-        from {
-            opacity: 0;
-        }
-        to {
-            opacity: 1;
-        }
-    }
-
-    @keyframes scaleIn {
-        from {
-            transform: scale(0.8);
-            opacity: 0;
-        }
-        to {
-            transform: scale(1);
-            opacity: 1;
-        }
-    }
-`;
-document.head.appendChild(style);
+// CSS animations are now in gamification.css (Issue #179 - CSP compliance)
+// No dynamic style injection needed
 
 // Initialize UI when DOM is ready
 if (document.readyState === 'loading') {

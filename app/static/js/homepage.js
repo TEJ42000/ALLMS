@@ -325,24 +325,22 @@ function hideLoginPrompt() {
     }
 }
 
-// Add scroll animations
+// Add scroll animations using CSS classes (CSP-safe, Issue #179)
 window.addEventListener('scroll', () => {
     const features = document.querySelectorAll('.feature-card');
     const courses = document.querySelectorAll('.course-card');
-    
+
     [...features, ...courses].forEach(element => {
         const rect = element.getBoundingClientRect();
         const isVisible = rect.top < window.innerHeight - 100;
-        
+
         if (isVisible && !element.classList.contains('animated')) {
-            element.style.opacity = '0';
-            element.style.transform = 'translateY(30px)';
-            
+            // Use CSS classes instead of inline styles for CSP compliance
+            element.classList.add('scroll-animate-hidden');
+
             setTimeout(() => {
-                element.style.transition = 'all 0.6s ease';
-                element.style.opacity = '1';
-                element.style.transform = 'translateY(0)';
-                element.classList.add('animated');
+                element.classList.remove('scroll-animate-hidden');
+                element.classList.add('scroll-animate-visible', 'animated');
             }, 100);
         }
     });

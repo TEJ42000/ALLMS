@@ -1,6 +1,9 @@
 /**
  * Usage Analytics Dashboard JavaScript
  * Handles charts, data grid, and API interactions
+ *
+ * Security Fixes:
+ * - Issue #118: Input sanitization for grid search
  */
 
 // Chart color constants
@@ -102,14 +105,53 @@ function initializeDateControls() {
         loadGridData();
     });
     
-    // Grid search
+    // Grid search with debouncing and sanitization
+    // Issue #118: XSS prevention - sanitize user input before filtering
+    let searchDebounceTimer = null;
     document.getElementById('grid-search').addEventListener('input', (e) => {
-        if (usageGrid) {
-            usageGrid.setFilter([
-                {field: 'user_email', type: 'like', value: e.target.value},
-            ]);
+        // Debounce to avoid excessive filtering
+        if (searchDebounceTimer) {
+            clearTimeout(searchDebounceTimer);
         }
+
+        searchDebounceTimer = setTimeout(() => {
+            if (usageGrid) {
+                // Sanitize input: remove HTML tags and limit length
+                const rawValue = e.target.value || '';
+                const sanitizedValue = sanitizeSearchInput(rawValue);
+
+                usageGrid.setFilter([
+                    {field: 'user_email', type: 'like', value: sanitizedValue},
+                ]);
+            }
+        }, 300); // 300ms debounce
     });
+}
+
+/**
+ * Sanitize search input to prevent XSS
+ * Issue #118
+ *
+ * @param {string} input - Raw user input
+ * @returns {string} - Sanitized search string
+ */
+function sanitizeSearchInput(input) {
+    if (!input || typeof input !== 'string') {
+        return '';
+    }
+
+    // Limit length to prevent DoS
+    const maxLength = 200;
+    let sanitized = input.slice(0, maxLength);
+
+    // Remove HTML tags
+    sanitized = sanitized.replace(/<[^>]*>/g, '');
+
+    // Remove potentially dangerous characters for search
+    // Allow alphanumeric, spaces, @, ., -, _ (for email search)
+    sanitized = sanitized.replace(/[^\w\s@.\-]/gi, '');
+
+    return sanitized.trim();
 }
 
 function formatDate(date) {
