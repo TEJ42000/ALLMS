@@ -69,6 +69,7 @@ logger = logging.getLogger(__name__)
 # Collection names
 COURSES_COLLECTION = "courses"
 WEEKS_SUBCOLLECTION = "weeks"
+MATERIALS_SUBCOLLECTION = "materials"
 LEGAL_SKILLS_SUBCOLLECTION = "legalSkills"
 TOPICS_SUBCOLLECTION = "topics"
 
