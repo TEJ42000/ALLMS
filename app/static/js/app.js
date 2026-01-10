@@ -2851,7 +2851,8 @@ async function loadFlashcards() {
             num_cards: DEFAULT_FLASHCARD_COUNT
         });
 
-        const response = await fetch(`${API_BASE}/api/files-content/flashcards`, {
+        // Use secureFetch to automatically include CSRF token
+        const response = await secureFetch(`${API_BASE}/api/files-content/flashcards`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(requestBody)
