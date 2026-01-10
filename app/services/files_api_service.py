@@ -1239,9 +1239,29 @@ Include:
         )
 
         if not materials_with_text:
-            # Include week context in error message for better debugging
-            week_msg = f" for week {week_number}" if week_number else ""
-            raise ValueError(f"No materials found for course {course_id}{week_msg}")
+            # Check if materials exist but text extraction failed
+            materials = self.get_course_materials(
+                course_id=course_id,
+                week_number=week_number,
+                limit=MAX_MATERIALS_PER_GENERATION
+            )
+
+            if materials:
+                # Materials exist but text extraction failed for all of them
+                logger.error(
+                    "Found %d materials for course %s but text extraction failed for all",
+                    len(materials),
+                    course_id
+                )
+                raise ValueError(
+                    f"Text extraction failed for all materials in course {course_id}. "
+                    f"Found {len(materials)} materials but couldn't extract text from any of them. "
+                    f"This may be a server configuration issue."
+                )
+            else:
+                # No materials exist at all
+                week_msg = f" for week {week_number}" if week_number else ""
+                raise ValueError(f"No materials found for course {course_id}{week_msg}")
 
         # Build content blocks using extracted text
         content_blocks = []
