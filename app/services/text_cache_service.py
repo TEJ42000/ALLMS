@@ -352,17 +352,27 @@ def get_text_cache_service() -> TextCacheService:
     return TextCacheService()
 
 
-def extract_text_cached(file_path: Path, use_cache: bool = True) -> ExtractionResult:
+def extract_text_cached(
+    file_path: Path,
+    use_cache: bool = True,
+    *,
+    _skip_path_validation: bool = False
+) -> ExtractionResult:
     """Extract text with caching support.
 
     This is the main entry point that wraps extract_text with caching.
+    
+    Args:
+        file_path: Path to the file
+        use_cache: Whether to use the cache
+        _skip_path_validation: Internal flag for testing only. DO NOT use in production.
     """
     # Normalize path to be relative to Materials
     if file_path.is_absolute():
         try:
             rel_path = str(file_path.relative_to(MATERIALS_ROOT.resolve()))
         except ValueError:
-            return extract_text(file_path)
+            return extract_text(file_path, _skip_path_validation=_skip_path_validation)
     else:
         path_str = str(file_path)
         if path_str.startswith("Materials/"):
@@ -393,7 +403,7 @@ def extract_text_cached(file_path: Path, use_cache: bool = True) -> ExtractionRe
             error=f"File not found: {rel_path}",
         )
 
-    result = extract_text(full_path)
+    result = extract_text(full_path, _skip_path_validation=_skip_path_validation)
 
     # Cache the result
     if use_cache and cache.is_available and result.success:

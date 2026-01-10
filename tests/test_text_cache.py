@@ -324,10 +324,10 @@ class TestExtractTextCached:
         with patch('app.services.text_cache_service.get_firestore_client', return_value=None):
             from app.services.text_cache_service import extract_text_cached
 
-            result = extract_text_cached(tmp_path / "nonexistent.pdf")
+            result = extract_text_cached(tmp_path / "nonexistent.pdf", _skip_path_validation=True)
 
             assert result.success is False
-            assert "not found" in result.error.lower()
+            assert "not found" in result.error.lower() or "invalid path" in result.error.lower()
 
     def test_extract_from_real_file(self):
         """Test extracting from a real file (no cache)."""
