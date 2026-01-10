@@ -2,9 +2,14 @@ name: Tests
 
 on:
   push:
-    branches: [main, feature/*, issue-*]
+    branches: [main]  # Only run on direct pushes to main
   pull_request:
-    branches: [main]
+    branches: [main]  # Run on PRs targeting main
+
+# Cancel duplicate runs for the same branch/PR
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 # Security: Explicitly declare minimum required permissions (CWE-250)
 permissions:
