@@ -1,6 +1,13 @@
 /**
  * Week Content Display System
  * Fetches week data from API and renders interactive week cards
+ *
+ * Cache Lifecycle:
+ * - Populated: On initial page load via loadWeeks() and after successful API fetch
+ * - Storage: In-memory (this.currentWeek, this.currentWeekTitle) - session-based
+ * - Invalidated: When user switches courses or manually refreshes the page
+ * - TTL: Session-based (cleared on page reload, no persistent storage)
+ * - Refresh triggers: Course change, page reload, manual refresh
  */
 
 class WeekContentManager {
@@ -10,7 +17,7 @@ class WeekContentManager {
         this.currentWeek = null;
         this.currentWeekTitle = '';
         this.courseId = window.COURSE_CONTEXT?.courseId || window.COURSE_ID || 'LLS-2025-2026';
-        
+
         this.init();
     }
     
@@ -140,6 +147,12 @@ class WeekContentManager {
     }
     
     async openWeekStudyNotes(weekNumber, weekTitle) {
+        // Validate weekNumber to prevent cache corruption and API errors
+        if (!Number.isInteger(weekNumber) || weekNumber < 1 || weekNumber > 52) {
+            console.error('[WeekContentManager] Invalid weekNumber:', weekNumber);
+            throw new TypeError(`weekNumber must be an integer between 1 and 52, got: ${weekNumber}`);
+        }
+
         this.currentWeek = weekNumber;
         this.currentWeekTitle = weekTitle || `Week ${weekNumber}`;
 
@@ -427,14 +440,22 @@ class WeekContentManager {
     }
     
     openAITutor(weekNumber, weekTitle) {
+        // Validate weekNumber if provided
+        if (weekNumber !== null && weekNumber !== undefined) {
+            if (!Number.isInteger(weekNumber) || weekNumber < 1 || weekNumber > 52) {
+                console.error('[WeekContentManager] Invalid weekNumber:', weekNumber);
+                throw new TypeError(`weekNumber must be an integer between 1 and 52, got: ${weekNumber}`);
+            }
+        }
+
         // Close week modal if open
         this.closeModal();
-        
+
         // Switch to AI Tutor tab
         const tutorTab = document.querySelector('[data-tab="tutor"]');
         if (tutorTab) {
             tutorTab.click();
-            
+
             // Wait for tab to switch, then pre-fill context
             setTimeout(() => {
                 const chatInput = document.getElementById('chat-input');
