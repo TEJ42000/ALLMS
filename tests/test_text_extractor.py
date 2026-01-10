@@ -298,6 +298,14 @@ class TestIntegrationWithRealFiles:
         compatibility and avoid git line-ending issues.
         """
         import base64
+        import sys
+
+        # FIX #259: Remove any mock of fitz from other tests (test_syllabus_parser)
+        # This ensures we use the real PyMuPDF library
+        if 'fitz' in sys.modules:
+            from unittest.mock import MagicMock
+            if isinstance(sys.modules['fitz'], MagicMock):
+                del sys.modules['fitz']
 
         # Check if PyMuPDF is installed
         try:
