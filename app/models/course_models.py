@@ -306,8 +306,8 @@ class CourseMaterial(BaseModel):
     # File info
     filename: str  # Original filename
     storagePath: str  # Path relative to Materials/ (e.g., "Course_Materials/LLS/Readings/file.pdf")
-    fileSize: int  # Bytes
-    fileType: str  # 'pdf', 'docx', 'slide_archive', 'image', 'text', etc.
+    fileSize: Optional[int] = None  # Bytes (optional for backwards compatibility)
+    fileType: Optional[str] = None  # 'pdf', 'docx', 'slide_archive', 'image', 'text', etc. (optional for backwards compatibility)
     mimeType: Optional[str] = None
 
     # Categorization
