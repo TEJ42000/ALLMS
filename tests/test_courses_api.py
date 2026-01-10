@@ -264,3 +264,123 @@ class TestGetCoursePublic:
         response = client.get("/api/courses/LLS-2025-2026")
 
         assert response.status_code == 503
+
+
+class TestMaterialCountsByWeek:
+    """Tests for GET /api/courses/{course_id}/materials/week-counts."""
+
+    def test_get_material_counts_authenticated(self, client, mock_course_service, override_auth_dependency):
+        """Should return material counts by week for authenticated user."""
+        from app.models.course_models import Course
+
+        # Mock course exists and is active
+        mock_course = MagicMock(spec=Course)
+        mock_course.active = True
+        mock_course_service.get_course.return_value = mock_course
+
+        # Mock materials service
+        with patch("app.routes.courses.get_course_materials_service") as mock_get_materials:
+            mock_materials_service = MagicMock()
+            mock_materials_service.get_material_counts_by_week.return_value = {
+                "course_id": "LLS-2025-2026",
+                "weeks": [
+                    {"week": 1, "count": 2},
+                    {"week": 2, "count": 3},
+                    {"week": 3, "count": 0},
+                ],
+                "no_week_count": 5,
+                "total": 10
+            }
+            mock_get_materials.return_value = mock_materials_service
+
+            response = client.get("/api/courses/LLS-2025-2026/materials/week-counts")
+
+            assert response.status_code == 200
+            data = response.json()
+            assert data["course_id"] == "LLS-2025-2026"
+            assert len(data["weeks"]) == 3
+            assert data["weeks"][0]["week"] == 1
+            assert data["weeks"][0]["count"] == 2
+            assert data["weeks"][2]["count"] == 0
+            assert data["total"] == 10
+
+    def test_get_material_counts_unauthenticated(self, client):
+        """Should return 401 for unauthenticated user."""
+        from fastapi import HTTPException
+        from app.dependencies.auth import require_authenticated
+
+        # Override to simulate unauthenticated user
+        def raise_unauthorized():
+            raise HTTPException(status_code=401, detail="Not authenticated")
+
+        app.dependency_overrides[require_authenticated] = raise_unauthorized
+
+        response = client.get("/api/courses/LLS-2025-2026/materials/week-counts")
+
+        assert response.status_code == 401
+        app.dependency_overrides.clear()
+
+    def test_get_material_counts_course_not_found(self, client, mock_course_service, override_auth_dependency):
+        """Should return 404 when course doesn't exist."""
+        mock_course_service.get_course.return_value = None
+
+        response = client.get("/api/courses/nonexistent/materials/week-counts")
+
+        assert response.status_code == 404
+
+    def test_get_material_counts_inactive_course(self, client, mock_course_service, override_auth_dependency):
+        """Should return 404 for inactive course."""
+        from app.models.course_models import Course
+
+        mock_course = MagicMock(spec=Course)
+        mock_course.active = False
+        mock_course_service.get_course.return_value = mock_course
+
+        response = client.get("/api/courses/LLS-2025-2026/materials/week-counts")
+
+        assert response.status_code == 404
+
+    def test_get_material_counts_custom_max_week(self, client, mock_course_service, override_auth_dependency):
+        """Should respect max_week parameter."""
+        from app.models.course_models import Course
+
+        mock_course = MagicMock(spec=Course)
+        mock_course.active = True
+        mock_course_service.get_course.return_value = mock_course
+
+        with patch("app.routes.courses.get_course_materials_service") as mock_get_materials:
+            mock_materials_service = MagicMock()
+            mock_materials_service.get_material_counts_by_week.return_value = {
+                "course_id": "LLS-2025-2026",
+                "weeks": [{"week": i, "count": 0} for i in range(1, 8)],
+                "no_week_count": 0,
+                "total": 0
+            }
+            mock_get_materials.return_value = mock_materials_service
+
+            response = client.get("/api/courses/LLS-2025-2026/materials/week-counts?max_week=7")
+
+            assert response.status_code == 200
+            mock_materials_service.get_material_counts_by_week.assert_called_once_with(
+                "LLS-2025-2026", 7
+            )
+
+    def test_get_material_counts_service_error(self, client, mock_course_service, override_auth_dependency):
+        """Should return 500 when materials service fails."""
+        from app.models.course_models import Course
+
+        mock_course = MagicMock(spec=Course)
+        mock_course.active = True
+        mock_course_service.get_course.return_value = mock_course
+
+        with patch("app.routes.courses.get_course_materials_service") as mock_get_materials:
+            mock_materials_service = MagicMock()
+            mock_materials_service.get_material_counts_by_week.side_effect = Exception("Database error")
+            mock_get_materials.return_value = mock_materials_service
+
+            response = client.get("/api/courses/LLS-2025-2026/materials/week-counts")
+
+            assert response.status_code == 500
+            data = response.json()
+            assert "detail" in data
+            assert "fail" in data["detail"].lower()

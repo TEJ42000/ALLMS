@@ -435,13 +435,11 @@
                             <label for="study-week-select">Week (optional):</label>
                             <select id="study-week-select" class="form-control">
                                 <option value="">All Weeks</option>
-                                <option value="1">Week 1</option>
-                                <option value="2">Week 2</option>
-                                <option value="3">Week 3</option>
-                                <option value="4">Week 4</option>
-                                <option value="5">Week 5</option>
-                                <option value="6">Week 6</option>
-                                <option value="7">Week 7</option>
+                                {% if topics %}
+                                {% for topic in topics %}
+                                <option value="{{ topic.weekNumber }}" data-week="{{ topic.weekNumber }}">Week {{ topic.weekNumber }}: {{ topic.name }}</option>
+                                {% endfor %}
+                                {% endif %}
                             </select>
                             <button type="button" id="estimate-tokens-btn" class="btn btn-small btn-secondary" style="margin-left: 10px;">📊 Estimate Tokens</button>
                         </div>
