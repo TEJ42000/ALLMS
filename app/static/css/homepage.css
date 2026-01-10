@@ -629,6 +629,19 @@
     padding: 4rem 2rem;
 }
 
+.login-prompt-message {
+    text-align: center;
+    padding: 4rem 2rem;
+}
+
+.login-prompt-message .login-btn {
+    margin-top: 1.5rem;
+    display: inline-block;
+    padding: 1rem 2rem;
+    font-size: 1.1rem;
+    text-decoration: none;
+}
+
 .empty-state {
     max-width: 500px;
     margin: 0 auto;

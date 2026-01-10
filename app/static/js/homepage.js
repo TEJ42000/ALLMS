@@ -3,27 +3,29 @@
  * Handles course loading and interactions for the premium homepage
  */
 
-// API Base URL
-const API_BASE = '/api/admin/courses';
+// API Base URL - use public courses endpoint (not admin)
+const API_BASE = '/api/courses';
 
 // DOM Elements
 let coursesGrid;
 let loadingIndicator;
 let errorMessage;
 let noCoursesMessage;
+let loginPromptMessage;
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
     console.log('[Homepage] Initializing...');
-    
+
     coursesGrid = document.getElementById('courses-grid');
     loadingIndicator = document.getElementById('loading-indicator');
     errorMessage = document.getElementById('error-message');
     noCoursesMessage = document.getElementById('no-courses-message');
-    
+    loginPromptMessage = document.getElementById('login-prompt-message');
+
     // Smooth scroll for anchor links
     initSmoothScroll();
-    
+
     // Load courses
     loadCourses();
 });
@@ -55,8 +57,17 @@ async function loadCourses() {
         showLoading();
         hideError();
         hideNoCourses();
+        hideLoginPrompt();
 
         const response = await fetch(API_BASE);
+
+        // Handle 401 - user not logged in
+        if (response.status === 401) {
+            console.log('[Homepage] User not authenticated, showing login prompt');
+            hideLoading();
+            showLoginPrompt();
+            return;
+        }
 
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
@@ -290,6 +301,27 @@ function showNoCourses() {
 function hideNoCourses() {
     if (noCoursesMessage) {
         noCoursesMessage.style.display = 'none';
+    }
+}
+
+/**
+ * Show login prompt message
+ */
+function showLoginPrompt() {
+    if (loginPromptMessage) {
+        loginPromptMessage.style.display = 'block';
+    }
+    if (coursesGrid) {
+        coursesGrid.style.display = 'none';
+    }
+}
+
+/**
+ * Hide login prompt message
+ */
+function hideLoginPrompt() {
+    if (loginPromptMessage) {
+        loginPromptMessage.style.display = 'none';
     }
 }
 
