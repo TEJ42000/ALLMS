@@ -2098,7 +2098,7 @@ async function deleteCourse(courseId, courseName) {
             `Click OK to delete files, or Cancel to keep them.`
         );
 
-        const response = await secureFetch(`/admin/api/courses/${courseId}/permanent?delete_files=${deleteFiles}`, {
+        const response = await secureFetch(`/api/admin/courses/${courseId}/permanent?delete_files=${deleteFiles}`, {
             method: 'DELETE',
             headers: {
                 'Content-Type': 'application/json'
