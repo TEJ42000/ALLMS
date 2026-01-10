@@ -68,11 +68,13 @@ def _get_cached_response(cache_key: str) -> Optional[str]:
 
         logger.info("Cache HIT for tutor response: %s", cache_key)
 
-        # Update hit count (best effort, don't fail on stats update)
+        # Update hit count atomically (best effort, don't fail on stats update)
         try:
-            doc_ref.update({"hit_count": (data.get("hit_count", 0) or 0) + 1})
-        except Exception:
-            pass
+            from google.cloud.firestore import Increment
+            doc_ref.update({"hit_count": Increment(1)})
+        except Exception as e:
+            # Log but don't fail - cache stats are not critical
+            logger.debug("Failed to update cache hit count: %s", e)
 
         return data.get("response")
 

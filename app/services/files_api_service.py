@@ -487,15 +487,23 @@ Return ONLY valid JSON:
             topic: Topic name for the quiz
             num_questions: Number of questions to generate
             difficulty: 'easy', 'medium', or 'hard'
-            week_number: Optional week filter
+            week_number: Optional week filter (1-52)
             user_context: User context for usage tracking
 
         Returns:
             Dictionary with quiz questions
 
         Raises:
-            ValueError: If no materials found
+            ValueError: If no materials found or week_number is invalid
         """
+        # Validate week_number if provided
+        if week_number is not None:
+            from app.services.course_service import validate_week_number
+            try:
+                week_number = validate_week_number(week_number)
+            except ValueError as e:
+                raise ValueError(f"Invalid week_number: {e}") from e
+
         logger.info(
             "Generating quiz from course %s: %d questions, week=%s",
             course_id, num_questions, week_number
@@ -623,8 +631,17 @@ Return ONLY valid JSON:
             Formatted study guide in Markdown
 
         Raises:
-            ValueError: If no materials found
+            ValueError: If no materials found or week_numbers are invalid
         """
+        # Validate week_numbers if provided
+        if week_numbers:
+            from app.services.course_service import validate_week_number
+            for week_num in week_numbers:
+                try:
+                    validate_week_number(week_num)
+                except ValueError as e:
+                    raise ValueError(f"Invalid week_number in list: {e}") from e
+
         logger.info(
             "Generating study guide from course %s, weeks=%s",
             course_id, week_numbers
@@ -1220,8 +1237,14 @@ Include:
             raise ValueError("course_id is required and cannot be empty")
         if not MIN_FLASHCARDS <= num_cards <= MAX_FLASHCARDS:
             raise ValueError(f"num_cards must be between {MIN_FLASHCARDS} and {MAX_FLASHCARDS}")
-        if week_number is not None and not 1 <= week_number <= MAX_WEEK_NUMBER:
-            raise ValueError(f"week_number must be between 1 and {MAX_WEEK_NUMBER}")
+
+        # Validate week_number using centralized validation
+        if week_number is not None:
+            from app.services.course_service import validate_week_number
+            try:
+                week_number = validate_week_number(week_number)
+            except ValueError as e:
+                raise ValueError(f"Invalid week_number: {e}") from e
 
         # Sanitize topic using shared method
         topic = self._sanitize_topic(topic)
