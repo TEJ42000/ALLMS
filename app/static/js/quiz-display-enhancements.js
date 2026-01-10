@@ -272,18 +272,19 @@ function createEnhancedQuestionHeader(question, questionNum, totalQuestions, tim
 
 /**
  * Add fade-in animation to question card
+ * Uses CSS classes for CSP compliance (Issue #179)
  * @param {HTMLElement} element - Element to animate
  */
 function addFadeInAnimation(element) {
-    element.style.opacity = '0';
-    element.style.transform = 'translateY(20px)';
-    
-    // Trigger reflow
+    // Add hidden state class
+    element.classList.add('quiz-fade-in-hidden');
+
+    // Trigger reflow to ensure initial state is applied
     element.offsetHeight;
-    
-    element.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
-    element.style.opacity = '1';
-    element.style.transform = 'translateY(0)';
+
+    // Transition to visible state using CSS class
+    element.classList.remove('quiz-fade-in-hidden');
+    element.classList.add('quiz-fade-in-visible');
 }
 
 /**

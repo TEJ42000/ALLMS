@@ -12,6 +12,7 @@
     <link rel="stylesheet" href="/static/css/quiz-results-display.css">
     <link rel="stylesheet" href="/static/css/quiz-accessibility.css">
     <link rel="stylesheet" href="/static/css/quiz-mobile.css">
+    <link rel="stylesheet" href="/static/css/gamification.css">
     <!-- EasyMDE Markdown Editor -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/easymde@2.18.0/dist/easymde.min.css">
     <script src="https://cdn.jsdelivr.net/npm/easymde@2.18.0/dist/easymde.min.js"></script>
@@ -471,7 +472,8 @@
     <footer class="footer">
         <p>&copy; 2026 Cognitio Flow | University of Groningen | v{{ version }}</p>
     </footer>
-    <!-- Load scripts in correct order: dependencies first, then features, then app -->
+    <!-- Load scripts in correct order: utils first, then dependencies, then features, then app -->
+    <script src="/static/js/utils.js" defer></script>
     <script src="/static/js/activity-tracker.js" defer></script>
     <script src="/static/js/gamification-ui.js" defer></script>
     <script src="/static/js/gamification-animations.js" defer></script>

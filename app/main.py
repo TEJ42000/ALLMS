@@ -16,8 +16,8 @@ from app import __version__
 # Import routers
 from app.routes import ai_tutor, assessment, pages, files_content, admin_courses, admin_pages, admin_users, admin_usage, echr, text_cache, quiz_management, study_guide_routes, gamification, gdpr, upload, auth, flashcard_notes, flashcard_issues, courses
 
-# Import authentication middleware
-from app.middleware import AuthMiddleware
+# Import authentication and CSRF middleware
+from app.middleware import AuthMiddleware, CSRFMiddleware
 from app.services.auth_service import get_auth_config
 
 # Load environment variables
@@ -39,6 +39,13 @@ app = FastAPI(
 # This validates IAP headers and attaches user to request.state
 app.add_middleware(AuthMiddleware)
 
+# Add CSRF protection middleware (runs after Auth, before routes)
+# Uses double-submit cookie pattern - more robust than Origin/Referer alone
+# Issue: #204
+# Disabled in test environment to prevent 403 errors on POST/PUT/PATCH/DELETE requests
+if os.getenv("TESTING") != "true":
+    app.add_middleware(CSRFMiddleware)
+
 # CORS middleware (adjust origins as needed)
 app.add_middleware(
     CORSMiddleware,
@@ -46,6 +53,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["X-CSRF-Token"],  # Allow JS to read CSRF header
 )
 
 

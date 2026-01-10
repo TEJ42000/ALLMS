@@ -1,9 +1,13 @@
 /**
  * Usage Analytics Dashboard JavaScript
  * Handles charts, data grid, and API interactions
+ *
+ * Security Fixes:
+ * - Issue #118: Input sanitization for grid search
+ * - Issue #179: Color sanitization for CSP compliance
  */
 
-// Chart color constants
+// Chart color constants (safe, hardcoded values)
 const CHART_COLORS = {
     INPUT_TOKENS: '#6c63ff',      // Purple
     OUTPUT_TOKENS: '#00d4aa',     // Teal
@@ -14,6 +18,33 @@ const CHART_COLORS = {
     WARNING: '#ffa500',
     DANGER: '#ff6b6b',
 };
+
+// Allowed colors whitelist (for defense-in-depth color validation)
+const ALLOWED_COLORS = new Set(Object.values(CHART_COLORS));
+
+/**
+ * Sanitize a color value to prevent CSS injection
+ * Only allows valid hex colors from CHART_COLORS or explicit safe colors
+ *
+ * @param {string} color - Color value to sanitize
+ * @param {string} fallback - Fallback color if invalid (default: #888888)
+ * @returns {string} - Safe color value
+ */
+function sanitizeColor(color, fallback = '#888888') {
+    // Check if it's in our whitelist
+    if (ALLOWED_COLORS.has(color)) {
+        return color;
+    }
+
+    // Validate hex color format (3 or 6 digit)
+    const hexPattern = /^#([0-9A-Fa-f]{3}){1,2}$/;
+    if (hexPattern.test(color)) {
+        return color;
+    }
+
+    // Return fallback for any suspicious value
+    return fallback;
+}
 
 // State management
 const state = {
@@ -102,14 +133,59 @@ function initializeDateControls() {
         loadGridData();
     });
     
-    // Grid search
+    // Grid search with debouncing and sanitization
+    // Issue #118: XSS prevention - sanitize user input before filtering
+    let searchDebounceTimer = null;
     document.getElementById('grid-search').addEventListener('input', (e) => {
-        if (usageGrid) {
-            usageGrid.setFilter([
-                {field: 'user_email', type: 'like', value: e.target.value},
-            ]);
+        // Debounce to avoid excessive filtering
+        if (searchDebounceTimer) {
+            clearTimeout(searchDebounceTimer);
         }
+
+        searchDebounceTimer = setTimeout(() => {
+            if (usageGrid) {
+                // Sanitize input: remove HTML tags and limit length
+                const rawValue = e.target.value || '';
+                const sanitizedValue = sanitizeSearchInput(rawValue);
+
+                usageGrid.setFilter([
+                    {field: 'user_email', type: 'like', value: sanitizedValue},
+                ]);
+            }
+        }, 300); // 300ms debounce
     });
+}
+
+/**
+ * Sanitize search input to prevent XSS
+ * Issue #118
+ *
+ * NOTE: This is defense-in-depth. Server-side validation should also be implemented
+ * for any endpoints that use search/filter parameters.
+ *
+ * @param {string} input - Raw user input
+ * @returns {string} - Sanitized search string
+ */
+function sanitizeSearchInput(input) {
+    if (!input || typeof input !== 'string') {
+        return '';
+    }
+
+    // Limit length to prevent DoS
+    const maxLength = 200;
+    let sanitized = input.slice(0, maxLength);
+
+    // Remove control characters and zero-width characters
+    sanitized = sanitized.replace(/[\x00-\x1F\x7F\u200B-\u200D\uFEFF]/g, '');
+
+    // Remove HTML tags
+    sanitized = sanitized.replace(/<[^>]*>/g, '');
+
+    // Allow only ASCII alphanumeric, spaces, @, ., -, _ (for email search)
+    // Using explicit ASCII ranges instead of \w to avoid Unicode word characters
+    sanitized = sanitized.replace(/[^a-zA-Z0-9\s@._-]/g, '');
+
+    return sanitized.trim();
 }
 
 function formatDate(date) {
@@ -672,14 +748,18 @@ function updateTokenComparisonTable(data) {
         const variance = data.variance_tokens[type.key];
         const variancePercent = anthropic > 0 ? (variance / anthropic * 100) : 0;
 
-        const varianceColor = Math.abs(variancePercent) < 1 ? '#00d4aa' :
-                             Math.abs(variancePercent) < 5 ? '#ffa500' : '#ff6b6b';
+        // Sanitize colors for CSP compliance (Issue #179)
+        const typeColor = sanitizeColor(type.color);
+        const varianceColor = sanitizeColor(
+            Math.abs(variancePercent) < 1 ? '#00d4aa' :
+            Math.abs(variancePercent) < 5 ? '#ffa500' : '#ff6b6b'
+        );
         const varianceSign = variance >= 0 ? '+' : '';
 
         return `
             <tr style="border-bottom: 1px solid #222;">
                 <td style="padding: 0.75rem;">
-                    <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: ${type.color}; margin-right: 0.5rem;"></span>
+                    <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: ${typeColor}; margin-right: 0.5rem;"></span>
                     ${type.label}
                 </td>
                 <td style="text-align: right; padding: 0.75rem;">${formatTokens(internal)}</td>

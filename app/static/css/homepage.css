@@ -846,3 +846,17 @@
     }
 }
 
+/* ========== CSP-Safe Scroll Animations (Issue #179) ========== */
+/* These classes replace inline styles for animation */
+
+.scroll-animate-hidden {
+    opacity: 0;
+    transform: translateY(30px);
+}
+
+.scroll-animate-visible {
+    opacity: 1;
+    transform: translateY(0);
+    transition: opacity 0.6s ease, transform 0.6s ease;
+}
+

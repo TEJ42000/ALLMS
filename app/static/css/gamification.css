@@ -1,0 +1,223 @@
+/**
+ * Gamification UI Styles
+ * 
+ * CSP-safe styling for gamification components (Issue #179)
+ * Moves inline styles from gamification-ui.js to CSS classes
+ */
+
+/* ========== Keyframe Animations ========== */
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes fadeOut {
+    from {
+        opacity: 1;
+    }
+    to {
+        opacity: 0;
+    }
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes scaleIn {
+    from {
+        transform: scale(0.8);
+        opacity: 0;
+    }
+    to {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+/* ========== Level Progress Bar ========== */
+.header-with-progress {
+    position: relative;
+}
+
+.level-progress-container {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    overflow: hidden;
+}
+
+.level-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #4CAF50, #8BC34A);
+    transition: width 0.5s ease;
+}
+
+/* ========== XP Notification ========== */
+.xp-notification {
+    position: fixed;
+    top: 80px;
+    right: 20px;
+    padding: 1rem 1.5rem;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    z-index: 10000;
+    animation: slideInRight 0.3s ease, fadeOut 0.3s ease 2.7s forwards;
+    font-weight: 600;
+}
+
+.xp-notification-amount {
+    font-size: 1.2em;
+}
+
+.xp-notification-total {
+    font-size: 0.9em;
+    opacity: 0.9;
+}
+
+/* ========== Level Up Overlay ========== */
+.level-up-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10001;
+    animation: fadeIn 0.3s ease;
+}
+
+.level-up-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 3rem;
+    border-radius: 16px;
+    text-align: center;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    animation: scaleIn 0.5s ease;
+    max-width: 400px;
+}
+
+.level-up-emoji {
+    font-size: 4em;
+    margin-bottom: 1rem;
+}
+
+.level-up-title {
+    font-size: 2em;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+}
+
+.level-up-level {
+    font-size: 1.5em;
+    margin-bottom: 0.5rem;
+}
+
+.level-up-level-title {
+    font-size: 1.2em;
+    opacity: 0.9;
+}
+
+.level-up-continue-btn {
+    margin-top: 2rem;
+    padding: 0.75rem 2rem;
+    background: white;
+    color: #667eea;
+    border: none;
+    border-radius: 8px;
+    font-size: 1em;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.level-up-continue-btn:hover {
+    background: #f0f0f0;
+}
+
+/* ========== Badge Notification ========== */
+.badge-notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 1rem;
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    color: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(240, 147, 251, 0.4);
+    z-index: 10000;
+    animation: slideInRight 0.5s ease;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+/* ========== Streak Milestone Notification ========== */
+.streak-milestone-notification {
+    position: fixed;
+    top: 80px;
+    right: 20px;
+    padding: 1rem 1.5rem;
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    color: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    z-index: 10000;
+    animation: slideInRight 0.3s ease, fadeOut 0.3s ease 3.7s forwards;
+    font-weight: 600;
+}
+
+.streak-milestone-title {
+    font-size: 1.5em;
+    margin-bottom: 0.25rem;
+}
+
+.streak-milestone-subtitle {
+    font-size: 0.9em;
+    opacity: 0.9;
+}
+
+/* ========== Freeze Used Notification ========== */
+.freeze-used-notification {
+    position: fixed;
+    top: 80px;
+    right: 20px;
+    padding: 1rem 1.5rem;
+    background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+    color: #333;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    z-index: 10000;
+    animation: slideInRight 0.3s ease, fadeOut 0.3s ease 3.7s forwards;
+    font-weight: 600;
+}
+
+.freeze-used-title {
+    font-size: 1.3em;
+    margin-bottom: 0.25rem;
+}
+
+.freeze-used-subtitle {
+    font-size: 0.9em;
+    opacity: 0.8;
+}
+

@@ -125,32 +125,41 @@ class TestRetryWithBackoff:
     
     @pytest.mark.asyncio
     async def test_exponential_backoff_timing(self):
-        """Test that delays follow exponential backoff pattern."""
+        """Test that delays follow exponential backoff pattern using mocked sleep."""
         mock_func = AsyncMock(side_effect=[
             Exception("Error 1"),
             Exception("Error 2"),
             "success"
         ])
-        
+
         config = RetryConfig(
             max_retries=3,
-            initial_delay=0.1,
+            initial_delay=1.0,
             exponential_base=2.0,
             jitter=False  # Disable jitter for predictable timing
         )
-        
-        start_time = time.time()
-        result = await retry_with_backoff(mock_func, config=config)
-        elapsed = time.time() - start_time
-        
-        # Expected delays: 0.1s (after 1st failure) + 0.2s (after 2nd failure) = 0.3s
-        # Allow some tolerance for execution time
+
+        # Track sleep calls
+        sleep_calls = []
+
+        async def mock_sleep(delay):
+            sleep_calls.append(delay)
+
+        with patch('asyncio.sleep', side_effect=mock_sleep):
+            result = await retry_with_backoff(mock_func, config=config)
+
+        # Verify result
         assert result == "success"
-        assert 0.25 < elapsed < 0.45, f"Expected ~0.3s, got {elapsed:.3f}s"
+        assert mock_func.call_count == 3
+
+        # Verify exponential backoff delays (without timing assertions)
+        assert len(sleep_calls) == 2  # 2 retries = 2 sleeps
+        assert sleep_calls[0] == 1.0  # First retry: initial_delay
+        assert sleep_calls[1] == 2.0  # Second retry: initial_delay * exponential_base
     
     @pytest.mark.asyncio
     async def test_max_delay_cap(self):
-        """Test that delay is capped at max_delay."""
+        """Test that delay is capped at max_delay using mocked sleep."""
         mock_func = AsyncMock(side_effect=[
             Exception("Error 1"),
             Exception("Error 2"),
@@ -160,52 +169,68 @@ class TestRetryWithBackoff:
 
         config = RetryConfig(
             max_retries=4,
-            initial_delay=0.1,
-            max_delay=0.2,  # Cap at 0.2s
+            initial_delay=1.0,
+            max_delay=2.0,  # Cap at 2.0s
             exponential_base=2.0,
             jitter=False
         )
 
-        start_time = time.time()
-        result = await retry_with_backoff(mock_func, config=config)
-        elapsed = time.time() - start_time
+        # Track sleep calls
+        sleep_calls = []
 
-        # Expected delays: 0.1s, 0.2s (capped), 0.2s (capped) = 0.5s
-        # Allow some tolerance for execution time
+        async def mock_sleep(delay):
+            sleep_calls.append(delay)
+
+        with patch('asyncio.sleep', side_effect=mock_sleep):
+            result = await retry_with_backoff(mock_func, config=config)
+
+        # Verify result
         assert result == "success"
-        assert 0.45 < elapsed < 0.65, f"Expected ~0.5s, got {elapsed:.3f}s"
+        assert mock_func.call_count == 4
+
+        # Verify delays are capped at max_delay
+        assert len(sleep_calls) == 3  # 3 retries = 3 sleeps
+        assert sleep_calls[0] == 1.0  # First retry: 1.0
+        assert sleep_calls[1] == 2.0  # Second retry: 2.0 (capped from 2.0)
+        assert sleep_calls[2] == 2.0  # Third retry: 2.0 (capped from 4.0)
     
     @pytest.mark.asyncio
     async def test_jitter_adds_randomness(self):
-        """Test that jitter adds randomness to delays."""
+        """Test that jitter adds randomness to delays using mocked sleep."""
         mock_func = AsyncMock(side_effect=[
             Exception("Error"),
             "success"
         ])
-        
+
         config = RetryConfig(
             max_retries=2,
             initial_delay=1.0,
             jitter=True
         )
-        
-        # Run multiple times and check that delays vary
-        delays = []
+
+        # Run multiple times and collect sleep delays
+        all_sleep_calls = []
         for _ in range(5):
             mock_func.reset_mock()
             mock_func.side_effect = [Exception("Error"), "success"]
-            
-            start_time = time.time()
-            await retry_with_backoff(mock_func, config=config)
-            elapsed = time.time() - start_time
-            delays.append(elapsed)
-        
+
+            sleep_calls = []
+
+            async def mock_sleep(delay):
+                sleep_calls.append(delay)
+
+            with patch('asyncio.sleep', side_effect=mock_sleep):
+                await retry_with_backoff(mock_func, config=config)
+
+            all_sleep_calls.extend(sleep_calls)
+
         # With jitter, delays should vary (not all the same)
-        assert len(set(delays)) > 1, "Jitter should produce varying delays"
-        
-        # All delays should be within reasonable range (0.75s to 1.25s for 1.0s ±25%)
-        for delay in delays:
-            assert 0.7 < delay < 1.3, f"Delay {delay:.3f}s outside expected range"
+        unique_delays = set(all_sleep_calls)
+        assert len(unique_delays) > 1, "Jitter should produce varying delays"
+
+        # All delays should be within jitter range (0.75 to 1.25 for 1.0s ±25%)
+        for delay in all_sleep_calls:
+            assert 0.75 <= delay <= 1.25, f"Delay {delay:.3f}s outside jitter range [0.75, 1.25]"
     
     @pytest.mark.asyncio
     async def test_retryable_exceptions_filter(self):
