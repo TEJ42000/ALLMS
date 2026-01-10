@@ -144,9 +144,6 @@ function sanitizeSearchInput(input) {
     const maxLength = 200;
     let sanitized = input.slice(0, maxLength);
 
-    // Remove HTML tags
-    sanitized = sanitized.replace(/<[^>]*>/g, '');
-
     // Remove potentially dangerous characters for search
     // Allow alphanumeric, spaces, @, ., -, _ (for email search)
     sanitized = sanitized.replace(/[^\w\s@.\-]/gi, '');
