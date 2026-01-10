@@ -2798,7 +2798,12 @@ function initFlashcardListeners() {
     // DON'T auto-generate flashcards on page load - it's expensive and slow
     // Show empty state instead and let user click "Load Flashcards" button
     // This prevents unnecessary API calls and gives users control
+
+    // Debug: Log to console to verify this code is running
+    console.log('[Flashcards] Initializing with empty state, flashcards.length:', flashcards.length);
+
     updateFlashcardDisplay(); // Shows empty state with instructions
+    updateFlashcardStats(); // Update stats to show 0/0
 }
 
 /**
@@ -3041,8 +3046,12 @@ function updateFlashcardDisplay() {
     const questionEl = document.getElementById('flashcard-question');
     const answerEl = document.getElementById('flashcard-answer');
 
+    console.log('[Flashcards] updateFlashcardDisplay called, flashcards.length:', flashcards.length);
+    console.log('[Flashcards] Elements found - question:', !!questionEl, 'answer:', !!answerEl);
+
     if (flashcards.length === 0) {
         // Show friendly empty state instead of just "No flashcards available"
+        console.log('[Flashcards] Showing empty state');
         if (questionEl) {
             questionEl.innerHTML = `
                 <div style="text-align: center; padding: 20px;">
@@ -3050,13 +3059,17 @@ function updateFlashcardDisplay() {
                     <div style="font-size: 18px; font-weight: 500; margin-bottom: 10px;">No Flashcards Yet</div>
                 </div>
             `;
+        } else {
+            console.error('[Flashcards] questionEl not found!');
         }
         if (answerEl) {
             answerEl.innerHTML = `
                 <div style="text-align: center; padding: 20px; color: #666;">
-                    <p>Click "Generate New Flashcards" to create flashcards from your course materials.</p>
+                    <p>Click "🔄 Generate New Flashcards" button above to create flashcards from your course materials.</p>
                 </div>
             `;
+        } else {
+            console.error('[Flashcards] answerEl not found!');
         }
         return;
     }
