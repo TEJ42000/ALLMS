@@ -405,8 +405,11 @@ class WeekContentManager {
                         <div class="topics-grid">
             `;
             data.topics.forEach(topic => {
-                const topicText = typeof topic === 'string' ? topic : (topic.name || topic);
-                const topicDesc = typeof topic === 'object' ? topic.description : '';
+                // FIX: Handle object topics properly - don't fall back to the object itself
+                const topicText = typeof topic === 'string'
+                    ? topic
+                    : (topic.name || topic.title || topic.text || topic.topic || '[Unnamed Topic]');
+                const topicDesc = typeof topic === 'object' ? (topic.description || '') : '';
                 html += `
                     <div class="topic-card-note">
                         <div class="topic-card-title">${this.escapeHtml(topicText)}</div>
