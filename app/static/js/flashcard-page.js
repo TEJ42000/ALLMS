@@ -61,20 +61,22 @@ function validateFlashcardSet(set, index) {
     }
 
     // Validate each card
-    const validCards = set.cards.every((card, cardIndex) => {
+    // Issue #166: Use optional chaining for defensive property access
+    const validCards = set?.cards?.every((card, cardIndex) => {
         if (!card || typeof card !== 'object') {
             console.warn(`[FlashcardPage] Invalid card at set ${index}, card ${cardIndex}`);
             return false;
         }
 
         // Card must have either question/answer OR term/definition
+        // Issue #166: Use optional chaining with safe trim access
         const hasQuestionAnswer =
-            typeof card.question === 'string' && card.question.trim().length > 0 &&
-            typeof card.answer === 'string' && card.answer.trim().length > 0;
+            typeof card?.question === 'string' && card?.question?.trim()?.length > 0 &&
+            typeof card?.answer === 'string' && card?.answer?.trim()?.length > 0;
 
         const hasTermDefinition =
-            typeof card.term === 'string' && card.term.trim().length > 0 &&
-            typeof card.definition === 'string' && card.definition.trim().length > 0;
+            typeof card?.term === 'string' && card?.term?.trim()?.length > 0 &&
+            typeof card?.definition === 'string' && card?.definition?.trim()?.length > 0;
 
         if (!hasQuestionAnswer && !hasTermDefinition) {
             console.warn(`[FlashcardPage] Invalid card at set ${index}, card ${cardIndex}: missing content`);
@@ -82,7 +84,7 @@ function validateFlashcardSet(set, index) {
         }
 
         return true;
-    });
+    }) ?? false;
 
     return validCards;
 }
@@ -136,15 +138,16 @@ function loadFlashcardSets() {
         return;
     }
 
+    // Issue #166: Use optional chaining for defensive property access
     setsContainer.innerHTML = flashcardSets.map(set => `
-        <div class="flashcard-set-card" data-set-id="${set.id}">
+        <div class="flashcard-set-card" data-set-id="${set?.id}">
             <div class="set-icon" aria-hidden="true">📚</div>
-            <h3>${escapeHtml(set.title)}</h3>
-            <p>${escapeHtml(set.description || '')}</p>
+            <h3>${escapeHtml(set?.title ?? '')}</h3>
+            <p>${escapeHtml(set?.description ?? '')}</p>
             <div class="set-meta">
-                <span class="card-count">${set.cards.length} cards</span>
+                <span class="card-count">${set?.cards?.length ?? 0} cards</span>
             </div>
-            <button class="btn-study" data-set-id="${set.id}" aria-label="Start studying ${escapeHtml(set.title)}">
+            <button class="btn-study" data-set-id="${set?.id}" aria-label="Start studying ${escapeHtml(set?.title ?? '')}">
                 Start Studying
             </button>
         </div>

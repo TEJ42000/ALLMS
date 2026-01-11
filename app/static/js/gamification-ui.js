@@ -152,6 +152,7 @@ class GamificationUI {
     
     /**
      * Setup event listeners for XP updates
+     * Issue #139: Track all listeners for proper cleanup
      */
     setupEventListeners() {
         // Store bound listener functions for cleanup
@@ -160,25 +161,25 @@ class GamificationUI {
             'level-up': (event) => this.handleLevelUp(event.detail),
             'streak-updated': (event) => this.handleStreakUpdated(event.detail),
             'freeze-used': (event) => this.handleFreezeUsed(event.detail),
-            'badge-earned': (event) => this.handleBadgeEarned(event.detail)
+            'badge-earned': (event) => this.handleBadgeEarned(event.detail),
+            // Issue #139: Track tab-changed listener for cleanup
+            'tab-changed': (event) => {
+                if (event?.detail?.tab === 'badges') {
+                    this.loadBadges();
+                }
+            }
         };
 
         // Add event listeners
         Object.entries(this.listeners).forEach(([eventName, handler]) => {
             document.addEventListener(eventName, handler);
         });
-
-        // Listen for tab changes to load badges when badges tab is opened
-        document.addEventListener('tab-changed', (event) => {
-            if (event.detail.tab === 'badges') {
-                this.loadBadges();
-            }
-        });
     }
 
     /**
      * Cleanup event listeners to prevent memory leaks
      * Call this method when destroying the GamificationUI instance
+     * Issue #139: Now properly cleans up all registered listeners
      */
     cleanup() {
         // Remove all event listeners
@@ -563,6 +564,13 @@ if (document.readyState === 'loading') {
     window.gamificationUI = new GamificationUI();
 }
 
+// Issue #139: Cleanup event listeners on page unload to prevent memory leaks
+// This is especially important for SPA navigation and dynamic content loading
+window.addEventListener('beforeunload', () => {
+    if (window.gamificationUI) {
+        window.gamificationUI.cleanup();
+    }
+});
+
 // Export for use in other scripts
 window.GamificationUI = GamificationUI;
-

@@ -67,8 +67,9 @@ class FlashcardViewer {
 
             // HIGH FIX: Validate content length (prevent extremely long cards)
             // MEDIUM FIX: Use constant instead of magic number
-            const content = card.question || card.term || '';
-            const answer = card.answer || card.definition || '';
+            // Issue #166: Use optional chaining for defensive property access
+            const content = card?.question || card?.term || '';
+            const answer = card?.answer || card?.definition || '';
 
             if (content.length > FLASHCARD_CONSTANTS.MAX_CARD_LENGTH ||
                 answer.length > FLASHCARD_CONSTANTS.MAX_CARD_LENGTH) {
@@ -202,7 +203,7 @@ class FlashcardViewer {
                             <div class="flashcard-front" aria-hidden="${this.isFlipped}">
                                 <div class="card-label">Question</div>
                                 <div class="card-content">
-                                    ${this.escapeHtml(currentCard.question || currentCard.term || '')}
+                                    ${this.escapeHtml(currentCard?.question || currentCard?.term || '')}
                                 </div>
                                 <div class="card-hint">Click to flip</div>
                             </div>
@@ -211,7 +212,7 @@ class FlashcardViewer {
                             <div class="flashcard-back" aria-hidden="${!this.isFlipped}">
                                 <div class="card-label">Answer</div>
                                 <div class="card-content">
-                                    ${this.escapeHtml(currentCard.answer || currentCard.definition || '')}
+                                    ${this.escapeHtml(currentCard?.answer || currentCard?.definition || '')}
                                 </div>
                             </div>
                         </div>
