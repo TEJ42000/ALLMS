@@ -93,15 +93,13 @@ class UploadManager {
         // FIX: Client-side file size validation
         if (file.size > this.MAX_FILE_SIZE_BYTES) {
             const fileSizeMB = (file.size / 1024 / 1024).toFixed(1);
-            const errorMsg = `File too large (${fileSizeMB}MB). Maximum size: ${this.MAX_FILE_SIZE_MB}MB`;
-            console.error('[UploadManager] File size validation failed:', errorMsg);
+            console.error('[UploadManager] File size validation failed:', fileSizeMB, 'MB');
 
-            // Show error notification
-            if (typeof showNotification === 'function') {
-                showNotification(errorMsg, 'error', 5000);
-            } else {
-                alert(errorMsg);
-            }
+            // Show enhanced error notification with actionable guidance
+            this.handleError(
+                { message: 'File too large' },
+                { fileSizeMB: fileSizeMB, file: file }
+            );
             return;
         }
 
@@ -168,15 +166,18 @@ class UploadManager {
         } catch (error) {
             console.error('[UploadManager] Error:', error);
             this.updateProgress(file.name, `Error: ${error.message}`, 'error');
-            
-            // Show error and allow retry
+
+            // Show error with actionable guidance and allow retry
             setTimeout(() => {
                 this.progressDiv.style.display = 'none';
                 this.dropzone.style.display = 'block';
-                if (typeof showNotification === 'function') {
-                    showNotification(`Upload failed: ${error.message}`, 'error', 5000);
-                }
-            }, 2000);
+
+                // Use enhanced error handling with file context
+                this.handleError(error, {
+                    file: file,
+                    fileSizeMB: (file.size / 1024 / 1024).toFixed(1)
+                });
+            }, 1500);
         }
     }
     
@@ -322,7 +323,18 @@ class UploadManager {
 
         } catch (error) {
             console.error('[UploadManager] Error generating quiz:', error);
-            if (typeof showNotification === 'function') {
+            // Use enhanced notification with retry action
+            if (typeof showEnhancedNotification === 'function') {
+                showEnhancedNotification(
+                    `Failed to generate quiz: ${error.message}`,
+                    'error',
+                    {
+                        action: 'Try again',
+                        actionCallback: () => this.generateQuiz(),
+                        duration: 8000
+                    }
+                );
+            } else if (typeof showNotification === 'function') {
                 showNotification(`Failed to generate quiz: ${error.message}`, 'error');
             }
         }
@@ -408,7 +420,18 @@ class UploadManager {
 
         } catch (error) {
             console.error('[UploadManager] Error generating flashcards:', error);
-            if (typeof showNotification === 'function') {
+            // Use enhanced notification with retry action
+            if (typeof showEnhancedNotification === 'function') {
+                showEnhancedNotification(
+                    `Failed to generate flashcards: ${error.message}`,
+                    'error',
+                    {
+                        action: 'Try again',
+                        actionCallback: () => this.generateFlashcards(),
+                        duration: 8000
+                    }
+                );
+            } else if (typeof showNotification === 'function') {
                 showNotification(`Failed to generate flashcards: ${error.message}`, 'error');
             }
         }
@@ -503,6 +526,195 @@ class UploadManager {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+
+    /**
+     * Handle errors with specific, actionable messages
+     *
+     * Issue #208: Improve frontend error messages with actionable guidance
+     *
+     * @param {Object|Error} error - Error object with type/code or Error instance
+     * @param {Object} context - Additional context (fileSize, filename, etc.)
+     */
+    handleError(error, context = {}) {
+        // Determine error type from error object or response
+        const errorType = this.classifyError(error, context);
+
+        // Error message configurations
+        const errorMessages = {
+            'file_type': {
+                message: `File type not supported. Please upload PDF, DOCX, PPTX, TXT, MD, or HTML files.`,
+                type: 'error',
+                action: 'Supported formats',
+                actionUrl: '#',
+                duration: 8000
+            },
+            'file_size': {
+                message: `File too large (${context.fileSizeMB || 'unknown'}MB). Maximum size is ${this.MAX_FILE_SIZE_MB}MB. Try compressing your file or splitting it into smaller parts.`,
+                type: 'error',
+                action: 'Try smaller file',
+                actionCallback: () => this.reset(),
+                duration: 10000
+            },
+            'network': {
+                message: 'Network error. Check your internet connection and try again.',
+                type: 'error',
+                action: 'Retry',
+                actionCallback: () => {
+                    if (context.file) {
+                        this.handleFile(context.file);
+                    } else {
+                        this.reset();
+                    }
+                },
+                duration: 0 // Don't auto-dismiss
+            },
+            'rate_limit': {
+                message: 'Too many uploads. Please wait before trying again.',
+                type: 'warning',
+                countdown: context.retryAfter || 60,
+                action: 'Retry',
+                actionCallback: () => this.reset(),
+                duration: 0
+            },
+            'analysis_failed': {
+                message: 'Could not analyze file. The file may be corrupted, password-protected, or in an unsupported format. Try re-saving the file and uploading again.',
+                type: 'error',
+                action: 'Upload different file',
+                actionCallback: () => this.reset(),
+                duration: 10000
+            },
+            'extraction_failed': {
+                message: 'Could not extract text from file. The file may be an image-only PDF or corrupted. Try uploading a different format.',
+                type: 'error',
+                action: 'Upload different file',
+                actionCallback: () => this.reset(),
+                duration: 10000
+            },
+            'auth_required': {
+                message: 'Please sign in to upload files.',
+                type: 'warning',
+                action: 'Sign in',
+                actionUrl: '/login',
+                duration: 0
+            },
+            'permission_denied': {
+                message: 'You don\'t have permission to upload files to this course.',
+                type: 'error',
+                action: 'Contact admin',
+                actionUrl: 'mailto:support@example.com',
+                duration: 10000
+            },
+            'server_error': {
+                message: 'Server error occurred. Our team has been notified. Please try again in a few minutes.',
+                type: 'error',
+                action: 'Retry',
+                actionCallback: () => this.reset(),
+                duration: 10000
+            },
+            'timeout': {
+                message: 'Request timed out. This might happen with large files. Please try again.',
+                type: 'error',
+                action: 'Retry',
+                actionCallback: () => {
+                    if (context.file) {
+                        this.handleFile(context.file);
+                    } else {
+                        this.reset();
+                    }
+                },
+                duration: 0
+            },
+            'empty_file': {
+                message: 'The uploaded file appears to be empty. Please select a file with content.',
+                type: 'error',
+                action: 'Upload different file',
+                actionCallback: () => this.reset(),
+                duration: 8000
+            },
+            'default': {
+                message: error.message || 'An unexpected error occurred. Please try again.',
+                type: 'error',
+                action: 'Try again',
+                actionCallback: () => this.reset(),
+                duration: 8000
+            }
+        };
+
+        const config = errorMessages[errorType] || errorMessages.default;
+
+        console.error(`[UploadManager] Error type: ${errorType}`, error);
+
+        // Use enhanced notification if available, fall back to simple notification
+        if (typeof showEnhancedNotification === 'function') {
+            showEnhancedNotification(config.message, config.type, {
+                action: config.action,
+                actionUrl: config.actionUrl,
+                actionCallback: config.actionCallback,
+                countdown: config.countdown,
+                duration: config.duration
+            });
+        } else if (typeof showNotification === 'function') {
+            showNotification(config.message, config.type, config.duration || 5000);
+        } else {
+            alert(config.message);
+        }
+    }
+
+    /**
+     * Classify error into specific error type
+     *
+     * @param {Object|Error} error - Error object or Error instance
+     * @param {Object} context - Additional context
+     * @returns {string} - Error type key
+     */
+    classifyError(error, context = {}) {
+        const message = (error.message || error.detail || '').toLowerCase();
+        const status = error.status || context.status;
+
+        // Check for specific status codes
+        if (status === 401 || message.includes('unauthorized') || message.includes('authentication')) {
+            return 'auth_required';
+        }
+        if (status === 403 || message.includes('permission') || message.includes('forbidden')) {
+            return 'permission_denied';
+        }
+        if (status === 429 || message.includes('rate limit') || message.includes('too many')) {
+            return 'rate_limit';
+        }
+        if (status >= 500 || message.includes('server error') || message.includes('internal error')) {
+            return 'server_error';
+        }
+
+        // Check for specific error messages
+        if (message.includes('file type') || message.includes('not supported') || message.includes('invalid format')) {
+            return 'file_type';
+        }
+        if (message.includes('too large') || message.includes('file size') || message.includes('exceeds')) {
+            return 'file_size';
+        }
+        if (message.includes('empty') || message.includes('no content')) {
+            return 'empty_file';
+        }
+        if (message.includes('extract') || message.includes('extraction')) {
+            return 'extraction_failed';
+        }
+        if (message.includes('analys') || message.includes('analyze') || message.includes('analysis')) {
+            return 'analysis_failed';
+        }
+
+        // Check for network/timeout errors
+        if (error instanceof TypeError && message.includes('network')) {
+            return 'network';
+        }
+        if (message.includes('timeout') || message.includes('timed out') || error.name === 'AbortError') {
+            return 'timeout';
+        }
+        if (message.includes('network') || message.includes('connection') || message.includes('offline')) {
+            return 'network';
+        }
+
+        return 'default';
     }
 }
 
