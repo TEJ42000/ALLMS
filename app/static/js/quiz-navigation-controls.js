@@ -77,6 +77,13 @@ function getQuestionStatus(index, quizState) {
     
     if (quizState.userAnswers && quizState.userAnswers[index] !== null && quizState.userAnswers[index] !== undefined) {
         classes.push('answered');
+
+        // FIX #278: Check if answer was correct or incorrect for proper color indication
+        if (quizState.questions && quizState.questions[index] &&
+            typeof quizState.questions[index].correct_index === 'number') {
+            const isCorrect = quizState.userAnswers[index] === quizState.questions[index].correct_index;
+            classes.push(isCorrect ? 'correct' : 'incorrect');
+        }
     }
     
     if (quizState.flaggedQuestions && Array.isArray(quizState.flaggedQuestions) && quizState.flaggedQuestions.includes(index)) {
@@ -156,9 +163,11 @@ function createQuestionNavSidebar(quizState, onNavigate) {
     const legend = document.createElement('div');
     legend.className = 'nav-sidebar-legend';
     
+    // FIX #278: Updated legend to show correct/incorrect distinction
     const legendItems = [
         { class: 'current', label: 'Current' },
-        { class: 'answered', label: 'Answered' },
+        { class: 'correct', label: 'Correct' },
+        { class: 'incorrect', label: 'Incorrect' },
         { class: 'flagged', label: 'Flagged' }
     ];
     
