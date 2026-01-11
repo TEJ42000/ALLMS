@@ -10,7 +10,6 @@ from datetime import datetime
 import logging
 
 from app.services.gcp_service import get_firestore_client
-from app.middleware import get_current_user
 
 logger = logging.getLogger(__name__)
 
@@ -33,14 +32,16 @@ class UserStatsUpdate(BaseModel):
 async def get_user_stats(request: Request):
     """
     Get user gamification stats
-    
+
     Returns:
         User stats including achievements, points, streaks
     """
     try:
-        user_email = get_current_user(request)
-        if not user_email:
+        user = getattr(request.state, 'user', None)
+        if not user or not hasattr(user, 'email'):
             raise HTTPException(status_code=401, detail="Not authenticated")
+
+        user_email = user.email
         
         db = get_firestore_client()
         
@@ -86,17 +87,19 @@ async def get_user_stats(request: Request):
 async def update_user_stats(request: Request, stats: UserStatsUpdate):
     """
     Update user gamification stats
-    
+
     Args:
         stats: Updated user stats
-        
+
     Returns:
         Success message
     """
     try:
-        user_email = get_current_user(request)
-        if not user_email:
+        user = getattr(request.state, 'user', None)
+        if not user or not hasattr(user, 'email'):
             raise HTTPException(status_code=401, detail="Not authenticated")
+
+        user_email = user.email
         
         db = get_firestore_client()
         
@@ -130,16 +133,16 @@ async def update_user_stats(request: Request, stats: UserStatsUpdate):
 async def get_leaderboard(request: Request, limit: int = 10):
     """
     Get top users by points
-    
+
     Args:
         limit: Number of users to return
-        
+
     Returns:
         List of top users with points
     """
     try:
-        user_email = get_current_user(request)
-        if not user_email:
+        user = getattr(request.state, 'user', None)
+        if not user or not hasattr(user, 'email'):
             raise HTTPException(status_code=401, detail="Not authenticated")
         
         db = get_firestore_client()
