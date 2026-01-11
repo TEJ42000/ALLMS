@@ -1408,13 +1408,13 @@ async function generateQuiz() {
             requestBody.week = week;
         }
 
-        // Use the new quiz persistence API
-        const response = await fetch(`${API_BASE}/api/quizzes/courses/${COURSE_ID}`, {
+        // Use the new quiz persistence API with CSRF protection
+        const response = await secureFetch(`${API_BASE}/api/quizzes/courses/${COURSE_ID}`, {
             method: 'POST',
-            headers: {
+            headers: addCSRFHeader({
                 'Content-Type': 'application/json',
                 'X-User-ID': getUserId()
-            },
+            }),
             body: JSON.stringify(requestBody)
         });
 
@@ -1951,12 +1951,13 @@ async function submitQuizResults() {
     console.log('[Quiz Submit] Submitting for user:', userId, 'quiz:', quizState.quizId);
 
     try {
-        const response = await fetch(`${API_BASE}/api/quizzes/submit`, {
+        // FIX #278: Use secureFetch with CSRF token for POST request
+        const response = await secureFetch(`${API_BASE}/api/quizzes/submit`, {
             method: 'POST',
-            headers: {
+            headers: addCSRFHeader({
                 'Content-Type': 'application/json',
                 'X-User-ID': userId
-            },
+            }),
             body: JSON.stringify({
                 quiz_id: quizState.quizId,
                 course_id: quizState.courseId,
