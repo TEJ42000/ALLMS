@@ -91,6 +91,18 @@ document.addEventListener('DOMContentLoaded', () => {
     initQuizListeners();
     initStudyListeners();
     initFlashcardListeners();
+
+    // Initialize achievements system
+    if (typeof initAchievements === 'function') {
+        initAchievements();
+    }
+
+    // Listen for tab changes to initialize badges page
+    document.addEventListener('tab-changed', (e) => {
+        if (e.detail.tab === 'badges' && typeof initBadgesPage === 'function') {
+            initBadgesPage();
+        }
+    });
 });
 
 // ========== Loading State ==========
@@ -1855,8 +1867,14 @@ function selectAnswer(answerIndex) {
     quizState.userAnswers[quizState.currentQuestionIndex] = answerIndex;
 
     // Update score if correct
-    if (answerIndex === question.correct_index) {
+    const isCorrect = answerIndex === question.correct_index;
+    if (isCorrect) {
         quizState.score++;
+    }
+
+    // Track achievement progress
+    if (typeof recordQuizAnswer === 'function') {
+        recordQuizAnswer(isCorrect);
     }
 
     // Phase 5: Announce answer selection to screen readers
@@ -2538,7 +2556,27 @@ function safeParseInt(value, fallback = 0) {
     return isNaN(parsed) ? fallback : parsed;
 }
 
+/**
+ * Update dashboard stats with achievement data
+ */
+function updateDashboardStats() {
+    if (typeof userStats !== 'undefined') {
+        const pointsEl = document.getElementById('stat-points');
+        const streakEl = document.getElementById('stat-streak');
+
+        if (pointsEl) {
+            pointsEl.textContent = userStats.totalPoints.toLocaleString();
+        }
+        if (streakEl) {
+            streakEl.textContent = userStats.currentStreak;
+        }
+    }
+}
+
 function initDashboard() {
+    // Update dashboard stats with achievement data
+    updateDashboardStats();
+
     // Add course-specific information banner to dashboard
     const dashboardSection = document.getElementById('dashboard-section');
     if (dashboardSection && COURSE_ID) {

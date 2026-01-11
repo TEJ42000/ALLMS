@@ -1,0 +1,1426 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.13.5, pytest-7.4.4, pluggy-1.6.0 -- /Users/matejmonteleone/PycharmProjects/LLMRMS/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /Users/matejmonteleone/PycharmProjects/LLMRMS
+configfile: pytest.ini
+testpaths: tests
+plugins: asyncio-0.23.3, anyio-4.12.0
+asyncio: mode=Mode.AUTO
+collecting ... collected 827 items / 2 skipped
+
+tests/test_admin_auth.py::TestAdminPageAccess::test_admin_courses_accessible_in_dev_mode PASSED [  0%]
+tests/test_admin_auth.py::TestAdminPageAccess::test_admin_users_accessible_in_dev_mode PASSED [  0%]
+tests/test_admin_auth.py::TestAdminPageAccess::test_admin_redirect_accessible_in_dev_mode PASSED [  0%]
+tests/test_admin_auth.py::TestAdminAPIAccess::test_list_courses_accessible_in_dev_mode PASSED [  0%]
+tests/test_admin_auth.py::TestAdminAPIAccess::test_allowed_users_api_accessible_in_dev_mode PASSED [  0%]
+tests/test_admin_auth.py::TestPublicRouteAccess::test_health_endpoint_public PASSED [  0%]
+tests/test_admin_auth.py::TestPublicRouteAccess::test_api_docs_public PASSED [  0%]
+tests/test_admin_auth.py::TestPublicRouteAccess::test_static_files_public PASSED [  0%]
+tests/test_admin_auth.py::TestPublicRouteAccess::test_homepage_accessible PASSED [  1%]
+tests/test_admin_auth.py::TestMockUserInDevMode::test_mock_user_has_admin_access PASSED [  1%]
+tests/test_admin_auth.py::TestMockUserInDevMode::test_mock_user_email_in_response PASSED [  1%]
+tests/test_admin_auth.py::TestDevModeBanner::test_dev_mode_banner_shows_in_admin PASSED [  1%]
+tests/test_admin_auth.py::TestDevModeBanner::test_dev_mode_banner_on_users_page PASSED [  1%]
+tests/test_admin_auth.py::TestAPIResponseFormats::test_courses_api_returns_json PASSED [  1%]
+tests/test_admin_auth.py::TestAPIResponseFormats::test_allowed_users_api_returns_json PASSED [  1%]
+tests/test_admin_courses_api.py::TestListCourses::test_list_courses_success PASSED [  1%]
+tests/test_admin_courses_api.py::TestListCourses::test_list_courses_include_inactive PASSED [  2%]
+tests/test_admin_courses_api.py::TestGetCourse::test_get_course_success PASSED [  2%]
+tests/test_admin_courses_api.py::TestGetCourse::test_get_course_not_found PASSED [  2%]
+tests/test_admin_courses_api.py::TestGetCourse::test_get_course_invalid_id PASSED [  2%]
+tests/test_admin_courses_api.py::TestGetWeek::test_get_week_success PASSED [  2%]
+tests/test_admin_courses_api.py::TestGetWeek::test_get_week_not_found PASSED [  2%]
+tests/test_admin_courses_api.py::TestGetWeek::test_get_week_invalid_week_number_too_high PASSED [  2%]
+tests/test_admin_courses_api.py::TestGetWeek::test_get_week_invalid_week_number_zero PASSED [  2%]
+tests/test_admin_courses_api.py::TestDeactivateCourse::test_deactivate_success PASSED [  3%]
+tests/test_admin_courses_api.py::TestDeactivateCourse::test_deactivate_not_found PASSED [  3%]
+tests/test_admin_courses_api.py::TestCreateCourse::test_create_course_success PASSED [  3%]
+tests/test_admin_courses_api.py::TestCreateCourse::test_create_duplicate_course PASSED [  3%]
+tests/test_admin_courses_api.py::TestUpsertWeek::test_upsert_week_success PASSED [  3%]
+tests/test_admin_courses_api.py::TestUpsertWeek::test_upsert_week_number_mismatch PASSED [  3%]
+tests/test_admin_courses_api.py::TestUpsertWeek::test_upsert_week_invalid_number_too_high PASSED [  3%]
+tests/test_admin_courses_api.py::TestUpsertWeek::test_upsert_week_invalid_number_zero PASSED [  3%]
+tests/test_admin_courses_api.py::TestIncludeWeeksParameter::test_get_course_without_weeks PASSED [  3%]
+tests/test_admin_courses_api.py::TestIncludeWeeksParameter::test_get_course_with_weeks_default PASSED [  4%]
+tests/test_admin_courses_api.py::TestResolveIncompletePath::test_resolve_incomplete_path_success PASSED [  4%]
+tests/test_admin_courses_api.py::TestResolveIncompletePath::test_resolve_incomplete_path_already_complete PASSED [  4%]
+tests/test_admin_courses_api.py::TestResolveIncompletePath::test_resolve_incomplete_path_not_found PASSED [  4%]
+tests/test_admin_courses_api.py::TestResolveIncompletePath::test_resolve_incomplete_path_no_course_materials_dir PASSED [  4%]
+tests/test_admin_courses_api.py::TestValidateMaterialsPathWithResolution::test_validate_path_with_resolution_finds_file PASSED [  4%]
+tests/test_admin_courses_api.py::TestValidateMaterialsPathWithResolution::test_validate_path_without_resolution PASSED [  4%]
+tests/test_admin_courses_api.py::TestValidateMaterialsPathWithResolution::test_validate_path_rejects_null_bytes PASSED [  4%]
+tests/test_admin_courses_api.py::TestValidateMaterialsPathWithResolution::test_validate_path_blocks_traversal PASSED [  5%]
+tests/test_admin_courses_api.py::TestValidateMaterialsPathWithResolution::test_validate_path_corrected_path_must_exist PASSED [  5%]
+tests/test_ai_tutor.py::TestChatEndpoint::test_chat_success PASSED       [  5%]
+tests/test_ai_tutor.py::TestChatEndpoint::test_chat_with_conversation_history PASSED [  5%]
+tests/test_ai_tutor.py::TestChatEndpoint::test_chat_empty_message_fails PASSED [  5%]
+tests/test_ai_tutor.py::TestChatEndpoint::test_chat_whitespace_only_message_fails PASSED [  5%]
+tests/test_ai_tutor.py::TestChatEndpoint::test_chat_missing_message_fails PASSED [  5%]
+tests/test_ai_tutor.py::TestChatEndpoint::test_chat_default_context PASSED [  5%]
+tests/test_ai_tutor.py::TestChatEndpoint::test_chat_api_error_handling PASSED [  6%]
+tests/test_ai_tutor.py::TestTopicsEndpoint::test_get_topics_success PASSED [  6%]
+tests/test_ai_tutor.py::TestTopicsEndpoint::test_topics_contain_required_fields PASSED [  6%]
+tests/test_ai_tutor.py::TestTopicsEndpoint::test_topics_include_main_law_areas PASSED [  6%]
+tests/test_ai_tutor.py::TestExamplesEndpoint::test_get_examples_success PASSED [  6%]
+tests/test_ai_tutor.py::TestExamplesEndpoint::test_examples_have_questions PASSED [  6%]
+tests/test_ai_tutor.py::TestCourseAwareMode::test_chat_with_course_id PASSED [  6%]
+tests/test_ai_tutor.py::TestCourseAwareMode::test_topics_with_course_id PASSED [  6%]
+tests/test_ai_tutor.py::TestCourseAwareMode::test_topics_with_invalid_course_id PASSED [  7%]
+tests/test_ai_tutor.py::TestCourseAwareMode::test_examples_with_course_id PASSED [  7%]
+tests/test_ai_tutor.py::TestCourseAwareMode::test_course_info_endpoint PASSED [  7%]
+tests/test_ai_tutor.py::TestCourseAwareMode::test_course_info_not_found PASSED [  7%]
+tests/test_ai_tutor.py::TestCacheFunctionality::test_chat_uses_cache_on_repeated_request PASSED [  7%]
+tests/test_ai_tutor.py::TestCacheFunctionality::test_chat_different_messages_not_cached PASSED [  7%]
+tests/test_ai_tutor.py::TestMaterialsLoading::test_chat_with_materials_context PASSED [  7%]
+tests/test_ai_tutor.py::TestMaterialsLoading::test_chat_materials_loading_error PASSED [  7%]
+tests/test_ai_tutor.py::TestWeekFiltering::test_topics_with_week_parameter PASSED [  7%]
+tests/test_ai_tutor.py::TestWeekFiltering::test_examples_with_week_parameter PASSED [  8%]
+tests/test_ai_tutor.py::TestErrorHandling::test_chat_message_at_max_length PASSED [  8%]
+tests/test_ai_tutor.py::TestErrorHandling::test_chat_message_exceeds_max_length PASSED [  8%]
+tests/test_ai_tutor.py::TestErrorHandling::test_chat_message_boundary_cases[1-200-Minimum valid length] PASSED [  8%]
+tests/test_ai_tutor.py::TestErrorHandling::test_chat_message_boundary_cases[100-200-Normal length] PASSED [  8%]
+tests/test_ai_tutor.py::TestErrorHandling::test_chat_message_boundary_cases[4999-200-Just under max] PASSED [  8%]
+tests/test_ai_tutor.py::TestErrorHandling::test_chat_message_boundary_cases[5000-200-Exactly at max] PASSED [  8%]
+tests/test_ai_tutor.py::TestErrorHandling::test_chat_message_boundary_cases[5001-422-Just over max (should reject)] PASSED [  8%]
+tests/test_ai_tutor.py::TestErrorHandling::test_chat_message_boundary_cases[10000-422-Far over max (should reject)] PASSED [  9%]
+tests/test_ai_tutor.py::TestErrorHandling::test_chat_with_special_characters PASSED [  9%]
+tests/test_ai_tutor.py::TestErrorHandling::test_chat_with_unicode_characters PASSED [  9%]
+tests/test_ai_tutor.py::TestErrorHandling::test_chat_api_timeout PASSED  [  9%]
+tests/test_ai_tutor.py::TestErrorHandling::test_chat_api_rate_limit PASSED [  9%]
+tests/test_ai_tutor.py::TestConversationHistory::test_chat_with_long_conversation_history PASSED [  9%]
+tests/test_ai_tutor.py::TestConversationHistory::test_chat_with_invalid_history_format PASSED [  9%]
+tests/test_ai_tutor.py::TestConversationHistory::test_chat_with_empty_history PASSED [  9%]
+tests/test_ai_tutor.py::TestContextVariations::test_chat_with_law_contexts[Constitutional Law] PASSED [ 10%]
+tests/test_ai_tutor.py::TestContextVariations::test_chat_with_law_contexts[Administrative Law] PASSED [ 10%]
+tests/test_ai_tutor.py::TestContextVariations::test_chat_with_law_contexts[Criminal Law] PASSED [ 10%]
+tests/test_ai_tutor.py::TestContextVariations::test_chat_with_law_contexts[Private Law] PASSED [ 10%]
+tests/test_ai_tutor.py::TestContextVariations::test_chat_with_law_contexts[International Law] PASSED [ 10%]
+tests/test_ai_tutor.py::TestContextVariations::test_chat_with_custom_context PASSED [ 10%]
+tests/test_ai_tutor.py::TestContextVariations::test_chat_without_context PASSED [ 10%]
+tests/test_ai_tutor.py::TestResponseFormatting::test_chat_response_has_timestamp PASSED [ 10%]
+tests/test_ai_tutor.py::TestResponseFormatting::test_chat_response_structure PASSED [ 11%]
+tests/test_ai_tutor.py::TestResponseFormatting::test_topics_response_structure PASSED [ 11%]
+tests/test_ai_tutor.py::TestResponseFormatting::test_examples_response_structure PASSED [ 11%]
+tests/test_ai_tutor.py::TestConcurrentRequests::test_multiple_concurrent_chat_requests PASSED [ 11%]
+tests/test_allow_list_service.py::TestAllowListEntry::test_create_entry PASSED [ 11%]
+tests/test_allow_list_service.py::TestAllowListEntry::test_entry_with_expiration_future PASSED [ 11%]
+tests/test_allow_list_service.py::TestAllowListEntry::test_entry_with_expiration_past PASSED [ 11%]
+tests/test_allow_list_service.py::TestAllowListEntry::test_inactive_entry_not_effective PASSED [ 11%]
+tests/test_allow_list_service.py::TestAllowListEntry::test_entry_firestore_dump PASSED [ 11%]
+tests/test_allow_list_service.py::TestAllowListCreateRequest::test_valid_request PASSED [ 12%]
+tests/test_allow_list_service.py::TestAllowListCreateRequest::test_email_normalized_to_lowercase PASSED [ 12%]
+tests/test_allow_list_service.py::TestAllowListCreateRequest::test_cannot_add_mgms_domain PASSED [ 12%]
+tests/test_allow_list_service.py::TestAllowListCreateRequest::test_reason_required PASSED [ 12%]
+tests/test_allow_list_service.py::TestAllowListCreateRequest::test_invalid_email_rejected PASSED [ 12%]
+tests/test_allow_list_service.py::TestAllowListUpdateRequest::test_partial_update PASSED [ 12%]
+tests/test_allow_list_service.py::TestAllowListUpdateRequest::test_full_update PASSED [ 12%]
+tests/test_allow_list_service.py::TestAllowListResponse::test_from_entry PASSED [ 12%]
+tests/test_anthropic_file_manager.py::TestAnthropicFileManagerPathValidation::test_get_local_file_path_valid PASSED [ 13%]
+tests/test_anthropic_file_manager.py::TestAnthropicFileManagerPathValidation::test_get_local_file_path_traversal_attack PASSED [ 13%]
+tests/test_anthropic_file_manager.py::TestAnthropicFileManagerPathValidation::test_get_local_file_path_double_dot_in_middle PASSED [ 13%]
+tests/test_anthropic_file_manager.py::TestAnthropicFileManagerFileValidation::test_validate_file_not_found PASSED [ 13%]
+tests/test_anthropic_file_manager.py::TestAnthropicFileManagerFileValidation::test_validate_file_empty PASSED [ 13%]
+tests/test_anthropic_file_manager.py::TestAnthropicFileManagerFileValidation::test_validate_file_unsupported_extension PASSED [ 13%]
+tests/test_anthropic_file_manager.py::TestAnthropicFileManagerFileValidation::test_validate_file_valid_pdf PASSED [ 13%]
+tests/test_anthropic_file_manager.py::TestAnthropicFileManagerFileValidation::test_validate_file_valid_txt PASSED [ 13%]
+tests/test_anthropic_file_manager.py::TestAnthropicFileManagerUpload::test_upload_file_success PASSED [ 14%]
+tests/test_anthropic_file_manager.py::TestAnthropicFileManagerUpload::test_upload_file_api_error PASSED [ 14%]
+tests/test_anthropic_file_manager.py::TestAnthropicFileManagerCheckExists::test_check_file_exists_true PASSED [ 14%]
+tests/test_anthropic_file_manager.py::TestAnthropicFileManagerCheckExists::test_check_file_exists_not_found PASSED [ 14%]
+tests/test_anthropic_file_manager.py::TestAdminEndpointValidation::test_validate_course_id_internal_function PASSED [ 14%]
+tests/test_anthropic_file_manager.py::TestAdminEndpointValidation::test_validate_course_id_special_chars_internal PASSED [ 14%]
+tests/test_anthropic_file_manager.py::TestAdminEndpointValidation::test_validate_course_id_too_long PASSED [ 14%]
+tests/test_anthropic_file_manager.py::TestAdminEndpointValidation::test_validate_course_id_valid_format PASSED [ 14%]
+tests/test_anthropic_file_manager.py::TestEnsureFileAvailable::test_ensure_file_available_returns_existing_valid_file PASSED [ 14%]
+tests/test_anthropic_file_manager.py::TestEnsureFileAvailable::test_ensure_file_available_uploads_when_expired PASSED [ 15%]
+tests/test_anthropic_file_manager.py::TestEnsureFileAvailable::test_ensure_file_available_uploads_when_missing PASSED [ 15%]
+tests/test_anthropic_file_manager.py::TestFirestoreUpdateFailures::test_update_material_fields_raises_on_failure PASSED [ 15%]
+tests/test_anthropic_file_manager.py::TestGenerateQuizFromCourse::test_generate_quiz_from_course_success PASSED [ 15%]
+tests/test_anthropic_file_manager.py::TestGenerateQuizFromCourse::test_generate_quiz_from_course_no_materials PASSED [ 15%]
+tests/test_anthropic_file_manager.py::TestRefreshEndpointIntegration::test_refresh_endpoint_validates_course_id PASSED [ 15%]
+tests/test_anthropic_file_manager.py::TestRefreshEndpointIntegration::test_refresh_endpoint_handles_nonexistent_course PASSED [ 15%]
+tests/test_assessment.py::TestExtractGrade::test_extract_grade_standard_format PASSED [ 15%]
+tests/test_assessment.py::TestExtractGrade::test_extract_grade_lowercase PASSED [ 16%]
+tests/test_assessment.py::TestExtractGrade::test_extract_grade_with_score_prefix PASSED [ 16%]
+tests/test_assessment.py::TestExtractGrade::test_extract_grade_with_header PASSED [ 16%]
+tests/test_assessment.py::TestExtractGrade::test_extract_grade_not_found PASSED [ 16%]
+tests/test_assessment.py::TestExtractGrade::test_extract_grade_invalid_range PASSED [ 16%]
+tests/test_assessment.py::TestExtractGrade::test_extract_grade_zero PASSED [ 16%]
+tests/test_assessment.py::TestExtractGrade::test_extract_grade_ten PASSED [ 16%]
+tests/test_assessment.py::TestAssessEndpoint::test_assess_success PASSED [ 16%]
+tests/test_assessment.py::TestAssessEndpoint::test_assess_extracts_grade PASSED [ 17%]
+tests/test_assessment.py::TestAssessEndpoint::test_assess_minimal_request PASSED [ 17%]
+tests/test_assessment.py::TestAssessEndpoint::test_assess_invalid_topic_fails PASSED [ 17%]
+tests/test_assessment.py::TestAssessEndpoint::test_assess_short_answer_fails PASSED [ 17%]
+tests/test_assessment.py::TestAssessEndpoint::test_assess_missing_topic_fails PASSED [ 17%]
+tests/test_assessment.py::TestAssessEndpoint::test_assess_api_error_handling PASSED [ 17%]
+tests/test_assessment.py::TestRubricEndpoint::test_get_rubric_success PASSED [ 17%]
+tests/test_assessment.py::TestRubricEndpoint::test_rubric_contains_grade_levels PASSED [ 17%]
+tests/test_assessment.py::TestRubricEndpoint::test_rubric_levels_have_criteria PASSED [ 18%]
+tests/test_assessment.py::TestSampleAnswersEndpoint::test_get_sample_answers_success PASSED [ 18%]
+tests/test_assessment.py::TestSampleAnswersEndpoint::test_sample_answers_have_required_fields PASSED [ 18%]
+tests/test_auth_middleware.py::TestPublicPathExclusions::test_health_is_public PASSED [ 18%]
+tests/test_auth_middleware.py::TestPublicPathExclusions::test_static_is_public PASSED [ 18%]
+tests/test_auth_middleware.py::TestPublicPathExclusions::test_api_docs_is_public PASSED [ 18%]
+tests/test_auth_middleware.py::TestAuthDisabledMode::test_mock_user_created_when_auth_disabled PASSED [ 18%]
+tests/test_auth_middleware.py::TestAuthDisabledMode::test_mock_user_has_admin_properties PASSED [ 18%]
+tests/test_auth_middleware.py::TestUserCreationFromHeaders::test_user_from_mgms_domain PASSED [ 18%]
+tests/test_auth_middleware.py::TestUserCreationFromHeaders::test_user_from_external_domain PASSED [ 19%]
+tests/test_auth_middleware.py::TestUserCreationFromHeaders::test_user_domain_extraction PASSED [ 19%]
+tests/test_auth_middleware.py::TestAuthConfigValidation::test_auth_config_loads PASSED [ 19%]
+tests/test_auth_middleware.py::TestAuthConfigValidation::test_auth_disabled_config PASSED [ 19%]
+tests/test_auth_middleware.py::TestAuthConfigValidation::test_custom_domain_config PASSED [ 19%]
+tests/test_auth_middleware.py::TestMiddlewareIntegration::test_public_endpoints_no_auth_required PASSED [ 19%]
+tests/test_auth_middleware.py::TestMiddlewareIntegration::test_protected_endpoints_accessible_in_dev_mode PASSED [ 19%]
+tests/test_auth_middleware.py::TestMiddlewareIntegration::test_api_endpoints_accessible_in_dev_mode PASSED [ 19%]
+tests/test_auth_service.py::TestIAPHeaderExtraction::test_extract_valid_headers PASSED [ 20%]
+tests/test_auth_service.py::TestIAPHeaderExtraction::test_extract_missing_email_header PASSED [ 20%]
+tests/test_auth_service.py::TestIAPHeaderExtraction::test_extract_missing_id_header PASSED [ 20%]
+tests/test_auth_service.py::TestIAPHeaderExtraction::test_extract_invalid_email_format PASSED [ 20%]
+tests/test_auth_service.py::TestDomainValidation::test_mgms_domain_valid PASSED [ 20%]
+tests/test_auth_service.py::TestDomainValidation::test_mgms_domain_case_insensitive PASSED [ 20%]
+tests/test_auth_service.py::TestDomainValidation::test_other_domains_invalid PASSED [ 20%]
+tests/test_auth_service.py::TestAuthConfig::test_auth_config_from_env PASSED [ 20%]
+tests/test_auth_service.py::TestAuthConfig::test_auth_config_defaults PASSED [ 21%]
+tests/test_auth_service.py::TestAuthConfig::test_mock_user_email_configurable PASSED [ 21%]
+tests/test_badge_api_endpoints.py::TestBadgeAPIEndpoints::test_user_stats_with_activities_attribute PASSED [ 21%]
+tests/test_badge_api_endpoints.py::TestBadgeAPIEndpoints::test_activity_counters_field_names PASSED [ 21%]
+tests/test_badge_api_endpoints.py::TestBadgeAPIEndpoints::test_badge_service_uses_correct_attributes PASSED [ 21%]
+tests/test_badge_api_endpoints.py::TestBadgeAPIEndpoints::test_badge_progress_calculation_with_correct_fields PASSED [ 21%]
+tests/test_badge_api_endpoints.py::TestBadgeAPIEndpoints::test_field_mapping_in_activity_criteria PASSED [ 21%]
+tests/test_badge_api_endpoints.py::TestBadgeAPIEndpoints::test_multiple_activity_criteria PASSED [ 21%]
+tests/test_badge_api_endpoints.py::TestBadgeAPIEndpoints::test_api_endpoint_structure_verification PASSED [ 22%]
+tests/test_badge_api_endpoints.py::TestBadgeAPIEndpoints::test_badge_definition_serialization PASSED [ 22%]
+tests/test_badge_api_endpoints.py::TestBadgeAPIEndpoints::test_user_badge_serialization PASSED [ 22%]
+tests/test_badge_api_endpoints.py::TestFieldNameConsistency::test_no_activity_counters_attribute PASSED [ 22%]
+tests/test_badge_api_endpoints.py::TestFieldNameConsistency::test_no_flashcard_sets_completed_field PASSED [ 22%]
+tests/test_badge_api_endpoints.py::TestFieldNameConsistency::test_complete_field_name_mapping PASSED [ 22%]
+tests/test_badge_api_endpoints.py::TestFieldNameConsistency::test_field_mapping_with_zero_values PASSED [ 22%]
+tests/test_badge_api_endpoints.py::TestFieldNameConsistency::test_field_mapping_with_exact_match PASSED [ 22%]
+tests/test_badge_api_endpoints.py::TestFieldNameConsistency::test_field_mapping_with_multiple_criteria PASSED [ 22%]
+tests/test_badge_e2e.py::TestBadgeE2E::test_complete_badge_earning_flow PASSED [ 23%]
+tests/test_badge_e2e.py::TestBadgeE2E::test_badge_showcase_display_flow PASSED [ 23%]
+tests/test_badge_e2e.py::TestBadgeE2E::test_admin_badge_seeding_flow PASSED [ 23%]
+tests/test_badge_e2e.py::TestBadgeE2E::test_only_active_badges_shown_to_users PASSED [ 23%]
+tests/test_badge_e2e.py::TestBadgeE2E::test_error_handling_graceful_degradation PASSED [ 23%]
+tests/test_badge_e2e.py::TestBadgeE2E::test_badge_progress_tracking PASSED [ 23%]
+tests/test_badge_e2e.py::TestBadgeE2E::test_concurrent_badge_unlocking_e2e PASSED [ 23%]
+tests/test_badge_e2e.py::TestBadgeE2E::test_input_validation_e2e PASSED  [ 23%]
+tests/test_badge_e2e.py::TestBadgeAPIEndpoints::test_get_all_badges_endpoint PASSED [ 24%]
+tests/test_badge_e2e.py::TestBadgeAPIEndpoints::test_get_earned_badges_endpoint PASSED [ 24%]
+tests/test_badge_e2e.py::TestBadgeAPIEndpoints::test_get_badge_details_endpoint PASSED [ 24%]
+tests/test_badge_e2e.py::TestBadgeAPIEndpoints::test_badge_seeding_endpoint PASSED [ 24%]
+tests/test_badge_integration.py::TestBadgeIntegration::test_service_unavailability_handling PASSED [ 24%]
+tests/test_badge_integration.py::TestBadgeIntegration::test_service_initialization_error_handling PASSED [ 24%]
+tests/test_badge_integration.py::TestBadgeIntegration::test_race_condition_protection FAILED [ 24%]
+tests/test_badge_integration.py::TestBadgeIntegration::test_concurrent_badge_unlocking PASSED [ 24%]
+tests/test_badge_integration.py::TestBadgeIntegration::test_end_to_end_badge_earning_flow PASSED [ 25%]
+tests/test_badge_integration.py::TestBadgeIntegration::test_error_recovery_in_badge_checking PASSED [ 25%]
+tests/test_badge_integration.py::TestBadgeIntegration::test_partial_failure_handling PASSED [ 25%]
+tests/test_badge_integration.py::TestBadgeServiceResilience::test_invalid_badge_data_handling PASSED [ 25%]
+tests/test_badge_integration.py::TestBadgeServiceResilience::test_network_timeout_handling PASSED [ 25%]
+tests/test_badge_system.py::TestBadgeService::test_check_streak_badge_criteria PASSED [ 25%]
+tests/test_badge_system.py::TestBadgeService::test_check_xp_badge_criteria PASSED [ 25%]
+tests/test_badge_system.py::TestBadgeService::test_check_activity_badge_criteria PASSED [ 25%]
+tests/test_badge_system.py::TestBadgeService::test_check_activity_badge_not_met PASSED [ 25%]
+tests/test_badge_system.py::TestBadgeService::test_calculate_progress_streak PASSED [ 26%]
+tests/test_badge_system.py::TestBadgeService::test_calculate_progress_xp PASSED [ 26%]
+tests/test_badge_system.py::TestBadgeService::test_unlock_badge FAILED   [ 26%]
+tests/test_badge_system.py::TestBadgeService::test_get_earned_badge_ids PASSED [ 26%]
+tests/test_badge_system.py::TestBadgeDefinitions::test_all_badge_definitions_count PASSED [ 26%]
+tests/test_badge_system.py::TestBadgeDefinitions::test_streak_badges_count PASSED [ 26%]
+tests/test_badge_system.py::TestBadgeDefinitions::test_xp_badges_count PASSED [ 26%]
+tests/test_badge_system.py::TestBadgeDefinitions::test_activity_badges_count PASSED [ 26%]
+tests/test_badge_system.py::TestBadgeDefinitions::test_consistency_badges_count PASSED [ 27%]
+tests/test_badge_system.py::TestBadgeDefinitions::test_special_badges_count PASSED [ 27%]
+tests/test_badge_system.py::TestBadgeDefinitions::test_badge_unique_ids PASSED [ 27%]
+tests/test_badge_system.py::TestBadgeDefinitions::test_badge_has_required_fields PASSED [ 27%]
+tests/test_badge_system.py::TestBadgeIntegration::test_badge_checking_on_activity PASSED [ 27%]
+tests/test_badge_system.py::TestBadgeIntegration::test_badge_progress_tracking PASSED [ 27%]
+tests/test_course_service.py::TestValidateCourseId::test_valid_course_id PASSED [ 27%]
+tests/test_course_service.py::TestValidateCourseId::test_empty_course_id PASSED [ 27%]
+tests/test_course_service.py::TestValidateCourseId::test_invalid_characters PASSED [ 28%]
+tests/test_course_service.py::TestValidateCourseId::test_too_long_course_id PASSED [ 28%]
+tests/test_course_service.py::TestValidateWeekNumber::test_valid_week_numbers PASSED [ 28%]
+tests/test_course_service.py::TestValidateWeekNumber::test_week_number_zero PASSED [ 28%]
+tests/test_course_service.py::TestValidateWeekNumber::test_week_number_negative PASSED [ 28%]
+tests/test_course_service.py::TestValidateWeekNumber::test_week_number_too_high PASSED [ 28%]
+tests/test_course_service.py::TestValidateWeekNumber::test_week_number_not_integer PASSED [ 28%]
+tests/test_course_service.py::TestCourseServiceInit::test_init_success PASSED [ 28%]
+tests/test_course_service.py::TestCourseServiceInit::test_init_no_firestore PASSED [ 29%]
+tests/test_course_service.py::TestGetCourse::test_get_course_not_found PASSED [ 29%]
+tests/test_course_service.py::TestGetCourse::test_get_course_invalid_id PASSED [ 29%]
+tests/test_course_service.py::TestGetCourse::test_get_course_empty_id PASSED [ 29%]
+tests/test_course_service.py::TestRetryLogic::test_is_retryable_error_service_unavailable PASSED [ 29%]
+tests/test_course_service.py::TestRetryLogic::test_is_retryable_error_deadline_exceeded PASSED [ 29%]
+tests/test_course_service.py::TestRetryLogic::test_is_retryable_error_resource_exhausted PASSED [ 29%]
+tests/test_course_service.py::TestRetryLogic::test_is_retryable_error_aborted PASSED [ 29%]
+tests/test_course_service.py::TestRetryLogic::test_is_retryable_error_not_found PASSED [ 29%]
+tests/test_course_service.py::TestRetryLogic::test_is_retryable_error_permission_denied PASSED [ 30%]
+tests/test_course_service.py::TestRetryLogic::test_is_retryable_error_value_error PASSED [ 30%]
+tests/test_course_service.py::TestRetryLogic::test_with_retry_success_on_first_try PASSED [ 30%]
+tests/test_course_service.py::TestRetryLogic::test_with_retry_success_after_transient_error PASSED [ 30%]
+tests/test_course_service.py::TestRetryLogic::test_with_retry_exhausts_retries PASSED [ 30%]
+tests/test_course_service.py::TestRetryLogic::test_with_retry_non_retryable_error PASSED [ 30%]
+tests/test_course_service.py::TestBatchWrites::test_batch_size_validation_under_limit PASSED [ 30%]
+tests/test_course_service.py::TestBatchWrites::test_batch_size_validation_over_limit PASSED [ 30%]
+tests/test_course_service.py::TestBatchWrites::test_firestore_batch_limit_constant PASSED [ 31%]
+tests/test_course_service.py::TestPagination::test_pagination_invalid_limit_zero PASSED [ 31%]
+tests/test_course_service.py::TestPagination::test_pagination_invalid_limit_over_100 PASSED [ 31%]
+tests/test_course_service.py::TestPagination::test_pagination_invalid_offset_negative PASSED [ 31%]
+tests/test_course_service.py::TestPagination::test_pagination_valid_boundary_limit_1 PASSED [ 31%]
+tests/test_course_service.py::TestPagination::test_pagination_valid_boundary_limit_100 PASSED [ 31%]
+tests/test_course_service.py::TestPagination::test_pagination_uses_firestore_native_methods PASSED [ 31%]
+tests/test_course_service.py::TestPagination::test_pagination_offset_zero PASSED [ 31%]
+tests/test_course_service.py::TestWeekCountSync::test_create_course_sets_initial_week_count PASSED [ 32%]
+tests/test_course_service.py::TestTopicOperations::test_get_topics_returns_empty_list_when_no_topics PASSED [ 32%]
+tests/test_course_service.py::TestTopicOperations::test_get_topics_returns_all_topics PASSED [ 32%]
+tests/test_course_service.py::TestTopicOperations::test_get_topics_filters_by_week PASSED [ 32%]
+tests/test_course_service.py::TestTopicOperations::test_get_topics_raises_course_not_found PASSED [ 32%]
+tests/test_course_service.py::TestTopicOperations::test_create_topic_success PASSED [ 32%]
+tests/test_course_service.py::TestTopicOperations::test_update_topic_success PASSED [ 32%]
+tests/test_course_service.py::TestTopicOperations::test_delete_topic_success PASSED [ 32%]
+tests/test_course_service.py::TestTopicOperations::test_delete_topic_not_found PASSED [ 33%]
+tests/test_course_service.py::TestTopicOperations::test_bulk_create_topics_success PASSED [ 33%]
+tests/test_course_service.py::TestTopicOperations::test_delete_all_topics_success PASSED [ 33%]
+tests/test_csv_injection_fix.py::TestCSVSanitization::test_sanitize_formula_injection_equals PASSED [ 33%]
+tests/test_csv_injection_fix.py::TestCSVSanitization::test_sanitize_formula_injection_plus PASSED [ 33%]
+tests/test_csv_injection_fix.py::TestCSVSanitization::test_sanitize_formula_injection_minus PASSED [ 33%]
+tests/test_csv_injection_fix.py::TestCSVSanitization::test_sanitize_formula_injection_at_sign PASSED [ 33%]
+tests/test_csv_injection_fix.py::TestCSVSanitization::test_sanitize_formula_injection_tab PASSED [ 33%]
+tests/test_csv_injection_fix.py::TestCSVSanitization::test_sanitize_normal_values PASSED [ 33%]
+tests/test_csv_injection_fix.py::TestCSVSanitization::test_sanitize_with_quotes PASSED [ 34%]
+tests/test_csv_injection_fix.py::TestCSVSanitization::test_sanitize_dangerous_with_quotes PASSED [ 34%]
+tests/test_csv_injection_fix.py::TestCSVSanitization::test_csv_row_format PASSED [ 34%]
+tests/test_csv_injection_fix.py::TestCSVSanitization::test_empty_values PASSED [ 34%]
+tests/test_csv_injection_fix.py::TestCSVSanitization::test_none_values PASSED [ 34%]
+tests/test_csv_injection_fix.py::TestCSVInjectionScenarios::test_excel_formula_attack PASSED [ 34%]
+tests/test_csv_injection_fix.py::TestCSVInjectionScenarios::test_google_sheets_formula_attack PASSED [ 34%]
+tests/test_csv_injection_fix.py::TestCSVInjectionScenarios::test_hyperlink_attack PASSED [ 34%]
+tests/test_csv_injection_fix.py::TestCSVInjectionScenarios::test_dde_attack PASSED [ 35%]
+tests/test_csv_injection_fix.py::TestCSVInjectionScenarios::test_combined_attack_vectors PASSED [ 35%]
+tests/test_docker_integration.py::test_docker_build_and_run SKIPPED      [ 35%]
+tests/test_docker_integration.py::test_docker_image_exists SKIPPED       [ 35%]
+tests/test_docker_integration.py::test_dockerfile_syntax SKIPPED (Docker
+is not available or not running)                                         [ 35%]
+tests/test_echr_service.py::TestECHRModels::test_echr_case_creation PASSED [ 35%]
+tests/test_echr_service.py::TestECHRModels::test_echr_case_summary_creation PASSED [ 35%]
+tests/test_echr_service.py::TestECHRModels::test_echr_search_request_defaults PASSED [ 35%]
+tests/test_echr_service.py::TestECHRModels::test_echr_search_request_with_filters PASSED [ 36%]
+tests/test_echr_service.py::TestCaseParsing::test_parse_case_basic PASSED [ 36%]
+tests/test_echr_service.py::TestCaseParsing::test_parse_case_articles PASSED [ 36%]
+tests/test_echr_service.py::TestCaseParsing::test_parse_case_violations PASSED [ 36%]
+tests/test_echr_service.py::TestCaseParsing::test_parse_case_dates PASSED [ 36%]
+tests/test_echr_service.py::TestCaseParsing::test_parse_case_with_missing_fields PASSED [ 36%]
+tests/test_echr_service.py::TestCaseParsing::test_parse_case_summary PASSED [ 36%]
+tests/test_echr_service.py::TestCaching::test_database_initialization PASSED [ 36%]
+tests/test_echr_service.py::TestCaching::test_cache_case PASSED          [ 37%]
+tests/test_echr_service.py::TestCaching::test_cache_memory_layer PASSED  [ 37%]
+tests/test_echr_service.py::TestCaching::test_cache_miss PASSED          [ 37%]
+tests/test_echr_service.py::TestCaching::test_clear_cache_specific PASSED [ 37%]
+tests/test_echr_service.py::TestCaching::test_clear_cache_all PASSED     [ 37%]
+tests/test_echr_service.py::TestCaching::test_cached_case_count PASSED   [ 37%]
+tests/test_echr_service.py::TestLocalSearch::test_search_cached_by_query PASSED [ 37%]
+tests/test_echr_service.py::TestLocalSearch::test_search_cached_by_respondent PASSED [ 37%]
+tests/test_echr_service.py::TestLocalSearch::test_search_cached_by_articles PASSED [ 37%]
+tests/test_echr_service.py::TestLocalSearch::test_search_cached_no_results PASSED [ 38%]
+tests/test_echr_service.py::TestLocalSearch::test_search_cached_pagination PASSED [ 38%]
+tests/test_echr_service.py::TestFiltering::test_filter_by_articles PASSED [ 38%]
+tests/test_echr_service.py::TestFiltering::test_filter_by_respondent PASSED [ 38%]
+tests/test_echr_service.py::TestFiltering::test_filter_by_importance PASSED [ 38%]
+tests/test_echr_service.py::TestFiltering::test_filter_by_query PASSED   [ 38%]
+tests/test_echr_service.py::TestFiltering::test_filter_combined PASSED   [ 38%]
+tests/test_echr_service.py::TestAPIClient::test_get_case_from_api PASSED [ 38%]
+tests/test_echr_service.py::TestAPIClient::test_get_case_from_cache PASSED [ 39%]
+tests/test_echr_service.py::TestAPIClient::test_get_case_not_found PASSED [ 39%]
+tests/test_echr_service.py::TestAPIClient::test_get_cases_paginated PASSED [ 39%]
+tests/test_echr_service.py::TestAPIClient::test_get_stats PASSED         [ 39%]
+tests/test_echr_service.py::TestAPIClient::test_get_conclusions PASSED   [ 39%]
+tests/test_echr_service.py::TestAPIClient::test_get_case_documents PASSED [ 39%]
+tests/test_echr_service.py::TestAPIClient::test_get_cited_applications PASSED [ 39%]
+tests/test_echr_service.py::TestSyncStatus::test_get_sync_status_empty PASSED [ 39%]
+tests/test_echr_service.py::TestSyncStatus::test_get_sync_status_with_cases PASSED [ 40%]
+tests/test_echr_service.py::TestSingleton::test_get_echr_service_singleton PASSED [ 40%]
+tests/test_echr_service.py::TestErrorHandling::test_echr_api_error PASSED [ 40%]
+tests/test_echr_service.py::TestErrorHandling::test_echr_service_error PASSED [ 40%]
+tests/test_extraction_status_api.py::TestGetCacheStats::test_get_cache_stats_success PASSED [ 40%]
+tests/test_extraction_status_api.py::TestGetCacheStats::test_get_cache_stats_empty PASSED [ 40%]
+tests/test_extraction_status_api.py::TestGetCacheStats::test_get_cache_stats_firestore_unavailable PASSED [ 40%]
+tests/test_extraction_status_api.py::TestGetCachedFile::test_get_cached_file_firestore_unavailable PASSED [ 40%]
+tests/test_extraction_status_api.py::TestGetCachedFile::test_get_cached_file_not_found PASSED [ 40%]
+tests/test_extraction_status_api.py::TestRefreshFileCache::test_refresh_file_cache_firestore_unavailable PASSED [ 41%]
+tests/test_extraction_status_api.py::TestRefreshFileCache::test_refresh_file_cache_not_found PASSED [ 41%]
+tests/test_extraction_status_api.py::TestExtractionWorkflow::test_check_stats_then_extract PASSED [ 41%]
+tests/test_extraction_status_api.py::TestHealthEndpoint::test_cache_health_available PASSED [ 41%]
+tests/test_extraction_status_api.py::TestHealthEndpoint::test_cache_health_unavailable PASSED [ 41%]
+tests/test_extraction_status_api.py::TestPopulateCache::test_populate_cache_firestore_unavailable PASSED [ 41%]
+tests/test_extraction_status_api.py::TestPopulateCache::test_populate_all_cache_firestore_unavailable PASSED [ 41%]
+tests/test_extraction_status_api.py::TestInvalidateCache::test_invalidate_cache_firestore_unavailable PASSED [ 41%]
+tests/test_extraction_status_ui.py::TestExtractionMetricsCalculation::test_calculate_coverage_percentage PASSED [ 42%]
+tests/test_extraction_status_ui.py::TestExtractionMetricsCalculation::test_count_by_status PASSED [ 42%]
+tests/test_extraction_status_ui.py::TestExtractionMetricsCalculation::test_calculate_total_characters PASSED [ 42%]
+tests/test_extraction_status_ui.py::TestExtractionMetricsCalculation::test_group_by_file_type PASSED [ 42%]
+tests/test_extraction_status_ui.py::TestExtractionStatusEndpoints::test_get_all_material_statuses PASSED [ 42%]
+tests/test_extraction_status_ui.py::TestActivityLogGeneration::test_generate_activity_log PASSED [ 42%]
+tests/test_extraction_status_ui.py::TestActivityLogGeneration::test_format_time_ago PASSED [ 42%]
+tests/test_extraction_status_ui.py::TestErrorHandlingAndReporting::test_handle_extraction_failure PASSED [ 42%]
+tests/test_extraction_status_ui.py::TestErrorHandlingAndReporting::test_generate_error_report PASSED [ 43%]
+tests/test_extraction_ui_integration.py::TestDashboardDataLoading::test_load_dashboard_metrics PASSED [ 43%]
+tests/test_extraction_ui_integration.py::TestExtractionWorkflow::test_check_stats_workflow PASSED [ 43%]
+tests/test_extraction_ui_integration.py::TestErrorHandlingWorkflow::test_handle_firestore_unavailable PASSED [ 43%]
+tests/test_extraction_ui_integration.py::TestErrorHandlingWorkflow::test_handle_file_not_found PASSED [ 43%]
+tests/test_extraction_ui_integration.py::TestHealthEndpoint::test_cache_health_available PASSED [ 43%]
+tests/test_extraction_ui_integration.py::TestHealthEndpoint::test_cache_health_unavailable PASSED [ 43%]
+tests/test_extraction_ui_integration.py::TestAPIEndpointStructure::test_stats_endpoint_structure PASSED [ 43%]
+tests/test_extraction_ui_integration.py::TestAPIEndpointStructure::test_health_endpoint_structure PASSED [ 44%]
+tests/test_files_content.py::TestFilesContentQuizEndpoint::test_quiz_generation_success PASSED [ 44%]
+tests/test_files_content.py::TestFilesContentQuizEndpoint::test_quiz_with_week_parameter PASSED [ 44%]
+tests/test_files_content.py::TestFilesContentStudyGuideEndpoint::test_study_guide_generation_success PASSED [ 44%]
+tests/test_files_content.py::TestFilesContentArticleExplainEndpoint::test_article_explanation_success PASSED [ 44%]
+tests/test_files_content.py::TestFilesContentCaseAnalysisEndpoint::test_case_analysis_success PASSED [ 44%]
+tests/test_files_content.py::TestFilesContentCaseAnalysisEndpoint::test_case_analysis_short_facts_fails PASSED [ 44%]
+tests/test_files_content.py::TestFilesContentFlashcardsEndpoint::test_flashcards_generation_success PASSED [ 44%]
+tests/test_files_content.py::TestFilesContentInfoEndpoints::test_available_files_endpoint PASSED [ 44%]
+tests/test_files_content.py::TestFilesContentInfoEndpoints::test_status_endpoint PASSED [ 45%]
+tests/test_files_content.py::TestFilesContentInfoEndpoints::test_examples_endpoint PASSED [ 45%]
+tests/test_files_content.py::TestThreeTierMaterialsStructure::test_get_files_by_tier PASSED [ 45%]
+tests/test_files_content.py::TestThreeTierMaterialsStructure::test_get_files_by_subject PASSED [ 45%]
+tests/test_files_content.py::TestThreeTierMaterialsStructure::test_get_prioritized_files PASSED [ 45%]
+tests/test_files_content.py::TestThreeTierMaterialsStructure::test_get_topic_files_with_three_tier_structure PASSED [ 45%]
+tests/test_files_content.py::TestInputValidation::test_generate_quiz_empty_file_keys PASSED [ 45%]
+tests/test_files_content.py::TestInputValidation::test_generate_quiz_invalid_file_keys_type PASSED [ 45%]
+tests/test_files_content.py::TestInputValidation::test_generate_study_guide_from_course_no_materials PASSED [ 46%]
+tests/test_files_content.py::TestInputValidation::test_generate_flashcards_empty_file_keys PASSED [ 46%]
+tests/test_files_content.py::TestInputValidation::test_generate_flashcards_invalid_file_keys_type PASSED [ 46%]
+tests/test_files_content.py::TestInputValidation::test_generate_flashcards_num_cards_too_low PASSED [ 46%]
+tests/test_files_content.py::TestInputValidation::test_generate_flashcards_num_cards_too_high PASSED [ 46%]
+tests/test_files_content.py::TestInputValidation::test_generate_flashcards_num_cards_boundary_min FAILED [ 46%]
+tests/test_files_content.py::TestInputValidation::test_generate_flashcards_num_cards_boundary_max FAILED [ 46%]
+tests/test_files_content.py::TestInputValidation::test_generate_flashcards_topic_boundary_max_length FAILED [ 46%]
+tests/test_files_content.py::TestInputValidation::test_generate_flashcards_topic_too_long PASSED [ 47%]
+tests/test_files_content.py::TestInputValidation::test_generate_flashcards_topic_200_chars_with_escaping FAILED [ 47%]
+tests/test_files_content.py::TestInputValidation::test_generate_flashcards_topic_sanitization FAILED [ 47%]
+tests/test_files_content.py::TestInputValidation::test_generate_flashcards_topic_whitespace_only FAILED [ 47%]
+tests/test_files_content.py::TestInputValidation::test_generate_flashcards_prompt_injection_ignore_previous PASSED [ 47%]
+tests/test_files_content.py::TestInputValidation::test_generate_flashcards_prompt_injection_system_prompt FAILED [ 47%]
+tests/test_files_content.py::TestInputValidation::test_generate_flashcards_prompt_injection_act_as FAILED [ 47%]
+tests/test_files_content.py::TestInputValidation::test_generate_flashcards_prompt_injection_with_whitespace_obfuscation PASSED [ 47%]
+tests/test_files_content.py::TestInputValidation::test_generate_flashcards_prompt_injection_new_instructions FAILED [ 48%]
+tests/test_files_content.py::TestInputValidation::test_generate_flashcards_prompt_injection_roleplay FAILED [ 48%]
+tests/test_files_content.py::TestInputValidation::test_generate_flashcards_unicode_whitespace_sanitization FAILED [ 48%]
+tests/test_files_content.py::TestCourseAwareQuizEndpoint::test_quiz_with_course_id PASSED [ 48%]
+tests/test_files_content.py::TestCourseAwareQuizEndpoint::test_quiz_with_course_id_and_week PASSED [ 48%]
+tests/test_files_content.py::TestCourseAwareQuizEndpoint::test_quiz_course_not_found PASSED [ 48%]
+tests/test_files_content.py::TestCourseAwareQuizEndpoint::test_quiz_requires_course_id PASSED [ 48%]
+tests/test_files_content.py::TestCourseAwareStudyGuideEndpoint::test_study_guide_with_course_id PASSED [ 48%]
+tests/test_files_content.py::TestCourseAwareStudyGuideEndpoint::test_study_guide_with_course_id_and_single_week PASSED [ 48%]
+tests/test_files_content.py::TestCourseAwareStudyGuideEndpoint::test_study_guide_with_multiple_weeks PASSED [ 49%]
+tests/test_files_content.py::TestCourseAwareStudyGuideEndpoint::test_study_guide_weeks_validation PASSED [ 49%]
+tests/test_files_content.py::TestCourseAwareStudyGuideEndpoint::test_study_guide_requires_course_id PASSED [ 49%]
+tests/test_files_content.py::TestCourseAwareStudyGuideEndpoint::test_study_guide_deprecated_topic_parameter_warning PASSED [ 49%]
+tests/test_files_content.py::TestStudyGuideErrorHandling::test_study_guide_no_materials_with_course_id PASSED [ 49%]
+tests/test_files_content.py::TestStudyGuideErrorHandling::test_study_guide_no_materials_with_weeks PASSED [ 49%]
+tests/test_files_content.py::TestStudyGuideErrorHandling::test_study_guide_requires_course_id PASSED [ 49%]
+tests/test_files_content.py::TestCourseAwareFlashcardsEndpoint::test_flashcards_with_course_id PASSED [ 49%]
+tests/test_files_content.py::TestCourseAwareFlashcardsEndpoint::test_generate_flashcards_from_course_num_cards_validation FAILED [ 50%]
+tests/test_files_content.py::TestCourseAwareFlashcardsEndpoint::test_generate_flashcards_from_course_week_validation FAILED [ 50%]
+tests/test_files_content.py::TestCourseAwareFlashcardsEndpoint::test_generate_flashcards_from_course_topic_validation PASSED [ 50%]
+tests/test_files_content.py::TestCourseAwareFlashcardsEndpoint::test_generate_flashcards_from_course_topic_whitespace FAILED [ 50%]
+tests/test_files_content.py::TestCourseAwareFlashcardsEndpoint::test_generate_flashcards_from_course_topic_sanitization FAILED [ 50%]
+tests/test_files_content.py::TestCourseFilesEndpoint::test_get_course_files PASSED [ 50%]
+tests/test_files_content.py::TestCourseFilesEndpoint::test_get_course_files_with_week PASSED [ 50%]
+tests/test_files_content.py::TestCourseFilesEndpoint::test_get_course_files_not_found PASSED [ 50%]
+tests/test_files_content.py::TestTopicsEndpointCourseAware::test_topics_default PASSED [ 51%]
+tests/test_files_content.py::TestTopicsEndpointCourseAware::test_topics_with_course_id PASSED [ 51%]
+tests/test_files_content.py::TestTopicsEndpointCourseAware::test_topics_course_not_found PASSED [ 51%]
+tests/test_files_content.py::TestWeekValidation::test_quiz_week_too_high PASSED [ 51%]
+tests/test_files_content.py::TestWeekValidation::test_quiz_week_zero PASSED [ 51%]
+tests/test_flashcard_enhancements.py::TestSpacedRepetitionAlgorithm::test_sm2_quality_5_increases_interval PASSED [ 51%]
+tests/test_flashcard_enhancements.py::TestSpacedRepetitionAlgorithm::test_sm2_quality_0_resets_interval PASSED [ 51%]
+tests/test_flashcard_enhancements.py::TestSpacedRepetitionAlgorithm::test_sm2_easiness_factor_minimum PASSED [ 51%]
+tests/test_flashcard_enhancements.py::TestSpacedRepetitionAlgorithm::test_sm2_interval_progression PASSED [ 51%]
+tests/test_flashcard_enhancements.py::TestGamificationIntegration::test_gamification_status_check PASSED [ 52%]
+tests/test_flashcard_enhancements.py::TestGamificationIntegration::test_gamification_disabled_for_unauthenticated PASSED [ 52%]
+tests/test_flashcard_enhancements.py::TestGamificationIntegration::test_session_start_creates_session_id PASSED [ 52%]
+tests/test_flashcard_enhancements.py::TestGamificationIntegration::test_session_end_logs_duration PASSED [ 52%]
+tests/test_flashcard_enhancements.py::TestGamificationIntegration::test_xp_award_calculation PASSED [ 52%]
+tests/test_flashcard_enhancements.py::TestGamificationIntegration::test_xp_award_failure_handling PASSED [ 52%]
+tests/test_flashcard_enhancements.py::TestGamificationIntegration::test_time_tracker_updates PASSED [ 52%]
+tests/test_flashcard_enhancements.py::TestGamificationIntegration::test_time_tracker_cleanup PASSED [ 52%]
+tests/test_flashcard_enhancements.py::TestCardNotes::test_add_note_to_card PASSED [ 53%]
+tests/test_flashcard_enhancements.py::TestCardNotes::test_edit_existing_note PASSED [ 53%]
+tests/test_flashcard_enhancements.py::TestCardNotes::test_delete_note PASSED [ 53%]
+tests/test_flashcard_enhancements.py::TestCardNotes::test_note_xss_prevention FAILED [ 53%]
+tests/test_flashcard_enhancements.py::TestCardNotes::test_note_persistence_during_session PASSED [ 53%]
+tests/test_flashcard_enhancements.py::TestCardNotes::test_note_button_active_state PASSED [ 53%]
+tests/test_flashcard_enhancements.py::TestReportIssue::test_report_issue_modal_opens PASSED [ 53%]
+tests/test_flashcard_enhancements.py::TestReportIssue::test_report_issue_types PASSED [ 53%]
+tests/test_flashcard_enhancements.py::TestReportIssue::test_report_validation PASSED [ 54%]
+tests/test_flashcard_enhancements.py::TestReportIssue::test_report_submission PASSED [ 54%]
+tests/test_flashcard_enhancements.py::TestReportIssue::test_report_xss_prevention PASSED [ 54%]
+tests/test_flashcard_enhancements.py::TestModalSystem::test_modal_opens_with_animation PASSED [ 54%]
+tests/test_flashcard_enhancements.py::TestModalSystem::test_modal_closes_on_escape PASSED [ 54%]
+tests/test_flashcard_enhancements.py::TestModalSystem::test_modal_closes_on_overlay_click PASSED [ 54%]
+tests/test_flashcard_enhancements.py::TestModalSystem::test_modal_closes_on_x_button PASSED [ 54%]
+tests/test_flashcard_enhancements.py::TestModalSystem::test_modal_closes_on_cancel PASSED [ 54%]
+tests/test_flashcard_enhancements.py::TestModalSystem::test_modal_keyboard_shortcuts PASSED [ 55%]
+tests/test_flashcard_enhancements.py::TestModalSystem::test_modal_cleanup PASSED [ 55%]
+tests/test_flashcard_enhancements.py::TestMemoryLeaks::test_timer_cleanup_on_destroy PASSED [ 55%]
+tests/test_flashcard_enhancements.py::TestMemoryLeaks::test_event_listener_cleanup PASSED [ 55%]
+tests/test_flashcard_enhancements.py::TestMemoryLeaks::test_reference_cleanup PASSED [ 55%]
+tests/test_flashcard_enhancements.py::TestMemoryLeaks::test_modal_event_listener_cleanup PASSED [ 55%]
+tests/test_flashcard_enhancements.py::TestAsyncRaceConditions::test_gamification_init_before_render PASSED [ 55%]
+tests/test_flashcard_enhancements.py::TestAsyncRaceConditions::test_session_start_completes_before_xp_award PASSED [ 55%]
+tests/test_flashcard_enhancements.py::TestAsyncRaceConditions::test_concurrent_quality_ratings PASSED [ 55%]
+tests/test_flashcard_enhancements.py::TestErrorHandling::test_network_error_handling PASSED [ 56%]
+tests/test_flashcard_enhancements.py::TestErrorHandling::test_api_error_response_handling PASSED [ 56%]
+tests/test_flashcard_enhancements.py::TestErrorHandling::test_json_parse_error_handling PASSED [ 56%]
+tests/test_flashcard_enhancements.py::TestErrorHandling::test_localstorage_quota_exceeded PASSED [ 56%]
+tests/test_flashcard_enhancements.py::TestAccessibility::test_aria_labels_present PASSED [ 56%]
+tests/test_flashcard_enhancements.py::TestAccessibility::test_keyboard_navigation PASSED [ 56%]
+tests/test_flashcard_enhancements.py::TestAccessibility::test_focus_management_in_modals PASSED [ 56%]
+tests/test_flashcard_enhancements.py::TestAccessibility::test_screen_reader_announcements PASSED [ 56%]
+tests/test_flashcard_enhancements.py::TestMobileResponsiveness::test_quality_buttons_responsive_grid PASSED [ 57%]
+tests/test_flashcard_enhancements.py::TestMobileResponsiveness::test_modal_responsive_width PASSED [ 57%]
+tests/test_flashcard_enhancements.py::TestMobileResponsiveness::test_touch_targets_adequate_size PASSED [ 57%]
+tests/test_flashcard_route.py::TestFlashcardRoute::test_flashcard_route_exists PASSED [ 57%]
+tests/test_flashcard_route.py::TestFlashcardRoute::test_flashcard_route_returns_html PASSED [ 57%]
+tests/test_flashcard_route.py::TestFlashcardRoute::test_flashcard_page_has_title PASSED [ 57%]
+tests/test_flashcard_route.py::TestFlashcardRoute::test_flashcard_page_includes_viewer_js PASSED [ 57%]
+tests/test_flashcard_route.py::TestFlashcardRoute::test_flashcard_page_includes_viewer_css PASSED [ 57%]
+tests/test_flashcard_route.py::TestFlashcardRoute::test_flashcard_page_has_viewer_container PASSED [ 58%]
+tests/test_flashcard_route.py::TestFlashcardRoute::test_flashcard_page_has_sets_container PASSED [ 58%]
+tests/test_flashcard_route.py::TestFlashcardRoute::test_flashcard_page_includes_page_js PASSED [ 58%]
+tests/test_flashcard_route.py::TestFlashcardRoute::test_flashcard_page_includes_page_css PASSED [ 58%]
+tests/test_flashcard_route.py::TestFlashcardRoute::test_flashcard_page_no_inline_scripts PASSED [ 58%]
+tests/test_flashcard_route.py::TestFlashcardRoute::test_flashcard_page_no_inline_styles PASSED [ 58%]
+tests/test_gamification_badges.py::test_seed_badge_definitions_success PASSED [ 58%]
+tests/test_gamification_badges.py::test_seed_badge_definitions_skip_existing PASSED [ 58%]
+tests/test_gamification_badges.py::test_seed_badge_definitions_no_firestore PASSED [ 59%]
+tests/test_gamification_badges.py::test_get_badge_definitions_success PASSED [ 59%]
+tests/test_gamification_badges.py::test_get_user_badges_success FAILED   [ 59%]
+tests/test_gamification_badges.py::test_night_owl_badge_earned_hard_quiz FAILED [ 59%]
+tests/test_gamification_badges.py::test_night_owl_badge_not_earned_daytime PASSED [ 59%]
+tests/test_gamification_badges.py::test_early_riser_badge_earned FAILED  [ 59%]
+tests/test_gamification_badges.py::test_deep_diver_badge_earned FAILED   [ 59%]
+tests/test_gamification_badges.py::test_deep_diver_badge_not_earned_short_time PASSED [ 59%]
+tests/test_gamification_badges.py::test_combo_king_badge_earned FAILED   [ 59%]
+tests/test_gamification_badges.py::test_badge_tier_upgrade_bronze_to_silver FAILED [ 60%]
+tests/test_gamification_badges.py::test_badge_no_tier_upgrade PASSED     [ 60%]
+tests/test_gamification_badges.py::test_hat_trick_badge_earned FAILED    [ 60%]
+tests/test_gamification_badges.py::test_hat_trick_badge_not_earned_not_perfect PASSED [ 60%]
+tests/test_gamification_badges.py::test_legal_scholar_badge_earned FAILED [ 60%]
+tests/test_gamification_badges.py::test_legal_scholar_badge_not_earned_sequence_broken PASSED [ 60%]
+tests/test_gamification_badges.py::test_check_and_award_badges_no_firestore PASSED [ 60%]
+tests/test_gamification_badges.py::test_award_badge_definition_not_found PASSED [ 60%]
+tests/test_gamification_badges.py::test_concurrent_badge_earning_race_condition FAILED [ 61%]
+tests/test_gamification_badges.py::test_concurrent_badge_earning_no_tier_upgrade FAILED [ 61%]
+tests/test_gamification_streaks.py::TestStreakDayCalculation::test_before_4am_counts_as_previous_day PASSED [ 61%]
+tests/test_gamification_streaks.py::TestStreakDayCalculation::test_at_4am_counts_as_current_day PASSED [ 61%]
+tests/test_gamification_streaks.py::TestStreakDayCalculation::test_after_4am_counts_as_current_day PASSED [ 61%]
+tests/test_gamification_streaks.py::TestStreakDayCalculation::test_midnight_counts_as_previous_day PASSED [ 61%]
+tests/test_gamification_streaks.py::TestStreakStatusCheck::test_first_activity_ever PASSED [ 61%]
+tests/test_gamification_streaks.py::TestStreakStatusCheck::test_same_day_activity_maintains_streak PASSED [ 61%]
+tests/test_gamification_streaks.py::TestStreakStatusCheck::test_next_day_activity_increments_streak PASSED [ 62%]
+tests/test_gamification_streaks.py::TestStreakStatusCheck::test_missed_one_day_with_freeze_maintains_streak PASSED [ 62%]
+tests/test_gamification_streaks.py::TestStreakStatusCheck::test_missed_one_day_without_freeze_breaks_streak PASSED [ 62%]
+tests/test_gamification_streaks.py::TestStreakStatusCheck::test_missed_multiple_days_breaks_streak_even_with_freeze PASSED [ 62%]
+tests/test_gamification_streaks.py::TestStreakEdgeCases::test_activity_just_before_4am_same_streak_day PASSED [ 62%]
+tests/test_gamification_streaks.py::TestStreakEdgeCases::test_activity_at_4am_is_next_day PASSED [ 62%]
+tests/test_gamification_streaks.py::TestStreakEdgeCases::test_late_night_study_session_crosses_midnight PASSED [ 62%]
+tests/test_gamification_streaks.py::TestStreakFreezeEarning::test_freeze_earned_every_500_xp PASSED [ 62%]
+tests/test_gamification_streaks.py::TestStreakIntegration::test_firestore_unavailable_raises_exception PASSED [ 62%]
+tests/test_gamification_streaks.py::TestStreakIntegration::test_longest_streak_tracking PASSED [ 63%]
+tests/test_gamification_streaks.py::TestStreakIntegration::test_no_previous_activity_starts_streak PASSED [ 63%]
+tests/test_gamification_streaks.py::TestStreakIntegration::test_future_timestamp_raises_error PASSED [ 63%]
+tests/test_gamification_ui.py::TestGamificationAnimations::test_level_up_event_structure PASSED [ 63%]
+tests/test_gamification_ui.py::TestGamificationAnimations::test_badge_earned_event_structure PASSED [ 63%]
+tests/test_gamification_ui.py::TestGamificationAnimations::test_xp_gain_event_structure PASSED [ 63%]
+tests/test_gamification_ui.py::TestGamificationAnimations::test_streak_milestone_event_structure PASSED [ 63%]
+tests/test_gamification_ui.py::TestProgressVisualizations::test_color_interpolation_red_to_yellow PASSED [ 63%]
+tests/test_gamification_ui.py::TestProgressVisualizations::test_color_interpolation_yellow_to_green PASSED [ 64%]
+tests/test_gamification_ui.py::TestProgressVisualizations::test_color_interpolation_green_range PASSED [ 64%]
+tests/test_gamification_ui.py::TestProgressVisualizations::test_circular_progress_calculation PASSED [ 64%]
+tests/test_gamification_ui.py::TestProgressVisualizations::test_exam_readiness_calculation PASSED [ 64%]
+tests/test_gamification_ui.py::TestShareableGraphics::test_canvas_dimensions PASSED [ 64%]
+tests/test_gamification_ui.py::TestShareableGraphics::test_weekly_report_data_structure PASSED [ 64%]
+tests/test_gamification_ui.py::TestShareableGraphics::test_badge_showcase_filtering PASSED [ 64%]
+tests/test_gamification_ui.py::TestShareableGraphics::test_badge_showcase_max_badges PASSED [ 64%]
+tests/test_gamification_ui.py::TestShareableGraphics::test_tier_color_mapping PASSED [ 65%]
+tests/test_gamification_ui.py::TestSoundControl::test_sound_default_state PASSED [ 65%]
+tests/test_gamification_ui.py::TestSoundControl::test_sound_toggle PASSED [ 65%]
+tests/test_gamification_ui.py::TestSoundControl::test_sound_persistence PASSED [ 65%]
+tests/test_gamification_ui.py::TestOnboardingTour::test_tour_steps_structure PASSED [ 65%]
+tests/test_gamification_ui.py::TestOnboardingTour::test_tour_completion_tracking PASSED [ 65%]
+tests/test_gamification_ui.py::TestOnboardingTour::test_tour_visit_count PASSED [ 65%]
+tests/test_gamification_ui.py::TestOnboardingTour::test_tour_shows_on_first_visit PASSED [ 65%]
+tests/test_gamification_ui.py::TestAccessibility::test_reduced_motion_preference PASSED [ 66%]
+tests/test_gamification_ui.py::TestAccessibility::test_aria_labels_present PASSED [ 66%]
+tests/test_gamification_ui.py::TestAccessibility::test_keyboard_navigation PASSED [ 66%]
+tests/test_gamification_ui.py::TestPerformance::test_debounce_interval PASSED [ 66%]
+tests/test_gamification_ui.py::TestPerformance::test_update_interval PASSED [ 66%]
+tests/test_gamification_ui.py::TestPerformance::test_cleanup_threshold PASSED [ 66%]
+tests/test_gdpr_compliance.py::TestGDPRService::test_record_consent_success FAILED [ 66%]
+tests/test_gdpr_compliance.py::TestGDPRService::test_record_consent_empty_user_id PASSED [ 66%]
+tests/test_gdpr_compliance.py::TestGDPRService::test_record_consent_no_database PASSED [ 66%]
+tests/test_gdpr_compliance.py::TestGDPRService::test_export_user_data_success PASSED [ 67%]
+tests/test_gdpr_compliance.py::TestGDPRService::test_export_user_data_empty_user_id PASSED [ 67%]
+tests/test_gdpr_compliance.py::TestGDPRService::test_export_user_data_no_database PASSED [ 67%]
+tests/test_gdpr_compliance.py::TestGDPRService::test_delete_user_data_soft_delete FAILED [ 67%]
+tests/test_gdpr_compliance.py::TestGDPRService::test_delete_user_data_empty_user_id PASSED [ 67%]
+tests/test_gdpr_compliance.py::TestGDPRService::test_delete_user_data_negative_retention PASSED [ 67%]
+tests/test_gdpr_compliance.py::TestGDPRService::test_delete_user_data_no_database PASSED [ 67%]
+tests/test_gdpr_compliance.py::TestGDPRValidation::test_consent_type_validation PASSED [ 67%]
+tests/test_gdpr_compliance.py::TestGDPRValidation::test_consent_status_validation PASSED [ 68%]
+tests/test_gdpr_compliance.py::TestGDPRRateLimiting::test_rate_limit_structure PASSED [ 68%]
+tests/test_gdpr_compliance.py::TestGDPRSecurity::test_filename_sanitization PASSED [ 68%]
+tests/test_gdpr_compliance.py::TestGDPRSecurity::test_email_validation_required PASSED [ 68%]
+tests/test_gdpr_compliance.py::TestGDPRAuditLogging::test_audit_log_creation PASSED [ 68%]
+tests/test_gdpr_integration.py::TestConsentEndpoints::test_record_consent_success PASSED [ 68%]
+tests/test_gdpr_integration.py::TestConsentEndpoints::test_record_consent_invalid_type PASSED [ 68%]
+tests/test_gdpr_integration.py::TestConsentEndpoints::test_record_consent_unauthenticated FAILED [ 68%]
+tests/test_gdpr_integration.py::TestConsentEndpoints::test_get_consents_success PASSED [ 69%]
+tests/test_gdpr_integration.py::TestDataExportEndpoint::test_export_data_success PASSED [ 69%]
+tests/test_gdpr_integration.py::TestDataExportEndpoint::test_export_data_unauthenticated FAILED [ 69%]
+tests/test_gdpr_integration.py::TestDataExportEndpoint::test_export_data_rate_limiting FAILED [ 69%]
+tests/test_gdpr_integration.py::TestAccountDeletionEndpoints::test_request_deletion_success FAILED [ 69%]
+tests/test_gdpr_integration.py::TestAccountDeletionEndpoints::test_request_deletion_unauthenticated FAILED [ 69%]
+tests/test_gdpr_integration.py::TestAccountDeletionEndpoints::test_delete_account_success FAILED [ 69%]
+tests/test_gdpr_integration.py::TestAccountDeletionEndpoints::test_delete_account_invalid_token FAILED [ 69%]
+tests/test_gdpr_integration.py::TestAccountDeletionEndpoints::test_delete_account_email_mismatch FAILED [ 70%]
+tests/test_gdpr_integration.py::TestPrivacySettingsEndpoints::test_get_privacy_settings_success FAILED [ 70%]
+tests/test_gdpr_integration.py::TestPrivacySettingsEndpoints::test_update_privacy_settings_success FAILED [ 70%]
+tests/test_health.py::TestHealthEndpoint::test_health_check_returns_ok PASSED [ 70%]
+tests/test_health.py::TestHealthEndpoint::test_health_check_version PASSED [ 70%]
+tests/test_health.py::TestPagesEndpoint::test_index_page_returns_html PASSED [ 70%]
+tests/test_health.py::TestPagesEndpoint::test_index_page_contains_main_elements PASSED [ 70%]
+tests/test_health.py::TestAPIDocsEndpoint::test_swagger_docs_accessible PASSED [ 70%]
+tests/test_health.py::TestAPIDocsEndpoint::test_redoc_accessible PASSED  [ 70%]
+tests/test_homepage_logo.py::TestHomepageLogo::test_logo_exists_in_navigation PASSED [ 71%]
+tests/test_homepage_logo.py::TestHomepageLogo::test_logo_exists_in_footer PASSED [ 71%]
+tests/test_homepage_logo.py::TestHomepageLogo::test_no_emoji_in_navigation PASSED [ 71%]
+tests/test_homepage_logo.py::TestHomepageLogo::test_no_emoji_in_footer PASSED [ 71%]
+tests/test_homepage_logo.py::TestHomepageLogo::test_brand_name_present PASSED [ 71%]
+tests/test_homepage_logo.py::TestHomepageLogo::test_logo_accessibility PASSED [ 71%]
+tests/test_homepage_logo.py::TestHomepageLogo::test_css_classes_applied PASSED [ 71%]
+tests/test_homepage_logo.py::TestHomepageLogo::test_footer_brand_header_structure PASSED [ 71%]
+tests/test_homepage_logo.py::TestLogoCSS::test_homepage_css_loaded PASSED [ 72%]
+tests/test_homepage_logo.py::TestLogoCSS::test_logo_css_exists PASSED    [ 72%]
+tests/test_homepage_logo.py::TestLogoCSS::test_logo_sizing_css PASSED    [ 72%]
+tests/test_homepage_logo.py::TestLogoCSS::test_responsive_logo_css PASSED [ 72%]
+tests/test_homepage_logo.py::TestLogoFile::test_favicon_svg_exists PASSED [ 72%]
+tests/test_homepage_logo.py::TestLogoFile::test_favicon_svg_valid PASSED [ 72%]
+tests/test_homepage_logo.py::TestLogoFile::test_favicon_svg_accessible PASSED [ 72%]
+tests/test_homepage_logo.py::TestBackwardCompatibility::test_homepage_still_loads PASSED [ 72%]
+tests/test_homepage_logo.py::TestBackwardCompatibility::test_navigation_structure_intact PASSED [ 73%]
+tests/test_homepage_logo.py::TestBackwardCompatibility::test_footer_structure_intact PASSED [ 73%]
+tests/test_page_routes.py::TestGetUserFromRequest::test_returns_user_when_authenticated PASSED [ 73%]
+tests/test_page_routes.py::TestGetUserFromRequest::test_returns_none_when_not_authenticated PASSED [ 73%]
+tests/test_page_routes.py::TestGetUserFromRequest::test_return_type_annotation PASSED [ 73%]
+tests/test_page_routes.py::TestLandingPage::test_landing_page_returns_html PASSED [ 73%]
+tests/test_page_routes.py::TestLandingPage::test_landing_page_with_authenticated_user PASSED [ 73%]
+tests/test_page_routes.py::TestLandingPage::test_landing_page_return_type PASSED [ 73%]
+tests/test_page_routes.py::TestCourseStudyPortal::test_course_study_portal_raises_http_exception PASSED [ 74%]
+tests/test_page_routes.py::TestCourseStudyPortal::test_course_study_portal_has_correct_return_type PASSED [ 74%]
+tests/test_page_routes.py::TestCourseStudyPortal::test_course_study_portal_has_course_id_parameter PASSED [ 74%]
+tests/test_page_routes.py::TestHealthCheck::test_health_check_returns_valid_response PASSED [ 74%]
+tests/test_page_routes.py::TestHealthCheck::test_health_check_return_type PASSED [ 74%]
+tests/test_page_routes.py::TestPrivacyDashboard::test_privacy_dashboard_requires_authentication PASSED [ 74%]
+tests/test_page_routes.py::TestPrivacyDashboard::test_privacy_dashboard_with_authenticated_user PASSED [ 74%]
+tests/test_page_routes.py::TestPrivacyDashboard::test_privacy_dashboard_documents_authentication_requirement PASSED [ 74%]
+tests/test_page_routes.py::TestBadgesPage::test_badges_page_requires_authentication PASSED [ 74%]
+tests/test_page_routes.py::TestBadgesPage::test_badges_page_with_authenticated_user PASSED [ 75%]
+tests/test_page_routes.py::TestFlashcardsPage::test_flashcards_page_allows_anonymous_access PASSED [ 75%]
+tests/test_page_routes.py::TestFlashcardsPage::test_flashcards_page_with_authenticated_user PASSED [ 75%]
+tests/test_page_routes.py::TestFlashcardsPage::test_flashcards_page_has_security_headers PASSED [ 75%]
+tests/test_page_routes.py::TestFlashcardsPage::test_flashcards_page_does_not_document_raises PASSED [ 75%]
+tests/test_page_routes.py::TestTypeAnnotations::test_all_routes_have_return_type_annotations PASSED [ 75%]
+tests/test_page_routes.py::TestTypeAnnotations::test_all_routes_have_request_parameter_annotation PASSED [ 75%]
+tests/test_quiz_persistence.py::TestQuizSubmitRequestValidation::test_valid_submit_request PASSED [ 75%]
+tests/test_quiz_persistence.py::TestQuizSubmitRequestValidation::test_submit_request_requires_course_id PASSED [ 76%]
+tests/test_quiz_persistence.py::TestQuizSubmitRequestValidation::test_submit_request_rejects_negative_answers PASSED [ 76%]
+tests/test_quiz_persistence.py::TestQuizSubmitRequestValidation::test_submit_request_accepts_zero_answers PASSED [ 76%]
+tests/test_quiz_persistence.py::TestContentHashing::test_generate_content_hash_same_questions PASSED [ 76%]
+tests/test_quiz_persistence.py::TestContentHashing::test_generate_content_hash_different_order_same_hash PASSED [ 76%]
+tests/test_quiz_persistence.py::TestContentHashing::test_generate_content_hash_different_questions PASSED [ 76%]
+tests/test_quiz_persistence.py::TestContentHashing::test_generate_content_hash_length PASSED [ 76%]
+tests/test_quiz_persistence.py::TestSaveQuiz::test_save_quiz_success PASSED [ 76%]
+tests/test_quiz_persistence.py::TestSaveQuiz::test_save_quiz_no_firestore PASSED [ 77%]
+tests/test_quiz_persistence.py::TestSaveQuiz::test_save_quiz_invalid_correct_index_too_high PASSED [ 77%]
+tests/test_quiz_persistence.py::TestSaveQuiz::test_save_quiz_invalid_correct_index_negative PASSED [ 77%]
+tests/test_quiz_persistence.py::TestGetQuiz::test_get_quiz_found PASSED  [ 77%]
+tests/test_quiz_persistence.py::TestGetQuiz::test_get_quiz_not_found PASSED [ 77%]
+tests/test_quiz_persistence.py::TestSaveQuizResult::test_save_result_success PASSED [ 77%]
+tests/test_quiz_persistence.py::TestSaveQuizResult::test_save_result_calculates_percentage PASSED [ 77%]
+tests/test_quiz_persistence.py::TestCalculateScore::test_calculate_score_all_correct PASSED [ 77%]
+tests/test_quiz_persistence.py::TestCalculateScore::test_calculate_score_partial PASSED [ 77%]
+tests/test_quiz_persistence.py::TestCalculateScore::test_calculate_score_quiz_not_found PASSED [ 78%]
+tests/test_quiz_persistence.py::TestCalculateScore::test_calculate_score_answer_count_mismatch PASSED [ 78%]
+tests/test_quiz_persistence.py::TestListQuizzes::test_list_quizzes_success PASSED [ 78%]
+tests/test_quiz_persistence.py::TestListQuizzes::test_list_quizzes_with_filter PASSED [ 78%]
+tests/test_quiz_persistence.py::TestListQuizzes::test_list_quizzes_empty PASSED [ 78%]
+tests/test_quiz_persistence.py::TestFindDuplicateQuiz::test_find_duplicate_found PASSED [ 78%]
+tests/test_quiz_persistence.py::TestFindDuplicateQuiz::test_find_duplicate_not_found PASSED [ 78%]
+tests/test_quiz_persistence.py::TestQuizManagementAPI::test_list_quizzes_endpoint PASSED [ 78%]
+tests/test_quiz_persistence.py::TestQuizManagementAPI::test_get_quiz_endpoint_found PASSED [ 79%]
+tests/test_quiz_persistence.py::TestQuizManagementAPI::test_get_quiz_endpoint_not_found PASSED [ 79%]
+tests/test_quiz_persistence.py::TestQuizManagementAPI::test_create_quiz_endpoint PASSED [ 79%]
+tests/test_quiz_persistence.py::TestQuizManagementAPI::test_create_quiz_returns_existing_duplicate PASSED [ 79%]
+tests/test_quiz_persistence.py::TestQuizManagementAPI::test_get_quiz_history_endpoint PASSED [ 79%]
+tests/test_quiz_system.py::TestQuizGeneration::test_quiz_generation_with_valid_topic PASSED [ 79%]
+tests/test_quiz_system.py::TestQuizGeneration::test_quiz_generation_with_course_id PASSED [ 79%]
+tests/test_quiz_system.py::TestQuizGeneration::test_quiz_generation_with_multiple_questions PASSED [ 79%]
+tests/test_quiz_system.py::TestQuizGeneration::test_quiz_generation_with_difficulty_levels PASSED [ 80%]
+tests/test_quiz_system.py::TestQuizStructure::test_quiz_question_has_required_fields PASSED [ 80%]
+tests/test_quiz_system.py::TestQuizStructure::test_quiz_options_are_strings PASSED [ 80%]
+tests/test_quiz_system.py::TestQuizScoring::test_score_calculation_all_correct PASSED [ 80%]
+tests/test_quiz_system.py::TestQuizScoring::test_score_calculation_all_incorrect PASSED [ 80%]
+tests/test_quiz_system.py::TestQuizScoring::test_score_calculation_mixed PASSED [ 80%]
+tests/test_quiz_system.py::TestQuizScoring::test_percentage_calculation PASSED [ 80%]
+tests/test_quiz_system.py::TestQuizErrorHandling::test_quiz_generation_with_no_files PASSED [ 80%]
+tests/test_quiz_system.py::TestQuizErrorHandling::test_quiz_generation_with_invalid_difficulty PASSED [ 81%]
+tests/test_quiz_system.py::TestQuizErrorHandling::test_quiz_generation_with_invalid_num_questions PASSED [ 81%]
+tests/test_quiz_system.py::TestQuizIntegration::test_complete_quiz_workflow PASSED [ 81%]
+tests/test_streak_api.py::TestStreakCalendarAPI::test_get_calendar_success FAILED [ 81%]
+tests/test_streak_api.py::TestStreakCalendarAPI::test_get_calendar_invalid_days FAILED [ 81%]
+tests/test_streak_api.py::TestStreakCalendarAPI::test_get_calendar_unauthorized FAILED [ 81%]
+tests/test_streak_api.py::TestWeeklyConsistencyAPI::test_get_consistency_success FAILED [ 81%]
+tests/test_streak_api.py::TestWeeklyConsistencyAPI::test_get_consistency_bonus_active FAILED [ 81%]
+tests/test_streak_api.py::TestWeeklyConsistencyAPI::test_get_consistency_unauthorized FAILED [ 81%]
+tests/test_streak_api.py::TestStreakMaintenanceAPI::test_maintenance_success_admin FAILED [ 82%]
+tests/test_streak_api.py::TestStreakMaintenanceAPI::test_maintenance_forbidden_non_admin PASSED [ 82%]
+tests/test_streak_api.py::TestStreakMaintenanceAPI::test_maintenance_unauthorized PASSED [ 82%]
+tests/test_streak_api.py::TestStreakAPIIntegration::test_calendar_and_consistency_consistency FAILED [ 82%]
+tests/test_streak_api.py::TestStreakAPIErrorHandling::test_calendar_service_error PASSED [ 82%]
+tests/test_streak_api.py::TestStreakAPIErrorHandling::test_consistency_service_error PASSED [ 82%]
+tests/test_streak_api.py::TestStreakAPIErrorHandling::test_maintenance_service_error FAILED [ 82%]
+tests/test_streak_integration.py::TestWeeklyConsistencyIntegration::test_complete_weekly_consistency_flow SKIPPED8080) [ 82%]
+tests/test_streak_integration.py::TestWeeklyConsistencyIntegration::test_weekly_consistency_race_condition SKIPPED8080) [ 83%]
+tests/test_streak_integration.py::TestStreakFreezeIntegration::test_freeze_application_flow SKIPPED8080) [ 83%]
+tests/test_streak_integration.py::TestStreakFreezeIntegration::test_freeze_race_condition_prevention SKIPPED8080) [ 83%]
+tests/test_streak_integration.py::TestMaintenanceJobIntegration::test_maintenance_job_with_multiple_users SKIPPED8080) [ 83%]
+tests/test_streak_integration.py::TestLoadTest::test_maintenance_job_performance SKIPPED8080) [ 83%]
+tests/test_streak_system.py::TestWeeklyConsistencyBonus::test_weekly_consistency_tracking ERROR [ 83%]
+tests/test_streak_system.py::TestWeeklyConsistencyBonus::test_weekly_consistency_bonus_earned ERROR [ 83%]
+tests/test_streak_system.py::TestWeeklyConsistencyBonus::test_weekly_consistency_xp_bonus_applied ERROR [ 83%]
+tests/test_streak_system.py::TestWeeklyConsistencyBonus::test_weekly_reset ERROR [ 84%]
+tests/test_streak_system.py::TestStreakFreeze::test_freeze_applied_successfully FAILED [ 84%]
+tests/test_streak_system.py::TestStreakFreeze::test_freeze_not_applied_when_none_available FAILED [ 84%]
+tests/test_streak_system.py::TestStreakFreeze::test_freeze_race_condition_handling FAILED [ 84%]
+tests/test_streak_system.py::TestStreakMaintenance::test_daily_maintenance_runs FAILED [ 84%]
+tests/test_streak_system.py::TestStreakMaintenance::test_batch_processing FAILED [ 84%]
+tests/test_streak_system.py::TestInputValidation::test_invalid_activity_type ERROR [ 84%]
+tests/test_streak_system.py::TestInputValidation::test_negative_freeze_count_prevented FAILED [ 84%]
+tests/test_streak_system.py::TestInputValidation::test_xp_bonus_multiplier_bounds ERROR [ 85%]
+tests/test_streak_system.py::TestInputValidation::test_bonus_multiplier_validation_on_creation FAILED [ 85%]
+tests/test_streak_system.py::TestSecurityFixes::test_weekly_reset_race_condition_prevented ERROR [ 85%]
+tests/test_streak_system.py::TestSecurityFixes::test_freeze_count_logging_accuracy PASSED [ 85%]
+tests/test_streak_system.py::TestStreakSystemIntegration::test_end_to_end_weekly_consistency PASSED [ 85%]
+tests/test_streak_system.py::TestStreakSystemIntegration::test_end_to_end_freeze_application PASSED [ 85%]
+tests/test_streak_system.py::TestActivityDateFiltering::test_get_activities_with_start_date ERROR [ 85%]
+tests/test_streak_system.py::TestActivityDateFiltering::test_get_activities_with_end_date ERROR [ 85%]
+tests/test_streak_system.py::TestActivityDateFiltering::test_get_activities_with_date_range ERROR [ 85%]
+tests/test_text_cache.py::TestTextCacheEntry::test_create_valid_entry PASSED [ 86%]
+tests/test_text_cache.py::TestTextCacheEntry::test_path_traversal_rejected PASSED [ 86%]
+tests/test_text_cache.py::TestTextCacheEntry::test_absolute_path_rejected PASSED [ 86%]
+tests/test_text_cache.py::TestCacheStats::test_create_empty_stats PASSED [ 86%]
+tests/test_text_cache.py::TestCacheStats::test_stats_with_data PASSED    [ 86%]
+tests/test_text_cache.py::TestCachePopulateRequest::test_valid_request PASSED [ 86%]
+tests/test_text_cache.py::TestCachePopulateRequest::test_path_traversal_rejected PASSED [ 86%]
+tests/test_text_cache.py::TestCachePopulateRequest::test_path_normalized PASSED [ 86%]
+tests/test_text_cache.py::TestCacheInvalidateRequest::test_invalidate_single_file PASSED [ 87%]
+tests/test_text_cache.py::TestCacheInvalidateRequest::test_invalidate_stale PASSED [ 87%]
+tests/test_text_cache.py::TestHelperFunctions::test_compute_file_hash PASSED [ 87%]
+tests/test_text_cache.py::TestHelperFunctions::test_compute_file_hash_different_content PASSED [ 87%]
+tests/test_text_cache.py::TestHelperFunctions::test_compute_file_hash_rejects_outside_materials PASSED [ 87%]
+tests/test_text_cache.py::TestHelperFunctions::test_path_to_doc_id PASSED [ 87%]
+tests/test_text_cache.py::TestHelperFunctions::test_extract_subject_and_tier PASSED [ 87%]
+tests/test_text_cache.py::TestTextCacheServiceNoFirestore::test_service_unavailable PASSED [ 87%]
+tests/test_text_cache.py::TestTextCacheServiceNoFirestore::test_stats_when_unavailable PASSED [ 88%]
+tests/test_text_cache.py::TestCacheAPIEndpoints::test_cache_health_endpoint PASSED [ 88%]
+tests/test_text_cache.py::TestCacheAPIEndpoints::test_cache_stats_endpoint_no_firestore PASSED [ 88%]
+tests/test_text_cache.py::TestCacheAPIEndpoints::test_populate_invalid_path PASSED [ 88%]
+tests/test_text_cache.py::TestCacheAPIEndpoints::test_invalidate_requires_target PASSED [ 88%]
+tests/test_text_cache.py::TestExtractTextCached::test_extract_nonexistent_file PASSED [ 88%]
+tests/test_text_cache.py::TestExtractTextCached::test_extract_from_real_file PASSED [ 88%]
+tests/test_text_extractor.py::TestFileTypeDetection::test_get_file_extension PASSED [ 88%]
+tests/test_text_extractor.py::TestFileTypeDetection::test_detect_markdown_file PASSED [ 88%]
+tests/test_text_extractor.py::TestFileTypeDetection::test_detect_text_file PASSED [ 89%]
+tests/test_text_extractor.py::TestFileTypeDetection::test_detect_html_file PASSED [ 89%]
+tests/test_text_extractor.py::TestFileTypeDetection::test_detect_json_file PASSED [ 89%]
+tests/test_text_extractor.py::TestFileTypeDetection::test_detect_image_files PASSED [ 89%]
+tests/test_text_extractor.py::TestFileTypeDetection::test_detect_nonexistent_file PASSED [ 89%]
+tests/test_text_extractor.py::TestTextExtraction::test_extract_from_markdown PASSED [ 89%]
+tests/test_text_extractor.py::TestTextExtraction::test_extract_from_text_file PASSED [ 89%]
+tests/test_text_extractor.py::TestTextExtraction::test_extract_from_html PASSED [ 89%]
+tests/test_text_extractor.py::TestTextExtraction::test_extract_from_json PASSED [ 90%]
+tests/test_text_extractor.py::TestTextExtraction::test_extract_nonexistent_file PASSED [ 90%]
+tests/test_text_extractor.py::TestTextExtraction::test_extract_with_encoding_fallback PASSED [ 90%]
+tests/test_text_extractor.py::TestExtractionResult::test_extraction_result_defaults PASSED [ 90%]
+tests/test_text_extractor.py::TestExtractionResult::test_extraction_result_with_pages PASSED [ 90%]
+tests/test_text_extractor.py::TestDocxExtraction::test_extract_text_file_with_docx_extension PASSED [ 90%]
+tests/test_text_extractor.py::TestBatchExtraction::test_extract_all_from_folder PASSED [ 90%]
+tests/test_text_extractor.py::TestBatchExtraction::test_extract_all_non_recursive PASSED [ 90%]
+tests/test_text_extractor.py::TestBatchExtraction::test_get_extraction_summary PASSED [ 91%]
+tests/test_text_extractor.py::TestIntegrationWithRealFiles::test_extract_real_markdown_file PASSED [ 91%]
+tests/test_text_extractor.py::TestIntegrationWithRealFiles::test_extract_real_pdf_file PASSED [ 91%]
+tests/test_text_extractor.py::TestIntegrationWithRealFiles::test_extract_slide_archive PASSED [ 91%]
+tests/test_text_extractor.py::TestAPIEndpoints::test_extract_single_file_endpoint PASSED [ 91%]
+tests/test_text_extractor.py::TestAPIEndpoints::test_extract_nonexistent_file_endpoint PASSED [ 91%]
+tests/test_text_extractor.py::TestAPIEndpoints::test_extract_batch_endpoint PASSED [ 91%]
+tests/test_text_extractor.py::TestAPIEndpoints::test_extract_batch_nonexistent_folder PASSED [ 91%]
+tests/test_upload.py::TestAuthentication::test_upload_requires_authentication PASSED [ 92%]
+tests/test_upload.py::TestAuthentication::test_analyze_requires_authentication PASSED [ 92%]
+tests/test_upload.py::TestAuthentication::test_list_uploads_requires_authentication PASSED [ 92%]
+tests/test_upload.py::TestSecurity::test_sanitize_course_id_valid PASSED [ 92%]
+tests/test_upload.py::TestSecurity::test_sanitize_course_id_path_traversal PASSED [ 92%]
+tests/test_upload.py::TestSecurity::test_sanitize_course_id_special_chars PASSED [ 92%]
+tests/test_upload.py::TestFileValidation::test_validate_pdf_content_valid PASSED [ 92%]
+tests/test_upload.py::TestFileValidation::test_validate_pdf_content_invalid PASSED [ 92%]
+tests/test_upload.py::TestFileValidation::test_validate_docx_content_valid PASSED [ 92%]
+tests/test_upload.py::TestFileValidation::test_validate_txt_content_always_valid PASSED [ 93%]
+tests/test_upload.py::TestUploadEndpoint::test_upload_missing_csrf_headers PASSED [ 93%]
+tests/test_upload.py::TestUploadEndpoint::test_upload_invalid_extension PASSED [ 93%]
+tests/test_upload.py::TestUploadEndpoint::test_upload_no_filename PASSED [ 93%]
+tests/test_upload.py::TestUploadEndpoint::test_upload_file_too_large PASSED [ 93%]
+tests/test_upload.py::TestUploadEndpoint::test_upload_valid_txt_file PASSED [ 93%]
+tests/test_upload.py::TestUploadEndpoint::test_upload_malicious_pdf PASSED [ 93%]
+tests/test_upload.py::TestUploadEndpoint::test_upload_path_traversal_attempt PASSED [ 93%]
+tests/test_upload.py::TestUploadEndpoint::test_upload_path_traversal_in_course_id PASSED [ 94%]
+tests/test_upload.py::TestAnalyzeEndpoint::test_analyze_file_not_found PASSED [ 94%]
+tests/test_upload.py::TestAnalyzeEndpoint::test_analyze_extraction_failure PASSED [ 94%]
+tests/test_upload.py::TestAnalyzeEndpoint::test_analyze_rate_limit_retry PASSED [ 94%]
+tests/test_upload.py::TestAnalyzeEndpoint::test_analyze_prompt_injection_sanitized PASSED [ 94%]
+tests/test_upload_files_script.py::TestDiscoverMaterials::test_discover_materials_basic_structure PASSED [ 94%]
+tests/test_upload_files_script.py::TestDiscoverMaterials::test_discover_materials_tier_priorities PASSED [ 94%]
+tests/test_upload_files_script.py::TestDiscoverMaterials::test_discover_materials_supported_extensions PASSED [ 94%]
+tests/test_upload_files_script.py::TestDiscoverMaterials::test_discover_materials_case_insensitive_tier_names PASSED [ 95%]
+tests/test_upload_files_script.py::TestDiscoverMaterials::test_discover_materials_unique_keys_across_tiers PASSED [ 95%]
+tests/test_upload_files_script.py::TestDiscoverMaterials::test_discover_materials_metadata PASSED [ 95%]
+tests/test_upload_files_script.py::TestDiscoverMaterials::test_discover_materials_nonexistent_directory PASSED [ 95%]
+tests/test_upload_files_script.py::TestDiscoverMaterials::test_discover_materials_empty_directory PASSED [ 95%]
+tests/test_upload_files_script.py::TestDiscoverMaterials::test_discover_materials_skips_non_tier_directories PASSED [ 95%]
+tests/test_upload_files_script.py::TestDiscoverMaterials::test_discover_materials_key_generation PASSED [ 95%]
+tests/test_usage_tracking.py::TestCalculateCost::test_calculate_cost_input_only PASSED [ 95%]
+tests/test_usage_tracking.py::TestCalculateCost::test_calculate_cost_output_only PASSED [ 96%]
+tests/test_usage_tracking.py::TestCalculateCost::test_calculate_cost_with_cache PASSED [ 96%]
+tests/test_usage_tracking.py::TestCalculateCost::test_calculate_cost_small_usage PASSED [ 96%]
+tests/test_usage_tracking.py::TestCalculateCost::test_calculate_cost_zero PASSED [ 96%]
+tests/test_usage_tracking.py::TestLLMUsageRecord::test_create_record PASSED [ 96%]
+tests/test_usage_tracking.py::TestLLMUsageRecord::test_record_with_optional_fields PASSED [ 96%]
+tests/test_usage_tracking.py::TestUsageTrackingService::test_record_usage PASSED [ 96%]
+tests/test_usage_tracking.py::TestUsageTrackingService::test_record_usage_no_firestore PASSED [ 96%]
+tests/test_usage_tracking.py::TestUsageTrackingService::test_record_usage_with_metadata PASSED [ 96%]
+tests/test_usage_tracking.py::TestUsageTrackingService::test_record_usage_cost_calculation PASSED [ 97%]
+tests/test_usage_tracking.py::TestUserContext::test_create_user_context PASSED [ 97%]
+tests/test_usage_tracking.py::TestUserContext::test_create_user_context_with_course PASSED [ 97%]
+tests/test_week7_quest_service.py::TestWeek7QuestService::test_activate_quest_success PASSED [ 97%]
+tests/test_week7_quest_service.py::TestWeek7QuestService::test_activate_quest_wrong_week PASSED [ 97%]
+tests/test_week7_quest_service.py::TestWeek7QuestService::test_activate_quest_wrong_course PASSED [ 97%]
+tests/test_week7_quest_service.py::TestWeek7QuestService::test_activate_quest_already_active PASSED [ 97%]
+tests/test_week7_quest_service.py::TestWeek7QuestService::test_activate_quest_already_completed PASSED [ 97%]
+tests/test_week7_quest_service.py::TestWeek7QuestService::test_exam_readiness_zero_activities PASSED [ 98%]
+tests/test_week7_quest_service.py::TestWeek7QuestService::test_exam_readiness_partial_progress PASSED [ 98%]
+tests/test_week7_quest_service.py::TestWeek7QuestService::test_exam_readiness_full_progress PASSED [ 98%]
+tests/test_week7_quest_service.py::TestWeek7QuestService::test_exam_readiness_over_requirements PASSED [ 98%]
+tests/test_week7_quest_service.py::TestWeek7QuestService::test_calculate_quest_updates_inactive_quest PASSED [ 98%]
+tests/test_week7_quest_service.py::TestWeek7QuestService::test_calculate_quest_updates_with_activity PASSED [ 98%]
+tests/test_week7_quest_service.py::TestWeek7QuestService::test_calculate_quest_updates_boss_completion PASSED [ 98%]
+tests/test_week7_quest_service.py::TestWeek7QuestService::test_exam_readiness_with_negative_values PASSED [ 98%]
+tests/test_week7_quest_service.py::TestWeek7QuestService::test_predict_stats_after_quiz PASSED [ 99%]
+tests/test_week7_quest_service.py::TestWeek7QuestService::test_predict_stats_after_flashcard PASSED [ 99%]
+tests/test_week7_quest_service.py::TestWeek7QuestService::test_get_quest_requirements PASSED [ 99%]
+tests/integration/test_badge_real_activity.py::TestBadgeUnlockingWithRealActivity::test_first_activity_unlocks_ignition_badge ERROR [ 99%]
+tests/integration/test_badge_real_activity.py::TestBadgeUnlockingWithRealActivity::test_flashcard_activity_unlocks_badge ERROR [ 99%]
+tests/integration/test_badge_real_activity.py::TestBadgeUnlockingWithRealActivity::test_xp_milestone_unlocks_badge ERROR [ 99%]
+tests/integration/test_badge_real_activity.py::TestBadgeUnlockingWithRealActivity::test_multiple_criteria_badge_requires_all ERROR [ 99%]
+tests/integration/test_badge_real_activity.py::TestBadgeUnlockingWithRealActivity::test_already_earned_badge_not_unlocked_again ERROR [ 99%]
+tests/integration/test_badge_real_activity.py::TestBadgeUnlockingWithRealActivity::test_zero_division_protection_in_progress ERROR [100%]
+
+==================================== ERRORS ====================================
+_ ERROR at setup of TestWeeklyConsistencyBonus.test_weekly_consistency_tracking _
+tests/test_streak_system.py:35: in gamification_service
+    service.db = mock_db
+E   AttributeError: property 'db' of 'GamificationService' object has no setter
+_ ERROR at setup of TestWeeklyConsistencyBonus.test_weekly_consistency_bonus_earned _
+tests/test_streak_system.py:35: in gamification_service
+    service.db = mock_db
+E   AttributeError: property 'db' of 'GamificationService' object has no setter
+_ ERROR at setup of TestWeeklyConsistencyBonus.test_weekly_consistency_xp_bonus_applied _
+tests/test_streak_system.py:35: in gamification_service
+    service.db = mock_db
+E   AttributeError: property 'db' of 'GamificationService' object has no setter
+________ ERROR at setup of TestWeeklyConsistencyBonus.test_weekly_reset ________
+tests/test_streak_system.py:35: in gamification_service
+    service.db = mock_db
+E   AttributeError: property 'db' of 'GamificationService' object has no setter
+_______ ERROR at setup of TestInputValidation.test_invalid_activity_type _______
+tests/test_streak_system.py:339: in gamification_service
+    service.db = Mock()
+E   AttributeError: property 'db' of 'GamificationService' object has no setter
+____ ERROR at setup of TestInputValidation.test_xp_bonus_multiplier_bounds _____
+tests/test_streak_system.py:339: in gamification_service
+    service.db = Mock()
+E   AttributeError: property 'db' of 'GamificationService' object has no setter
+_ ERROR at setup of TestSecurityFixes.test_weekly_reset_race_condition_prevented _
+tests/test_streak_system.py:437: in gamification_service
+    service.db = Mock()
+E   AttributeError: property 'db' of 'GamificationService' object has no setter
+_ ERROR at setup of TestActivityDateFiltering.test_get_activities_with_start_date _
+tests/test_streak_system.py:518: in gamification_service
+    service.db = Mock()
+E   AttributeError: property 'db' of 'GamificationService' object has no setter
+_ ERROR at setup of TestActivityDateFiltering.test_get_activities_with_end_date _
+tests/test_streak_system.py:518: in gamification_service
+    service.db = Mock()
+E   AttributeError: property 'db' of 'GamificationService' object has no setter
+_ ERROR at setup of TestActivityDateFiltering.test_get_activities_with_date_range _
+tests/test_streak_system.py:518: in gamification_service
+    service.db = Mock()
+E   AttributeError: property 'db' of 'GamificationService' object has no setter
+_ ERROR at setup of TestBadgeUnlockingWithRealActivity.test_first_activity_unlocks_ignition_badge _
+tests/integration/test_badge_real_activity.py:45: in user_stats_new_user
+    streak=StreakInfo(
+E   pydantic_core._pydantic_core.ValidationError: 1 validation error for StreakInfo
+E   last_activity_date
+E     Input should be a valid datetime [type=datetime_type, input_value=None, input_type=NoneType]
+E       For further information visit https://errors.pydantic.dev/2.12/v/datetime_type
+_ ERROR at setup of TestBadgeUnlockingWithRealActivity.test_flashcard_activity_unlocks_badge _
+tests/integration/test_badge_real_activity.py:56: in user_stats_active_user
+    return UserStats(
+E   pydantic_core._pydantic_core.ValidationError: 1 validation error for UserStats
+E   user_email
+E     Field required [type=missing, input_value={'user_id': 'test_user_ac...=datetime.timezone.utc)}, input_type=dict]
+E       For further information visit https://errors.pydantic.dev/2.12/v/missing
+_ ERROR at setup of TestBadgeUnlockingWithRealActivity.test_xp_milestone_unlocks_badge _
+tests/integration/test_badge_real_activity.py:56: in user_stats_active_user
+    return UserStats(
+E   pydantic_core._pydantic_core.ValidationError: 1 validation error for UserStats
+E   user_email
+E     Field required [type=missing, input_value={'user_id': 'test_user_ac...=datetime.timezone.utc)}, input_type=dict]
+E       For further information visit https://errors.pydantic.dev/2.12/v/missing
+_ ERROR at setup of TestBadgeUnlockingWithRealActivity.test_multiple_criteria_badge_requires_all _
+tests/integration/test_badge_real_activity.py:56: in user_stats_active_user
+    return UserStats(
+E   pydantic_core._pydantic_core.ValidationError: 1 validation error for UserStats
+E   user_email
+E     Field required [type=missing, input_value={'user_id': 'test_user_ac...=datetime.timezone.utc)}, input_type=dict]
+E       For further information visit https://errors.pydantic.dev/2.12/v/missing
+_ ERROR at setup of TestBadgeUnlockingWithRealActivity.test_already_earned_badge_not_unlocked_again _
+tests/integration/test_badge_real_activity.py:56: in user_stats_active_user
+    return UserStats(
+E   pydantic_core._pydantic_core.ValidationError: 1 validation error for UserStats
+E   user_email
+E     Field required [type=missing, input_value={'user_id': 'test_user_ac...=datetime.timezone.utc)}, input_type=dict]
+E       For further information visit https://errors.pydantic.dev/2.12/v/missing
+_ ERROR at setup of TestBadgeUnlockingWithRealActivity.test_zero_division_protection_in_progress _
+tests/integration/test_badge_real_activity.py:45: in user_stats_new_user
+    streak=StreakInfo(
+E   pydantic_core._pydantic_core.ValidationError: 1 validation error for StreakInfo
+E   last_activity_date
+E     Input should be a valid datetime [type=datetime_type, input_value=None, input_type=NoneType]
+E       For further information visit https://errors.pydantic.dev/2.12/v/datetime_type
+=================================== FAILURES ===================================
+_____________ TestBadgeIntegration.test_race_condition_protection ______________
+tests/test_badge_integration.py:134: in test_race_condition_protection
+    assert result2.badge_id == "test_badge"
+E   AssertionError: assert <Mock name='mock.transactional()().badge_id' id='4478848704'> == 'test_badge'
+E    +  where <Mock name='mock.transactional()().badge_id' id='4478848704'> = <Mock name='mock.transactional()()' id='4478855760'>.badge_id
+______________________ TestBadgeService.test_unlock_badge ______________________
+tests/test_badge_system.py:186: in test_unlock_badge
+    assert user_badge.user_id == "test_user"
+E   AssertionError: assert <Mock name='mock.transactional()().user_id' id='4501039696'> == 'test_user'
+E    +  where <Mock name='mock.transactional()().user_id' id='4501039696'> = <Mock name='mock.transactional()()' id='4501039360'>.user_id
+_____ TestInputValidation.test_generate_flashcards_num_cards_boundary_min ______
+tests/test_files_content.py:470: in test_generate_flashcards_num_cards_boundary_min
+    with patch.object(service, '_get_anthropic_client') as mock_client:
+/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/unittest/mock.py:1497: in __enter__
+    original, local = self.get_original()
+/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/unittest/mock.py:1467: in get_original
+    raise AttributeError(
+E   AttributeError: <app.services.files_api_service.FilesAPIService object at 0x10af3d4a0> does not have the attribute '_get_anthropic_client'
+_____ TestInputValidation.test_generate_flashcards_num_cards_boundary_max ______
+tests/test_files_content.py:490: in test_generate_flashcards_num_cards_boundary_max
+    with patch.object(service, '_get_anthropic_client') as mock_client:
+/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/unittest/mock.py:1497: in __enter__
+    original, local = self.get_original()
+/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/unittest/mock.py:1467: in get_original
+    raise AttributeError(
+E   AttributeError: <app.services.files_api_service.FilesAPIService object at 0x10a96f590> does not have the attribute '_get_anthropic_client'
+____ TestInputValidation.test_generate_flashcards_topic_boundary_max_length ____
+tests/test_files_content.py:510: in test_generate_flashcards_topic_boundary_max_length
+    with patch.object(service, '_get_anthropic_client') as mock_client:
+/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/unittest/mock.py:1497: in __enter__
+    original, local = self.get_original()
+/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/unittest/mock.py:1467: in get_original
+    raise AttributeError(
+E   AttributeError: <app.services.files_api_service.FilesAPIService object at 0x10a96fad0> does not have the attribute '_get_anthropic_client'
+__ TestInputValidation.test_generate_flashcards_topic_200_chars_with_escaping __
+tests/test_files_content.py:544: in test_generate_flashcards_topic_200_chars_with_escaping
+    with patch.object(service, '_get_anthropic_client') as mock_client:
+/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/unittest/mock.py:1497: in __enter__
+    original, local = self.get_original()
+/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/unittest/mock.py:1467: in get_original
+    raise AttributeError(
+E   AttributeError: <app.services.files_api_service.FilesAPIService object at 0x10ae5f070> does not have the attribute '_get_anthropic_client'
+_______ TestInputValidation.test_generate_flashcards_topic_sanitization ________
+tests/test_files_content.py:582: in test_generate_flashcards_topic_sanitization
+    with patch.object(service, '_get_anthropic_client') as mock_client:
+/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/unittest/mock.py:1497: in __enter__
+    original, local = self.get_original()
+/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/unittest/mock.py:1467: in get_original
+    raise AttributeError(
+E   AttributeError: <app.services.files_api_service.FilesAPIService object at 0x10ae54410> does not have the attribute '_get_anthropic_client'
+______ TestInputValidation.test_generate_flashcards_topic_whitespace_only ______
+tests/test_files_content.py:626: in test_generate_flashcards_topic_whitespace_only
+    with patch.object(service, '_get_anthropic_client') as mock_client:
+/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/unittest/mock.py:1497: in __enter__
+    original, local = self.get_original()
+/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/unittest/mock.py:1467: in get_original
+    raise AttributeError(
+E   AttributeError: <app.services.files_api_service.FilesAPIService object at 0x10ae55ef0> does not have the attribute '_get_anthropic_client'
+_ TestInputValidation.test_generate_flashcards_prompt_injection_system_prompt __
+tests/test_files_content.py:666: in test_generate_flashcards_prompt_injection_system_prompt
+    await service.generate_flashcards(
+app/services/files_api_service.py:1119: in generate_flashcards
+    response = await self.client.beta.messages.create(
+.venv/lib/python3.13/site-packages/anthropic/resources/beta/messages/messages.py:2664: in create
+    return await self._post(
+.venv/lib/python3.13/site-packages/anthropic/_base_client.py:1902: in post
+    return await self.request(cast_to, opts, stream=stream, stream_cls=stream_cls)
+.venv/lib/python3.13/site-packages/anthropic/_base_client.py:1702: in request
+    raise self._make_status_error_from_response(err.response) from None
+E   anthropic.AuthenticationError: Error code: 401 - {'type': 'error', 'error': {'type': 'authentication_error', 'message': 'invalid x-api-key'}, 'request_id': 'req_011CWwwLDuJe6rrAjQcehtgY'}
+------------------------------ Captured log call -------------------------------
+WARNING  app.services.files_api_service:files_api_service.py:1093 Skipping file 'reader_criminal_law': File reader_criminal_law not found in file_ids.json
+_____ TestInputValidation.test_generate_flashcards_prompt_injection_act_as _____
+tests/test_files_content.py:678: in test_generate_flashcards_prompt_injection_act_as
+    await service.generate_flashcards(
+app/services/files_api_service.py:1119: in generate_flashcards
+    response = await self.client.beta.messages.create(
+.venv/lib/python3.13/site-packages/anthropic/resources/beta/messages/messages.py:2664: in create
+    return await self._post(
+.venv/lib/python3.13/site-packages/anthropic/_base_client.py:1902: in post
+    return await self.request(cast_to, opts, stream=stream, stream_cls=stream_cls)
+.venv/lib/python3.13/site-packages/anthropic/_base_client.py:1702: in request
+    raise self._make_status_error_from_response(err.response) from None
+E   anthropic.AuthenticationError: Error code: 401 - {'type': 'error', 'error': {'type': 'authentication_error', 'message': 'invalid x-api-key'}, 'request_id': 'req_011CWwwLFBSs73vjj9XA4mH1'}
+------------------------------ Captured log call -------------------------------
+WARNING  app.services.files_api_service:files_api_service.py:1093 Skipping file 'reader_criminal_law': File reader_criminal_law not found in file_ids.json
+_ TestInputValidation.test_generate_flashcards_prompt_injection_new_instructions _
+tests/test_files_content.py:702: in test_generate_flashcards_prompt_injection_new_instructions
+    await service.generate_flashcards(
+app/services/files_api_service.py:1119: in generate_flashcards
+    response = await self.client.beta.messages.create(
+.venv/lib/python3.13/site-packages/anthropic/resources/beta/messages/messages.py:2664: in create
+    return await self._post(
+.venv/lib/python3.13/site-packages/anthropic/_base_client.py:1902: in post
+    return await self.request(cast_to, opts, stream=stream, stream_cls=stream_cls)
+.venv/lib/python3.13/site-packages/anthropic/_base_client.py:1702: in request
+    raise self._make_status_error_from_response(err.response) from None
+E   anthropic.AuthenticationError: Error code: 401 - {'type': 'error', 'error': {'type': 'authentication_error', 'message': 'invalid x-api-key'}, 'request_id': 'req_011CWwwLGTb9mDM5NXLmGQVk'}
+------------------------------ Captured log call -------------------------------
+WARNING  app.services.files_api_service:files_api_service.py:1093 Skipping file 'reader_criminal_law': File reader_criminal_law not found in file_ids.json
+____ TestInputValidation.test_generate_flashcards_prompt_injection_roleplay ____
+tests/test_files_content.py:714: in test_generate_flashcards_prompt_injection_roleplay
+    await service.generate_flashcards(
+app/services/files_api_service.py:1119: in generate_flashcards
+    response = await self.client.beta.messages.create(
+.venv/lib/python3.13/site-packages/anthropic/resources/beta/messages/messages.py:2664: in create
+    return await self._post(
+.venv/lib/python3.13/site-packages/anthropic/_base_client.py:1902: in post
+    return await self.request(cast_to, opts, stream=stream, stream_cls=stream_cls)
+.venv/lib/python3.13/site-packages/anthropic/_base_client.py:1702: in request
+    raise self._make_status_error_from_response(err.response) from None
+E   anthropic.AuthenticationError: Error code: 401 - {'type': 'error', 'error': {'type': 'authentication_error', 'message': 'invalid x-api-key'}, 'request_id': 'req_011CWwwLHkixHuunce5FhVtL'}
+------------------------------ Captured log call -------------------------------
+WARNING  app.services.files_api_service:files_api_service.py:1093 Skipping file 'reader_criminal_law': File reader_criminal_law not found in file_ids.json
+_ TestInputValidation.test_generate_flashcards_unicode_whitespace_sanitization _
+tests/test_files_content.py:726: in test_generate_flashcards_unicode_whitespace_sanitization
+    with patch.object(service, '_get_anthropic_client') as mock_client:
+/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/unittest/mock.py:1497: in __enter__
+    original, local = self.get_original()
+/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/unittest/mock.py:1467: in get_original
+    raise AttributeError(
+E   AttributeError: <app.services.files_api_service.FilesAPIService object at 0x10ca01e50> does not have the attribute '_get_anthropic_client'
+_ TestCourseAwareFlashcardsEndpoint.test_generate_flashcards_from_course_num_cards_validation _
+tests/test_files_content.py:1060: in test_generate_flashcards_from_course_num_cards_validation
+    await service.generate_flashcards_from_course(
+E   TypeError: FilesAPIService.generate_flashcards_from_course() missing 1 required positional argument: 'topic'
+_ TestCourseAwareFlashcardsEndpoint.test_generate_flashcards_from_course_week_validation _
+tests/test_files_content.py:1079: in test_generate_flashcards_from_course_week_validation
+    await service.generate_flashcards_from_course(
+E   TypeError: FilesAPIService.generate_flashcards_from_course() missing 1 required positional argument: 'topic'
+_ TestCourseAwareFlashcardsEndpoint.test_generate_flashcards_from_course_topic_whitespace _
+tests/test_files_content.py:1113: in test_generate_flashcards_from_course_topic_whitespace
+    with patch.object(service, '_get_anthropic_client') as mock_client:
+/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/unittest/mock.py:1497: in __enter__
+    original, local = self.get_original()
+/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/unittest/mock.py:1467: in get_original
+    raise AttributeError(
+E   AttributeError: <app.services.files_api_service.FilesAPIService object at 0x10c77c950> does not have the attribute '_get_anthropic_client'
+_ TestCourseAwareFlashcardsEndpoint.test_generate_flashcards_from_course_topic_sanitization _
+tests/test_files_content.py:1147: in test_generate_flashcards_from_course_topic_sanitization
+    with patch.object(service, '_get_anthropic_client') as mock_client:
+/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/unittest/mock.py:1497: in __enter__
+    original, local = self.get_original()
+/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/unittest/mock.py:1467: in get_original
+    raise AttributeError(
+E   AttributeError: <app.services.files_api_service.FilesAPIService object at 0x10c77d3d0> does not have the attribute '_get_anthropic_client'
+____________________ TestCardNotes.test_note_xss_prevention ____________________
+tests/test_flashcard_enhancements.py:302: in test_note_xss_prevention
+    assert 'onerror=' not in escaped.lower()
+E   AssertionError: assert 'onerror=' not in '&lt;img src=x onerror=alert(&quot;xss&quot;)&gt;'
+E     'onerror=' is contained here:
+E       &lt;img src=x onerror=alert(&quot;xss&quot;)&gt;
+E     ?               ++++++++
+_________________________ test_get_user_badges_success _________________________
+tests/test_gamification_badges.py:230: in test_get_user_badges_success
+    assert len(result) == 1
+E   assert 0 == 1
+E    +  where 0 = len([])
+------------------------------ Captured log call -------------------------------
+WARNING  app.services.gamification_service:gamification_service.py:1371 Error parsing user badge <MagicMock name='mock.id' id='4475766496'>: 1 validation error for UserBadge
+user_id
+  Field required [type=missing, input_value={'badge_id': 'night_owl',...utc), 'times_earned': 1}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.12/v/missing
+____________________ test_night_owl_badge_earned_hard_quiz _____________________
+tests/test_gamification_badges.py:276: in test_night_owl_badge_earned_hard_quiz
+    assert "night_owl" in earned_badges
+E   AssertionError: assert 'night_owl' in []
+------------------------------ Captured log call -------------------------------
+ERROR    app.services.gamification_service:gamification_service.py:1573 Error awarding badge night_owl to test-user-123: 1 validation error for UserBadge
+user_id
+  Field required [type=missing, input_value={'badge_id': 'night_owl',...': 1, 'course_id': None}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.12/v/missing
+________________________ test_early_riser_badge_earned _________________________
+tests/test_gamification_badges.py:336: in test_early_riser_badge_earned
+    assert "early_riser" in earned_badges
+E   AssertionError: assert 'early_riser' in []
+------------------------------ Captured log call -------------------------------
+ERROR    app.services.gamification_service:gamification_service.py:1573 Error awarding badge early_riser to test-user-123: 1 validation error for UserBadge
+user_id
+  Field required [type=missing, input_value={'badge_id': 'early_riser...': 1, 'course_id': None}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.12/v/missing
+_________________________ test_deep_diver_badge_earned _________________________
+tests/test_gamification_badges.py:370: in test_deep_diver_badge_earned
+    assert "deep_diver" in earned_badges
+E   AssertionError: assert 'deep_diver' in []
+------------------------------ Captured log call -------------------------------
+ERROR    app.services.gamification_service:gamification_service.py:1573 Error awarding badge deep_diver to test-user-123: 1 validation error for UserBadge
+user_id
+  Field required [type=missing, input_value={'badge_id': 'deep_diver'...': 1, 'course_id': None}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.12/v/missing
+_________________________ test_combo_king_badge_earned _________________________
+tests/test_gamification_badges.py:423: in test_combo_king_badge_earned
+    assert "combo_king" in earned_badges
+E   AssertionError: assert 'combo_king' in []
+------------------------------ Captured log call -------------------------------
+ERROR    app.services.gamification_service:gamification_service.py:1573 Error awarding badge combo_king to test-user-123: 1 validation error for UserBadge
+user_id
+  Field required [type=missing, input_value={'badge_id': 'combo_king'...': 1, 'course_id': None}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.12/v/missing
+___________________ test_badge_tier_upgrade_bronze_to_silver ___________________
+tests/test_gamification_badges.py:479: in test_badge_tier_upgrade_bronze_to_silver
+    assert "combo_king" in earned_badges  # Badge returned because tier upgraded
+E   AssertionError: assert 'combo_king' in []
+------------------------------ Captured log call -------------------------------
+ERROR    app.services.gamification_service:gamification_service.py:1573 Error awarding badge combo_king to test-user-123: 'BadgeDefinition' object has no attribute 'tier_requirements'
+_________________________ test_hat_trick_badge_earned __________________________
+tests/test_gamification_badges.py:610: in test_hat_trick_badge_earned
+    assert "hat_trick" in earned_badges
+E   AssertionError: assert 'hat_trick' in []
+------------------------------ Captured log call -------------------------------
+ERROR    app.services.gamification_service:gamification_service.py:1573 Error awarding badge hat_trick to test-user-123: 1 validation error for UserBadge
+user_id
+  Field required [type=missing, input_value={'badge_id': 'hat_trick',...': 1, 'course_id': None}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.12/v/missing
+_______________________ test_legal_scholar_badge_earned ________________________
+tests/test_gamification_badges.py:703: in test_legal_scholar_badge_earned
+    assert "legal_scholar" in earned_badges
+E   AssertionError: assert 'legal_scholar' in []
+------------------------------ Captured log call -------------------------------
+ERROR    app.services.gamification_service:gamification_service.py:1573 Error awarding badge legal_scholar to test-user-123: 1 validation error for UserBadge
+user_id
+  Field required [type=missing, input_value={'badge_id': 'legal_schol...': 1, 'course_id': None}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.12/v/missing
+_________________ test_concurrent_badge_earning_race_condition _________________
+tests/test_gamification_badges.py:873: in test_concurrent_badge_earning_race_condition
+    assert isinstance(first_update_call["times_earned"], Increment)
+E   TypeError: isinstance() arg 2 must be a type, a tuple of types, or a union
+------------------------------ Captured log call -------------------------------
+ERROR    app.services.gamification_service:gamification_service.py:1573 Error awarding badge combo_king to test-user-123: 'BadgeDefinition' object has no attribute 'tier_requirements'
+________________ test_concurrent_badge_earning_no_tier_upgrade _________________
+tests/test_gamification_badges.py:967: in test_concurrent_badge_earning_no_tier_upgrade
+    assert isinstance(first_update_call["times_earned"], Increment)
+E   TypeError: isinstance() arg 2 must be a type, a tuple of types, or a union
+------------------------------ Captured log call -------------------------------
+ERROR    app.services.gamification_service:gamification_service.py:1573 Error awarding badge night_owl to test-user-123: 'BadgeDefinition' object has no attribute 'tier_requirements'
+_________________ TestGDPRService.test_record_consent_success __________________
+tests/test_gdpr_compliance.py:58: in test_record_consent_success
+    mock_doc.set.assert_called_once()
+/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/unittest/mock.py:958: in assert_called_once
+    raise AssertionError(msg)
+E   AssertionError: Expected 'set' to have been called once. Called 2 times.
+E   Calls: [call({'user_id': 'test-user-123', 'consent_type': 'analytics', 'status': 'granted', 'granted_at': datetime.datetime(2026, 1, 9, 14, 9, 53, 620906), 'revoked_at': None, 'consent_version': '1.0', 'ip_address': '192.168.1.1', 'user_agent': 'Mozilla/5.0'}),
+E    call({'log_id': 'b400c708-8570-4988-9de5-854ef714126a', 'user_id': 'test-user-123', 'action': 'consent_granted', 'timestamp': datetime.datetime(2026, 1, 9, 14, 9, 53, 620990), 'ip_address': '192.168.1.1', 'user_agent': 'Mozilla/5.0', 'details': {'consent_type': 'analytics'}})].
+______________ TestGDPRService.test_delete_user_data_soft_delete _______________
+tests/test_gdpr_compliance.py:147: in test_delete_user_data_soft_delete
+    mock_user_ref.update.assert_called_once()
+/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/unittest/mock.py:958: in assert_called_once
+    raise AssertionError(msg)
+E   AssertionError: Expected 'update' to have been called once. Called 0 times.
+___________ TestConsentEndpoints.test_record_consent_unauthenticated ___________
+tests/test_gdpr_integration.py:97: in test_record_consent_unauthenticated
+    assert response.status_code == 401
+E   assert 200 == 401
+E    +  where 200 = <Response [200 OK]>.status_code
+___________ TestDataExportEndpoint.test_export_data_unauthenticated ____________
+tests/test_gdpr_integration.py:152: in test_export_data_unauthenticated
+    assert response.status_code == 401
+E   assert 200 == 401
+E    +  where 200 = <Response [200 OK]>.status_code
+____________ TestDataExportEndpoint.test_export_data_rate_limiting _____________
+tests/test_gdpr_integration.py:171: in test_export_data_rate_limiting
+    assert response.status_code == 200
+E   assert 429 == 200
+E    +  where 429 = <Response [429 Too Many Requests]>.status_code
+__________ TestAccountDeletionEndpoints.test_request_deletion_success __________
+tests/test_gdpr_integration.py:193: in test_request_deletion_success
+    assert data["email"] == mock_user.email
+E   AssertionError: assert 'dev@mgms.eu' == 'test@example.com'
+E     - test@example.com
+E     + dev@mgms.eu
+______ TestAccountDeletionEndpoints.test_request_deletion_unauthenticated ______
+tests/test_gdpr_integration.py:203: in test_request_deletion_unauthenticated
+    assert response.status_code == 401
+E   assert 200 == 401
+E    +  where 200 = <Response [200 OK]>.status_code
+___________ TestAccountDeletionEndpoints.test_delete_account_success ___________
+tests/test_gdpr_integration.py:228: in test_delete_account_success
+    assert response.status_code == 200
+E   assert 403 == 200
+E    +  where 403 = <Response [403 Forbidden]>.status_code
+------------------------------ Captured log call -------------------------------
+WARNING  app.routes.gdpr:gdpr.py:442 User ID mismatch in deletion request: mock-user-id-12345 vs test-user-123
+________ TestAccountDeletionEndpoints.test_delete_account_invalid_token ________
+tests/test_gdpr_integration.py:252: in test_delete_account_invalid_token
+    assert response.status_code == 400
+E   assert 403 == 400
+E    +  where 403 = <Response [403 Forbidden]>.status_code
+------------------------------ Captured log call -------------------------------
+WARNING  app.routes.gdpr:gdpr.py:442 User ID mismatch in deletion request: mock-user-id-12345 vs test-user-123
+_______ TestAccountDeletionEndpoints.test_delete_account_email_mismatch ________
+tests/test_gdpr_integration.py:269: in test_delete_account_email_mismatch
+    assert "Email mismatch" in response.json()["detail"]
+E   AssertionError: assert 'Email mismatch' in 'User ID mismatch'
+------------------------------ Captured log call -------------------------------
+WARNING  app.routes.gdpr:gdpr.py:442 User ID mismatch in deletion request: mock-user-id-12345 vs test-user-123
+________ TestPrivacySettingsEndpoints.test_get_privacy_settings_success ________
+tests/test_gdpr_integration.py:292: in test_get_privacy_settings_success
+    assert data["settings"]["user_id"] == mock_user.user_id
+E   KeyError: 'user_id'
+______ TestPrivacySettingsEndpoints.test_update_privacy_settings_success _______
+tests/test_gdpr_integration.py:316: in test_update_privacy_settings_success
+    assert response.status_code == 200
+E   assert 403 == 200
+E    +  where 403 = <Response [403 Forbidden]>.status_code
+_______________ TestStreakCalendarAPI.test_get_calendar_success ________________
+tests/test_streak_api.py:75: in test_get_calendar_success
+    assert "calendar" in data
+E   AssertionError: assert 'calendar' in {'current_streak': 5, 'days': [{'activity_count': 0, 'date': '2025-12-10', 'freeze_used': False, 'has_activity': False}, {'activity_count': 0, 'date': '2025-12-11', 'freeze_used': False, 'has_activity': False}, {'activity_count': 0, 'date': '2025-12-12', 'freeze_used': False, 'has_activity': False}, {'activity_count': 0, 'date': '2025-12-13', 'freeze_used': False, 'has_activity': False}, {'activity_count': 0, 'date': '2025-12-14', 'freeze_used': False, 'has_activity': False}, {'activity_count': 0, 'date': '2025-12-15', 'freeze_used': False, 'has_activity': False}, ...], 'freezes_available': 2, 'longest_streak': 0}
+_____________ TestStreakCalendarAPI.test_get_calendar_invalid_days _____________
+tests/test_streak_api.py:87: in test_get_calendar_invalid_days
+    assert response.status_code == 400
+E   assert 422 == 400
+E    +  where 422 = <Response [422 Unprocessable Entity]>.status_code
+_____________ TestStreakCalendarAPI.test_get_calendar_unauthorized _____________
+tests/test_streak_api.py:95: in test_get_calendar_unauthorized
+    assert response.status_code in [401, 403]
+E   assert 200 in [401, 403]
+E    +  where 200 = <Response [200 OK]>.status_code
+------------------------------ Captured log call -------------------------------
+ERROR    app.services.gamification_service:gamification_service.py:225 Error getting user stats for mock-user-id-12345: 2 validation errors for UserStats
+user_id
+  Field required [type=missing, input_value={}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.12/v/missing
+user_email
+  Field required [type=missing, input_value={}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.12/v/missing
+____________ TestWeeklyConsistencyAPI.test_get_consistency_success _____________
+tests/test_streak_api.py:130: in test_get_consistency_success
+    assert response.status_code == 200
+E   assert 500 == 200
+E    +  where 500 = <Response [500 Internal Server Error]>.status_code
+------------------------------ Captured log call -------------------------------
+ERROR    app.routes.gamification:gamification.py:568 Error getting weekly consistency: unsupported operand type(s) for +: 'Mock' and 'datetime.timedelta'
+__________ TestWeeklyConsistencyAPI.test_get_consistency_bonus_active __________
+tests/test_streak_api.py:170: in test_get_consistency_bonus_active
+    assert response.status_code == 200
+E   assert 500 == 200
+E    +  where 500 = <Response [500 Internal Server Error]>.status_code
+------------------------------ Captured log call -------------------------------
+ERROR    app.routes.gamification:gamification.py:568 Error getting weekly consistency: unsupported operand type(s) for +: 'Mock' and 'datetime.timedelta'
+__________ TestWeeklyConsistencyAPI.test_get_consistency_unauthorized __________
+tests/test_streak_api.py:182: in test_get_consistency_unauthorized
+    assert response.status_code in [401, 403]
+E   assert 200 in [401, 403]
+E    +  where 200 = <Response [200 OK]>.status_code
+------------------------------ Captured log call -------------------------------
+ERROR    app.services.gamification_service:gamification_service.py:225 Error getting user stats for mock-user-id-12345: 2 validation errors for UserStats
+user_id
+  Field required [type=missing, input_value={}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.12/v/missing
+user_email
+  Field required [type=missing, input_value={}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.12/v/missing
+___________ TestStreakMaintenanceAPI.test_maintenance_success_admin ____________
+tests/test_streak_api.py:207: in test_maintenance_success_admin
+    assert response.status_code == 200
+E   assert 403 == 200
+E    +  where 403 = <Response [403 Forbidden]>.status_code
+------------------------------ Captured log call -------------------------------
+ERROR    app.routes.gamification:gamification.py:593 ADMIN_EMAILS environment variable not configured, denying streak maintenance request
+______ TestStreakAPIIntegration.test_calendar_and_consistency_consistency ______
+tests/test_streak_api.py:269: in test_calendar_and_consistency_consistency
+    assert consistency_response.status_code == 200
+E   assert 500 == 200
+E    +  where 500 = <Response [500 Internal Server Error]>.status_code
+------------------------------ Captured log call -------------------------------
+ERROR    app.routes.gamification:gamification.py:568 Error getting weekly consistency: unsupported operand type(s) for +: 'Mock' and 'datetime.timedelta'
+__________ TestStreakAPIErrorHandling.test_maintenance_service_error ___________
+tests/test_streak_api.py:325: in test_maintenance_service_error
+    assert response.status_code == 500
+E   assert 403 == 500
+E    +  where 403 = <Response [403 Forbidden]>.status_code
+------------------------------ Captured log call -------------------------------
+ERROR    app.routes.gamification:gamification.py:593 ADMIN_EMAILS environment variable not configured, denying streak maintenance request
+______________ TestStreakFreeze.test_freeze_applied_successfully _______________
+tests/test_streak_system.py:215: in test_freeze_applied_successfully
+    assert success is True
+E   AssertionError: assert <MagicMock name='mock.transactional()()' id='4474435440'> is True
+_________ TestStreakFreeze.test_freeze_not_applied_when_none_available _________
+tests/test_streak_system.py:240: in test_freeze_not_applied_when_none_available
+    assert success is False
+E   AssertionError: assert <MagicMock name='mock.transactional()()' id='4474435440'> is False
+_____________ TestStreakFreeze.test_freeze_race_condition_handling _____________
+tests/test_streak_system.py:273: in test_freeze_race_condition_handling
+    assert isinstance(success, bool)
+E   AssertionError: assert False
+E    +  where False = isinstance(<MagicMock name='mock.transactional()()' id='4474435440'>, bool)
+______________ TestStreakMaintenance.test_daily_maintenance_runs _______________
+tests/test_streak_system.py:302: in test_daily_maintenance_runs
+    assert result["success"] is True
+E   KeyError: 'success'
+------------------------------ Captured log call -------------------------------
+ERROR    app.services.streak_maintenance:streak_maintenance.py:119 Error in daily streak maintenance: 'Mock' object is not iterable
+Traceback (most recent call last):
+  File "/Users/matejmonteleone/PycharmProjects/LLMRMS/app/services/streak_maintenance.py", line 67, in run_daily_maintenance
+    docs = list(query.stream())
+TypeError: 'Mock' object is not iterable
+_________________ TestStreakMaintenance.test_batch_processing __________________
+tests/test_streak_system.py:328: in test_batch_processing
+    assert result["users_processed"] == 150
+E   KeyError: 'users_processed'
+------------------------------ Captured log call -------------------------------
+ERROR    app.services.streak_maintenance:streak_maintenance.py:119 Error in daily streak maintenance: 'Mock' object is not iterable
+Traceback (most recent call last):
+  File "/Users/matejmonteleone/PycharmProjects/LLMRMS/app/services/streak_maintenance.py", line 67, in run_daily_maintenance
+    docs = list(query.stream())
+TypeError: 'Mock' object is not iterable
+___________ TestInputValidation.test_negative_freeze_count_prevented ___________
+tests/test_streak_system.py:381: in test_negative_freeze_count_prevented
+    assert result is False, "Should not apply freeze when none available"
+E   AssertionError: Should not apply freeze when none available
+E   assert <MagicMock name='mock.transactional()()' id='4474435440'> is False
+_______ TestInputValidation.test_bonus_multiplier_validation_on_creation _______
+tests/test_streak_system.py:417: in test_bonus_multiplier_validation_on_creation
+    assert "greater than or equal to 1.0" in str(exc_info.value).lower()
+E   AssertionError: assert 'greater than or equal to 1.0' in '1 validation error for streakinfo\nbonus_multiplier\n  input should be greater than or equal to 1 [type=greater_than_equal, input_value=0.5, input_type=float]\n    for further information visit https://errors.pydantic.dev/2.12/v/greater_than_equal'
+E    +  where '1 validation error for streakinfo\nbonus_multiplier\n  input should be greater than or equal to 1 [type=greater_than_equal, input_value=0.5, input_type=float]\n    for further information visit https://errors.pydantic.dev/2.12/v/greater_than_equal' = <built-in method lower of str object at 0x10c6ec810>()
+E    +    where <built-in method lower of str object at 0x10c6ec810> = '1 validation error for StreakInfo\nbonus_multiplier\n  Input should be greater than or equal to 1 [type=greater_than_equal, input_value=0.5, input_type=float]\n    For further information visit https://errors.pydantic.dev/2.12/v/greater_than_equal'.lower
+E    +      where '1 validation error for StreakInfo\nbonus_multiplier\n  Input should be greater than or equal to 1 [type=greater_than_equal, input_value=0.5, input_type=float]\n    For further information visit https://errors.pydantic.dev/2.12/v/greater_than_equal' = str(1 validation error for StreakInfo\nbonus_multiplier\n  Input should be greater than or equal to 1 [type=greater_than_equal, input_value=0.5, input_type=float]\n    For further information visit https://errors.pydantic.dev/2.12/v/greater_than_equal)
+E    +        where 1 validation error for StreakInfo\nbonus_multiplier\n  Input should be greater than or equal to 1 [type=greater_than_equal, input_value=0.5, input_type=float]\n    For further information visit https://errors.pydantic.dev/2.12/v/greater_than_equal = <ExceptionInfo 1 validation error for StreakInfo\nbonus_multiplier\n  Input should be greater than or equal to 1 [type=greater_than_equ...ut_value=0.5, input_type=float]\n    For further information visit https://errors.pydantic.dev/2.12/v/greater_than_equal tblen=2>.value
+=============================== warnings summary ===============================
+tests/test_gdpr_integration.py::TestDataExportEndpoint::test_export_data_success
+tests/test_gdpr_integration.py::TestDataExportEndpoint::test_export_data_unauthenticated
+tests/test_gdpr_integration.py::TestDataExportEndpoint::test_export_data_rate_limiting
+  /Users/matejmonteleone/PycharmProjects/LLMRMS/.venv/lib/python3.13/site-packages/pydantic/main.py:464: UserWarning: Pydantic serializer warnings:
+    PydanticSerializationUnexpectedValue(Expected `dict[str, any]` - serialized value may not be as expected [field_name='profile_data', input_value=<MagicMock name='mock.col...dict()' id='4476105264'>, input_type=MagicMock])
+    return self.__pydantic_serializer__.to_python(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_badge_integration.py::TestBadgeIntegration::test_race_condition_protection
+FAILED tests/test_badge_system.py::TestBadgeService::test_unlock_badge - Asse...
+FAILED tests/test_files_content.py::TestInputValidation::test_generate_flashcards_num_cards_boundary_min
+FAILED tests/test_files_content.py::TestInputValidation::test_generate_flashcards_num_cards_boundary_max
+FAILED tests/test_files_content.py::TestInputValidation::test_generate_flashcards_topic_boundary_max_length
+FAILED tests/test_files_content.py::TestInputValidation::test_generate_flashcards_topic_200_chars_with_escaping
+FAILED tests/test_files_content.py::TestInputValidation::test_generate_flashcards_topic_sanitization
+FAILED tests/test_files_content.py::TestInputValidation::test_generate_flashcards_topic_whitespace_only
+FAILED tests/test_files_content.py::TestInputValidation::test_generate_flashcards_prompt_injection_system_prompt
+FAILED tests/test_files_content.py::TestInputValidation::test_generate_flashcards_prompt_injection_act_as
+FAILED tests/test_files_content.py::TestInputValidation::test_generate_flashcards_prompt_injection_new_instructions
+FAILED tests/test_files_content.py::TestInputValidation::test_generate_flashcards_prompt_injection_roleplay
+FAILED tests/test_files_content.py::TestInputValidation::test_generate_flashcards_unicode_whitespace_sanitization
+FAILED tests/test_files_content.py::TestCourseAwareFlashcardsEndpoint::test_generate_flashcards_from_course_num_cards_validation
+FAILED tests/test_files_content.py::TestCourseAwareFlashcardsEndpoint::test_generate_flashcards_from_course_week_validation
+FAILED tests/test_files_content.py::TestCourseAwareFlashcardsEndpoint::test_generate_flashcards_from_course_topic_whitespace
+FAILED tests/test_files_content.py::TestCourseAwareFlashcardsEndpoint::test_generate_flashcards_from_course_topic_sanitization
+FAILED tests/test_flashcard_enhancements.py::TestCardNotes::test_note_xss_prevention
+FAILED tests/test_gamification_badges.py::test_get_user_badges_success - asse...
+FAILED tests/test_gamification_badges.py::test_night_owl_badge_earned_hard_quiz
+FAILED tests/test_gamification_badges.py::test_early_riser_badge_earned - Ass...
+FAILED tests/test_gamification_badges.py::test_deep_diver_badge_earned - Asse...
+FAILED tests/test_gamification_badges.py::test_combo_king_badge_earned - Asse...
+FAILED tests/test_gamification_badges.py::test_badge_tier_upgrade_bronze_to_silver
+FAILED tests/test_gamification_badges.py::test_hat_trick_badge_earned - Asser...
+FAILED tests/test_gamification_badges.py::test_legal_scholar_badge_earned - A...
+FAILED tests/test_gamification_badges.py::test_concurrent_badge_earning_race_condition
+FAILED tests/test_gamification_badges.py::test_concurrent_badge_earning_no_tier_upgrade
+FAILED tests/test_gdpr_compliance.py::TestGDPRService::test_record_consent_success
+FAILED tests/test_gdpr_compliance.py::TestGDPRService::test_delete_user_data_soft_delete
+FAILED tests/test_gdpr_integration.py::TestConsentEndpoints::test_record_consent_unauthenticated
+FAILED tests/test_gdpr_integration.py::TestDataExportEndpoint::test_export_data_unauthenticated
+FAILED tests/test_gdpr_integration.py::TestDataExportEndpoint::test_export_data_rate_limiting
+FAILED tests/test_gdpr_integration.py::TestAccountDeletionEndpoints::test_request_deletion_success
+FAILED tests/test_gdpr_integration.py::TestAccountDeletionEndpoints::test_request_deletion_unauthenticated
+FAILED tests/test_gdpr_integration.py::TestAccountDeletionEndpoints::test_delete_account_success
+FAILED tests/test_gdpr_integration.py::TestAccountDeletionEndpoints::test_delete_account_invalid_token
+FAILED tests/test_gdpr_integration.py::TestAccountDeletionEndpoints::test_delete_account_email_mismatch
+FAILED tests/test_gdpr_integration.py::TestPrivacySettingsEndpoints::test_get_privacy_settings_success
+FAILED tests/test_gdpr_integration.py::TestPrivacySettingsEndpoints::test_update_privacy_settings_success
+FAILED tests/test_streak_api.py::TestStreakCalendarAPI::test_get_calendar_success
+FAILED tests/test_streak_api.py::TestStreakCalendarAPI::test_get_calendar_invalid_days
+FAILED tests/test_streak_api.py::TestStreakCalendarAPI::test_get_calendar_unauthorized
+FAILED tests/test_streak_api.py::TestWeeklyConsistencyAPI::test_get_consistency_success
+FAILED tests/test_streak_api.py::TestWeeklyConsistencyAPI::test_get_consistency_bonus_active
+FAILED tests/test_streak_api.py::TestWeeklyConsistencyAPI::test_get_consistency_unauthorized
+FAILED tests/test_streak_api.py::TestStreakMaintenanceAPI::test_maintenance_success_admin
+FAILED tests/test_streak_api.py::TestStreakAPIIntegration::test_calendar_and_consistency_consistency
+FAILED tests/test_streak_api.py::TestStreakAPIErrorHandling::test_maintenance_service_error
+FAILED tests/test_streak_system.py::TestStreakFreeze::test_freeze_applied_successfully
+FAILED tests/test_streak_system.py::TestStreakFreeze::test_freeze_not_applied_when_none_available
+FAILED tests/test_streak_system.py::TestStreakFreeze::test_freeze_race_condition_handling
+FAILED tests/test_streak_system.py::TestStreakMaintenance::test_daily_maintenance_runs
+FAILED tests/test_streak_system.py::TestStreakMaintenance::test_batch_processing
+FAILED tests/test_streak_system.py::TestInputValidation::test_negative_freeze_count_prevented
+FAILED tests/test_streak_system.py::TestInputValidation::test_bonus_multiplier_validation_on_creation
+ERROR tests/test_streak_system.py::TestWeeklyConsistencyBonus::test_weekly_consistency_tracking
+ERROR tests/test_streak_system.py::TestWeeklyConsistencyBonus::test_weekly_consistency_bonus_earned
+ERROR tests/test_streak_system.py::TestWeeklyConsistencyBonus::test_weekly_consistency_xp_bonus_applied
+ERROR tests/test_streak_system.py::TestWeeklyConsistencyBonus::test_weekly_reset
+ERROR tests/test_streak_system.py::TestInputValidation::test_invalid_activity_type
+ERROR tests/test_streak_system.py::TestInputValidation::test_xp_bonus_multiplier_bounds
+ERROR tests/test_streak_system.py::TestSecurityFixes::test_weekly_reset_race_condition_prevented
+ERROR tests/test_streak_system.py::TestActivityDateFiltering::test_get_activities_with_start_date
+ERROR tests/test_streak_system.py::TestActivityDateFiltering::test_get_activities_with_end_date
+ERROR tests/test_streak_system.py::TestActivityDateFiltering::test_get_activities_with_date_range
+ERROR tests/integration/test_badge_real_activity.py::TestBadgeUnlockingWithRealActivity::test_first_activity_unlocks_ignition_badge
+ERROR tests/integration/test_badge_real_activity.py::TestBadgeUnlockingWithRealActivity::test_flashcard_activity_unlocks_badge
+ERROR tests/integration/test_badge_real_activity.py::TestBadgeUnlockingWithRealActivity::test_xp_milestone_unlocks_badge
+ERROR tests/integration/test_badge_real_activity.py::TestBadgeUnlockingWithRealActivity::test_multiple_criteria_badge_requires_all
+ERROR tests/integration/test_badge_real_activity.py::TestBadgeUnlockingWithRealActivity::test_already_earned_badge_not_unlocked_again
+ERROR tests/integration/test_badge_real_activity.py::TestBadgeUnlockingWithRealActivity::test_zero_division_protection_in_progress
+====== 56 failed, 746 passed, 11 skipped, 3 warnings, 16 errors in 5.29s =======

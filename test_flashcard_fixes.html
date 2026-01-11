@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flashcard Viewer - Configuration Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        .test-section {
+            margin: 30px 0;
+            padding: 20px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+        }
+        .test-section h2 {
+            margin-top: 0;
+            color: #333;
+        }
+        .result {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .pass {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .fail {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        #flashcard-viewer {
+            min-height: 200px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Flashcard Viewer Configuration Tests</h1>
+    
+    <div class="test-section">
+        <h2>Test 1: XP Configuration</h2>
+        <div id="test1-results"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Test 2: originalFlashcards Edge Case</h2>
+        <div id="test2-results"></div>
+    </div>
+    
+    <div id="flashcard-viewer"></div>
+    
+    <script src="/static/js/utils.js"></script>
+    <script src="/static/js/flashcard-viewer.js"></script>
+    <script>
+        // Test data
+        const testCards = [
+            { question: "What is 2+2?", answer: "4" },
+            { question: "What is 3+3?", answer: "6" },
+            { question: "What is 4+4?", answer: "8" }
+        ];
+        
+        function logResult(testId, message, passed) {
+            const resultsDiv = document.getElementById(testId + '-results');
+            const resultDiv = document.createElement('div');
+            resultDiv.className = 'result ' + (passed ? 'pass' : 'fail');
+            resultDiv.textContent = (passed ? '✓ PASS: ' : '✗ FAIL: ') + message;
+            resultsDiv.appendChild(resultDiv);
+        }
+        
+        // Test 1: XP Configuration
+        console.log('=== Test 1: XP Configuration ===');
+        
+        // Test 1a: Default XP display (should be true)
+        try {
+            const viewer1 = new FlashcardViewer('flashcard-viewer', testCards, {
+                studyMode: 'quiz'
+            });
+            const showXPDefault = viewer1.showXP === true;
+            logResult('test1', 'Default showXP is true', showXPDefault);
+            viewer1.cleanup();
+        } catch (e) {
+            logResult('test1', 'Default showXP test: ' + e.message, false);
+        }
+        
+        // Test 1b: Explicit showXP = false
+        try {
+            const viewer2 = new FlashcardViewer('flashcard-viewer', testCards, {
+                studyMode: 'quiz',
+                showXP: false
+            });
+            const showXPFalse = viewer2.showXP === false;
+            logResult('test1', 'showXP can be set to false', showXPFalse);
+            viewer2.cleanup();
+        } catch (e) {
+            logResult('test1', 'showXP false test: ' + e.message, false);
+        }
+        
+        // Test 1c: Default xpPerCard (should be 1)
+        try {
+            const viewer3 = new FlashcardViewer('flashcard-viewer', testCards, {
+                studyMode: 'quiz'
+            });
+            const xpPerCardDefault = viewer3.xpPerCard === 1;
+            logResult('test1', 'Default xpPerCard is 1', xpPerCardDefault);
+            viewer3.cleanup();
+        } catch (e) {
+            logResult('test1', 'Default xpPerCard test: ' + e.message, false);
+        }
+        
+        // Test 1d: Custom xpPerCard
+        try {
+            const viewer4 = new FlashcardViewer('flashcard-viewer', testCards, {
+                studyMode: 'quiz',
+                xpPerCard: 5
+            });
+            const xpPerCardCustom = viewer4.xpPerCard === 5;
+            logResult('test1', 'xpPerCard can be configured (set to 5)', xpPerCardCustom);
+            
+            // Test that XP calculation uses custom value
+            viewer4.markQuizAnswer('correct');
+            const xpEarnedCorrect = viewer4.xpEarned === 5;
+            logResult('test1', 'XP earned uses custom xpPerCard (5 XP for correct answer)', xpEarnedCorrect);
+            
+            viewer4.cleanup();
+        } catch (e) {
+            logResult('test1', 'Custom xpPerCard test: ' + e.message, false);
+        }
+        
+        // Test 2: originalFlashcards Edge Case
+        console.log('=== Test 2: originalFlashcards Edge Case ===');
+        
+        try {
+            const viewer5 = new FlashcardViewer('flashcard-viewer', testCards, {
+                studyMode: 'quiz'
+            });
+            
+            // Verify originalFlashcards is initialized
+            const hasOriginal = Array.isArray(viewer5.originalFlashcards);
+            logResult('test2', 'originalFlashcards is initialized as array', hasOriginal);
+            
+            // Mark some cards as incorrect
+            viewer5.quizAnswers.set(0, 'incorrect');
+            viewer5.quizAnswers.set(1, 'correct');
+            viewer5.quizAnswers.set(2, 'incorrect');
+            
+            // Test reviewIncorrectCards
+            try {
+                viewer5.reviewIncorrectCards();
+                const filteredCorrectly = viewer5.flashcards.length === 2;
+                logResult('test2', 'reviewIncorrectCards filters to 2 incorrect cards', filteredCorrectly);
+                
+                // Verify sourceFlashcards fallback works
+                const usedOriginal = viewer5.isFilteredView === true;
+                logResult('test2', 'reviewIncorrectCards sets isFilteredView flag', usedOriginal);
+            } catch (e) {
+                logResult('test2', 'reviewIncorrectCards execution: ' + e.message, false);
+            }
+            
+            viewer5.cleanup();
+        } catch (e) {
+            logResult('test2', 'originalFlashcards test: ' + e.message, false);
+        }
+        
+        // Test 2b: Edge case - calling reviewIncorrectCards when originalFlashcards might be undefined
+        try {
+            const viewer6 = new FlashcardViewer('flashcard-viewer', testCards, {
+                studyMode: 'quiz'
+            });
+            
+            // Simulate edge case by temporarily clearing originalFlashcards
+            const savedOriginal = viewer6.originalFlashcards;
+            viewer6.originalFlashcards = null;
+            
+            // Mark cards as incorrect
+            viewer6.quizAnswers.set(0, 'incorrect');
+            
+            // This should not throw an error due to the fallback
+            try {
+                viewer6.reviewIncorrectCards();
+                logResult('test2', 'reviewIncorrectCards handles null originalFlashcards gracefully', true);
+            } catch (e) {
+                logResult('test2', 'reviewIncorrectCards with null originalFlashcards: ' + e.message, false);
+            }
+            
+            // Restore
+            viewer6.originalFlashcards = savedOriginal;
+            viewer6.cleanup();
+        } catch (e) {
+            logResult('test2', 'Edge case test: ' + e.message, false);
+        }
+        
+        console.log('=== All Tests Complete ===');
+    </script>
+</body>
+</html>
+

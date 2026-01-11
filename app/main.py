@@ -14,7 +14,7 @@ from fastapi.templating import Jinja2Templates
 from app import __version__
 
 # Import routers
-from app.routes import ai_tutor, assessment, pages, files_content, admin_courses, admin_pages, admin_users, admin_usage, echr, text_cache, quiz_management, study_guide_routes, gamification, gdpr, upload, auth, flashcard_notes, flashcard_issues, courses
+from app.routes import ai_tutor, assessment, pages, files_content, admin_courses, admin_pages, admin_users, admin_usage, echr, text_cache, quiz_management, study_guide_routes, gamification, gamification_api, gdpr, upload, auth, flashcard_notes, flashcard_issues, courses
 
 # Import authentication and CSRF middleware
 from app.middleware import AuthMiddleware, CSRFMiddleware
@@ -124,6 +124,7 @@ app.include_router(text_cache.router)
 app.include_router(quiz_management.router)
 app.include_router(study_guide_routes.router)
 app.include_router(gamification.router)
+app.include_router(gamification_api.router)  # New achievements API
 app.include_router(gdpr.router)  # GDPR compliance routes
 app.include_router(flashcard_notes.router)  # Phase 2: Flashcard notes
 app.include_router(flashcard_issues.router)  # Phase 2: Flashcard issues

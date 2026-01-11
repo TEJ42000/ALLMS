@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Delete Button Test</title>
+    <style>
+        :root {
+            --bg-card: #1a1a2e;
+            --border-color: #2d2d44;
+            --gold: #d4af37;
+            --gold-light: #f0d98d;
+            --text-primary: #e0e0e0;
+            --text-secondary: #a0a0a0;
+        }
+        
+        body {
+            background: #0f0f1e;
+            color: var(--text-primary);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            padding: 40px;
+        }
+        
+        .courses-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 20px;
+            max-width: 1200px;
+        }
+        
+        .course-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 15px;
+            padding: 25px;
+            cursor: pointer;
+            transition: all 0.3s;
+            position: relative;
+        }
+        
+        .course-card:hover {
+            transform: translateY(-5px);
+            border-color: var(--gold);
+            box-shadow: 0 10px 30px rgba(212, 175, 55, 0.15);
+        }
+        
+        .course-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        
+        .course-card h3 {
+            color: var(--gold-light);
+            margin: 0;
+            font-size: 1.3em;
+            flex: 1;
+        }
+        
+        .btn-icon {
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 5px;
+            font-size: 1.2em;
+            border-radius: 5px;
+            transition: all 0.2s;
+            opacity: 0.6;
+        }
+        
+        .btn-icon:hover {
+            opacity: 1;
+            transform: scale(1.1);
+        }
+        
+        .btn-delete {
+            color: #ff4444;
+        }
+        
+        .btn-delete:hover {
+            background: rgba(255, 68, 68, 0.1);
+        }
+        
+        .course-id {
+            color: var(--gold);
+            font-family: monospace;
+            font-size: 0.9em;
+            margin-bottom: 10px;
+        }
+        
+        .course-meta {
+            color: var(--text-secondary);
+            font-size: 0.9em;
+            margin-bottom: 15px;
+        }
+        
+        .course-status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8em;
+            font-weight: 600;
+            background: rgba(72, 187, 120, 0.2);
+            color: #48bb78;
+        }
+        
+        h1 {
+            color: var(--gold);
+            margin-bottom: 30px;
+        }
+        
+        .test-info {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .test-info h2 {
+            color: var(--gold-light);
+            margin-top: 0;
+        }
+        
+        .test-info ul {
+            color: var(--text-secondary);
+        }
+        
+        .test-info li {
+            margin: 10px 0;
+        }
+        
+        .success {
+            color: #48bb78;
+        }
+    </style>
+</head>
+<body>
+    <h1>🗑️ Delete Button Test Page</h1>
+    
+    <div class="test-info">
+        <h2>What You Should See:</h2>
+        <ul>
+            <li>Each course card below should have a <strong class="success">red trash icon (🗑️)</strong> in the top-right corner</li>
+            <li>The icon should be <strong class="success">semi-transparent (60% opacity)</strong> normally</li>
+            <li>When you <strong>hover over the icon</strong>, it should:
+                <ul>
+                    <li>Become <strong class="success">fully opaque (100%)</strong></li>
+                    <li>Get <strong class="success">slightly larger</strong> (scale 1.1)</li>
+                    <li>Show a <strong class="success">light red background</strong></li>
+                </ul>
+            </li>
+            <li>Clicking the icon should show an alert (test functionality)</li>
+        </ul>
+    </div>
+    
+    <div class="courses-grid">
+        <div class="course-card">
+            <div class="course-card-header">
+                <h3>Law and Legal Skills</h3>
+                <button class="btn-icon btn-delete" onclick="testDelete('LLS-2025-2026', 'Law and Legal Skills')" title="Delete course permanently">
+                    🗑️
+                </button>
+            </div>
+            <div class="course-id">LLS-2025-2026</div>
+            <div class="course-meta">
+                University of Groningen • 2025-2026 • 15 ECTS
+            </div>
+            <span class="course-status">● Active</span>
+        </div>
+        
+        <div class="course-card">
+            <div class="course-card-header">
+                <h3>Criminal Law</h3>
+                <button class="btn-icon btn-delete" onclick="testDelete('CRIM-2025-2026', 'Criminal Law')" title="Delete course permanently">
+                    🗑️
+                </button>
+            </div>
+            <div class="course-id">CRIM-2025-2026</div>
+            <div class="course-meta">
+                University of Groningen • 2025-2026 • 10 ECTS
+            </div>
+            <span class="course-status">● Active</span>
+        </div>
+        
+        <div class="course-card">
+            <div class="course-card-header">
+                <h3>European Union Law</h3>
+                <button class="btn-icon btn-delete" onclick="testDelete('EU-2025-2026', 'European Union Law')" title="Delete course permanently">
+                    🗑️
+                </button>
+            </div>
+            <div class="course-id">EU-2025-2026</div>
+            <div class="course-meta">
+                University of Groningen • 2025-2026 • 12 ECTS
+            </div>
+            <span class="course-status">● Active</span>
+        </div>
+    </div>
+    
+    <script>
+        function testDelete(courseId, courseName) {
+            alert(`Delete button clicked!\n\nCourse: ${courseName}\nID: ${courseId}\n\nIn the real admin panel, this would show a confirmation dialog.`);
+        }
+        
+        // Prevent card click when clicking delete button
+        document.querySelectorAll('.course-card').forEach(card => {
+            card.addEventListener('click', (e) => {
+                if (!e.target.closest('.btn-delete')) {
+                    alert('Course card clicked! (In real admin, this opens course details)');
+                }
+            });
+        });
+    </script>
+</body>
+</html>
+

@@ -13,6 +13,7 @@
     <link rel="stylesheet" href="/static/css/quiz-accessibility.css">
     <link rel="stylesheet" href="/static/css/quiz-mobile.css">
     <link rel="stylesheet" href="/static/css/gamification.css">
+    <link rel="stylesheet" href="/static/css/badges.css">
     <!-- EasyMDE Markdown Editor -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/easymde@2.18.0/dist/easymde.min.css">
     <script src="https://cdn.jsdelivr.net/npm/easymde@2.18.0/dist/easymde.min.js"></script>
@@ -109,26 +110,8 @@
                 </div>
             </section>
             <section id="badges-section" class="section">
-                <div class="badges-header">
-                    <h2 class="section-title">🏆 Badge Collection</h2>
-                    <p class="section-description">Earn badges by completing challenges and reaching milestones</p>
-                </div>
-
-                <!-- Earned Badges -->
-                <div class="badges-category">
-                    <h3 class="section-subtitle">✨ Your Badges</h3>
-                    <div id="earned-badges-grid" class="badges-grid">
-                        <div class="loading-placeholder">Loading your badges...</div>
-                    </div>
-                </div>
-
-                <!-- Available Badges -->
-                <div class="badges-category">
-                    <h3 class="section-subtitle">🔒 Available Badges</h3>
-                    <p class="badges-category-description">Complete these challenges to earn more badges!</p>
-                    <div id="available-badges-grid" class="badges-grid">
-                        <div class="loading-placeholder">Loading available badges...</div>
-                    </div>
+                <div id="badges-content">
+                    <div class="loading-placeholder">Loading achievements...</div>
                 </div>
             </section>
 
@@ -490,6 +473,8 @@
     <!-- Load scripts in correct order: utils first, then dependencies, then features, then app -->
     <script src="/static/js/utils.js" defer></script>
     <script src="/static/js/activity-tracker.js" defer></script>
+    <script src="/static/js/achievements.js" defer></script>
+    <script src="/static/js/badges-page.js" defer></script>
     <script src="/static/js/gamification-ui.js" defer></script>
     <script src="/static/js/gamification-animations.js" defer></script>
     <script src="/static/js/progress-visualizations.js" defer></script>

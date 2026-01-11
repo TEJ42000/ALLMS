@@ -1,0 +1,91 @@
+Subject: You're All Set! How to Access the LLS Study Portal
+
+Hi!
+
+Great news - you've been successfully added to the LLS Study Portal! 🎉
+
+However, your web browser remembers that you were previously denied access. We just need to clear that memory so your browser knows you now have access.
+
+This is very simple - just follow these 5 steps:
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📋 SIMPLE 5-STEP PROCESS:
+
+1. CLOSE YOUR BROWSER
+   → Close ALL browser windows completely
+
+2. OPEN A PRIVATE WINDOW
+   → Press these keys at the same time:
+   
+   If you use Chrome or Edge:
+   • Windows: Ctrl + Shift + N
+   • Mac: Cmd + Shift + N
+   
+   If you use Safari (Mac):
+   • Mac: Cmd + Shift + N
+   
+   If you use Firefox:
+   • Windows: Ctrl + Shift + P
+   • Mac: Cmd + Shift + P
+
+3. YOU'LL SEE A SPECIAL DARK WINDOW
+   → This means you're in private mode ✓
+
+4. GO TO THE WEBSITE
+   → Copy and paste this link into the address bar:
+   https://lls-study-portal-sarfwmfd3q-ez.a.run.app
+
+5. LOG IN
+   → Click "Login with Google"
+   → Choose your email: amberunal13@gmail.com
+   → Enter your password
+   → You're in! ✓
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📱 ON YOUR PHONE?
+
+iPhone/iPad:
+1. Open Safari
+2. Tap the tabs icon (two squares) at the bottom
+3. Tap "Private" in the bottom-left
+4. Tap + for a new private tab
+5. Go to the website and log in
+
+Android:
+1. Open Chrome
+2. Tap the 3 dots at the top
+3. Tap "New Incognito Tab"
+4. Go to the website and log in
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+❓ QUICK QUESTIONS:
+
+Q: Why do I need to do this?
+A: Your browser remembers you were denied before. This clears that memory.
+
+Q: Do I need to do this every time?
+A: No! Only this first time. After that, you can use your normal browser.
+
+Q: Is this safe?
+A: Yes! Private/Incognito mode is completely safe. It just doesn't save your browsing history.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🆘 STILL HAVING TROUBLE?
+
+If it still doesn't work after following these steps, please reply to this email and let me know:
+1. Which browser you're using (Chrome, Safari, Firefox, Edge)
+2. What happened when you tried to log in
+
+I'm here to help!
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Best regards,
+Matej
+
+P.S. I've also attached a detailed guide with screenshots if you need more help!
+
