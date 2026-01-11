@@ -1621,13 +1621,14 @@ function displayCurrentQuestion(container) {
             phase2Cleanup = null;
         }
 
-        // CRITICAL FIX: Use Phase 2 event handlers OR fallback to old handler, not both
+        // FIX #278: Always add navigation button handler for Next/Previous/Finish buttons
+        // Phase 2 only handles option clicks (with stopPropagation), so navigation needs separate handling
+        container.addEventListener('click', handleQuizContainerClick);
+
+        // Additionally use Phase 2 for enhanced option styling if available
         if (typeof initializePhase2Enhancements === 'function') {
-            // Phase 2 handles all option clicks internally
+            // Phase 2 handles option clicks with visual enhancements
             phase2Cleanup = initializePhase2Enhancements(container, selectAnswer);
-        } else {
-            // Fallback: Use event delegation on the container
-            container.addEventListener('click', handleQuizContainerClick);
         }
     } else {
         // No Phase 2: Use event delegation on the container

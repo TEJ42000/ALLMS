@@ -152,16 +152,37 @@
     box-shadow: 0 2px 8px rgba(33, 150, 243, 0.3);
 }
 
-.question-nav-btn.answered {
+/* FIX #278: Correct answers - green */
+.question-nav-btn.answered.correct {
     background: var(--success-light, #e8f5e9);
     border-color: var(--success, #4caf50);
     color: var(--success-dark, #2e7d32);
 }
 
-.question-nav-btn.answered.current {
+.question-nav-btn.answered.correct.current {
     background: var(--success, #4caf50);
     border-color: var(--success-dark, #388e3c);
     color: white;
+}
+
+/* FIX #278: Incorrect answers - red */
+.question-nav-btn.answered.incorrect {
+    background: var(--danger-light, #ffebee);
+    border-color: var(--danger, #f44336);
+    color: var(--danger-dark, #c62828);
+}
+
+.question-nav-btn.answered.incorrect.current {
+    background: var(--danger, #f44336);
+    border-color: var(--danger-dark, #c62828);
+    color: white;
+}
+
+/* Fallback for answered without correct/incorrect (legacy compatibility) */
+.question-nav-btn.answered:not(.correct):not(.incorrect) {
+    background: var(--success-light, #e8f5e9);
+    border-color: var(--success, #4caf50);
+    color: var(--success-dark, #2e7d32);
 }
 
 .question-nav-btn.flagged::after {
@@ -201,6 +222,18 @@
     border-color: var(--primary-dark, #1976d2);
 }
 
+/* FIX #278: Legend indicators for correct/incorrect */
+.legend-indicator.correct {
+    background: var(--success-light, #e8f5e9);
+    border-color: var(--success, #4caf50);
+}
+
+.legend-indicator.incorrect {
+    background: var(--danger-light, #ffebee);
+    border-color: var(--danger, #f44336);
+}
+
+/* Legacy fallback */
 .legend-indicator.answered {
     background: var(--success-light, #e8f5e9);
     border-color: var(--success, #4caf50);
