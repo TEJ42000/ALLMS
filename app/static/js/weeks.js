@@ -432,8 +432,19 @@ class WeekContentManager {
                     <div class="notes-section-content">
             `;
             data.keyConcepts.forEach((concept, idx) => {
-                const conceptText = typeof concept === 'string' ? concept : (concept.name || concept);
-                const conceptDesc = typeof concept === 'object' ? concept.description : '';
+                // FIX BUG #1: Handle both string and object formats
+                let conceptText, conceptDesc, conceptSource;
+                if (typeof concept === 'string') {
+                    conceptText = concept;
+                    conceptDesc = '';
+                    conceptSource = '';
+                } else if (typeof concept === 'object') {
+                    // Support multiple object formats
+                    conceptText = concept.term || concept.name || concept.title || '[Unnamed Concept]';
+                    conceptDesc = concept.definition || concept.description || '';
+                    conceptSource = concept.source || '';
+                }
+
                 html += `
                     <div class="concept-box">
                         <div class="concept-header">
@@ -441,10 +452,82 @@ class WeekContentManager {
                             <span class="concept-title">${this.escapeHtml(conceptText)}</span>
                         </div>
                         ${conceptDesc ? `<div class="concept-description">${this.escapeHtml(conceptDesc)}</div>` : ''}
+                        ${conceptSource ? `<div class="concept-source"><em>Source: ${this.escapeHtml(conceptSource)}</em></div>` : ''}
                     </div>
                 `;
             });
             html += `
+                    </div>
+                </div>
+            `;
+        }
+
+        // FIX BUG #2: Add Key Cases section
+        if (data.keyCases?.length) {
+            html += `
+                <div class="notes-section notes-cases">
+                    <div class="notes-section-header">
+                        <span class="notes-icon">⚖️</span>
+                        <h3>Key Cases</h3>
+                    </div>
+                    <div class="notes-section-content">
+            `;
+            data.keyCases.forEach((caseItem, idx) => {
+                let caseName, caseDesc, caseYear;
+                if (typeof caseItem === 'string') {
+                    caseName = caseItem;
+                    caseDesc = '';
+                    caseYear = '';
+                } else if (typeof caseItem === 'object') {
+                    caseName = caseItem.name || caseItem.title || '[Unnamed Case]';
+                    caseDesc = caseItem.description || caseItem.holding || '';
+                    caseYear = caseItem.year || '';
+                }
+
+                html += `
+                    <div class="case-card">
+                        <div class="case-header">
+                            <span class="case-number">${idx + 1}</span>
+                            <span class="case-name">${this.escapeHtml(caseName)}</span>
+                            ${caseYear ? `<span class="case-year">(${this.escapeHtml(caseYear)})</span>` : ''}
+                        </div>
+                        ${caseDesc ? `<div class="case-description">${this.escapeHtml(caseDesc)}</div>` : ''}
+                    </div>
+                `;
+            });
+            html += `
+                    </div>
+                </div>
+            `;
+        }
+
+        // FIX BUG #2: Add Key Frameworks section
+        if (data.keyFrameworks?.length) {
+            html += `
+                <div class="notes-section notes-frameworks">
+                    <div class="notes-section-header">
+                        <span class="notes-icon">🔧</span>
+                        <h3>Key Frameworks</h3>
+                    </div>
+                    <div class="notes-section-content">
+                        <ul class="frameworks-list">
+            `;
+            data.keyFrameworks.forEach((framework, idx) => {
+                const frameworkText = typeof framework === 'string' ? framework : (framework.name || framework.title || framework);
+                const frameworkDesc = typeof framework === 'object' ? (framework.description || '') : '';
+
+                html += `
+                    <li class="framework-item">
+                        <div class="framework-header">
+                            <span class="framework-number">${idx + 1}</span>
+                            <span class="framework-text">${this.escapeHtml(frameworkText)}</span>
+                        </div>
+                        ${frameworkDesc ? `<div class="framework-description">${this.escapeHtml(frameworkDesc)}</div>` : ''}
+                    </li>
+                `;
+            });
+            html += `
+                        </ul>
                     </div>
                 </div>
             `;
@@ -478,7 +561,7 @@ class WeekContentManager {
             `;
         }
 
-        // Exam Tips with special styling
+        // Exam Tips with special styling - handle both string and array
         if (data.examTips) {
             html += `
                 <div class="notes-section notes-tips">
@@ -487,15 +570,49 @@ class WeekContentManager {
                         <h3>Exam Tips</h3>
                     </div>
                     <div class="notes-section-content">
-                        <div class="exam-tips-box">
-                            ${this.escapeHtml(data.examTips)}
-                        </div>
+            `;
+
+            if (Array.isArray(data.examTips)) {
+                html += '<ul class="exam-tips-list">';
+                data.examTips.forEach((tip, idx) => {
+                    const tipText = typeof tip === 'string' ? tip : (tip.text || tip.tip || tip);
+                    html += `
+                        <li class="exam-tip-item">
+                            <span class="tip-number">💡</span>
+                            <span class="tip-text">${this.escapeHtml(tipText)}</span>
+                        </li>
+                    `;
+                });
+                html += '</ul>';
+            } else {
+                html += `<div class="exam-tips-box">${this.escapeHtml(data.examTips)}</div>`;
+            }
+
+            html += `
                     </div>
                 </div>
             `;
         }
 
-        html += '</div>';
+        html += '</div>'; // Close study-notes-content
+
+        // FIX BUG #3: Add action buttons at the bottom
+        html += `
+            <div class="modal-actions">
+                <button class="btn-action btn-quiz" onclick="weekContentManager.generateQuizForWeek()">
+                    <span class="btn-icon">📝</span>
+                    <span class="btn-text">Generate Quiz</span>
+                </button>
+                <button class="btn-action btn-flashcards" onclick="weekContentManager.generateFlashcardsForWeek()">
+                    <span class="btn-icon">🗂️</span>
+                    <span class="btn-text">Generate Flashcards</span>
+                </button>
+                <button class="btn-action btn-tutor" onclick="weekContentManager.askAITutorAboutWeek()">
+                    <span class="btn-icon">🤖</span>
+                    <span class="btn-text">Ask AI Tutor</span>
+                </button>
+            </div>
+        `;
 
         return html || this.getPlaceholderStudyNotes(data.weekNumber || this.currentWeek, data.title || this.currentWeekTitle);
     }
@@ -628,6 +745,94 @@ class WeekContentManager {
         const div = document.createElement('div');
         div.textContent = String(str);
         return div.innerHTML;
+    }
+
+    // FIX BUG #3: Action button methods
+    generateQuizForWeek() {
+        console.log('[WeekContentManager] Generating quiz for week:', this.currentWeek);
+
+        // Close modal
+        this.closeModal();
+
+        // Switch to Quiz tab
+        if (typeof switchTab === 'function') {
+            switchTab('quiz');
+        }
+
+        // Set week number in quiz form
+        setTimeout(() => {
+            const weekSelect = document.getElementById('quiz-week');
+            if (weekSelect) {
+                weekSelect.value = this.currentWeek;
+            }
+
+            // Auto-populate topic with week title
+            const topicInput = document.getElementById('quiz-topic');
+            if (topicInput && this.currentWeekTitle) {
+                topicInput.value = this.currentWeekTitle;
+            }
+
+            // Show notification
+            if (typeof showNotification === 'function') {
+                showNotification(`Ready to generate quiz for ${this.currentWeekTitle}`, 'success', 3000);
+            }
+        }, 300);
+    }
+
+    generateFlashcardsForWeek() {
+        console.log('[WeekContentManager] Generating flashcards for week:', this.currentWeek);
+
+        // Close modal
+        this.closeModal();
+
+        // Switch to Flashcards tab
+        if (typeof switchTab === 'function') {
+            switchTab('flashcards');
+        }
+
+        // Set week number and topic
+        setTimeout(() => {
+            const weekSelect = document.getElementById('flashcard-week');
+            if (weekSelect) {
+                weekSelect.value = this.currentWeek;
+            }
+
+            const topicInput = document.getElementById('flashcard-topic');
+            if (topicInput && this.currentWeekTitle) {
+                topicInput.value = this.currentWeekTitle;
+            }
+
+            // Show notification
+            if (typeof showNotification === 'function') {
+                showNotification(`Ready to generate flashcards for ${this.currentWeekTitle}`, 'success', 3000);
+            }
+        }, 300);
+    }
+
+    askAITutorAboutWeek() {
+        console.log('[WeekContentManager] Opening AI Tutor for week:', this.currentWeek);
+
+        // Close modal
+        this.closeModal();
+
+        // Switch to AI Tutor tab
+        if (typeof switchTab === 'function') {
+            switchTab('tutor');
+        }
+
+        // Pre-fill tutor input with week context
+        setTimeout(() => {
+            const tutorInput = document.getElementById('tutor-input');
+            if (tutorInput) {
+                tutorInput.value = `I have questions about ${this.currentWeekTitle}`;
+                tutorInput.focus();
+            }
+
+            // Show notification
+            if (typeof showNotification === 'function') {
+                showNotification(`AI Tutor ready to help with ${this.currentWeekTitle}`, 'success', 3000);
+            }
+        }, 300);
     }
 }
 

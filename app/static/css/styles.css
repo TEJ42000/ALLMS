@@ -545,6 +545,207 @@ body { font-family: Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-ser
     margin-top: 10px;
 }
 
+.concept-source {
+    color: #94a3b8;
+    font-size: 0.9em;
+    margin-top: 8px;
+    font-style: italic;
+}
+
+/* Key Cases */
+.case-card {
+    background: rgba(59, 130, 246, 0.08);
+    border: 1px solid rgba(59, 130, 246, 0.2);
+    border-radius: 10px;
+    padding: 18px;
+    margin-bottom: 15px;
+}
+
+.case-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.case-number {
+    background: rgba(59, 130, 246, 0.2);
+    color: #60a5fa;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 0.9em;
+}
+
+.case-name {
+    color: #60a5fa;
+    font-weight: 600;
+    font-size: 1.05em;
+}
+
+.case-year {
+    color: #94a3b8;
+    font-size: 0.95em;
+}
+
+.case-description {
+    color: #e0e6ed;
+    line-height: 1.6;
+    margin-top: 10px;
+}
+
+/* Key Frameworks */
+.frameworks-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.framework-item {
+    background: rgba(16, 185, 129, 0.08);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    border-radius: 10px;
+    padding: 15px;
+    margin-bottom: 12px;
+}
+
+.framework-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+}
+
+.framework-number {
+    background: rgba(16, 185, 129, 0.2);
+    color: #34d399;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 0.9em;
+    flex-shrink: 0;
+}
+
+.framework-text {
+    color: #e0e6ed;
+    line-height: 1.6;
+    flex: 1;
+}
+
+.framework-description {
+    color: #cbd5e1;
+    line-height: 1.6;
+    margin-top: 10px;
+    margin-left: 40px;
+    font-size: 0.95em;
+}
+
+/* Exam Tips List */
+.exam-tips-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.exam-tip-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px;
+    margin-bottom: 10px;
+    background: rgba(251, 191, 36, 0.08);
+    border: 1px solid rgba(251, 191, 36, 0.2);
+    border-radius: 8px;
+}
+
+.tip-number {
+    font-size: 1.2em;
+    flex-shrink: 0;
+}
+
+.tip-text {
+    color: #e0e6ed;
+    line-height: 1.6;
+    flex: 1;
+}
+
+/* Modal Action Buttons */
+.modal-actions {
+    display: flex;
+    gap: 12px;
+    padding: 20px;
+    background: rgba(0, 0, 0, 0.2);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    margin-top: 20px;
+}
+
+.btn-action {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 14px 20px;
+    border: none;
+    border-radius: 10px;
+    font-size: 1em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.btn-quiz {
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    color: white;
+}
+
+.btn-quiz:hover {
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+}
+
+.btn-flashcards {
+    background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+    color: white;
+}
+
+.btn-flashcards:hover {
+    background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
+}
+
+.btn-tutor {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white;
+}
+
+.btn-tutor:hover {
+    background: linear-gradient(135deg, #059669 0%, #047857 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+}
+
+.btn-icon {
+    font-size: 1.2em;
+}
+
+.btn-text {
+    font-size: 0.95em;
+}
+
+/* Responsive modal actions */
+@media (max-width: 768px) {
+    .modal-actions {
+        flex-direction: column;
+    }
+
+    .btn-action {
+        width: 100%;
+    }
+}
+
 /* Modern Chatbot Interface */
 .chat-container {
     background: var(--bg-card);
