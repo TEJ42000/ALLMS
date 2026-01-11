@@ -57,29 +57,53 @@ async function initAchievements() {
 }
 
 /**
- * Load user stats from Firestore
+ * Load user stats from Firestore gamification API
+ *
+ * FIX #278: Map from actual gamification API response format to local stats format.
+ * The API returns: { total_xp, current_level, streak: {current_count, ...}, activities: {...} }
+ * We also load from localStorage for achievement progress that doesn't map to the API.
  */
 async function loadUserStats() {
     if (!COURSE_ID) return;
-    
+
+    // Load local achievement data from localStorage first
+    const localData = localStorage.getItem('allms_achievements_data');
+    if (localData) {
+        try {
+            const parsed = JSON.parse(localData);
+            userStats = {
+                achievements: parsed.achievements || [],
+                totalPoints: parsed.totalPoints || 0,
+                quizQuestionsAnswered: parsed.quizQuestionsAnswered || 0,
+                quizQuestionsCorrect: parsed.quizQuestionsCorrect || 0,
+                flashcardsMastered: parsed.flashcardsMastered || 0,
+                currentStreak: parsed.currentStreak || 0,
+                lastActivityDate: parsed.lastActivityDate || null,
+                dailyLogins: parsed.dailyLogins || 0
+            };
+            console.log('[Achievements] Loaded local stats:', userStats);
+        } catch (e) {
+            console.error('[Achievements] Error parsing local stats:', e);
+        }
+    }
+
+    // Also try to sync streak from gamification API
     try {
         const response = await secureFetch(`${API_BASE}/api/gamification/stats`);
         if (response.ok) {
             const data = await response.json();
-            userStats = {
-                achievements: data.achievements || [],
-                totalPoints: data.total_points || 0,
-                quizQuestionsAnswered: data.quiz_questions_answered || 0,
-                quizQuestionsCorrect: data.quiz_questions_correct || 0,
-                flashcardsMastered: data.flashcards_mastered || 0,
-                currentStreak: data.current_streak || 0,
-                lastActivityDate: data.last_activity_date || null,
-                dailyLogins: data.daily_logins || 0
-            };
-            console.log('[Achievements] Loaded user stats:', userStats);
+            // Sync streak from gamification API (this is the authoritative source)
+            if (data.streak && typeof data.streak.current_count === 'number') {
+                userStats.currentStreak = data.streak.current_count;
+            }
+            // Sync XP as points (convert from gamification system)
+            if (typeof data.total_xp === 'number') {
+                userStats.totalPoints = Math.max(userStats.totalPoints, data.total_xp);
+            }
+            console.log('[Achievements] Synced with gamification API, streak:', userStats.currentStreak);
         }
     } catch (error) {
-        console.error('[Achievements] Error loading stats:', error);
+        console.error('[Achievements] Error syncing with gamification API:', error);
     }
 }
 
@@ -189,26 +213,29 @@ async function awardPoints(points, reason) {
 }
 
 /**
- * Save user stats to Firestore
+ * Save user stats to localStorage
+ *
+ * FIX #278: Save to localStorage instead of non-existent POST endpoint.
+ * The gamification API doesn't have a POST /stats endpoint - it uses /activity
+ * for logging. Achievement progress is tracked locally until proper backend integration.
  */
 async function saveUserStats() {
     if (!COURSE_ID) return;
-    
+
     try {
-        await secureFetch(`${API_BASE}/api/gamification/stats`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                achievements: userStats.achievements,
-                total_points: userStats.totalPoints,
-                quiz_questions_answered: userStats.quizQuestionsAnswered,
-                quiz_questions_correct: userStats.quizQuestionsCorrect,
-                flashcards_mastered: userStats.flashcardsMastered,
-                current_streak: userStats.currentStreak,
-                last_activity_date: userStats.lastActivityDate,
-                daily_logins: userStats.dailyLogins
-            })
-        });
+        const dataToSave = {
+            achievements: userStats.achievements,
+            totalPoints: userStats.totalPoints,
+            quizQuestionsAnswered: userStats.quizQuestionsAnswered,
+            quizQuestionsCorrect: userStats.quizQuestionsCorrect,
+            flashcardsMastered: userStats.flashcardsMastered,
+            currentStreak: userStats.currentStreak,
+            lastActivityDate: userStats.lastActivityDate,
+            dailyLogins: userStats.dailyLogins,
+            lastSaved: new Date().toISOString()
+        };
+        localStorage.setItem('allms_achievements_data', JSON.stringify(dataToSave));
+        console.log('[Achievements] Saved stats to localStorage');
     } catch (error) {
         console.error('[Achievements] Error saving stats:', error);
     }

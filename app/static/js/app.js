@@ -1047,16 +1047,6 @@ async function viewEssayAttempt(attemptId) {
     }
 }
 
-function getUserId() {
-    // Get or create a persistent user ID
-    let userId = localStorage.getItem('lls_user_id');
-    if (!userId) {
-        userId = 'user-' + Array.from(window.crypto.getRandomValues(new Uint8Array(12)), b => b.toString(16).padStart(2, '0')).join('');
-        localStorage.setItem('lls_user_id', userId);
-    }
-    return userId;
-}
-
 // ========== Quiz Generator ==========
 // Quiz state management
 let quizState = {
@@ -1082,11 +1072,22 @@ let quizEnhancements = null;
 let phase2Cleanup = null;
 
 // Simulated user ID (stored in localStorage until real auth)
+// FIX #278: Consolidated getUserId() function with migration from legacy 'lls_user_id'
 function getUserId() {
     let userId = localStorage.getItem('allms_user_id');
     if (!userId) {
-        userId = 'sim-' + crypto.randomUUID();
-        localStorage.setItem('allms_user_id', userId);
+        // Migration: Check for legacy 'lls_user_id' and migrate it
+        const legacyUserId = localStorage.getItem('lls_user_id');
+        if (legacyUserId) {
+            // Migrate legacy ID to new key for continuity
+            localStorage.setItem('allms_user_id', legacyUserId);
+            userId = legacyUserId;
+            console.log('[User] Migrated legacy user ID to allms_user_id');
+        } else {
+            // No existing ID, generate new one
+            userId = 'sim-' + crypto.randomUUID();
+            localStorage.setItem('allms_user_id', userId);
+        }
     }
     return userId;
 }
@@ -1623,18 +1624,15 @@ function displayCurrentQuestion(container) {
 
         // FIX #278: Always add navigation button handler for Next/Previous/Finish buttons
         // Phase 2 only handles option clicks (with stopPropagation), so navigation needs separate handling
-        console.log('[Quiz] Adding handleQuizContainerClick to container (Phase 2 path)');
         container.addEventListener('click', handleQuizContainerClick);
 
         // Additionally use Phase 2 for enhanced option styling if available
         if (typeof initializePhase2Enhancements === 'function') {
             // Phase 2 handles option clicks with visual enhancements
-            console.log('[Quiz] Initializing Phase 2 enhancements');
             phase2Cleanup = initializePhase2Enhancements(container, selectAnswer);
         }
     } else {
         // No Phase 2: Use event delegation on the container
-        console.log('[Quiz] Adding handleQuizContainerClick to container (fallback path)');
         container.addEventListener('click', handleQuizContainerClick);
     }
 
@@ -1832,9 +1830,6 @@ function initializeQuizAccessibility(container) {
 function handleQuizContainerClick(event) {
     const target = event.target;
 
-    // DEBUG: Log all clicks for troubleshooting
-    console.log('[Quiz] Container click:', target.className, target.tagName);
-
     // Handle quiz option selection (both old and Phase 2 enhanced options)
     const optionBtn = target.closest('.quiz-option') || target.closest('.quiz-option-enhanced');
     if (optionBtn && !optionBtn.disabled) {
@@ -1847,22 +1842,16 @@ function handleQuizContainerClick(event) {
 
     // Handle previous button
     const prevBtn = target.closest('.nav-prev-btn');
-    if (prevBtn) {
-        console.log('[Quiz] Previous button clicked, disabled:', prevBtn.disabled);
-        if (!prevBtn.disabled) {
-            previousQuestion();
-            return;
-        }
+    if (prevBtn && !prevBtn.disabled) {
+        previousQuestion();
+        return;
     }
 
     // Handle next button (also handles Finish Quiz on last question)
     const nextBtn = target.closest('.nav-next-btn');
-    if (nextBtn) {
-        console.log('[Quiz] Next/Finish button clicked, disabled:', nextBtn.disabled);
-        if (!nextBtn.disabled) {
-            nextQuestion();
-            return;
-        }
+    if (nextBtn && !nextBtn.disabled) {
+        nextQuestion();
+        return;
     }
 }
 
