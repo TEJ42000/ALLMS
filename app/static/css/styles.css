@@ -4388,3 +4388,189 @@ textarea { resize: vertical; font-family: inherit; }
 .part-tab[data-part="mixed"]::before {
     content: "🔀 ";
 }
+
+/* =============================================================================
+   Enhanced Notification System (Issue #208)
+   Toast notifications with action buttons and countdown support
+   ============================================================================= */
+
+.notification-toast,
+.enhanced-notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    min-width: 320px;
+    max-width: 450px;
+    padding: 16px 20px;
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    z-index: 10001;
+    opacity: 0;
+    transform: translateX(400px);
+    transition: all 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.notification-toast.show,
+.enhanced-notification.show {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+/* Notification Types */
+.notification-success {
+    background: linear-gradient(135deg, rgba(72, 187, 120, 0.95), rgba(56, 161, 105, 0.95));
+    border: 1px solid rgba(72, 187, 120, 0.5);
+}
+
+.notification-error {
+    background: linear-gradient(135deg, rgba(245, 101, 101, 0.95), rgba(229, 62, 62, 0.95));
+    border: 1px solid rgba(245, 101, 101, 0.5);
+}
+
+.notification-warning {
+    background: linear-gradient(135deg, rgba(236, 201, 75, 0.95), rgba(214, 158, 46, 0.95));
+    border: 1px solid rgba(236, 201, 75, 0.5);
+    color: #1a1a2e;
+}
+
+.notification-info {
+    background: linear-gradient(135deg, rgba(66, 153, 225, 0.95), rgba(49, 130, 206, 0.95));
+    border: 1px solid rgba(66, 153, 225, 0.5);
+}
+
+/* Notification Content Layout */
+.notification-toast .notification-content,
+.enhanced-notification .notification-content {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    color: white;
+}
+
+.notification-warning .notification-content {
+    color: #1a1a2e;
+}
+
+.notification-toast .notification-icon,
+.enhanced-notification .notification-icon {
+    font-size: 1.4em;
+    flex-shrink: 0;
+}
+
+.notification-toast .notification-message,
+.enhanced-notification .notification-message {
+    flex: 1;
+    font-size: 14px;
+    line-height: 1.5;
+    word-break: break-word;
+}
+
+/* Countdown Timer */
+.notification-countdown {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    flex-shrink: 0;
+    min-width: 48px;
+    text-align: center;
+}
+
+.notification-warning .notification-countdown {
+    background: rgba(0, 0, 0, 0.15);
+}
+
+/* Close Button */
+.notification-toast .notification-close,
+.enhanced-notification .notification-close {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    color: white;
+    font-size: 18px;
+    line-height: 1;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.notification-warning .notification-close {
+    color: #1a1a2e;
+    background: rgba(0, 0, 0, 0.1);
+}
+
+.notification-toast .notification-close:hover,
+.enhanced-notification .notification-close:hover {
+    background: rgba(255, 255, 255, 0.4);
+    transform: scale(1.1);
+}
+
+/* Action Buttons */
+.notification-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 8px 16px;
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 8px;
+    color: white;
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.2s;
+    align-self: flex-start;
+}
+
+.notification-warning .notification-action {
+    color: #1a1a2e;
+    background: rgba(0, 0, 0, 0.1);
+    border-color: rgba(0, 0, 0, 0.2);
+}
+
+.notification-action:hover {
+    background: rgba(255, 255, 255, 0.35);
+    transform: translateY(-1px);
+}
+
+.notification-warning .notification-action:hover {
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.notification-action.disabled,
+.notification-action:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* Mobile Responsive */
+@media (max-width: 480px) {
+    .notification-toast,
+    .enhanced-notification {
+        top: 10px;
+        right: 10px;
+        left: 10px;
+        min-width: auto;
+        max-width: none;
+        transform: translateY(-100px);
+    }
+
+    .notification-toast.show,
+    .enhanced-notification.show {
+        transform: translateY(0);
+    }
+}
