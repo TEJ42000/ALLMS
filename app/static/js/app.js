@@ -1197,13 +1197,18 @@ async function loadQuizHistory() {
 
     try {
         const userId = getUserId();
+        console.log('[Quiz History] Fetching history for user:', userId);
         const response = await fetch(`${API_BASE}/api/quizzes/history/${userId}`, {
             headers: { 'X-User-ID': userId }
         });
 
-        if (!response.ok) throw new Error('Failed to load history');
+        if (!response.ok) {
+            console.error('[Quiz History] Failed to load:', response.status, response.statusText);
+            throw new Error('Failed to load history');
+        }
 
         const data = await response.json();
+        console.log('[Quiz History] Response:', data);
         const history = data.history || [];
 
         if (history.length === 0) {
@@ -1934,7 +1939,7 @@ function nextQuestion() {
 async function submitQuizResults() {
     // Only submit if we have both quiz ID and course ID (persisted quiz)
     if (!quizState.quizId || !quizState.courseId) {
-        console.log('Quiz not persisted or missing course ID, skipping result submission');
+        console.log('[Quiz Submit] Skipping - quizId:', quizState.quizId, 'courseId:', quizState.courseId);
         return;
     }
 
@@ -1942,29 +1947,33 @@ async function submitQuizResults() {
         ? Math.round((Date.now() - quizState.startTime) / 1000)
         : null;
 
+    const userId = getUserId();
+    console.log('[Quiz Submit] Submitting for user:', userId, 'quiz:', quizState.quizId);
+
     try {
         const response = await fetch(`${API_BASE}/api/quizzes/submit`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-User-ID': getUserId()
+                'X-User-ID': userId
             },
             body: JSON.stringify({
                 quiz_id: quizState.quizId,
                 course_id: quizState.courseId,
                 answers: quizState.userAnswers,
-                user_id: getUserId(),
+                user_id: userId,
                 time_taken_seconds: timeTaken
             })
         });
 
         if (!response.ok) {
-            console.error('Failed to submit quiz results:', response.status);
+            const errorText = await response.text();
+            console.error('[Quiz Submit] Failed:', response.status, errorText);
             return;
         }
 
         const data = await response.json();
-        console.log('Quiz results submitted:', data);
+        console.log('[Quiz Submit] Success:', data);
 
         // Update local stats
         updateLocalQuizStats();

@@ -243,6 +243,10 @@ async def submit_quiz(
     try:
         service = get_quiz_persistence_service()
         user_id = request.user_id or get_or_create_user_id(x_user_id)
+        logger.info(
+            "Submitting quiz: quiz_id=%s, user_id=%s, request.user_id=%s, x_user_id=%s",
+            request.quiz_id, user_id, request.user_id, x_user_id
+        )
 
         # Verify quiz exists using the service layer
         quiz = await service.get_quiz(request.course_id, request.quiz_id)
@@ -298,6 +302,7 @@ async def get_quiz_history(
     Returns list of past quiz attempts with scores and metadata.
     """
     try:
+        logger.info("Fetching quiz history for user: %s, course: %s", user_id, course_id)
         service = get_quiz_persistence_service()
         history = await service.get_user_quiz_history(
             user_id=user_id,
@@ -305,6 +310,7 @@ async def get_quiz_history(
             limit=limit
         )
 
+        logger.info("Found %d quiz results for user: %s", len(history), user_id)
         return {
             "history": history,
             "count": len(history),
