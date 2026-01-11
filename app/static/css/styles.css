@@ -183,6 +183,15 @@ body { font-family: Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-ser
     transform: translateX(5px);
 }
 
+.material-item.material-clickable {
+    cursor: pointer;
+}
+
+.material-item.material-clickable:hover {
+    background: rgba(59, 130, 246, 0.1);
+    border-color: rgba(59, 130, 246, 0.5);
+}
+
 .material-icon {
     font-size: 1.5em;
     line-height: 1;
@@ -192,6 +201,17 @@ body { font-family: Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-ser
     flex: 1;
     color: #e0e6ed;
     font-size: 0.95em;
+}
+
+.material-action {
+    color: #3b82f6;
+    font-size: 1.2em;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.material-item.material-clickable:hover .material-action {
+    opacity: 1;
 }
 
 /* Exam Tips Box */
@@ -389,25 +409,548 @@ body { font-family: Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-ser
     font-weight: 700;
 }
 
+/* ========================================
+   TEXTBOOK CHAPTER STYLES - REAL STUDY NOTES
+   ======================================== */
+
 .study-notes-content {
     padding: 0;
 }
 
-.notes-section {
-    margin-bottom: 30px;
-    background: rgba(255, 255, 255, 0.02);
-    border-radius: 12px;
+.textbook-chapter {
+    font-size: 16px;
+    line-height: 1.8;
+    color: #e0e6ed;
+}
+
+.chapter-content {
+    padding: 0;
+}
+
+.chapter-content h1 {
+    color: #3b82f6;
+    font-size: 2em;
+    font-weight: 700;
+    margin: 0 0 30px 0;
+    padding-bottom: 15px;
+    border-bottom: 3px solid rgba(59, 130, 246, 0.4);
+}
+
+.chapter-content h2 {
+    color: #60a5fa;
+    font-size: 1.6em;
+    font-weight: 700;
+    margin: 40px 0 20px 0;
+}
+
+.chapter-content h3 {
+    color: #93c5fd;
+    font-size: 1.3em;
+    font-weight: 600;
+    margin: 30px 0 15px 0;
+}
+
+.chapter-content p {
+    margin-bottom: 16px;
+    line-height: 1.9;
+}
+
+.chapter-content ul,
+.chapter-content ol {
+    margin: 15px 0 15px 25px;
+    line-height: 1.8;
+}
+
+.chapter-content li {
+    margin-bottom: 10px;
+}
+
+.chapter-content strong {
+    color: #fbbf24;
+    font-weight: 700;
+}
+
+.chapter-content em {
+    color: #a78bfa;
+    font-style: italic;
+}
+
+/* Framework diagrams */
+.framework-box {
+    margin: 25px 0;
     padding: 20px;
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    border-left: 4px solid #10b981;
+    border-radius: 12px;
+}
+
+/* Old ASCII diagram style - kept for backward compatibility */
+.framework-diagram pre {
+    font-family: 'Courier New', monospace;
+    color: #34d399;  /* Brighter green for better visibility */
+    font-size: 0.9em;
+    line-height: 1.6;
+    white-space: pre;
+    overflow-x: auto;
+}
+
+.critical-note {
+    margin-top: 15px;
+    padding: 12px 15px;
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(239, 68, 68, 0.05) 100%);
+    border-left: 3px solid #ef4444;
+    border-radius: 0 8px 8px 0;
+    color: #fca5a5;
+    font-weight: 700;
+}
+
+/* Case boxes */
+.case-box {
+    margin: 25px 0;
+    padding: 20px;
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(59, 130, 246, 0.03) 100%);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    border-left: 4px solid #3b82f6;
+    border-radius: 12px;
+}
+
+.case-box h3 {
+    color: #3b82f6;
+    font-size: 1.2em;
+    font-weight: 700;
+    margin: 0 0 15px 0;
+}
+
+.case-box p {
+    margin-bottom: 12px;
+}
+
+.case-box p:last-child {
+    margin-bottom: 0;
+}
+
+/* Exam tips */
+.exam-tips {
+    list-style: none;
+    padding: 0;
+    margin: 20px 0;
+}
+
+.exam-tips li {
+    padding: 12px 15px;
+    margin-bottom: 10px;
+    background: linear-gradient(135deg, rgba(212, 175, 55, 0.1) 0%, rgba(212, 175, 55, 0.05) 100%);
+    border-left: 3px solid #d4af37;
+    border-radius: 0 8px 8px 0;
+    color: #fbbf24;
+}
+
+/* Practice questions */
+.practice-question {
+    margin: 20px 0;
+    padding: 20px;
+    background: rgba(139, 92, 246, 0.08);
+    border: 1px solid rgba(139, 92, 246, 0.3);
+    border-radius: 12px;
+}
+
+.practice-question p {
+    margin-bottom: 12px;
+}
+
+.practice-question details {
+    margin-top: 15px;
+}
+
+.practice-question summary {
+    padding: 12px 15px;
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(16, 185, 129, 0.05) 100%);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    border-radius: 8px;
+    color: #10b981;
+    font-weight: 700;
+    cursor: pointer;
+    list-style: none;
+}
+
+.practice-question summary:hover {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.25) 0%, rgba(16, 185, 129, 0.15) 100%);
+}
+
+.practice-question details[open] summary {
+    margin-bottom: 15px;
+}
+
+/* ========================================
+   VISUAL LEARNING ENHANCEMENTS
+   ======================================== */
+
+/* Framework Diagrams - Flexbox with arrows */
+.framework-diagram {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 15px;
+    margin: 25px 0;
+    padding: 25px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 2px solid rgba(16, 185, 129, 0.4);
+    border-radius: 12px;
+    overflow-x: auto;
+}
+
+.framework-diagram .stage {
+    flex: 0 0 auto;
+    min-width: 180px;
+    padding: 20px;
+    background: rgba(26, 31, 53, 0.9);  /* Dark background for contrast */
+    border: 2px solid rgba(16, 185, 129, 0.5);
+    border-radius: 12px;
+    text-align: center;
+}
+
+.framework-diagram .stage-1 {
+    border-color: #3b82f6;
+    background: rgba(26, 31, 53, 0.9);  /* Dark background */
+}
+
+.framework-diagram .stage-2 {
+    border-color: #10b981;
+    background: rgba(26, 31, 53, 0.9);  /* Dark background */
+}
+
+.framework-diagram .stage-3 {
+    border-color: #a78bfa;
+    background: rgba(26, 31, 53, 0.9);  /* Dark background */
+}
+
+.framework-diagram .stage-number {
+    display: inline-block;
+    width: 40px;
+    height: 40px;
+    line-height: 40px;
+    background: rgba(16, 185, 129, 0.3);
+    border-radius: 50%;
+    font-size: 1.3em;
+    font-weight: 700;
+    color: #10b981;
+    margin-bottom: 10px;
+}
+
+.framework-diagram .stage-1 .stage-number {
+    background: rgba(59, 130, 246, 0.3);
+    color: #60a5fa;  /* Brighter blue for better contrast */
+}
+
+.framework-diagram .stage-2 .stage-number {
+    background: rgba(16, 185, 129, 0.3);
+    color: #34d399;  /* Brighter green for better contrast */
+}
+
+.framework-diagram .stage-3 .stage-number {
+    background: rgba(167, 139, 250, 0.3);
+    color: #c4b5fd;  /* Brighter purple for better contrast */
+}
+
+.framework-diagram .stage-title {
+    font-size: 1.1em;
+    font-weight: 700;
+    color: #f3f4f6;  /* Bright white for excellent contrast */
+    margin-bottom: 8px;
+}
+
+.framework-diagram .stage-items {
+    font-size: 0.95em;
+    color: #e5e7eb;  /* Light gray with good contrast on dark background */
+    line-height: 1.6;
+}
+
+.framework-diagram .arrow {
+    font-size: 2em;
+    color: #34d399;  /* Brighter green for visibility */
+    font-weight: 700;
+}
+
+/* Case Cards */
+.case-card {
+    margin: 25px 0;
+    padding: 0;
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(59, 130, 246, 0.03) 100%);
+    border: 2px solid rgba(59, 130, 246, 0.4);
+    border-left: 5px solid #3b82f6;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.case-card-header {
+    padding: 15px 20px;
+    background: rgba(59, 130, 246, 0.15);
+    border-bottom: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.case-card-name {
+    font-size: 1.2em;
+    font-weight: 700;
+    color: #3b82f6;
+    margin: 0;
+}
+
+.case-card-year {
+    font-size: 0.9em;
+    color: #9ca3af;
+    margin-top: 5px;
+}
+
+.case-card-body {
+    padding: 20px;
+}
+
+.case-card-section {
+    margin-bottom: 15px;
+}
+
+.case-card-section:last-child {
+    margin-bottom: 0;
+}
+
+.case-card-label {
+    display: inline-block;
+    font-weight: 700;
+    color: #fbbf24;
+    margin-right: 8px;
+}
+
+.case-card-text {
+    color: #e0e6ed;
+    line-height: 1.8;
+}
+
+/* Exam Tips Box */
+.exam-tips-box {
+    margin: 30px 0;
+    padding: 20px;
+    background: linear-gradient(135deg, rgba(251, 191, 36, 0.15) 0%, rgba(251, 191, 36, 0.05) 100%);
+    border: 2px solid rgba(251, 191, 36, 0.4);
+    border-left: 5px solid #fbbf24;
+    border-radius: 12px;
+}
+
+.exam-tips-box h3 {
+    color: #fbbf24;
+    font-size: 1.3em;
+    font-weight: 700;
+    margin: 0 0 15px 0;
+}
+
+.exam-tips-box ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.exam-tips-box li {
+    padding: 10px 0;
+    padding-left: 30px;
+    position: relative;
+    color: #e0e6ed;
+    line-height: 1.8;
+}
+
+.exam-tips-box li:before {
+    content: "💡";
+    position: absolute;
+    left: 0;
+    font-size: 1.2em;
+}
+
+/* Mnemonic Box */
+.mnemonic-box {
+    margin: 20px 0;
+    padding: 15px 20px;
+    background: linear-gradient(135deg, rgba(167, 139, 250, 0.15) 0%, rgba(167, 139, 250, 0.05) 100%);
+    border: 2px solid rgba(167, 139, 250, 0.4);
+    border-left: 5px solid #a78bfa;
+    border-radius: 12px;
+}
+
+.mnemonic-box .mnemonic-label {
+    font-weight: 700;
+    color: #a78bfa;
+    font-size: 0.9em;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+}
+
+.mnemonic-box .mnemonic-text {
+    font-size: 1.1em;
+    font-weight: 700;
+    color: #e0e6ed;
+    margin-bottom: 8px;
+}
+
+.mnemonic-box .mnemonic-explanation {
+    font-size: 0.95em;
+    color: #9ca3af;
+    line-height: 1.6;
+}
+
+/* Recall Prompts (Collapsible Q&A) */
+.recall-prompt {
+    margin: 20px 0;
+    padding: 15px;
+    background: rgba(16, 185, 129, 0.08);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    border-radius: 12px;
+}
+
+.recall-prompt summary {
+    padding: 12px 15px;
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(16, 185, 129, 0.05) 100%);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    border-radius: 8px;
+    color: #10b981;
+    font-weight: 700;
+    cursor: pointer;
+    list-style: none;
+    font-size: 1.05em;
+}
+
+.recall-prompt summary:before {
+    content: "🎯 ";
+    margin-right: 8px;
+}
+
+.recall-prompt summary:hover {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.25) 0%, rgba(16, 185, 129, 0.15) 100%);
+}
+
+.recall-prompt details[open] summary {
+    margin-bottom: 15px;
+}
+
+.recall-prompt .recall-answer {
+    padding: 15px;
+    color: #e0e6ed;
+    line-height: 1.8;
+}
+
+/* Summary Box (Key Takeaways) */
+.summary-box {
+    margin: 30px 0;
+    padding: 25px;
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(59, 130, 246, 0.05) 100%);
+    border: 2px solid rgba(59, 130, 246, 0.4);
+    border-radius: 12px;
+}
+
+.summary-box h3 {
+    color: #3b82f6;
+    font-size: 1.4em;
+    font-weight: 700;
+    margin: 0 0 20px 0;
+}
+
+.summary-box ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.summary-box li {
+    padding: 12px 0;
+    padding-left: 35px;
+    position: relative;
+    color: #e0e6ed;
+    line-height: 1.8;
+    font-size: 1.05em;
+}
+
+.summary-box li:before {
+    content: "✓";
+    position: absolute;
+    left: 0;
+    width: 25px;
+    height: 25px;
+    line-height: 25px;
+    text-align: center;
+    background: rgba(59, 130, 246, 0.3);
+    border-radius: 50%;
+    color: #3b82f6;
+    font-weight: 700;
+}
+
+/* Warning/Alert Boxes */
+.warning-box {
+    margin: 20px 0;
+    padding: 15px 20px;
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(239, 68, 68, 0.05) 100%);
+    border: 2px solid rgba(239, 68, 68, 0.4);
+    border-left: 5px solid #ef4444;
+    border-radius: 12px;
+    color: #1a1f35;  /* Dark text for readability on light background */
+}
+
+.warning-box:before {
+    content: "⚠️ ";
+    font-size: 1.2em;
+    margin-right: 8px;
+}
+
+.warning-box strong {
+    color: #991b1b;  /* Darker red for "CRITICAL:" text */
+}
+
+.comprehensive-study-guide {
+    font-size: 16px;
+    line-height: 1.8;
+}
+
+.notes-section {
+    margin-bottom: 40px;
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 16px;
+    padding: 30px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    transition: all 0.3s ease;
+}
+
+.notes-section:hover {
+    background: rgba(255, 255, 255, 0.03);
+    border-color: rgba(255, 255, 255, 0.12);
 }
 
 .notes-section-header {
     display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 25px;
+    padding-bottom: 20px;
+    border-bottom: 3px solid rgba(59, 130, 246, 0.4);
+}
+
+.notes-section-header h2 {
+    margin: 0;
+    color: #3b82f6;
+    font-size: 1.8em;
+    font-weight: 700;
+    display: flex;
     align-items: center;
-    gap: 12px;
-    margin-bottom: 20px;
-    padding-bottom: 15px;
-    border-bottom: 2px solid rgba(59, 130, 246, 0.3);
+    gap: 15px;
+}
+
+.notes-section-header h3 {
+    margin: 0;
+    color: #3b82f6;
+    font-size: 1.3em;
+}
+
+.section-subtitle {
+    color: #94a3b8;
+    font-size: 0.95em;
+    font-style: italic;
+    margin: 0;
 }
 
 .notes-icon {
@@ -415,10 +958,52 @@ body { font-family: Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-ser
     line-height: 1;
 }
 
-.notes-section-header h3 {
+/* ========================================
+   1. WEEK OVERVIEW SECTION
+   ======================================== */
+
+.section-overview .overview-text {
+    font-size: 1.1em;
+    line-height: 1.9;
+    color: #e0e6ed;
+    margin-bottom: 25px;
+}
+
+.section-overview .overview-text p {
+    margin-bottom: 18px;
+}
+
+.context-box,
+.focus-box {
+    margin-top: 20px;
+    padding: 20px;
+    border-radius: 12px;
+    border-left: 4px solid;
+}
+
+.context-box {
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(139, 92, 246, 0.05) 100%);
+    border-left-color: #8b5cf6;
+}
+
+.focus-box {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(16, 185, 129, 0.05) 100%);
+    border-left-color: #10b981;
+}
+
+.context-box h4,
+.focus-box h4 {
+    margin: 0 0 12px 0;
+    color: #e0e6ed;
+    font-size: 1.1em;
+    font-weight: 700;
+}
+
+.context-box p,
+.focus-box p {
     margin: 0;
-    color: #3b82f6;
-    font-size: 1.3em;
+    color: #cbd5e1;
+    line-height: 1.8;
 }
 
 .notes-description {
@@ -428,7 +1013,9 @@ body { font-family: Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-ser
     margin-bottom: 15px;
 }
 
-/* Learning Objectives */
+/* ========================================
+   2. LEARNING OBJECTIVES SECTION
+   ======================================== */
 .objectives-list {
     list-style: none;
     padding: 0;
@@ -472,6 +1059,151 @@ body { font-family: Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-ser
     flex: 1;
     color: #e0e6ed;
     line-height: 1.6;
+}
+
+/* ========================================
+   3. DETAILED CONTENT SECTIONS
+   ======================================== */
+
+.section-detailed-content .content-section {
+    margin-bottom: 35px;
+    padding-bottom: 30px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.section-detailed-content .content-section:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.content-section.compact {
+    margin-bottom: 25px;
+    padding-bottom: 20px;
+}
+
+.section-heading {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 20px;
+    color: #e0e6ed;
+    font-size: 1.4em;
+    font-weight: 700;
+}
+
+.section-number {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+    color: white;
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: 0.9em;
+    flex-shrink: 0;
+    box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+}
+
+.section-explanation {
+    font-size: 1.05em;
+    line-height: 1.9;
+    color: #cbd5e1;
+    margin-bottom: 20px;
+}
+
+.section-explanation p {
+    margin-bottom: 16px;
+}
+
+.section-explanation p:last-child {
+    margin-bottom: 0;
+}
+
+/* Examples Box */
+.examples-box {
+    margin-top: 25px;
+    padding: 20px;
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(59, 130, 246, 0.03) 100%);
+    border: 1px solid rgba(59, 130, 246, 0.2);
+    border-left: 4px solid #3b82f6;
+    border-radius: 12px;
+}
+
+.examples-box h4 {
+    margin: 0 0 15px 0;
+    color: #3b82f6;
+    font-size: 1.1em;
+    font-weight: 700;
+}
+
+.example-item {
+    margin-bottom: 15px;
+    padding: 15px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+}
+
+.example-item:last-child {
+    margin-bottom: 0;
+}
+
+.example-label {
+    color: #60a5fa;
+    font-weight: 700;
+    font-size: 0.95em;
+    margin-bottom: 8px;
+}
+
+.example-text {
+    color: #cbd5e1;
+    line-height: 1.7;
+}
+
+/* Common Mistakes Box */
+.mistakes-box {
+    margin-top: 25px;
+    padding: 20px;
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.08) 0%, rgba(239, 68, 68, 0.03) 100%);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    border-left: 4px solid #ef4444;
+    border-radius: 12px;
+}
+
+.mistakes-box h4 {
+    margin: 0 0 15px 0;
+    color: #ef4444;
+    font-size: 1.1em;
+    font-weight: 700;
+}
+
+.mistakes-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.mistakes-list li {
+    padding: 10px 15px;
+    margin-bottom: 8px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    color: #fca5a5;
+    line-height: 1.6;
+    position: relative;
+    padding-left: 35px;
+}
+
+.mistakes-list li:before {
+    content: "⚠️";
+    position: absolute;
+    left: 10px;
+    top: 10px;
+}
+
+.mistakes-list li:last-child {
+    margin-bottom: 0;
 }
 
 /* Topics Grid */
@@ -552,6 +1284,98 @@ body { font-family: Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-ser
     font-style: italic;
 }
 
+/* Detailed Study Notes Cards - Beautiful Format */
+.study-notes-detailed {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.detailed-note-card {
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.06) 0%, rgba(59, 130, 246, 0.04) 100%);
+    border: 1px solid rgba(139, 92, 246, 0.25);
+    border-left: 5px solid #8b5cf6;
+    border-radius: 16px;
+    overflow: hidden;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.detailed-note-card:hover {
+    border-left-color: #a78bfa;
+    box-shadow: 0 12px 32px rgba(139, 92, 246, 0.2);
+    transform: translateY(-4px);
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.08) 0%, rgba(59, 130, 246, 0.06) 100%);
+}
+
+.note-card-header {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    padding: 24px;
+    background: rgba(139, 92, 246, 0.1);
+    border-bottom: 1px solid rgba(139, 92, 246, 0.15);
+}
+
+.note-number {
+    width: 48px;
+    height: 48px;
+    background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+    color: white;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 1.3em;
+    flex-shrink: 0;
+    box-shadow: 0 6px 16px rgba(139, 92, 246, 0.4);
+}
+
+.note-title {
+    color: #e0e6ed;
+    font-size: 1.3em;
+    font-weight: 700;
+    margin: 0;
+    line-height: 1.4;
+    letter-spacing: -0.02em;
+}
+
+.note-card-body {
+    padding: 24px;
+}
+
+.note-content {
+    margin-bottom: 18px;
+}
+
+.note-explanation {
+    color: #cbd5e1;
+    line-height: 1.9;
+    font-size: 1.05em;
+    margin: 0;
+    text-align: justify;
+}
+
+.note-footer {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding-top: 18px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.note-source-label {
+    color: #8b5cf6;
+    font-weight: 700;
+    font-size: 0.95em;
+}
+
+.note-source-text {
+    color: #94a3b8;
+    font-size: 0.95em;
+    font-style: italic;
+}
+
 /* Key Cases */
 .case-card {
     background: rgba(59, 130, 246, 0.08);
@@ -559,28 +1383,134 @@ body { font-family: Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-ser
     border-radius: 10px;
     padding: 18px;
     margin-bottom: 15px;
+    transition: all 0.3s ease;
+}
+
+.case-card:hover {
+    background: rgba(59, 130, 246, 0.12);
+    border-color: rgba(59, 130, 246, 0.3);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
 }
 
 .case-header {
     display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 10px;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 12px;
 }
 
 .case-number {
     background: rgba(59, 130, 246, 0.2);
     color: #60a5fa;
-    padding: 4px 10px;
+    padding: 6px 12px;
     border-radius: 6px;
     font-weight: 600;
     font-size: 0.9em;
+    flex-shrink: 0;
+}
+
+.case-title-block {
+    flex: 1;
 }
 
 .case-name {
     color: #60a5fa;
+    font-weight: 700;
+    font-size: 1.1em;
+    display: block;
+    margin-bottom: 4px;
+}
+
+.case-meta {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    margin-top: 4px;
+}
+
+.case-court {
+    color: #94a3b8;
+    font-size: 0.9em;
+    font-style: italic;
+}
+
+.case-year {
+    color: #94a3b8;
+    font-size: 0.9em;
+    font-weight: 500;
+}
+
+.case-description {
+    color: #e0e6ed;
+    line-height: 1.7;
+    margin-top: 12px;
+    padding-left: 44px;
+    font-size: 0.95em;
+}
+
+/* Detailed Case Cards - Beautiful Format */
+.detailed-case-card {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.06) 0%, rgba(16, 185, 129, 0.04) 100%);
+    border: 1px solid rgba(59, 130, 246, 0.25);
+    border-left: 5px solid #3b82f6;
+    border-radius: 16px;
+    overflow: hidden;
+    margin-bottom: 20px;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.detailed-case-card:hover {
+    border-left-color: #60a5fa;
+    box-shadow: 0 12px 32px rgba(59, 130, 246, 0.2);
+    transform: translateY(-4px);
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(16, 185, 129, 0.06) 100%);
+}
+
+.case-card-header {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    padding: 24px;
+    background: rgba(59, 130, 246, 0.1);
+    border-bottom: 1px solid rgba(59, 130, 246, 0.15);
+}
+
+.case-badge {
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    color: white;
+    padding: 8px 16px;
+    border-radius: 10px;
+    font-size: 0.85em;
+    font-weight: 700;
+    white-space: nowrap;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.case-title-section {
+    flex: 1;
+}
+
+.case-name {
+    color: #e0e6ed;
+    font-size: 1.3em;
+    font-weight: 700;
+    margin: 0 0 8px 0;
+    line-height: 1.3;
+    letter-spacing: -0.02em;
+}
+
+.case-citation {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.case-court {
+    color: #60a5fa;
+    font-size: 0.95em;
     font-weight: 600;
-    font-size: 1.05em;
 }
 
 .case-year {
@@ -588,10 +1518,257 @@ body { font-family: Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-ser
     font-size: 0.95em;
 }
 
-.case-description {
-    color: #e0e6ed;
-    line-height: 1.6;
-    margin-top: 10px;
+.case-card-body {
+    padding: 24px;
+}
+
+.case-principle-label {
+    color: #3b82f6;
+    font-weight: 700;
+    font-size: 0.95em;
+    margin-bottom: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.case-principle-text {
+    color: #cbd5e1;
+    line-height: 1.9;
+    font-size: 1.05em;
+    margin: 0;
+    text-align: justify;
+}
+
+/* ========================================
+   4. COMPREHENSIVE CASE ANALYSIS
+   ======================================== */
+
+.case-analysis {
+    margin-bottom: 30px;
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.06) 0%, rgba(16, 185, 129, 0.04) 100%);
+    border: 1px solid rgba(59, 130, 246, 0.25);
+    border-left: 5px solid #3b82f6;
+    border-radius: 16px;
+    overflow: hidden;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.case-analysis:hover {
+    border-left-color: #60a5fa;
+    box-shadow: 0 12px 32px rgba(59, 130, 246, 0.2);
+    transform: translateY(-4px);
+}
+
+.case-analysis .case-header {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    padding: 24px;
+    background: rgba(59, 130, 246, 0.1);
+    border-bottom: 1px solid rgba(59, 130, 246, 0.15);
+}
+
+.case-analysis .case-title-block h3 {
+    margin: 0 0 8px 0;
+}
+
+.case-body {
+    padding: 24px;
+}
+
+.case-section {
+    margin-bottom: 20px;
+    padding: 18px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 10px;
+}
+
+.case-section:last-child {
+    margin-bottom: 0;
+}
+
+.case-section.significance {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(16, 185, 129, 0.05) 100%);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.case-section-label {
+    color: #3b82f6;
+    font-weight: 700;
+    font-size: 1em;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.case-section.significance .case-section-label {
+    color: #10b981;
+}
+
+.case-section-text {
+    color: #cbd5e1;
+    line-height: 1.8;
+    margin: 0;
+}
+
+.case-section-text p {
+    margin-bottom: 12px;
+}
+
+.case-section-text p:last-child {
+    margin-bottom: 0;
+}
+
+/* ========================================
+   5. DIAGRAMS (Flowcharts, Decision Trees)
+   ======================================== */
+
+.diagram-container {
+    margin: 25px 0;
+    padding: 25px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+}
+
+.diagram-title {
+    text-align: center;
+    color: #3b82f6;
+    font-weight: 700;
+    font-size: 1.2em;
+    margin-bottom: 20px;
+}
+
+/* Flowchart Diagrams */
+.flowchart-steps {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+}
+
+.flowchart-step {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 18px 25px;
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(16, 185, 129, 0.05) 100%);
+    border: 2px solid rgba(16, 185, 129, 0.3);
+    border-radius: 12px;
+    min-width: 300px;
+    max-width: 600px;
+    transition: all 0.3s ease;
+}
+
+.flowchart-step:hover {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.25) 0%, rgba(16, 185, 129, 0.15) 100%);
+    border-color: rgba(16, 185, 129, 0.5);
+    transform: scale(1.02);
+}
+
+.flowchart-step .step-number {
+    width: 40px;
+    height: 40px;
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 1.2em;
+    flex-shrink: 0;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+}
+
+.flowchart-step .step-content {
+    flex: 1;
+}
+
+.flowchart-step .step-label {
+    color: #10b981;
+    font-weight: 700;
+    font-size: 1.1em;
+    margin-bottom: 5px;
+}
+
+.flowchart-step .step-desc {
+    color: #94a3b8;
+    font-size: 0.95em;
+    line-height: 1.5;
+}
+
+.flowchart-arrow {
+    color: #10b981;
+    font-size: 2.5em;
+    font-weight: 700;
+}
+
+/* Decision Tree Diagrams */
+.decision-tree {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.decision-node {
+    padding: 20px;
+    background: rgba(59, 130, 246, 0.08);
+    border: 2px solid rgba(59, 130, 246, 0.3);
+    border-radius: 12px;
+}
+
+.decision-question {
+    color: #3b82f6;
+    font-weight: 700;
+    font-size: 1.1em;
+    margin-bottom: 15px;
+    text-align: center;
+}
+
+.decision-paths {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+    margin-top: 15px;
+}
+
+.path {
+    padding: 15px;
+    border-radius: 8px;
+    text-align: center;
+}
+
+.yes-path {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(16, 185, 129, 0.05) 100%);
+    border: 2px solid rgba(16, 185, 129, 0.3);
+}
+
+.no-path {
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(239, 68, 68, 0.05) 100%);
+    border: 2px solid rgba(239, 68, 68, 0.3);
+}
+
+.path-label {
+    display: block;
+    font-weight: 700;
+    margin-bottom: 8px;
+    font-size: 1.1em;
+}
+
+.yes-path .path-label {
+    color: #10b981;
+}
+
+.no-path .path-label {
+    color: #ef4444;
+}
+
+.path-result {
+    display: block;
+    color: #cbd5e1;
+    font-size: 0.95em;
 }
 
 /* Key Frameworks */
@@ -604,24 +1781,35 @@ body { font-family: Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-ser
 .framework-item {
     background: rgba(16, 185, 129, 0.08);
     border: 1px solid rgba(16, 185, 129, 0.2);
-    border-radius: 10px;
-    padding: 15px;
-    margin-bottom: 12px;
+    border-left: 4px solid #10b981;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+    transition: all 0.3s ease;
+}
+
+.framework-item:hover {
+    background: rgba(16, 185, 129, 0.12);
+    border-color: rgba(16, 185, 129, 0.3);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(16, 185, 129, 0.15);
 }
 
 .framework-header {
     display: flex;
     align-items: flex-start;
-    gap: 10px;
+    gap: 12px;
+    margin-bottom: 15px;
 }
 
 .framework-number {
-    background: rgba(16, 185, 129, 0.2);
-    color: #34d399;
-    padding: 4px 10px;
-    border-radius: 6px;
-    font-weight: 600;
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white;
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-weight: 700;
     font-size: 0.9em;
+    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
     flex-shrink: 0;
 }
 
@@ -637,6 +1825,94 @@ body { font-family: Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-ser
     margin-top: 10px;
     margin-left: 40px;
     font-size: 0.95em;
+}
+
+/* Duplicate framework-diagram removed - see line 588 for main definition */
+
+.framework-step {
+    background: rgba(26, 31, 53, 0.9);  /* Dark background for contrast */
+    border: 2px solid rgba(16, 185, 129, 0.3);
+    border-radius: 12px;
+    padding: 16px 20px;
+    text-align: center;
+    min-width: 140px;
+    transition: all 0.3s ease;
+    color: #e5e7eb;  /* Light text for good contrast */
+}
+
+.framework-step:hover {
+    background: rgba(26, 31, 53, 1);  /* Slightly darker on hover */
+    border-color: rgba(16, 185, 129, 0.7);
+    transform: scale(1.05);
+}
+
+.framework-step .step-number {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 1.2em;
+    margin: 0 auto 10px;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+}
+
+.framework-step .step-label {
+    color: #34d399;  /* Brighter green for better contrast */
+    font-weight: 700;
+    font-size: 1.05em;
+    margin-bottom: 6px;
+}
+
+.framework-step .step-desc {
+    color: #e5e7eb;  /* Light gray for good contrast on dark background */
+    font-size: 0.9em;
+    line-height: 1.4;
+}
+
+.framework-arrow {
+    color: #34d399;  /* Brighter green for visibility */
+    font-size: 2em;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+/* Specific diagram styles */
+.tripartite-diagram .framework-step {
+    flex: 1;
+    min-width: 160px;
+}
+
+.irac-diagram .framework-step {
+    flex: 1;
+    min-width: 120px;
+}
+
+.test-diagram .framework-step {
+    flex: 1;
+    min-width: 140px;
+}
+
+/* Responsive framework diagrams */
+@media (max-width: 768px) {
+    .framework-diagram {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .framework-arrow {
+        transform: rotate(90deg);
+        font-size: 1.5em;
+    }
+
+    .framework-step {
+        width: 100%;
+        min-width: auto;
+    }
 }
 
 /* Exam Tips List */
@@ -666,6 +1942,160 @@ body { font-family: Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-ser
     color: #e0e6ed;
     line-height: 1.6;
     flex: 1;
+}
+
+/* ========================================
+   6. EXAM TIPS & STRATEGY (Enhanced)
+   ======================================== */
+
+.section-exam-tips {
+    background: linear-gradient(135deg, rgba(212, 175, 55, 0.1) 0%, rgba(212, 175, 55, 0.05) 100%);
+    border-color: rgba(212, 175, 55, 0.3);
+}
+
+.exam-tips-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 20px;
+}
+
+.exam-tip-card {
+    padding: 20px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(212, 175, 55, 0.2);
+    border-left: 4px solid #d4af37;
+    border-radius: 12px;
+    transition: all 0.3s ease;
+}
+
+.exam-tip-card:hover {
+    background: rgba(0, 0, 0, 0.4);
+    border-left-color: #fbbf24;
+    transform: translateY(-3px);
+    box-shadow: 0 8px 20px rgba(212, 175, 55, 0.2);
+}
+
+.tip-category {
+    color: #fbbf24;
+    font-weight: 700;
+    font-size: 0.9em;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 10px;
+}
+
+.exam-strategy-box {
+    margin-top: 25px;
+    padding: 20px;
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(139, 92, 246, 0.05) 100%);
+    border: 1px solid rgba(139, 92, 246, 0.3);
+    border-left: 4px solid #8b5cf6;
+    border-radius: 12px;
+}
+
+.exam-strategy-box h4 {
+    margin: 0 0 15px 0;
+    color: #a78bfa;
+    font-size: 1.1em;
+    font-weight: 700;
+}
+
+/* ========================================
+   7. PRACTICE QUESTIONS
+   ======================================== */
+
+.section-practice {
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.08) 0%, rgba(139, 92, 246, 0.03) 100%);
+    border-color: rgba(139, 92, 246, 0.3);
+}
+
+.practice-question {
+    margin-bottom: 25px;
+    padding: 20px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(139, 92, 246, 0.2);
+    border-radius: 12px;
+}
+
+.practice-question:last-child {
+    margin-bottom: 0;
+}
+
+.question-header {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 15px;
+}
+
+.question-number {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+    color: white;
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: 1em;
+    flex-shrink: 0;
+    box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+}
+
+.question-text {
+    flex: 1;
+    color: #e0e6ed;
+    font-size: 1.05em;
+    line-height: 1.7;
+}
+
+.question-hint {
+    margin-top: 12px;
+    padding: 12px 15px;
+    background: rgba(59, 130, 246, 0.1);
+    border-left: 3px solid #3b82f6;
+    border-radius: 0 8px 8px 0;
+    color: #cbd5e1;
+    font-size: 0.95em;
+    line-height: 1.6;
+}
+
+.question-hint strong {
+    color: #3b82f6;
+}
+
+.question-answer {
+    margin-top: 15px;
+}
+
+.question-answer summary {
+    padding: 12px 15px;
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(16, 185, 129, 0.05) 100%);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    border-radius: 8px;
+    color: #10b981;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    list-style: none;
+}
+
+.question-answer summary::-webkit-details-marker {
+    display: none;
+}
+
+.question-answer summary:hover {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.25) 0%, rgba(16, 185, 129, 0.15) 100%);
+    border-color: rgba(16, 185, 129, 0.5);
+}
+
+.answer-text {
+    margin-top: 15px;
+    padding: 15px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    color: #cbd5e1;
+    line-height: 1.8;
 }
 
 /* Modal Action Buttons */

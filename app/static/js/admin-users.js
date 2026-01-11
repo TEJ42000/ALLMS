@@ -9,6 +9,18 @@ const API_BASE = '/api/admin/users';
 let showExpired = false;
 let showInactive = false;
 
+// Helper function to get headers with CSRF token
+// Note: getCSRFToken() is provided by utils.js
+function getHeaders(includeContentType = true) {
+    const headers = {
+        'X-CSRF-Token': getCSRFToken()
+    };
+    if (includeContentType) {
+        headers['Content-Type'] = 'application/json';
+    }
+    return headers;
+}
+
 // DOM Elements
 const usersTbody = document.getElementById('users-tbody');
 const addUserBtn = document.getElementById('add-user-btn');
@@ -126,28 +138,28 @@ function closeModal() {
 
 async function handleAddUser(e) {
     e.preventDefault();
-    
+
     const email = document.getElementById('email').value;
     const reason = document.getElementById('reason').value;
     const expiresAt = document.getElementById('expires_at').value;
     const notes = document.getElementById('notes').value;
-    
+
     const body = { email, reason };
     if (expiresAt) body.expires_at = new Date(expiresAt).toISOString();
     if (notes) body.notes = notes;
-    
+
     try {
         const response = await fetch(`${API_BASE}/allowed`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: getHeaders(),
             body: JSON.stringify(body)
         });
-        
+
         if (!response.ok) {
             const error = await response.json();
             throw new Error(error.detail || 'Failed to add user');
         }
-        
+
         closeModal();
         loadUsers();
     } catch (error) {
@@ -159,10 +171,10 @@ async function toggleActive(email, active) {
     try {
         const response = await fetch(`${API_BASE}/allowed/${encodeURIComponent(email)}`, {
             method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
+            headers: getHeaders(),
             body: JSON.stringify({ active })
         });
-        
+
         if (!response.ok) throw new Error('Failed to update user');
         loadUsers();
     } catch (error) {
@@ -172,12 +184,13 @@ async function toggleActive(email, active) {
 
 async function removeUser(email) {
     if (!confirm(`Remove ${email} from the allow list?`)) return;
-    
+
     try {
         const response = await fetch(`${API_BASE}/allowed/${encodeURIComponent(email)}`, {
-            method: 'DELETE'
+            method: 'DELETE',
+            headers: getHeaders(false)  // DELETE doesn't need Content-Type
         });
-        
+
         if (!response.ok) throw new Error('Failed to remove user');
         loadUsers();
     } catch (error) {

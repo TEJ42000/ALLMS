@@ -125,6 +125,13 @@ class Week(BaseModel):
     keyConcepts: List[KeyConcept] = []
     decisionModel: Optional[DecisionModel] = None
 
+    # Rich study notes with visual learning elements
+    studyNotesHTML: Optional[str] = None  # Rich HTML content with diagrams, cases, mnemonics
+    learningObjectives: Optional[List[str]] = None  # Learning objectives for the week
+    examTips: Optional[str] = None  # Exam tips and strategy
+    keyCases: Optional[List[dict]] = None  # Key cases for the week
+    keyFrameworks: Optional[List[str]] = None  # Key frameworks/diagrams
+
 
 # ============================================================================
 # Legal Skills
