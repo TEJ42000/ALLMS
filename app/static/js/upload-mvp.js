@@ -19,11 +19,18 @@ class UploadManager {
         this.progressDiv = document.getElementById('upload-progress');
         this.resultsDiv = document.getElementById('upload-results');
         this.analysisContent = document.getElementById('analysis-content');
-        
+
+        // FIX: Initialize courseId from global context
+        this.courseId = window.COURSE_CONTEXT?.courseId || 'LLS-2025-2026';
+
         this.currentMaterialId = null;
         this.currentAnalysis = null;
         this.currentFilename = null;
-        
+
+        // File size limit (must match backend)
+        this.MAX_FILE_SIZE_MB = 25;
+        this.MAX_FILE_SIZE_BYTES = this.MAX_FILE_SIZE_MB * 1024 * 1024;
+
         this.init();
     }
     
@@ -82,21 +89,34 @@ class UploadManager {
     
     async handleFile(file) {
         console.log('[UploadManager] Handling file:', file.name);
-        
-        const courseId = window.COURSE_CONTEXT?.courseId || 'LLS-2025-2026';
-        
+
+        // FIX: Client-side file size validation
+        if (file.size > this.MAX_FILE_SIZE_BYTES) {
+            const fileSizeMB = (file.size / 1024 / 1024).toFixed(1);
+            const errorMsg = `File too large (${fileSizeMB}MB). Maximum size: ${this.MAX_FILE_SIZE_MB}MB`;
+            console.error('[UploadManager] File size validation failed:', errorMsg);
+
+            // Show error notification
+            if (typeof showNotification === 'function') {
+                showNotification(errorMsg, 'error', 5000);
+            } else {
+                alert(errorMsg);
+            }
+            return;
+        }
+
         // Show progress
         this.dropzone.style.display = 'none';
         this.progressDiv.style.display = 'block';
         this.resultsDiv.style.display = 'none';
-        
+
         this.updateProgress(file.name, 'Uploading...');
         
         try {
             // Upload file
             const formData = new FormData();
             formData.append('file', file);
-            formData.append('course_id', courseId);
+            formData.append('course_id', this.courseId);
             
             const uploadResponse = await fetch('/api/upload', {
                 method: 'POST',

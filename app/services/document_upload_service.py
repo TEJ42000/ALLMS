@@ -21,7 +21,7 @@ from app.services.gcp_service import get_firestore_client
 logger = logging.getLogger(__name__)
 
 # Configuration
-MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
+MAX_FILE_SIZE = 25 * 1024 * 1024  # 25MB (standardized across all upload endpoints)
 MATERIALS_ROOT = Path("Materials")
 
 # Supported file types
