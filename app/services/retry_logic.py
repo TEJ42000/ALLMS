@@ -9,13 +9,14 @@ Features:
 - Maximum delay cap
 - Comprehensive logging
 - Exception type filtering
+- Metrics tracking (Issue #220)
 
 Usage:
     from app.services.retry_logic import retry_with_backoff, RetryConfig
-    
+
     # Basic usage with defaults
     result = await retry_with_backoff(some_async_function, arg1, arg2)
-    
+
     # Custom configuration
     config = RetryConfig(
         max_retries=5,
@@ -35,6 +36,7 @@ Usage:
 import asyncio
 import logging
 import random
+import time
 from dataclasses import dataclass
 from typing import Callable, Any, Optional, Type, Tuple
 
@@ -222,6 +224,7 @@ async def retry_with_backoff(
 
     Retries the function on failure with exponentially increasing delays.
     Logs each attempt and the final result.
+    Issue #220: Now tracks metrics for observability.
 
     Args:
         func: Async function to execute
@@ -247,12 +250,20 @@ async def retry_with_backoff(
         config = RetryConfig(max_retries=5, initial_delay=2.0)
         user = await retry_with_backoff(flaky_api_call, "user123", config=config)
     """
+    # Issue #220: Import metrics lazily to avoid circular imports
+    from app.services.retry_metrics import get_retry_metrics
+    metrics = get_retry_metrics()
+
     if config is None:
         config = RetryConfig()
 
     last_exception = None
     delay = config.initial_delay
     func_name = getattr(func, '__name__', repr(func))
+
+    # Issue #220: Track timing and delays for metrics
+    start_time = time.time()
+    total_delay = 0.0
 
     for attempt in range(config.max_retries):
         try:
@@ -264,6 +275,13 @@ async def retry_with_backoff(
                 logger.info(
                     f"Function {func_name} succeeded on attempt {attempt + 1}/{config.max_retries}"
                 )
+                # Issue #220: Record retry success metrics
+                metrics.record_retry_success(
+                    operation=func_name,
+                    total_attempts=attempt + 1,
+                    total_duration=time.time() - start_time,
+                    total_delay=total_delay
+                )
 
             return result
 
@@ -273,15 +291,26 @@ async def retry_with_backoff(
             # Issue #218: Use helper function for exception check
             if not _should_retry_exception(e, config):
                 _log_non_retryable_exception(func_name, e)
+                # Issue #220: Record non-retryable exception metric
+                metrics.record_non_retryable(func_name, type(e).__name__)
                 raise
 
             # Log the failure and retry or give up
             if attempt < config.max_retries - 1:
                 # Issue #218: Use helper function for delay calculation
                 actual_delay = _calculate_delay_with_jitter(delay, config)
+                total_delay += actual_delay
 
                 # Issue #218: Use helper function for logging
                 _log_retry_attempt(func_name, attempt + 1, config.max_retries, e, actual_delay)
+
+                # Issue #220: Record retry attempt metric
+                metrics.record_retry_attempt(
+                    operation=func_name,
+                    attempt=attempt + 1,
+                    error_type=type(e).__name__,
+                    delay=actual_delay
+                )
 
                 # Wait before retrying
                 await asyncio.sleep(actual_delay)
@@ -292,6 +321,15 @@ async def retry_with_backoff(
                 # Final attempt failed
                 # Issue #218: Use helper function for logging
                 _log_all_retries_exhausted(func_name, config.max_retries, e)
+
+                # Issue #220: Record retry failure metric
+                metrics.record_retry_failure(
+                    operation=func_name,
+                    max_retries=config.max_retries,
+                    error_type=type(e).__name__,
+                    total_duration=time.time() - start_time,
+                    total_delay=total_delay
+                )
 
     # All retries exhausted, raise the last exception
     if last_exception is not None:
@@ -312,6 +350,7 @@ def retry_sync(
 
     Similar to retry_with_backoff but for synchronous functions.
     Uses time.sleep instead of asyncio.sleep.
+    Issue #220: Now tracks metrics for observability.
 
     Args:
         func: Synchronous function to execute
@@ -332,7 +371,9 @@ def retry_sync(
 
         results = retry_sync(flaky_database_query, "SELECT * FROM users")
     """
-    import time
+    # Issue #220: Import metrics lazily to avoid circular imports
+    from app.services.retry_metrics import get_retry_metrics
+    metrics = get_retry_metrics()
 
     if config is None:
         config = RetryConfig()
@@ -340,6 +381,10 @@ def retry_sync(
     last_exception = None
     delay = config.initial_delay
     func_name = getattr(func, '__name__', repr(func))
+
+    # Issue #220: Track timing and delays for metrics
+    start_time = time.time()
+    total_delay = 0.0
 
     for attempt in range(config.max_retries):
         try:
@@ -351,6 +396,13 @@ def retry_sync(
                 logger.info(
                     f"Function {func_name} succeeded on attempt {attempt + 1}/{config.max_retries}"
                 )
+                # Issue #220: Record retry success metrics
+                metrics.record_retry_success(
+                    operation=func_name,
+                    total_attempts=attempt + 1,
+                    total_duration=time.time() - start_time,
+                    total_delay=total_delay
+                )
 
             return result
 
@@ -360,15 +412,26 @@ def retry_sync(
             # Issue #218: Use helper function for exception check
             if not _should_retry_exception(e, config):
                 _log_non_retryable_exception(func_name, e)
+                # Issue #220: Record non-retryable exception metric
+                metrics.record_non_retryable(func_name, type(e).__name__)
                 raise
 
             # Log the failure and retry or give up
             if attempt < config.max_retries - 1:
                 # Issue #218: Use helper function for delay calculation
                 actual_delay = _calculate_delay_with_jitter(delay, config)
+                total_delay += actual_delay
 
                 # Issue #218: Use helper function for logging
                 _log_retry_attempt(func_name, attempt + 1, config.max_retries, e, actual_delay)
+
+                # Issue #220: Record retry attempt metric
+                metrics.record_retry_attempt(
+                    operation=func_name,
+                    attempt=attempt + 1,
+                    error_type=type(e).__name__,
+                    delay=actual_delay
+                )
 
                 # Wait before retrying (sync version uses time.sleep)
                 time.sleep(actual_delay)
@@ -379,7 +442,16 @@ def retry_sync(
                 # Final attempt failed
                 # Issue #218: Use helper function for logging
                 _log_all_retries_exhausted(func_name, config.max_retries, e)
-    
+
+                # Issue #220: Record retry failure metric
+                metrics.record_retry_failure(
+                    operation=func_name,
+                    max_retries=config.max_retries,
+                    error_type=type(e).__name__,
+                    total_duration=time.time() - start_time,
+                    total_delay=total_delay
+                )
+
     # All retries exhausted
     if last_exception is not None:
         raise last_exception

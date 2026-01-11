@@ -767,3 +767,186 @@
         transform: none;
     }
 }
+
+/* ============================================================================
+   Issue #165: Keyboard Help Overlay
+   ============================================================================ */
+
+.keyboard-help-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.keyboard-help-dialog {
+    background-color: #ffffff;
+    border-radius: 12px;
+    padding: 30px;
+    max-width: 500px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    animation: slideIn 0.2s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateY(-20px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.keyboard-help-dialog h2 {
+    margin: 0 0 24px 0;
+    font-size: 24px;
+    color: #333;
+    text-align: center;
+}
+
+.keyboard-help-grid {
+    display: grid;
+    gap: 16px;
+}
+
+.shortcut-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+}
+
+.shortcut-item kbd {
+    display: inline-block;
+    min-width: 40px;
+    padding: 6px 10px;
+    font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+    font-size: 13px;
+    font-weight: 600;
+    color: #333;
+    background-color: #ffffff;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    box-shadow: 0 2px 0 #d1d5db;
+    text-align: center;
+}
+
+.shortcut-item span:last-child {
+    flex: 1;
+    font-size: 14px;
+    color: #555;
+}
+
+.keyboard-help-footer {
+    margin-top: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.dont-show-again {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    color: #666;
+    cursor: pointer;
+}
+
+.dont-show-again input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+
+#btn-close-keyboard-help {
+    padding: 10px 24px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #ffffff;
+    background-color: #4CAF50;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+#btn-close-keyboard-help:hover {
+    background-color: #43a047;
+}
+
+#btn-close-keyboard-help:focus {
+    outline: 2px solid #4CAF50;
+    outline-offset: 2px;
+}
+
+/* Responsive adjustments for keyboard help */
+@media (max-width: 480px) {
+    .keyboard-help-dialog {
+        padding: 20px;
+    }
+
+    .keyboard-help-dialog h2 {
+        font-size: 20px;
+    }
+
+    .keyboard-help-footer {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    #btn-close-keyboard-help {
+        width: 100%;
+    }
+}
+
+/* Dark mode support for keyboard help */
+@media (prefers-color-scheme: dark) {
+    .keyboard-help-dialog {
+        background-color: #1e1e1e;
+        color: #e0e0e0;
+    }
+
+    .keyboard-help-dialog h2 {
+        color: #ffffff;
+    }
+
+    .shortcut-item {
+        background-color: #2d2d2d;
+    }
+
+    .shortcut-item kbd {
+        background-color: #3d3d3d;
+        border-color: #555;
+        box-shadow: 0 2px 0 #333;
+        color: #e0e0e0;
+    }
+
+    .shortcut-item span:last-child {
+        color: #bbb;
+    }
+
+    .dont-show-again {
+        color: #aaa;
+    }
+}
