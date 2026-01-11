@@ -178,11 +178,12 @@ class ActivityTracker {
      */
     async startSession() {
         try {
-            const response = await fetch('/api/gamification/session/start', {
+            // FIX #278: Use secureFetch with CSRF token
+            const response = await secureFetch('/api/gamification/session/start', {
                 method: 'POST',
-                headers: {
+                headers: addCSRFHeader({
                     'Content-Type': 'application/json'
-                }
+                })
             });
 
             if (response.ok) {
@@ -206,11 +207,12 @@ class ActivityTracker {
         const secondsToSend = this.activeSeconds;
 
         try {
-            const response = await fetch('/api/gamification/session/heartbeat', {
+            // FIX #278: Use secureFetch with CSRF token
+            const response = await secureFetch('/api/gamification/session/heartbeat', {
                 method: 'POST',
-                headers: {
+                headers: addCSRFHeader({
                     'Content-Type': 'application/json'
-                },
+                }),
                 body: JSON.stringify({
                     session_id: this.sessionId,
                     active_seconds: secondsToSend,
@@ -284,11 +286,12 @@ class ActivityTracker {
      */
     async logActivity(activityType, activityData = {}, courseId = null) {
         try {
-            const response = await fetch('/api/gamification/activity', {
+            // FIX #278: Use secureFetch with CSRF token
+            const response = await secureFetch('/api/gamification/activity', {
                 method: 'POST',
-                headers: {
+                headers: addCSRFHeader({
                     'Content-Type': 'application/json'
-                },
+                }),
                 body: JSON.stringify({
                     activity_type: activityType,
                     activity_data: activityData,
