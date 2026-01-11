@@ -374,6 +374,14 @@ class FlashcardViewer {
                 <span class="icon" aria-hidden="true">🧠</span>
                 <span class="label">SR Mode</span>
             </button>
+
+            <!-- Issue #165: Keyboard shortcuts help button -->
+            <button class="btn-action"
+                    id="btn-keyboard-help"
+                    aria-label="Show keyboard shortcuts (press ? key)">
+                <span class="icon" aria-hidden="true">⌨️</span>
+                <span class="label">Shortcuts</span>
+            </button>
         `;
     }
 
@@ -518,6 +526,14 @@ class FlashcardViewer {
             this.eventListeners.push({ element: btnSRMode, event: 'click', handler: srModeHandler });
         }
 
+        // Issue #165: Keyboard help button
+        const btnKeyboardHelp = document.getElementById('btn-keyboard-help');
+        if (btnKeyboardHelp) {
+            const keyboardHelpHandler = () => this.showKeyboardHelp();
+            btnKeyboardHelp.addEventListener('click', keyboardHelpHandler);
+            this.eventListeners.push({ element: btnKeyboardHelp, event: 'click', handler: keyboardHelpHandler });
+        }
+
         // PHASE 2C: Quality rating buttons
         const qualityButtons = document.querySelectorAll('.btn-quality');
         qualityButtons.forEach(button => {
@@ -558,6 +574,7 @@ class FlashcardViewer {
     /**
      * Setup keyboard shortcuts
      * CRITICAL FIX: Store handler as instance property for proper cleanup
+     * Issue #165: Added "?" shortcut to show keyboard help
      */
     setupKeyboardShortcuts() {
         // Store as instance property for cleanup
@@ -589,11 +606,132 @@ class FlashcardViewer {
                     e.preventDefault();
                     this.toggleKnown();
                     break;
+                // Issue #165: Show keyboard shortcuts help
+                case '?':
+                    e.preventDefault();
+                    this.showKeyboardHelp();
+                    break;
             }
         };
 
         document.addEventListener('keydown', this.keyHandler);
         this.eventListeners.push({ element: document, event: 'keydown', handler: this.keyHandler });
+
+        // Issue #165: Show help on first visit
+        this.maybeShowFirstTimeHelp();
+    }
+
+    /**
+     * Issue #165: Show keyboard shortcuts help overlay
+     */
+    showKeyboardHelp() {
+        // Prevent duplicate overlays
+        if (document.querySelector('.keyboard-help-overlay')) {
+            return;
+        }
+
+        const overlay = document.createElement('div');
+        overlay.className = 'keyboard-help-overlay';
+        overlay.setAttribute('role', 'dialog');
+        overlay.setAttribute('aria-modal', 'true');
+        overlay.setAttribute('aria-labelledby', 'keyboard-help-title');
+
+        overlay.innerHTML = `
+            <div class="keyboard-help-dialog">
+                <h2 id="keyboard-help-title">⌨️ Keyboard Shortcuts</h2>
+                <div class="keyboard-help-grid">
+                    <div class="shortcut-item">
+                        <kbd>←</kbd>
+                        <span>Previous card</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <kbd>→</kbd>
+                        <span>Next card</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <kbd>Space</kbd> or <kbd>Enter</kbd>
+                        <span>Flip card</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <kbd>S</kbd>
+                        <span>Star/Unstar card</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <kbd>K</kbd>
+                        <span>Mark as known</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <kbd>?</kbd>
+                        <span>Show this help</span>
+                    </div>
+                </div>
+                <div class="keyboard-help-footer">
+                    <label class="dont-show-again">
+                        <input type="checkbox" id="keyboard-help-dont-show">
+                        Don't show on startup
+                    </label>
+                    <button class="btn-primary" id="btn-close-keyboard-help" autofocus>Got it!</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(overlay);
+
+        // Close handlers
+        const closeHelp = () => {
+            // Save preference if checkbox is checked
+            const checkbox = document.getElementById('keyboard-help-dont-show');
+            if (checkbox?.checked) {
+                try {
+                    localStorage.setItem('flashcard-keyboard-help-shown', 'true');
+                } catch (e) {
+                    console.warn('[FlashcardViewer] Could not save preference:', e);
+                }
+            }
+
+            if (document.body.contains(overlay)) {
+                document.body.removeChild(overlay);
+            }
+            document.removeEventListener('keydown', escHandler);
+        };
+
+        // Close on button click
+        const btnClose = document.getElementById('btn-close-keyboard-help');
+        if (btnClose) {
+            btnClose.addEventListener('click', closeHelp);
+            btnClose.focus();
+        }
+
+        // Close on ESC key
+        const escHandler = (e) => {
+            if (e.key === 'Escape') {
+                closeHelp();
+            }
+        };
+        document.addEventListener('keydown', escHandler);
+
+        // Close on overlay click (outside dialog)
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) {
+                closeHelp();
+            }
+        });
+    }
+
+    /**
+     * Issue #165: Show keyboard help on first visit
+     */
+    maybeShowFirstTimeHelp() {
+        try {
+            const hasSeenHelp = localStorage.getItem('flashcard-keyboard-help-shown');
+            if (!hasSeenHelp) {
+                // Show help after a brief delay to let the UI render
+                setTimeout(() => this.showKeyboardHelp(), 500);
+            }
+        } catch (e) {
+            // localStorage not available, don't show
+            console.warn('[FlashcardViewer] Could not check help preference:', e);
+        }
     }
 
     /**
